@@ -1,6 +1,19 @@
 # org-hats
 
-*An organization model: five entities and two relationships that answer one question — who may act, in what capacity, over which group, and where — as a small library an application builds on.*
+*Who may act, in what capacity, over which group, and where — a small, reusable organization model for the authorization core of an application.*
+
+## In brief
+
+`org-hats` is a small, dependency-free component that answers one question — **who may act, in what capacity, over which group, and where** — in a shape that stays small as the organization grows. It separates the *capacity* (a role such as Supervisor) from the *context* (the team, the organization, the place), so the number of roles stays flat while teams, sites, and organizations multiply.
+
+It is a component to embed in an application, not a product or a service. The model is five entities and two relationships, and the decision rule is one line of logic; there are no runtime dependencies and no lock-in — SQLite today, Cloudflare D1 or anything else tomorrow. It sits *inside* role-based access control rather than beside it: the structural core an RBAC application is built on, not a replacement for one.
+
+| | |
+| --- | --- |
+| **What it buys** | Roles that do not grow with the org chart. Access that can be enumerated and reviewed. Revocation that is immediate and explicit. A core small enough to read, test, and audit in an afternoon. No dependence on a particular database, cloud, or vendor. |
+| **What it costs** | You supply the parts that are yours — identities, the objects being protected, the list of actions, and the audit log. This is the authorization core, not the whole system. |
+| **What it leaves out** | Role hierarchy, separation-of-duty rules, and role administration. Each is deferred on purpose, with the seam named, rather than half-built. |
+| **Maturity** | The model is frozen and exercised; the package is published under the MIT license; the public surface is small and stable. |
 
 ## The problem
 
@@ -8,8 +21,6 @@ Any application with more than a few users has to answer *who may do this, as wh
 
 - **Context encoded in role names.** `supervisor-northport`, `coach-drive` — a role per group and place, until roles outnumber people and no one can audit who may do what.
 - **Authority, membership, and place entangled.** One table carries the person, the group, the permission, and the place, so every question must join all four.
-
-This model separates them. A **role** is an opaque capacity that carries no context; a **team** and a **place** are values a grant reaches; **membership is derived**, so there is no second row to keep in step.
 
 ## The model
 
