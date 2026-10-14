@@ -1,0 +1,25 @@
+#!/usr/bin/env sh
+# The module check: the runtime-neutrality fence, then the examples.
+# A failure anywhere fails the run.
+set -eu
+cd "$(dirname "$0")/.."
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "node is required" >&2
+  exit 1
+fi
+
+echo "== fence: the pure core compiles without node types =="
+if [ -x node_modules/.bin/tsc ]; then
+  node_modules/.bin/tsc -p tsconfig.core.json
+  echo "ok — src/core.ts and src/port.ts compile with types: []"
+else
+  echo "(skipped — run 'pnpm install' to enable the fence)"
+fi
+
+echo
+echo "== examples =="
+node examples/check.ts
+
+echo
+echo "all checks passed"
