@@ -1,28 +1,35 @@
 # Publishing: remaining work
 
-*Open items only. The current state — canonical host, mirror config, tag, and pin — is in [`docs/publishing.md`](../docs/publishing.md).*
+*Open items only. The current state — canonical host, mirror, tag, and pin — is in [`docs/publishing.md`](../docs/publishing.md).*
 
 ## Open
 
-1. **Sync-on-commit.** Off today, so the mirror trails by up to the 6h interval and a release tag reaches GitHub only on the next sync. Decide: **enable it** (a near-real-time mirror; the interval stays as a backstop), or **keep it off** and make *Sync now* a step in the release ritual below.
+1. **Sync-on-commit.** Off today, so the mirror trails by up to the 6h interval and a release tag reaches GitHub only on the next sync. Decide: **enable it** (near-real-time mirror; the interval stays as a backstop) or **keep it off** and make *Sync now* a step in the release ritual.
 
 2. **GitHub repository cosmetics.** Set the description to *"Canonical: https://codeberg.org/rickhull/org-hats — a small, reusable organization model"*; disable **Issues**, **Wiki**, **Discussions** (PRs can't be disabled); add topics — `rbac`, `authorization`, `access-control`, `permissions`, `typescript`, `sqlite`, `cloudflare-d1`, `organization`.
 
-3. **Registry publication.** `org-hats` is unclaimed on npm, and `@rickhull/org-hats` is free on JSR. Decide whether to publish to either:
-   - **npm:** simple, but ESM-only and needs Node ≥ 22.5 for the adapter; add `"main": "./dist/index.js"`, an `"engines"` field, and `"publishConfig": { "access": "public" }`. **Provenance** (`--provenance`) needs a GitHub Action — unavailable from a Codeberg-only CI.
-   - **JSR:** the open alternative; publishes TypeScript and serves `.d.ts`; consumers use `npx jsr add`. Needs a scope (`@rickhull`) and a small `jsr.json`.
+3. **Registry publication.** `org-hats` is unclaimed on npm and `@rickhull/org-hats` is free on JSR. Decide whether to publish to either:
+   - **npm:** add `"main": "./dist/index.js"`, an `"engines"` field, and `"publishConfig": { "access": "public" }`. **Provenance** (`--provenance`) needs a GitHub Action.
+   - **JSR:** publish TypeScript directly; consumers use `npx jsr add`. Needs a scope and a small `jsr.json`.
    - **Neither:** keep the git tag, which is already working.
 
-4. **Consumer handoff.** Send the pin: `git+https://codeberg.org/rickhull/org-hats.git#v0.1.0` — and the note that the `OH-QM-01`…`10` ids are unchanged.
+4. **Consumer handoff.** Send the pin — `git+https://codeberg.org/rickhull/org-hats.git#v0.1.0` — and note that the `OH-QM-01`…`10` ids are unchanged.
 
-## Release ritual (for future versions)
+## Discipline now that something depends on us
+
+- **Tags are immutable.** Never move or delete `v0.1.0`; release by *adding* `v0.1.1`, never by rewriting a tagged commit. Force-pushing over a tag a consumer pinned is the one failure that breaks them silently.
+- **`dist/` must be fresh.** `bin/check` runs the fence but does not emit; only `pnpm build` does. **CI enforces it** (`.forgejo/workflows/check.yml`): on every push it builds, then fails if `git diff --quiet -- dist` is non-empty, then runs `bin/check`.
+- **The mirror fails silently.** A rotated or expired PAT just stops the sync. Check it after any credential change, and verify both hosts after a release.
+- **Know which host the consumer pins.** Codeberg is immune to the mirror lag; GitHub trails by the interval. Prefer Codeberg.
+
+## Release ritual
 
 1. Bump `version` in `package.json`.
-2. Commit it.
+2. `pnpm build`, then commit **source, `dist/`, and the version together**.
 3. Tag and push to the canonical host:
    ```sh
    git tag -a vX.Y.Z -m "vX.Y.Z"
    git push origin main
    git push origin vX.Y.Z
    ```
-4. Let the mirror sync (or press *Sync now*), then **verify**: `git ls-remote --tags --heads` on both hosts should show the same commit and tag.
+4. Let the mirror sync (or press *Sync now*), then **verify** — `git ls-remote --heads --tags` on both hosts must show the same commit and tag.

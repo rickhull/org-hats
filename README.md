@@ -60,6 +60,8 @@ pnpm build           # tsc -p tsconfig.json   -> dist/   (committed)
 pnpm typecheck       # the fence (tsconfig.core.json) + the build config
 ```
 
+CI runs the same on every push — install, build, a **stale-`dist/` guard**, then `bin/check` — in [`.forgejo/workflows/check.yml`](.forgejo/workflows/check.yml).
+
 ## Docs
 
 - **[`docs/tutorial.md`](docs/tutorial.md)** — a guided build from one person to a multi-organization operation, one concept at a time.
