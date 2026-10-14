@@ -87,7 +87,7 @@ Raised agreeing the shared shape with the consumer.
 
 ## TypeScript module
 
-Turning the monolith into a package (see [`plans/ts_package.md`](../plans/ts_package.md)).
+Turning the monolith into a package (see [`package.md`](package.md)).
 
 | Id | Status | Concern | Resolution / next |
 | --- | --- | --- | --- |

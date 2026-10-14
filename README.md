@@ -34,8 +34,8 @@ TypeScript is the package, published as `org-hats`. (A *package* is the unit of 
 - **[`src/conformance.ts`](src/conformance.ts)** — the shared `OH-QM-01` … `OH-QM-10` inventory as data, so this package and a consumer's suite prove the same cases and fail on a missing id.
 - **[`src/node.ts`](src/node.ts)** — the SQLite reference adapter (`org-hats/node`), the only place a driver is spoken to.
 - **[`examples/`](examples)** — the walkthroughs: the core, an operations layer that adds cross-organization peers, and the reference proof of the ten conformance cases.
-- **[`plans/ts_package.md`](plans/ts_package.md)** — the plan this layout implements.
-- **[`plans/publish.md`](plans/publish.md)** — the plan for going public: what stays, what is genericized, what is removed.
+
+See **[`docs/package.md`](docs/package.md)** for the layout, the published surface, the port, and the build rules.
 
 The packaged surface:
 
@@ -66,11 +66,14 @@ pnpm typecheck       # the fence (tsconfig.core.json) + the build config
 - **[`docs/organization_model.md`](docs/organization_model.md)** — the full statement: entities, rules, boundaries, the permission seam, data relationships, and complexity bounds.
 - **[`docs/rbac.md`](docs/rbac.md)** — this model in RBAC terms: the closest references, the mapping, and how to build a Core RBAC application on it.
 - **[`docs/operations_layer.md`](docs/operations_layer.md)** — how an application maps operations, sites, and multi-organization cooperation onto the model without changing it.
+- **[`docs/package.md`](docs/package.md)** — what `org-hats` ships: the layout, the published surface, the port, the fence, and the build/package rules.
+- **[`docs/publishing.md`](docs/publishing.md)** — where it is published, the Codeberg→GitHub mirror, and how a consumer pins it.
 - **[`docs/concerns.md`](docs/concerns.md)** — the tracked review queue.
+- **[`plans/publish.md`](plans/publish.md)** — the remaining publishing work (open items only).
 
 ## Status
 
-The model is frozen and exercised in the reference implementation. The permission layer is a seam — one `capability` table and one predicate — and is not yet wired into an application. The TypeScript **package** is being made installable; see [`plans/ts_package.md`](plans/ts_package.md). [`docs/concerns.md`](docs/concerns.md) tracks the review queue.
+The model is frozen and exercised in the reference implementation. The permission layer is a seam — one `capability` table and one predicate — and is not yet wired into an application. The TypeScript **package** is published; see [`docs/package.md`](docs/package.md) for what it ships and [`docs/publishing.md`](docs/publishing.md) for where. [`docs/concerns.md`](docs/concerns.md) tracks the review queue.
 
 ## License
 
