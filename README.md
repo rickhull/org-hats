@@ -60,7 +60,7 @@ pnpm build           # tsc -p tsconfig.json   -> dist/   (committed)
 pnpm typecheck       # the fence (tsconfig.core.json) + the build config
 ```
 
-CI runs the same on every push — install, build, a **stale-`dist/` guard**, then `bin/check` — in [`.forgejo/workflows/check.yml`](.forgejo/workflows/check.yml).
+CI runs the same on every push — install, build, a **stale-`dist/` guard**, then `bin/check` — in [`.github/workflows/check.yml`](.github/workflows/check.yml), on the GitHub mirror.
 
 ## Docs
 
