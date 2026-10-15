@@ -16,7 +16,7 @@ Zero runtime dependencies. `dist/` is committed, so nothing builds at install. T
 ```
 src/
   core.ts        types, Target, predicates, childPath, SCHEMA, actions   (no node:*)
-  port.ts        OrgHatsRepository — the async persistence port          (types only)
+  port.ts        OrgHatsRepository + perRequest — the port and its memo   (no node:*)
   conformance.ts the OH-QM inventory as data + the runConformance harness (no node:*)
   decide.ts      the request spine — decide/decideSpeak over the port    (no node:*)
   testing.ts     fakeRepository — a fake port for tests                  (no node:*)
@@ -75,12 +75,15 @@ export function decideSpeak(repo: OrgHatsRepository, request: DecideRequest): Pr
 // the fake port — two functions and a record, for tests
 export function fakeRepository(hats: FakeHats, read?: FakeRead): OrgHatsRepository;
 
+// the request-scoped memo — construct one per request
+export function perRequest(repo: OrgHatsRepository): OrgHatsRepository;
+
 // org-hats/node
 export class SqliteRepository implements OrgHatsRepository { /* ... */ }
 export function installSchema(db: DatabaseSync): void;
 ```
 
-`HeldHat` is the one derived record: the adapter joins `grant → role → capability` to fill `actions`, and `team → scope` to fill `anchorPath`. That is what lets every predicate stay pure and synchronous — the whole point of the split. It is **structural and open**: an interface, not a class; a consumer maps its own record onto it (or extends it) without ceremony. The three optional name fields are the common extension, adapter-filled from joins the adapter already makes and read by the predicates never — the legible snapshot (`supervisor:drive@north`) is words, and ids cannot produce them. `wearableAt` and `wornHat` are generic in the hat type — they only select from the array they are given, so a host's extended hat comes back as itself — and `wornHat`'s claim is an id **or a matcher** (`HatClaim`), so a name-keyed session claim never translates through a shim.
+`HeldHat` is the one derived record: the adapter joins `grant → role → capability` to fill `actions`, and `team → scope` to fill `anchorPath`. That is what lets every predicate stay pure and synchronous — the whole point of the split. It is **structural and open**: an interface, not a class; a consumer maps its own record onto it (or extends it) without ceremony. The three optional name fields are the common extension, adapter-filled from joins the adapter already makes and read by the predicates never — the legible snapshot (`supervisor:drive@north`) is words, and ids cannot produce them. `wearableAt` and `wornHat` are generic in the hat type — they only select from the array they are given, so a host's extended hat comes back as itself — and `wornHat`'s claim is an id **or a matcher** (`HatClaim`), so a name-keyed session claim never translates through a shim. One caution, stated where it belongs (on `HatClaim`): compose enough names to be unique — `roleName` alone is not (*Supervisor* over two teams), `role:team@scope` is, and the grant id is the unique key.
 
 `anchorPath` is one path, not two, because a hat's *wearability* and its *reach* are the same test — coverage of the anchor scope:
 
@@ -100,7 +103,7 @@ export interface OrgHatsRepository {
 }
 ```
 
-Two questions, both async. The **org-side read rule** (`organizationsOf`, `scopeCovers`) is core, pure, and exported; the *query* and any peer union are the adapter's. The core never sees a driver. `src/node.ts` is the SQLite reference adapter; a host supplies its own (e.g. D1). Three notes for adapter writers, the last two learned from a consumer: **memoize `hatsOf` per request** — the port looks like a cheap pure function, but `decide` asks once per decision and a request path may decide several times (`/api/me`, dashboards); **an adapter may run under enforced foreign keys** (D1 enforces them; the reference turns them on explicitly), which orders inserts — the scope row precedes whatever references it; and the reference adapter's site filter is **`substr`, never `LIKE`** — a consumer measured D1 rejecting `LIKE` patterns of fifty characters and up, which UUID-built paths exceed one level below the root ([organization_model.md](organization_model.md) § *Efficiency*).
+Two questions, both async. The **org-side read rule** (`organizationsOf`, `scopeCovers`) is core, pure, and exported; the *query* and any peer union are the adapter's. The core never sees a driver. `src/node.ts` is the SQLite reference adapter; a host supplies its own (e.g. D1). Three notes for adapter writers, the last two learned from a consumer: **memoize `hatsOf` per request** — the port looks like a cheap pure function, but `decide` asks once per decision and a request path may decide several times (`/api/me`, dashboards); `perRequest(repo)` is that instruction in executable form; **an adapter may run under enforced foreign keys** (D1 enforces them; the reference turns them on explicitly), which orders inserts — the scope row precedes whatever references it; and the reference adapter's site filter is **`substr`, never `LIKE`** — a consumer measured D1 rejecting `LIKE` patterns of fifty characters and up, which UUID-built paths exceed one level below the root ([organization_model.md](organization_model.md) § *Efficiency*).
 
 ## The request spine
 
@@ -111,8 +114,9 @@ The contract, in three points:
 - **A decision is data, never an exception.** `{ ok, hat, reason?, fallback, claimed, target, action }` — one shape for the audit row on allow and deny (rule 5). Reason codes: `unknown-actor`, `not-admitted`, `no-capability`, `out-of-reach` (and `not-affiliated`, for speaking). Mapping them to 404/403 is the host's; an unreadable thing is *not found*, never *forbidden* ([operations_layer.md](operations_layer.md)).
 - **A revoked claim falls back, and the drift is auditable.** `fallback` reports how the hat was chosen — `claimed | default | primary | first` — so OH-QM-04's fallback appears in the row instead of silently wearing the default.
 - **The organization is request context** — C31's position, taken: an optional `organizationId` filters wearability, so an actor's hats in other organizations are not even wearable. A host serving team routes passes the team's organization; a host that disagrees ignores the field.
+- **Enumeration is the port's; decision is the spine's.** RBAC96 answers “what can this user do?” with a union over activated roles; here that question is **enumeration** — `hatsOf` then `wearableAt`, names included — and the spine answers **one act at a time**. `/api/me` and dashboards are port questions; accumulation across hats is what the one-hat rule exists to prevent.
 
-**Cost posture (C54):** one `hatsOf` per request; no cache — immediacy is conformance (OH-QM-03, OH-QM-04), and Zanzibar's bounded staleness is the opposite trade ([literature_review.md](literature_review.md) § Zanzibar). If a host ever accepts a staleness contract, the cache belongs behind the port, never around the spine.
+**Cost posture (C54):** one `hatsOf` per request; no cache — immediacy is conformance (OH-QM-03, OH-QM-04), and Zanzibar's bounded staleness is the opposite trade ([literature_review.md](literature_review.md) § Zanzibar). The scale answer is a **request-scoped snapshot**: `perRequest(repo)` answers a request's every decision from one consistent read, and never outlives the request — revocation lands on the *next* one.
 
 `src/testing.ts` ships `fakeRepository` — the port is two questions, so a fake is two functions — for testing route wiring without a driver. `examples/decide.ts` walks every decision shape, over the adapter and the fake.
 

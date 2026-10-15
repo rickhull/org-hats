@@ -12,6 +12,7 @@ import {
   fakeRepository,
   leafScopeId,
   parentPath,
+  perRequest,
   type Decision,
   type HeldHat,
   type Id,
@@ -168,6 +169,24 @@ export async function runDecide(): Promise<void> {
     assert(leafScopeId(northPath) === north && leafScopeId("/acme/") === acme && leafScopeId("/") === "", "the leaf is the last segment");
     assert(parentPath(northPath) === "/acme/" && parentPath("/acme/") === "/" && parentPath("/") === "/", "the parent is the path less its leaf");
     assert(parentPath(northPath) + leafScopeId(northPath) + "/" === northPath, "parent + leaf + '/' rebuilds the path");
+
+    // 11. The request-scoped memo: one hatsOf per request, and one *consistent*
+    //     one — two decisions in a request cannot disagree mid-request. Never
+    //     shared across requests: revocation lands on the next one.
+    console.log("\n== the request-scoped memo ==");
+    let reads = 0;
+    const counted = fakeRepository(() => {
+      reads += 1;
+      return [hat];
+    });
+    const scoped = perRequest(counted);
+    await decide(scoped, { actorId: "avery", operationId: acme, scopePath: northPath, teamId: drive, action: AUTHOR });
+    await decide(scoped, { actorId: "avery", operationId: acme, scopePath: northPath, teamId: drive, action: RESOLVE });
+    console.log(`two decisions, one request   hatsOf called ${reads} time${reads === 1 ? "" : "s"}`);
+    assert(reads === 1, "a request reads the hats once, however many times it decides");
+    const fresh = perRequest(counted);
+    await decide(fresh, { actorId: "avery", operationId: acme, scopePath: northPath, teamId: drive, action: AUTHOR });
+    assert(reads === 2, "a new request is a new snapshot — the memo never outlives its request");
 
     console.log("\nall assertions passed (spine)");
   } finally {

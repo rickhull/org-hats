@@ -14,7 +14,7 @@ This repository defines no permissions over objects. It defines **who** acts (Ac
 - **Contextual roles — Covington, Moyer & Ahamad, *Generalized Role-Based Access Control* (GRBAC).** The precedent for an **environment** dimension in authorization — the idea that *where an act happens* participates in the decision. Their environment roles are *evaluated* (time of day, sensed place); a scope here is a static anchor on the grant. (Exact venue unverified — see [literature_review.md](literature_review.md).)
 - **Zanzibar — Pang et al. (USENIX ATC, 2019).** Relationship-based rather than role-based, but the closest industry model for the **directory graph**: organizations, teams, and cross-organization peers as explicit edges rather than role names. Two sharp divergences — staleness and negation — are detailed in [literature_review.md](literature_review.md).
 - **Kuhn, Coyne & Weil, *Adding Attributes to Role-Based Access Control* (IEEE Computer 43(6), 2010).** The clearest statement of the problem this model avoids: context that lives in a role's *name* multiplies roles until auditing is impossible. Same diagnosis, different cure: they generalize the condition algebra (the ABAC direction); this model deletes it — context is structural, never a predicate.
-- **ARBAC97 — Sandhu, Bhamidipati & Munawer (ACM TISSEC 2(1), 1999).** Role *administration* (who may grant roles). Explicitly outside this model; the application or a later layer — though the organization boundary and scope coverage already carry the geometry ARBAC97 used for its administrative ranges (C53).
+- **ARBAC97 — Sandhu, Bhamidipati & Munawer (ACM TISSEC 2(1), 1999).** Role *administration* (who may grant roles). Explicitly outside this model; the application or a later layer — though the organization boundary and scope coverage already carry the geometry ARBAC97 used for its administrative ranges (C53). And the model can say *who may grant* with the vocabulary it already has: an action (`grant`) whose worn hat reaches the new grant's target, plus the organization write-check. Administration lands as data, not as a new concept.
 
 The permission layer here is Core RBAC almost exactly. The directory layer is the parameterized-role and relationship-graph literature.
 
@@ -50,12 +50,13 @@ The role side is `capability`. The object side is `reach` — a target is either
 
 This is what lets one `Supervisor` role serve every team and site, instead of a `supervisor-northport` role per object. The role stays opaque; the object is a value the grant reaches.
 
-### Three things to keep straight
+### Four things to keep straight
 
 - **Target is the object's reach, not the object.** The application holds the object (a report, a resource); what `can` receives is where that object lives — a team or a scope. A permission is `capability(role, action)` composed with `reach(grant, object's reach)`.
 - **“Operation” is overloaded.** In this repository an *operation* is a customer and its envelope — the root scope — and never RBAC's operation. RBAC's operation is called an **action** here (`author`, `resolve`, `configure`).
 - **The active grant is one per organization, not one per realm.** `worn(actor, organization, scope)` selects the capacity in force; an actor who spans organizations has one active grant in each, and the session's organization is the application's context. (That multi-organization landing is an open decision — see `concerns.md` C31 — and is the one part of the session mapping that is not a clean RBAC0 correspondence.)
 - **“Subject” means the accessor in the wider literature.** This repository says **target** for what a grant aims at — the `Target` type — and reserves *actor* for the one who acts. A grant is *over* a target; it is never “scoped to a subject.”
+- **Enumeration is the port's; decision is the spine's.** RBAC96 answers “what can this user do?” with the union of the activated roles' permissions; here that question is **enumeration** — `hatsOf` then `wearableAt`, names included — and the spine answers **one act at a time**. `/api/me` and dashboards are port questions; accumulation across hats is what the one-hat rule exists to prevent.
 
 ## What this adds that Core RBAC does not have
 

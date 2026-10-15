@@ -75,7 +75,10 @@ export declare function can(hat: HeldHat | null, action: string, target: Target)
 export declare function maySpeak(worn: HeldHat | null, target: Target, held: readonly HeldHat[]): boolean;
 /** What a session claims: the worn hat's grant id, or a matcher. A
  * name-keyed claim — a UUID does not survive a re-seed, a name does — passes
- * `(hat) => ...` and never translates through a shim. */
+ * `(hat) => ...` and never translates through a shim. Compose enough names
+ * to be unique: `roleName` alone is not — one actor may hold *Supervisor*
+ * over two teams — while `role:team@scope` is, and the grant **id** is the
+ * unique key when it is available. */
 export type HatClaim = Id | ((hat: HeldHat) => boolean);
 /** The hats offered at a scope: those whose anchor covers it. Selects from
  * the array it is given, so it is generic in the hat type — a host's

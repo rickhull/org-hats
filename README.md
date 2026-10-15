@@ -83,7 +83,7 @@ Deliberately outside the model: role hierarchy (RBAC1), declarative separation o
 A TypeScript package, published as `org-hats`:
 
 - **[`src/core.ts`](src/core.ts)** — the pure surface: the entities, `Target`, and the predicates (`can`, `reach`, `wornHat`, `wearableAt`, `admitted`, `scopeCovers`, `childPath`, `leafScopeId`, `parentPath`, `organizationsOf`) — optional display names on `HeldHat`, and `HatClaim` (a claim is an id or a matcher). No runtime dependency and no `node:*`, enforced by [`tsconfig.core.json`](tsconfig.core.json).
-- **[`src/port.ts`](src/port.ts)** — `OrgHatsRepository`, the one async persistence contract.
+- **[`src/port.ts`](src/port.ts)** — `OrgHatsRepository`, the one async persistence contract, plus `perRequest` — the request-scoped memo: one consistent read per request, however many decisions it makes.
 - **[`src/conformance.ts`](src/conformance.ts)** — the shared `OH-QM-01` … `OH-QM-10` inventory, as data, plus `runConformance` — the harness that runs a host's bodies and diffs the ids against the inventory.
 - **[`src/decide.ts`](src/decide.ts)** — the request spine: `decide`/`decideSpeak` compose the port and the predicates in the order the rules require. A decision is data — allow, or deny with a reason.
 - **[`src/testing.ts`](src/testing.ts)** — `fakeRepository`, an in-memory port for tests: the port is two questions, so a fake is two functions.
@@ -128,7 +128,7 @@ CI runs the same on every push — install, build, a **stale-`dist/` guard**, th
 
 ## Status
 
-The model is frozen and exercised in the reference implementation. The permission layer is a seam — one `capability` table and one predicate — and is not yet wired into an application. `v0.2.0` adds the **request spine** (`decide`/`decideSpeak` — the rules composed in the order they require, decisions as data) and the **conformance harness** (`runConformance`), both additive and inside the fence. [`docs/concerns.md`](docs/concerns.md) tracks the review queue.
+The model is frozen and exercised in the reference implementation. The permission layer is a seam — one `capability` table and one predicate — and is not yet wired into an application. `v0.2.0` adds the **request spine** (`decide`/`decideSpeak` — the rules composed in the order they require, decisions as data) and the **conformance harness** (`runConformance`); `v0.2.1` carries the consumer review (names on `HeldHat`, generic selectors, `HatClaim`, the path readers, the D1-portable prefix test — C56–C61); `v0.2.2` adds `perRequest`, the request-scoped memo. [`docs/concerns.md`](docs/concerns.md) tracks the review queue.
 
 ## License
 

@@ -62,7 +62,7 @@ One section per reference, three questions each: **what it says**, **what it sup
 
 **Where it disagrees.**
 
-- **Evaluated versus anchored.** GRBAC's environment roles are *sensed* at access time; a scope here is a **static anchor stamped on the grant**. Wearability is a property of the authority, never of the weather. This is the auditable/deployable choice — and it means "wearable only 9–5" or "only when physically at Northport" is inexpressible here. That is GRBAC (and TRBAC) territory, deliberately deferred (D6).
+- **Evaluated versus anchored.** GRBAC's environment roles are *sensed* at access time; a scope here is a **static anchor stamped on the grant**. Wearability is a property of the authority, never of the weather. This is the auditable/deployable choice — and it means "wearable only 9–5" or "only when physically at Northport" is inexpressible here. That is GRBAC (and TRBAC) territory, deliberately deferred (D6) — and the deferral is free: if validity intervals ever arrive, they land **in the adapter**, as read-side filtering in `hatsOf` (which already means "the grants still held" — and *still* can include *not yet expired*). The core never learns time exists.
 - GRBAC also role-izes **objects** (object roles); this model's `Target` is a structural value — closer to Giuri–Iglió parameters than to anything in GRBAC.
 - **Citation caution:** the canonical GRBAC papers are the NISSC/NCSC-era conference versions (late 1990s–2000). The "2001" this repository previously carried could not be matched to a venue from this shelf — verify before citing (see [§ Citation precision](#citation-precision)).
 
@@ -79,7 +79,7 @@ One section per reference, three questions each: **what it says**, **what it sup
 
 **Where it disagrees.**
 
-- **Staleness posture — the sharpest dissonance in this whole file.** Zanzibar's central trade is bounded staleness to buy global scale; rule 7 + OH-QM-04 mandate **immediate** revocation. Under Zanzibar's default semantics, OH-QM-04 *fails*. These are opposite answers to the same question, both defensible — but this model has **no cost story**: immediacy is bought with a `hatsOf` query on every request, and nowhere states at what rate that hurts or where a cache could live without violating conformance. Now C54.
+- **Staleness posture — the sharpest dissonance in this whole file.** Zanzibar's central trade is bounded staleness to buy global scale; rule 7 + OH-QM-04 mandate **immediate** revocation. Under Zanzibar's default semantics, OH-QM-04 *fails*. These are opposite answers to the same question, both defensible — but this model had **no cost story**: immediacy is bought with a `hatsOf` query on every request, and nowhere stated at what rate that hurts or where a cache could live without violating conformance. Now C54, and the answer is shaped like Zanzibar's own: a **request-scoped snapshot** — memoize `hatsOf` for one request (consistency *within* a request: two decisions cannot disagree about the held hats mid-request), never across requests (immediacy: revocation lands on the *next* request). That is a zookie with a one-request lifetime, and it ships as `perRequest`.
 - **Negation.** Zanzibar has exclusion; this model has no negative grant. "Everyone at Northport *except* Blake" is inexpressible — restructure, or deny app-side. Deliberate, now named (D8).
 - **Layer.** Zanzibar is a schema-free substrate one layer *below* a directory model; this model fixes a five-entity schema on top of that idea. The practical descendant question — "why not OpenFGA or SpiceDB?" — is answered in [rbac.md](rbac.md) § *The generic-graph question*: fixed schema, DSD-by-session, immediate revocation, legible snapshots.
 
@@ -100,7 +100,7 @@ One section per reference, three questions each: **what it says**, **what it sup
 
 - **RBAC1 (hierarchy).** Refused, not merely omitted — the traversal and audit arguments stand ([organization_model.md](organization_model.md)). The *counter-position* is now stated too: RBAC96 scales by inheritance; this model scales structurally.
 - **RBAC2 (constraints).** The universal-conflict-set DSD is **already built** — it is rule 2. A consonance hiding in the "leaves out" list: the model implements the strongest constraint in the standard and defers only the declarative remainder (D2).
-- **ARBAC97 (administration).** Deferred — but understated twice over. First, the model *already has proto-ARBAC geometry*: the organization boundary and scope coverage by prefix are the same shape as ARBAC97's administrative ranges, so the natural landing spot for "who may grant" already exists in the schema. Second, grant **creation is currently unmodeled** — the model constrains what a grant *is*, never who may *write* one. That is the sharpest open security edge in the package. Now C53.
+- **ARBAC97 (administration).** Deferred — but understated twice over. First, the model *already has proto-ARBAC geometry*: the organization boundary and scope coverage by prefix are the same shape as ARBAC97's administrative ranges, so the natural landing spot for "who may grant" already exists in the schema. Second, grant **creation is currently unmodeled** — the model constrains what a grant *is*, never who may *write* one. That was the sharpest open security edge in the package (C53) — and it dissolves: **administration is an action.** Granting is an act like any other — an action (`grant`) whose worn hat reaches the new grant's target, plus the organization write-check that already exists. Same spine, same audit row, no new concept; the write-side statements will demonstrate it.
 
 ## Relatives the reading list now carries
 
@@ -122,8 +122,23 @@ The four nearest published relatives of the signature rules, none previously cit
 | GRBAC | the environment dimension; the conjunctive rule shape | environment *evaluated* vs scope *anchored*; venue unverified |
 | Zanzibar | tuples without rewrites (OH-QM-09); `maySpeak` = intersection; trust view = Expand | bounded staleness vs rule 7 (OH-QM-04 fails under Zanzibar defaults; C54); no negation (D8) |
 | Kuhn, Coyne & Weil | the role-explosion diagnosis, verbatim | their cure is an attribute algebra; this model's is its deletion |
-| ARBAC97 | proto-administrative ranges already exist (org boundary, scope coverage) | grant *creation* unmodeled — the sharpest open edge (C53) |
+| ARBAC97 | proto-administrative ranges already exist (org boundary, scope coverage) | administration *was* unmodeled — dissolved: *who may grant* is an action plus reach plus the org check (C53) |
 | UCON / GEO-RBAC / TRBAC | names for rules 7, 8, and D6 respectively | none — these are kin, not adversaries |
+
+## What the review changed
+
+Cross-checked against the consumer's review of v0.2.0 and the v0.2.1 round (see [concerns.md](concerns.md) C56–C61). The verdict first: **the literature forces no structural change.** Every dissonance is one of three things — a refusal the literature itself endorses, a deferral whose landing spot costs nothing, or an open seam the model can already express. The verdicts, with the evidence that settled them:
+
+| Dissonance | Verdict | What settled it |
+| --- | --- | --- |
+| One hat, not a subset (RBAC96) | keep — the refusal *is* the product | the consumer's ~30 routes doing boolean arithmetic over a flattened bag of precomputed hats were the RBAC96 union re-invented by the back door — and their audit hole; `decide` deletes it |
+| Immediacy vs bounded staleness (Zanzibar, C54) | keep; the scale answer is a request-scoped snapshot | memoizing `hatsOf` per request is zookie-shaped — consistency within a request, immediacy across — and now ships as `perRequest` |
+| Evaluated conditions vs static anchors (GRBAC/TRBAC, D6) | keep; time never reaches the core | validity, if ever wanted, is adapter-side read filtering in `hatsOf`; the consumer's revoke-is-delete lifecycle already behaves like expiry |
+| The attribute algebra vs its deletion (K–C–W) | keep | the consumer's capability matrix — flat, seeded, platform vocabulary — is where the governance concern landed, structurally |
+| The per-organization session (C31/C34) | taken as a position by the spine — `organizationId` as request context — and adopted downstream | and C34 is encoded in the port's signature already: `readableTeamsAt(hats, …)` unions `organizationsOf(hats)` — pass the worn organization's hats for follow-the-worn, all held for union. A host policy flag, not a schema change |
+| Who may grant (ARBAC97, C53) | **dissolved** — administration is an action | a `grant` action whose worn hat reaches the new grant's target, plus the organization write-check; the write-side statements will demonstrate it |
+
+One caution the review surfaced that is *not* structural: a name-keyed claim must compose enough names to be unique — `roleName` alone is not (*Supervisor* over two teams), `role:team@scope` is, and the grant id is the unique key (C58). Stated where it belongs, on `HatClaim`.
 
 ## Citation precision
 
