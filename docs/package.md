@@ -113,6 +113,7 @@ The contract, in three points:
 
 - **A decision is data, never an exception.** `{ ok, hat, reason?, fallback, claimed, target, action }` — one shape for the audit row on allow and deny (rule 5). Reason codes: `unknown-actor`, `not-admitted`, `no-capability`, `out-of-reach` (and `not-affiliated`, for speaking). Mapping them to 404/403 is the host's; an unreadable thing is *not found*, never *forbidden* ([operations_layer.md](operations_layer.md)).
 - **A revoked claim falls back, and the drift is auditable.** `fallback` reports how the hat was chosen — `claimed | default | primary | first` — so OH-QM-04's fallback appears in the row instead of silently wearing the default.
+- **“The claim resolved” is not “the claim mattered.”** When a row needs to know whether the claim *changed* what was worn — not merely that it resolved to the hat the landing order would have picked anyway — compare against the landing hat: `wornHat(wearableAt(hats, scopePath))` against the decision's hat. Free under the memo, one line in the host. Promoted to a field only if an audit row proves to need it (a consumer is watching for exactly this and will report).
 - **The organization is request context** — C31's position, taken: an optional `organizationId` filters wearability, so an actor's hats in other organizations are not even wearable. A host serving team routes passes the team's organization; a host that disagrees ignores the field.
 - **Enumeration is the port's; decision is the spine's.** RBAC96 answers “what can this user do?” with a union over activated roles; here that question is **enumeration** — `hatsOf` then `wearableAt`, names included — and the spine answers **one act at a time**. `/api/me` and dashboards are port questions; accumulation across hats is what the one-hat rule exists to prevent.
 
@@ -136,6 +137,8 @@ The contract, in three points:
 ## The conformance inventory
 
 `src/conformance.ts` carries `OH-QM-01` … `OH-QM-11` as **data** (`CONFORMANCE_CASES`) plus `conformanceGaps`, which fails a run on a missing or unknown id. The `OH` is this package, `QM` the first consumer's suite; the ids are kept stable so the two cannot drift. A host runs a body per id against its own adapter; `examples/conformance.ts` is the reference proof of all eleven, run by `bin/check`. `OH-QM-11` grew the inventory by design — a consumer observed that the memo's one-request lifetime was proved only in *its* suite; now two requests, two memos, and a revocation between them are the shared contract.
+
+A note on the pair, in a consumer's words: **OH-QM-05 proves the audit *snapshot* survives revocation; OH-QM-11 proves the *authority* does not.** Both revoke a hat; one is about what must persist and the other about what must not. (The consumer mutation-tested the pair at its boundary: hoisting the memo to module scope fails both cases, for opposite reasons.)
 
 ## What stays out
 
