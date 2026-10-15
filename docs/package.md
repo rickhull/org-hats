@@ -50,7 +50,8 @@ export interface HeldHat { readonly grant: Grant; readonly actions: readonly str
   readonly roleName?: string; readonly teamName?: string; readonly scopeName?: string; }
 export type HatClaim = Id | ((hat: HeldHat) => boolean);
 
-export const AUTHOR: "author"; // and READ, RESOLVE, CONFIGURE
+// The core names no action — the application names all of them, including
+// its word for the speech act that confers membership.
 
 export const childPath: (parentPath: string, id: Id) => string;
 export const leafScopeId: (scopePath: string) => string;
@@ -58,7 +59,8 @@ export const parentPath: (scopePath: string) => string;
 export const scopeCovers: (ancestorPath: string, descendantPath: string) => boolean;
 export function reach(hat: HeldHat, target: Target): boolean;
 export function can(hat: HeldHat | null, action: string, target: Target): boolean;
-export function maySpeak(worn: HeldHat | null, target: Target, held: readonly HeldHat[]): boolean;
+export function maySpeak(worn: HeldHat | null, target: Target, held: readonly HeldHat[], action: string): boolean;
+export function affiliated(hats: readonly HeldHat[], target: Target, action: string): boolean;
 export function wearableAt<H extends HeldHat>(hats: readonly H[], scopePath: string): H[];
 export function admitted(hats: readonly HeldHat[], scopePath: string): boolean;
 export function wornHat<H extends HeldHat>(wearable: readonly H[], claim?: HatClaim | null): H | null;
@@ -83,7 +85,7 @@ export class SqliteRepository implements OrgHatsRepository { /* ... */ }
 export function installSchema(db: DatabaseSync): void;
 ```
 
-`HeldHat` is the one derived record: the adapter joins `grant → role → capability` to fill `actions`, and `team → scope` to fill `anchorPath`. That is what lets every predicate stay pure and synchronous — the whole point of the split. It is **structural and open**: an interface, not a class; a consumer maps its own record onto it (or extends it) without ceremony. The three optional name fields are the common extension, adapter-filled from joins the adapter already makes and read by the predicates never — the legible snapshot (`supervisor:drive@north`) is words, and ids cannot produce them. `wearableAt` and `wornHat` are generic in the hat type — they only select from the array they are given, so a host's extended hat comes back as itself — and `wornHat`'s claim is an id **or a matcher** (`HatClaim`), so a name-keyed session claim never translates through a shim. One caution, stated where it belongs (on `HatClaim`): compose enough names to be unique — `roleName` alone is not (*Supervisor* over two teams), `role:team@scope` is, and the grant id is the unique key.
+`HeldHat` is the one derived record: the adapter joins `grant → role → capability` to fill `actions`, and `team → scope` to fill `anchorPath`. That is what lets every predicate stay pure and synchronous — the whole point of the split. It is **structural and open**: an interface, not a class; a consumer maps its own record onto it (or extends it) without ceremony. The three optional name fields are the common extension, adapter-filled from joins the adapter already makes and read by the predicates never — the legible snapshot (`stage-manager:stage ops@big park`) is words, and ids cannot produce them. `wearableAt` and `wornHat` are generic in the hat type — they only select from the array they are given, so a host's extended hat comes back as itself — and `wornHat`'s claim is an id **or a matcher** (`HatClaim`), so a name-keyed session claim never translates through a shim. One caution, stated where it belongs (on `HatClaim`): compose enough names to be unique — `roleName` alone is not (*Supervisor* over two teams), `role:team@scope` is, and the grant id is the unique key.
 
 `anchorPath` is one path, not two, because a hat's *wearability* and its *reach* are the same test — coverage of the anchor scope:
 
@@ -107,7 +109,7 @@ Two questions, both async. The **org-side read rule** (`organizationsOf`, `scope
 
 ## The request spine
 
-`src/decide.ts` composes the port and the predicates **once, in the order the rules require** — `hatsOf → wearableAt → wornHat(claim) → capability ∧ reach` — so the order is testable and the wrong order is inexpressible. Getting it wrong is how a revoked claim authorizes an act: the claim must be re-validated against the *wearable* set, not the held set (rule 7). Two functions over any adapter: `decide`, and `decideSpeak` — the two-edge rule (OH-QM-07), where the worn hat reaches and a *held* grant authors.
+`src/decide.ts` composes the port and the predicates **once, in the order the rules require** — `hatsOf → wearableAt → wornHat(claim) → capability ∧ reach` — so the order is testable and the wrong order is inexpressible. Getting it wrong is how a revoked claim authorizes an act: the claim must be re-validated against the *wearable* set, not the held set (rule 7). Two functions over any adapter: `decide`, and `decideSpeak` — the two-edge rule (OH-QM-07), where the worn hat reaches and a *held* grant speaks; the request's `action` is the speech act.
 
 The contract, in three points:
 

@@ -9,7 +9,7 @@
 // two relationships: a **grant** (an actor may wear a role over a team or a
 // scope) and a **capability** (a role may perform an action). Affiliation is
 // not a third edge: an actor is affiliated with a team when they hold a grant
-// over it whose role may author.
+// over it whose role carries the application's speech act.
 
 /** Every id is caller-supplied and opaque — a UUID or a slug. */
 export type Id = string;
@@ -22,12 +22,10 @@ export type Target =
 export const onTeam = (team: Id, scopePath: string): Target => ({ kind: "team", team, scopePath });
 export const atScope = (scopePath: string): Target => ({ kind: "scope", scopePath });
 
-/** The application's actions. The model reads `AUTHOR` by name: it is the
- * affiliation bit. */
-export const AUTHOR = "author";
-export const READ = "read_reports";
-export const RESOLVE = "resolve";
-export const CONFIGURE = "configure";
+// The application names every action — this module names none. Speaking is
+// the one act the model knows *of* without naming: a team is a group that
+// acts through its members, and the membership questions (`affiliated`,
+// `maySpeak`) take the speech act as a parameter — send, author, post.
 
 export interface Grant {
   id: Id;
@@ -109,12 +107,24 @@ export function can(hat: HeldHat | null, action: string, target: Target): boolea
   return reach(hat, target);
 }
 
-/** The two-edge rule: speaking for a team needs the worn hat to reach it and a
- * *held* grant over it whose role may author. The worn hat need not itself
- * carry AUTHOR, so a lead files on their own team without switching hats. */
-export function maySpeak(worn: HeldHat | null, target: Target, held: readonly HeldHat[]): boolean {
+/** Is this actor on the target's team — the roster predicate? A member
+ * holds a grant over the target whose role carries the application's speech
+ * act. Membership is a standing, checked against *held* grants; no hat need
+ * be worn, and revoking the grant removes the member in one row. */
+export function affiliated(hats: readonly HeldHat[], target: Target, action: string): boolean {
+  return hats.some((h) => reach(h, target) && h.actions.includes(action));
+}
+
+/** May the actor speak on behalf of the target, wearing this hat? Speaking
+ * for a team is inherent to teams — a team is a group that acts through its
+ * members — and the test is two-edged: the worn hat must *reach* the target
+ * (the session is there), and the actor must be *affiliated* (a held grant
+ * over it carries the speech act). The worn hat need not itself carry the
+ * action, so a working lead speaks for their own team without switching
+ * hats. The application names the speech act — send, author, post. */
+export function maySpeak(worn: HeldHat | null, target: Target, held: readonly HeldHat[], action: string): boolean {
   if (worn === null || !reach(worn, target)) return false;
-  return held.some((h) => reach(h, target) && h.actions.includes(AUTHOR));
+  return affiliated(held, target, action);
 }
 
 /** What a session claims: the worn hat's grant id, or a matcher. A

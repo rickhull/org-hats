@@ -73,14 +73,14 @@ One section per reference, three questions each: **what it says**, **what it sup
 **Supports here — including one consonance the docs missed.**
 
 - **Grants are relation tuples; peers are tuples without rewrites.** The four properties of the cooperation edge — mutual, read-only, scoped, non-transitive (OH-QM-09) — are exactly what falls out of *refusing* userset rewrites and transitive closure. Zanzibar users must impose that discipline by convention; this model bakes it in. That is a real differentiator.
-- **`maySpeak` is Zanzibar's intersection operator.** `reach(worn) ∧ held-AUTHOR-reach` — the worn hat reaches the target *and* some held grant authors there — is literally an intersection of two userset computations, Zanzibar's `editor ∩ viewer` pattern. The strongest structural rhyme in the codebase.
+- **`maySpeak` is Zanzibar's intersection operator.** `reach(worn) ∧ affiliated(held, ·, action)` — the worn hat reaches the target *and* some held grant over it speaks — is literally an intersection of two userset computations, Zanzibar's `editor ∩ viewer` pattern. The strongest structural rhyme in the codebase.
 - **The trust view is Expand in miniature.** `grant_by_team` and the derived roster are Zanzibar's reverse query, answered from one index instead of a tree walk — because non-transitivity means there is never a tree to walk.
 - **OH-QM-05 answers the zookie's concern** — *what was true at decision time* — by storing the resolved, legible hat on the act rather than by point-in-time reads. Same accountability goal, opposite mechanism.
 
 **Where it disagrees.**
 
 - **Staleness posture — the sharpest dissonance in this whole file.** Zanzibar's central trade is bounded staleness to buy global scale; rule 7 + OH-QM-04 mandate **immediate** revocation. Under Zanzibar's default semantics, OH-QM-04 *fails*. These are opposite answers to the same question, both defensible — but this model had **no cost story**: immediacy is bought with a `hatsOf` query on every request, and nowhere stated at what rate that hurts or where a cache could live without violating conformance. Now C54, and the answer is shaped like Zanzibar's own: a **request-scoped snapshot** — memoize `hatsOf` for one request (consistency *within* a request: two decisions cannot disagree about the held hats mid-request), never across requests (immediacy: revocation lands on the *next* request). That is a zookie with a one-request lifetime, and it ships as `perRequest`.
-- **Negation.** Zanzibar has exclusion; this model has no negative grant. "Everyone at Northport *except* Blake" is inexpressible — restructure, or deny app-side. Deliberate, now named (D8).
+- **Negation.** Zanzibar has exclusion; this model has no negative grant. "Everyone at Big Park *except* Ellis" is inexpressible — restructure, or deny app-side. Deliberate, now named (D8).
 - **Layer.** Zanzibar is a schema-free substrate one layer *below* a directory model; this model fixes a five-entity schema on top of that idea. The practical descendant question — "why not OpenFGA or SpiceDB?" — is answered in [rbac.md](rbac.md) § *The generic-graph question*: fixed schema, DSD-by-session, immediate revocation, legible snapshots.
 
 ## Kuhn, Coyne & Weil (IEEE Computer 43(6), 2010)
@@ -89,7 +89,7 @@ One section per reference, three questions each: **what it says**, **what it sup
 
 **Supports here.**
 
-- **The diagnosis, nearly verbatim.** `supervisor-northport` and `coach-drive` are their canonical pattern; "context in columns, never names" and the role-explosion section are this paper's argument restated, and the `grant` columns are the normalization it calls for.
+- **The diagnosis, nearly verbatim.** `stage-manager-bigpark` and `volunteer-gate` are their canonical pattern; "context in columns, never names" and the role-explosion section are this paper's argument restated, and the `grant` columns are the normalization it calls for.
 
 **Where it disagrees — subtly, and the docs did not surface it.**
 

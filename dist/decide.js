@@ -18,7 +18,7 @@
 //
 // This file is pure: no driver, no `node:*`, so it lives inside the fence
 // and runs over any adapter — SQLite, D1, or a fake in tests.
-import { AUTHOR, atScope, onTeam, reach, wearableAt, wornHat, } from "./core.js";
+import { affiliated, atScope, onTeam, reach, wearableAt, wornHat, } from "./core.js";
 function howWorn(hat, claim) {
     if (claim !== null && (typeof claim === "string" ? hat.grant.id === claim : claim(hat)))
         return "claimed";
@@ -68,10 +68,11 @@ export async function decide(repo, request) {
     }
     return { ok: true, hat: worn, fallback, ...base };
 }
-/** May the actor *speak for* the target — file, author, commit? The two-edge
- * rule (OH-QM-07): the worn hat must reach the target, and some *held* grant
- * over it must carry AUTHOR. The worn hat need not itself author, so a lead
- * files on their own team without switching hats. */
+/** May the actor *speak on behalf of* the target, wearing the hat in force?
+ * The two-edge rule (OH-QM-07): the worn hat must reach the target, and the
+ * actor must be affiliated — a held grant over it carries the speech act,
+ * which is the request's `action`. The worn hat need not itself carry it,
+ * so a working lead speaks for their own team without switching hats. */
 export async function decideSpeak(repo, request) {
     const { target, held, worn, fallback } = await loadWorn(repo, request);
     const base = { target, action: request.action, claimed: claimRecorded(request.claimedHatId ?? null, worn, fallback) };
@@ -82,7 +83,7 @@ export async function decideSpeak(repo, request) {
     if (!reach(worn, target)) {
         return { ok: false, reason: "out-of-reach", hat: worn, fallback, ...base };
     }
-    if (!held.some((h) => reach(h, target) && h.actions.includes(AUTHOR))) {
+    if (!affiliated(held, target, request.action)) {
         return { ok: false, reason: "not-affiliated", hat: worn, fallback, ...base };
     }
     return { ok: true, hat: worn, fallback, ...base };

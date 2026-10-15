@@ -22,8 +22,8 @@ Five entities, in two kinds.
 | Entity | Is | Examples |
 | --- | --- | --- |
 | **Actor** | An identifiable participant. | Alice, Bob |
-| **Role** | An opaque capacity. | Coach, Senior Lead Instructor, Supervisor |
-| **Team** | A named group, fielded by one organization and working at one scope. | Drive, Logistics |
+| **Role** | An opaque capacity. | Volunteer, Stage Manager, Ops Director |
+| **Team** | A named group, fielded by one organization and working at one scope. | Gate Crew, Stage Ops |
 
 **Boundaries** — the two coordinates that bound authority. They are entities as well: many teams reference the same one, and it constrains them.
 
@@ -32,7 +32,7 @@ Five entities, in two kinds.
 | **Organization** | Who fields a team and whom its actors answer to. | a firm, a contractor, a volunteer body |
 | **Scope** | Where authority reaches. Scopes nest. | an operation, a site, a floor |
 
-A **role is opaque**: its identity depends on neither its capabilities nor its scope, so one `Supervisor` role serves every team and site that grants it. This is what prevents role explosion.
+A **role is opaque**: its identity depends on neither its capabilities nor its scope, so one `Stage Manager` role serves every team and site that grants it. This is what prevents role explosion.
 
 ## Relationships
 
@@ -43,7 +43,7 @@ Two relationships, both many-to-many.
 | **Grant** | Actor — Role | This actor may wear this role over a team or a scope. |
 | **Capability** | Role — Action | This role may perform this action. The deferred layer; actions are the application's. |
 
-A **grant** supplies the who and the where; the **role** supplies the capability. **Affiliation** is not a third edge: an actor is affiliated with a team by holding a grant over it whose role may author there — the *member grant*. A member is a grant, and supervising a team never makes one a member.
+A **grant** supplies the who and the where; the **role** supplies the capability. **Affiliation** is not a third edge: an actor is affiliated with a team by holding a grant over it whose role carries the application's **speech act** — the *member grant*. Speaking on behalf of a team is inherent to teams: a team is a group that acts through its members, and the application names the act (`send`, `author`, `post`). A member is a grant, and supervising a team never makes one a member.
 
 ### The hat
 
@@ -53,13 +53,13 @@ A **hat** is the human name for a grant: a role held over a team or a scope. An 
 - **Default** — the hat worn when none is chosen, so work can begin without a decision. Optional; absent it, the primary is worn.
 - **Active** — the hat worn right now, at most one per session.
 
-Primary is identity; default is the landing context and may be less privileged — the chief executive's primary hat is *CEO*, and their default, for least privilege, may be *Janitor*. **A primary role adds no authority while another hat is active.**
+Primary is identity; default is the landing context and may be less privileged — the festival director's primary hat is *Festival Director*, and their default, for least privilege, may be *Volunteer*. **A primary role adds no authority while another hat is active.**
 
 ## Rules
 
 1. **Grant before activation.** Only a held hat may be worn, and only while its grant is valid.
 2. **One active hat.** Switching deactivates the previous one; capabilities never accumulate across hats. In RBAC terms this is dynamic separation of duty with the *universal* conflict set — every pair of held hats conflicts — enforced within one organization (C31).
-3. **Affiliation is capability-derived.** An actor is affiliated with a team by holding a grant over it whose role may author there. Switching hats changes no affiliation, and supervising a team never confers it.
+3. **Affiliation is capability-derived.** An actor is affiliated with a team by holding a grant over it whose role carries the application's speech act. Switching hats changes no affiliation, and supervising a team never confers it.
 4. **Role gives capability; team and scope give reach.** Authorization consults the active grant's role and the target's team or scope. Scope is stated structurally, never in a role's name.
 5. **Switching is explicit and auditable.** Record actor, old hat, new hat, and time, with a reason where it matters. Record grants, revocations, and exceptional activations too.
 6. **No implicit hierarchy.** A senior role inherits nothing from a junior one. A senior actor holds and wears the junior hat to do junior work.
@@ -72,7 +72,7 @@ Primary is identity; default is the landing context and may be less privileged �
 
 The organization is also the **read boundary**: an actor reads the teams of the organizations they are in **through a team** — a team-bound grant. A scope-bound configuring grant names an organization but puts the actor on no team, so it *admits and configures without adding read reach*.
 
-Read reach and affiliation are **different questions with similar names**, and they must not be confused: *read reach* follows any team-bearing grant, while *affiliation* — who may speak for a team — is a grant over that team whose role carries the authoring action. A supervisor holds read reach over an organization's teams while being affiliated with none of them.
+Read reach and affiliation are **different questions with similar names**, and they must not be confused: *read reach* follows any team-bearing grant, while *affiliation* — who may speak for a team — is a grant over that team whose role carries the speech act. A supervisor holds read reach over an organization's teams while being affiliated with none of them.
 
 **A grant's organization is who employs the holder.** It is independent of whether the grant is aimed at a team or a scope — a scope-bound configuring grant still names an employer — which is why `grant.organization_id` is `NOT NULL`. A grant is never anonymous, even when it reaches a whole site. (A real consumer arrived with grants that had a subject and a scope but no employer; the non-null field is what caught it.)
 
@@ -87,22 +87,22 @@ An optional layer, shaped here so it can be added without moving anything beneat
 - **Capabilities are assigned to roles.** One relationship; the role's identity is untouched.
 - **One predicate.**
   `can(activeGrant, action, target) → bool`
-  Capability comes from the role, reach from the grant. The model names no action and no target; the application supplies both — one exception: `author`, whose name the model reads as the affiliation bit (rule 3).
+  Capability comes from the role, reach from the grant. The model names no action and no target; the application supplies both. The one act the model knows *of* without naming is speech — a member is one who may speak for the team, and the application names its word for the act (rule 3).
 - **It stays cheap.** One active hat means a check is set membership in one role's capabilities, scoped by the target: flat indexed lookups. With no role hierarchy there is no traversal, and *who can do this* is answerable from a row.
 - **Constraints are a separate concern.** *One active hat* is dynamic separation of duty at strength one. Declarative forms — two roles that may be held but not worn together, or may not both be held — are deferred, not denied.
 
 ### Role explosion
 
-The failure mode this model is built to avoid: context encoded in role names until roles outnumber people. Its cause is putting the *where* or the *whom* into a role's identity. Here, context lives in the team, the organization, and the scope — columns, never names — and permissions attach to stable, opaque roles. `drive-team-handler` and `supervisor-northport` are the failure; `Supervisor` over `Drive` at `Northport` is the model.
+The failure mode this model is built to avoid: context encoded in role names until roles outnumber people. Its cause is putting the *where* or the *whom* into a role's identity. Here, context lives in the team, the organization, and the scope — columns, never names — and permissions attach to stable, opaque roles. `cart-concessionaire` and `stage-manager-bigpark` are the failure; `Stage Manager` over `Stage Ops` at `Big Park` is the model.
 
 ## Example
 
-An actor is affiliated with the **Drive** team — the **Coach** grant over it may author — and also holds the **Senior Lead Instructor** role over it.
+An actor is affiliated with the **Stage Ops** team — the **Volunteer** grant over it may send — and also holds the **Stage Manager** role over it.
 
-- Primary: **Senior Lead Instructor**. Default: **Coach**.
-- Instructing: the worn hat is **Coach**; supervisory capabilities are not active.
-- Supervising: switch to **Senior Lead Instructor**.
-- Exceptional Logistics cover: take a time-limited, scoped **Supervisor** grant over **Logistics** and wear it. It makes the actor neither a Logistics member nor an organization-crosser. (Time-limited in the host's grant lifecycle; the model stores no validity interval — D6.)
+- Primary: **Stage Manager**. Default: **Volunteer**.
+- Crewing: the worn hat is **Volunteer**; managing capabilities are not active.
+- Managing: switch to **Stage Manager**.
+- Exceptional Booth cover: take a time-limited, scoped **Stage Manager** grant over **Booth** and wear it. It makes the actor neither a Booth member nor an organization-crosser. (Time-limited in the host's grant lifecycle; the model stores no validity interval — D6.)
 
 ## Data relationships
 
@@ -111,7 +111,7 @@ A team is fielded by exactly one organization and works at exactly one scope; sc
 **Identity keys**
 
 - `grant` is identified by `(actor, organization, role, team?, scope?)`, NULL-safe.
-- `team` is identified by `(scope, name)`: `drive@north` and `drive@south` are two teams that coexist.
+- `team` is identified by `(scope, name)`: `gate@bigpark` and `gate@eaststage` are two crews that coexist.
 - `organization` is identified by `(scope, name)` within its operation; `actor` names are labels, never keys — two operations may each have a *Avery Quinn*.
 
 **Ids** are opaque and caller-supplied: the model stores them as text and never mints one, so a host passes its own UUIDs or slugs. One contract — a scope id must not contain `/`, because a scope's materialized path joins ids with it.
@@ -134,14 +134,14 @@ Let *n* be a table's size and *k* the rows returned. Every question is **one ind
 | the primary grant of (actor, organization) | O(log n) | `grant_one_primary` (partial) |
 | the default grant of (actor, organization) | O(log n) | `grant_one_default` (partial) |
 | a team's grants — the trust view | O(log n + k) | `grant_by_team` |
-| a team's roster (affiliates) | O(log n + m) | `grant_by_team`, filtered by AUTHOR |
+| a team's roster (affiliates) | O(log n + m) | `grant_by_team`, filtered by the speech act |
 | does a role carry an action | O(log c) | `capability_identity` (covering) |
 | an organization's teams | O(log t + k) | `team_by_org` (covering) |
 | a team's organization | O(log t) | primary key |
 | does scope A cover B | O(log s) | two point lookups + **O(1) string prefix** |
 | is a hat wearable at a scope | O(log n + k) | `grant_by_actor`, one anchor lookup per hat |
 | `can(activeGrant, action, target)` | O(log c + log s) | capability + reach |
-| `maySpeak(activeGrant, team, held)` | O(log c + k) | worn reaches, a held grant authors |
+| `maySpeak(activeGrant, team, held, action)` | O(log c + k) | worn reaches, a held grant speaks |
 | the worn hat | O(log n + k), k ≈ 1 | `grant_by_actor`, filtered |
 
 **The rules that keep those bounds true**

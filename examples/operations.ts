@@ -1,17 +1,15 @@
 // The operations layer — an example, not part of the module. It shows a host
 // adding an operation, a site-local peer edge, and a read rule that unions
-// peers on top of the core's organization rule.
+// peers on top of the core's organization rule. The world stays the festival:
+// at the big park, the Council's stage ops cooperates with Ampwire's board
+// team, and Long Table's coffee cart beyond it — one hop, never a chain.
 //
 //   node examples/operations.ts
 
 import { fileURLToPath } from "node:url";
 import { rmSync } from "node:fs";
 import {
-  READ,
-  RESOLVE,
-  AUTHOR,
   onTeam,
-  atScope,
   can,
   maySpeak,
   wearableAt,
@@ -19,6 +17,11 @@ import {
   type HeldHat,
 } from "../src/index.ts";
 import { Db, SqliteRepository, installSchema } from "../src/node.ts";
+
+// The dispatch board's actions — this application's vocabulary.
+const SEND = "send";
+const READ_LOG = "read_log";
+const RESOLVE = "resolve";
 
 export const OPS_SCHEMA = `
   CREATE INDEX team_by_scope ON team (scope_id);
@@ -83,7 +86,7 @@ export class Ops {
   async readableTeamsAt(hats: readonly HeldHat[], operationId: string, scopePath: string): Promise<string[]> {
     const own = await this.repo.readableTeamsAt(hats, operationId, scopePath);
     const supervised = hats
-      .filter((h) => h.grant.teamId !== null && h.actions.includes(READ) && scopePath.startsWith(h.anchorPath))
+      .filter((h) => h.grant.teamId !== null && h.actions.includes(READ_LOG) && scopePath.startsWith(h.anchorPath))
       .map((h) => h.grant.teamId!);
     const peer = supervised.flatMap((t) => this.peersOf(t));
     return [...new Set([...own, ...peer])].sort();
@@ -111,68 +114,69 @@ export async function runOperations(keep: boolean): Promise<void> {
     const o = new Ops(db);
     const repo = o.repo;
 
-    const acme = repo.addScope("acme");
-    const north = repo.addScope("north", acme);
-    const south = repo.addScope("south", acme);
-    const northPath = repo.scopePath(north)!;
-    const southPath = repo.scopePath(south)!;
-    o.addOperation(acme, "Acme Freight", "auth.acme.example");
+    const riverbend = repo.addScope("riverbend");
+    const bigpark = repo.addScope("bigpark", riverbend);
+    const eaststage = repo.addScope("eaststage", riverbend);
+    const bigparkPath = repo.scopePath(bigpark)!;
+    o.addOperation(riverbend, "Riverbend Festival", "auth.riverbend.example");
 
-    const atlas = repo.addOrg("atlas", acme, "Atlas");
-    const beacon = repo.addOrg("beacon", acme, "Beacon");
-    const cobalt = repo.addOrg("cobalt", acme, "Cobalt");
-    const drive = repo.addTeam("drive", atlas, north, "drive");
-    const logistics = repo.addTeam("logistics", atlas, north, "logistics");
-    const facilities = repo.addTeam("facilities", beacon, north, "facilities");
-    const workshop = repo.addTeam("workshop", cobalt, north, "workshop");
-    const delivery = repo.addTeam("delivery", atlas, south, "delivery");
+    const council = repo.addOrg("council", riverbend, "Riverbend Arts Council");
+    const ampwire = repo.addOrg("ampwire", riverbend, "Ampwire Sound");
+    const longtable = repo.addOrg("longtable", riverbend, "Long Table");
+    const gate = repo.addTeam("gate", council, bigpark, "gate crew");
+    const stageops = repo.addTeam("stageops", council, bigpark, "stage ops");
+    const board = repo.addTeam("board", ampwire, bigpark, "board");
+    const cart = repo.addTeam("cart", longtable, bigpark, "cart");
+    const booth = repo.addTeam("booth", council, eaststage, "booth");
 
-    const coach = repo.addRole("coach", "Coach");
-    const supervisor = repo.addRole("supervisor", "Supervisor");
-    repo.grantCapability(coach, AUTHOR);
-    repo.grantCapability(supervisor, READ);
-    repo.grantCapability(supervisor, RESOLVE);
+    const volunteer = repo.addRole("volunteer", "Volunteer");
+    const concession = repo.addRole("concession", "Concessionaire");
+    const stagemanager = repo.addRole("stagemanager", "Stage Manager");
+    repo.grantCapability(volunteer, SEND);
+    repo.grantCapability(concession, SEND);
+    repo.grantCapability(stagemanager, READ_LOG);
+    repo.grantCapability(stagemanager, RESOLVE);
 
     const avery = repo.addActor("avery", "Avery Quinn");
-    repo.addGrant("g-avery", avery, coach, atlas, { team: drive, primary: true, default: true });
+    repo.addGrant("g-avery", avery, volunteer, council, { team: gate, primary: true, default: true });
 
     const blake = repo.addActor("blake", "Blake Rivera");
-    repo.addGrant("g-blake-lead", blake, supervisor, atlas, { team: drive, primary: true });
+    repo.addGrant("g-blake-lead", blake, stagemanager, council, { team: stageops, primary: true });
 
     const casey = repo.addActor("casey", "Casey Morgan");
-    repo.addGrant("g-casey", casey, supervisor, beacon, { team: facilities, primary: true });
+    repo.addGrant("g-casey", casey, stagemanager, ampwire, { team: board, primary: true });
 
     const drew = repo.addActor("drew", "Drew Alvarez");
-    repo.addGrant("g-drew-north", drew, supervisor, atlas, { team: drive, primary: true });
-    repo.addGrant("g-drew-south", drew, supervisor, atlas, { team: delivery });
+    repo.addGrant("g-drew-bigpark", drew, stagemanager, council, { team: stageops, primary: true });
+    repo.addGrant("g-drew-east", drew, stagemanager, council, { team: booth });
 
     const ellis = repo.addActor("ellis", "Ellis Novak");
-    repo.addGrant("g-ellis-atlas", ellis, coach, atlas, { team: drive, primary: true });
-    repo.addGrant("g-ellis-beacon", ellis, coach, beacon, { team: facilities, primary: true });
+    repo.addGrant("g-ellis-council", ellis, volunteer, council, { team: gate, primary: true });
+    repo.addGrant("g-ellis-longtable", ellis, concession, longtable, { team: cart, primary: true });
 
-    o.linkTeams(drive, facilities, north);
-    o.linkTeams(facilities, workshop, north);
+    o.linkTeams(stageops, board, bigpark);
+    o.linkTeams(board, cart, bigpark);
 
-    const hatsOf = (actor: string): Promise<HeldHat[]> => repo.hatsOf(actor, acme);
+    const hatsOf = (actor: string): Promise<HeldHat[]> => repo.hatsOf(actor, riverbend);
     const averyHats = await hatsOf(avery);
     const blakeHats = await hatsOf(blake);
     const blakeLead = blakeHats[0]!;
 
     console.log("== an operation is a root scope; a site is a nested one ==");
-    console.log(`operation ${repo.scopePath(acme)} -> sites north, south`);
-    console.log(`drive peers: ${o.peersOf(drive).join(", ")};  facilities peers: ${o.peersOf(facilities).join(", ")}`);
-    console.log(`Avery reads:    ${(await o.readableTeamsAt(averyHats, acme, northPath)).join(", ")}`);
-    console.log(`Blake reads:  ${(await o.readableTeamsAt(blakeHats, acme, northPath)).join(", ")}`);
-    console.log(`Casey reads:     ${(await o.readableTeamsAt(await hatsOf(casey), acme, northPath)).join(", ")}`);
-    console.log(`Ellis reads:     ${(await o.readableTeamsAt(await hatsOf(ellis), acme, northPath)).join(", ")}`);
+    console.log(`operation ${repo.scopePath(riverbend)} -> sites big park, east stage`);
+    console.log(`stage ops peers: ${o.peersOf(stageops).join(", ")};  board peers: ${o.peersOf(board).join(", ")}`);
+    console.log(`Avery reads:     ${(await o.readableTeamsAt(averyHats, riverbend, bigparkPath)).join(", ")}`);
+    console.log(`Blake reads:     ${(await o.readableTeamsAt(blakeHats, riverbend, bigparkPath)).join(", ")}`);
+    console.log(`Casey reads:     ${(await o.readableTeamsAt(await hatsOf(casey), riverbend, bigparkPath)).join(", ")}`);
+    console.log(`Ellis reads:     ${(await o.readableTeamsAt(await hatsOf(ellis), riverbend, bigparkPath)).join(", ")}`);
 
     console.log("\n== the stated bounds, as the planner sees them ==");
     const checks: Record<string, [string, string]> = {
-      "a team's peers (by a)": ["SELECT team_b FROM team_link WHERE team_a = 'drive'", "team_link_identity"],
-      "a team's peers (by b)": ["SELECT team_a FROM team_link WHERE team_b = 'facilities'", "team_link_by_b"],
-      "are A and B peers": ["SELECT * FROM team_link WHERE team_a = 'drive' AND team_b = 'facilities' AND kind = 'peer'", "team_link_identity"],
-      "a site's teams": ["SELECT id FROM team WHERE scope_id = 'north'", "team_by_scope"],
-      "the operation": ["SELECT * FROM operation WHERE scope_id = 'acme'", "operation"],
+      "a team's peers (by a)": ["SELECT team_b FROM team_link WHERE team_a = 'stageops'", "team_link_identity"],
+      "a team's peers (by b)": ["SELECT team_a FROM team_link WHERE team_b = 'board'", "team_link_by_b"],
+      "are A and B peers": ["SELECT * FROM team_link WHERE team_a = 'board' AND team_b = 'stageops' AND kind = 'peer'", "team_link_identity"],
+      "a site's teams": ["SELECT id FROM team WHERE scope_id = 'bigpark'", "team_by_scope"],
+      "the operation": ["SELECT * FROM operation WHERE scope_id = 'riverbend'", "operation"],
     };
     for (const [label, [sql, index]] of Object.entries(checks)) {
       const detail = db.plan(sql);
@@ -180,29 +184,28 @@ export async function runOperations(keep: boolean): Promise<void> {
       assert(detail.includes(index), `expected ${index} for ${label}, got: ${detail}`);
     }
 
-    assert(o.peersOf(drive).join() === facilities, "peers are mutual by canonical row");
-    assert(same(await o.readableTeamsAt(averyHats, acme, northPath), [drive, logistics]), "the organization is the read boundary");
-    assert(same(await o.readableTeamsAt(blakeHats, acme, northPath), [drive, logistics, facilities]), "cooperation widens a supervisor's read");
-    assert(!(await o.readableTeamsAt(averyHats, acme, northPath)).includes(workshop), "a peer edge is supervisors-only");
-    assert(!(await o.readableTeamsAt(blakeHats, acme, northPath)).includes(workshop), "cooperation is not transitive");
-    assert(can(blakeLead, RESOLVE, onTeam(drive, northPath)), "acting is unchanged by cooperation");
-    assert(!can(blakeLead, RESOLVE, onTeam(facilities, northPath)), "cooperation is read-only");
-    assert(!maySpeak(wornHat(wearableAt(await hatsOf(drew), northPath)), onTeam(drive, northPath), await hatsOf(drew)), "a non-affiliate supervises without speaking");
-    assert(same(await o.readableTeamsAt(await hatsOf(ellis), acme, northPath), [drive, logistics, facilities]), "an actor spanning orgs reads both");
+    assert(o.peersOf(stageops).join() === board, "peers are mutual by canonical row");
+    assert(same(await o.readableTeamsAt(averyHats, riverbend, bigparkPath), [gate, stageops]), "the organization is the read boundary");
+    assert(same(await o.readableTeamsAt(blakeHats, riverbend, bigparkPath), [gate, stageops, board]), "cooperation widens a supervisor's read");
+    assert(!(await o.readableTeamsAt(averyHats, riverbend, bigparkPath)).includes(cart), "a peer edge is supervisors-only");
+    assert(!(await o.readableTeamsAt(blakeHats, riverbend, bigparkPath)).includes(cart), "cooperation is not transitive");
+    assert(can(blakeLead, RESOLVE, onTeam(stageops, bigparkPath)), "acting is unchanged by cooperation");
+    assert(!can(blakeLead, RESOLVE, onTeam(board, bigparkPath)), "cooperation is read-only");
+    assert(!maySpeak(wornHat(wearableAt(await hatsOf(drew), bigparkPath)), onTeam(stageops, bigparkPath), await hatsOf(drew), SEND), "a non-affiliate supervises without speaking");
+    assert(same(await o.readableTeamsAt(await hatsOf(ellis), riverbend, bigparkPath), [gate, stageops, cart]), "an actor spanning orgs reads both");
 
     let refused = 0;
     try {
-      o.linkTeams(drive, logistics, north);
+      o.linkTeams(stageops, gate, bigpark);
     } catch {
       refused++;
     }
     try {
-      o.linkTeams(facilities, delivery, north);
+      o.linkTeams(board, booth, bigpark);
     } catch {
       refused++;
     }
     assert(refused === 2, "intra-organization and cross-site edges must be refused");
-    assert(southPath.length > 0, "south exists");
 
     console.log("\nall assertions passed (operations)");
   } finally {

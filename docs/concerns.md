@@ -107,6 +107,14 @@ Raised by Quartermaster's v0.2.2 adoption report (October 2026). One entry; no r
 | --- | --- | --- | --- |
 | **C62** | resolved | `perRequest`'s one-request lifetime was documented prose, proved only in the consumer's own suite — the reference's OH-QM-05 body reads the store directly, so a host wiring the memo across requests would pass every upstream case. | **OH-QM-11** (v0.2.3): two requests, two memos, a revocation between them — the hat is worn by the first and not by the second, and the claim's fallback shows the drift. The inventory grows by design; a host reports the id missing until it adds a body. The consumer's measurement (three concurrent asks → one read; the promise is memoized, not the result) is now stated in [package.md](package.md) § *The port*. |
 
+## The abstraction release (v0.3.0)
+
+Raised by the maintainer (October 2026): the repo spun off a reporting app, and the reporting app's vocabulary came with it. One entry.
+
+| Id | Status | Concern | Resolution |
+| --- | --- | --- | --- |
+| **C63** | resolved | The core carried the first consumer's vocabulary: `AUTHOR` was a reserved action name read by `maySpeak`/`decideSpeak`, and `READ` (`read_reports`), `RESOLVE`, `CONFIGURE` were exported from `src/core.ts`. The model claimed to name no action and reserved one. | **The core names zero actions.** `affiliated(hats, target, action)` ships as the roster predicate; `maySpeak` takes the speech act as a required parameter; `decideSpeak` uses the request's `action`. The constants are gone (examples define their own vocabulary). Speaking on behalf of a team is inherent to teams — the application names the act (`send`, `author`, `post`); the model names the standing. Breaking for importers of the constants; the OH-QM ids are unchanged and OH-QM-07's description now says *speaks*. Fixtures become a festival — deliberately not the consumer's world, which is itself evidence the model is not domain-shaped. |
+
 ## Literature review
 
 Raised by the [literature review](literature_review.md), October 2026. Both are named positions, not defects found.

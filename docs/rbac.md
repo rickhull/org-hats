@@ -48,7 +48,7 @@ can(activeGrant, action, target)  =  PA(role, action)   ∧   reach(grant, targe
 
 The role side is `capability`. The object side is `reach` — a target is either a **team** (reached exactly) or a **scope** (reached spatially, including everything nested inside it). A permission is therefore not a row; it is the *composition* of a capability and a reach.
 
-This is what lets one `Supervisor` role serve every team and site, instead of a `supervisor-northport` role per object. The role stays opaque; the object is a value the grant reaches.
+This is what lets one `Stage Manager` role serve every team and site, instead of a `stage-manager-bigpark` role per object. The role stays opaque; the object is a value the grant reaches.
 
 ### Four things to keep straight
 
@@ -66,7 +66,7 @@ Core RBAC has users, roles, permissions, and sessions — and nothing that says 
 - **Organization** — who fields a team; the boundary authority cannot cross.
 - **Scope** — a nested place (operation → site → floor); where a grant reaches.
 - **Grant target** — a role is held *over* a team or a scope, not in the abstract.
-- **Affiliation** — a **member grant**: a team-bound grant whose role may author there. It is what lets an actor *speak for* a team, and it is not a third edge — supervising never confers it.
+- **Affiliation** — a **member grant**: a team-bound grant whose role carries the application's **speech act**. Speaking on behalf of a team is inherent to teams — a team acts through its members — and the application names the act (`send`, `author`, `post`). It is what lets an actor *speak for* a team, and it is not a third edge — supervising never confers it.
 
 These are the "parameterized roles" of Giuri & Iglio and GRBAC, plus the relationship graph of Zanzibar, assembled so that context never becomes part of a role's identity.
 
@@ -89,7 +89,7 @@ The practical alternative today is not another RBAC paper but a Zanzibar descend
 - **immediate revocation** — rule 7, conformance-proved (OH-QM-03, OH-QM-04), not bounded staleness;
 - a **legible audit snapshot** — the hat recorded on the act (OH-QM-05), not a point-in-time reconstruction.
 
-And the one place this model already speaks Zanzibar's language: `maySpeak` is an **intersection** — the worn hat reaches the target *and* a held grant authors there — two userset computations, conjoined, exactly Zanzibar's `editor ∩ viewer` pattern.
+And the one place this model already speaks Zanzibar's language: `maySpeak` is an **intersection** — the worn hat reaches the target *and* a held grant speaks — two userset computations, conjoined, exactly Zanzibar's `editor ∩ viewer` pattern.
 
 ## Building a Core RBAC application on it
 

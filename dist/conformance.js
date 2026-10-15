@@ -35,7 +35,7 @@ export const CONFORMANCE_CASES = [
     },
     {
         id: "OH-QM-07",
-        description: "A supervisor who is also a member authors without switching hats; a supervisor who is not is refused.",
+        description: "A supervisor who is also a member speaks for the team without switching hats; a supervisor who is not is refused.",
     },
     {
         id: "OH-QM-08",

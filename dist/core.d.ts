@@ -11,12 +11,6 @@ export type Target = {
 };
 export declare const onTeam: (team: Id, scopePath: string) => Target;
 export declare const atScope: (scopePath: string) => Target;
-/** The application's actions. The model reads `AUTHOR` by name: it is the
- * affiliation bit. */
-export declare const AUTHOR = "author";
-export declare const READ = "read_reports";
-export declare const RESOLVE = "resolve";
-export declare const CONFIGURE = "configure";
 export interface Grant {
     id: Id;
     actorId: Id;
@@ -69,10 +63,19 @@ export declare const parentPath: (scopePath: string) => string;
 export declare function reach(hat: HeldHat, target: Target): boolean;
 /** Can the active hat do this action, on this target? */
 export declare function can(hat: HeldHat | null, action: string, target: Target): boolean;
-/** The two-edge rule: speaking for a team needs the worn hat to reach it and a
- * *held* grant over it whose role may author. The worn hat need not itself
- * carry AUTHOR, so a lead files on their own team without switching hats. */
-export declare function maySpeak(worn: HeldHat | null, target: Target, held: readonly HeldHat[]): boolean;
+/** Is this actor on the target's team — the roster predicate? A member
+ * holds a grant over the target whose role carries the application's speech
+ * act. Membership is a standing, checked against *held* grants; no hat need
+ * be worn, and revoking the grant removes the member in one row. */
+export declare function affiliated(hats: readonly HeldHat[], target: Target, action: string): boolean;
+/** May the actor speak on behalf of the target, wearing this hat? Speaking
+ * for a team is inherent to teams — a team is a group that acts through its
+ * members — and the test is two-edged: the worn hat must *reach* the target
+ * (the session is there), and the actor must be *affiliated* (a held grant
+ * over it carries the speech act). The worn hat need not itself carry the
+ * action, so a working lead speaks for their own team without switching
+ * hats. The application names the speech act — send, author, post. */
+export declare function maySpeak(worn: HeldHat | null, target: Target, held: readonly HeldHat[], action: string): boolean;
 /** What a session claims: the worn hat's grant id, or a matcher. A
  * name-keyed claim — a UUID does not survive a re-seed, a name does — passes
  * `(hat) => ...` and never translates through a shim. Compose enough names

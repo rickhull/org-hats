@@ -14,8 +14,8 @@ export type DenyReason =
  | "no-capability"
 /** The worn hat's grant does not reach the target. */
  | "out-of-reach";
-/** Why `decideSpeak` refused. The author half is `not-affiliated`: no *held*
- * grant over the target carries AUTHOR (rule 3). */
+/** Why `decideSpeak` refused. The membership half is `not-affiliated`: no
+ * *held* grant over the target carries the speech act (rule 3). */
 export type SpeakDenyReason = "unknown-actor" | "not-admitted" | "out-of-reach" | "not-affiliated";
 /** One request, one act. Everything here is the application's context; the
  * model supplies only the order it is consulted in. */
@@ -76,8 +76,9 @@ export type SpeakDecision = SpeakAllow | SpeakDeny;
  * `can` split into its reasons: the role's capability, then the grant's
  * reach. */
 export declare function decide(repo: OrgHatsRepository, request: DecideRequest): Promise<Decision>;
-/** May the actor *speak for* the target — file, author, commit? The two-edge
- * rule (OH-QM-07): the worn hat must reach the target, and some *held* grant
- * over it must carry AUTHOR. The worn hat need not itself author, so a lead
- * files on their own team without switching hats. */
+/** May the actor *speak on behalf of* the target, wearing the hat in force?
+ * The two-edge rule (OH-QM-07): the worn hat must reach the target, and the
+ * actor must be affiliated — a held grant over it carries the speech act,
+ * which is the request's `action`. The worn hat need not itself carry it,
+ * so a working lead speaks for their own team without switching hats. */
 export declare function decideSpeak(repo: OrgHatsRepository, request: DecideRequest): Promise<SpeakDecision>;

@@ -86,11 +86,11 @@ Non-transitivity is what keeps it cheap: a peer set is **one hop**, never a clos
 
 ## Example
 
-An operation **Acme Freight** is the root scope; **Northport** and **Southport** are nested scopes. At Northport, **Atlas** fields Drive and Logistics, **Beacon** fields Facilities, and **Cobalt** fields Workshop — three organizations, one site.
+An operation **Riverbend Festival** is the root scope; **Big Park** and **East Stage** are nested sites. At Big Park, the **Council** fields Gate Crew and Stage Ops, **Ampwire Sound** fields Board, and **Long Table** fields Cart — three organizations, one site.
 
-- An Atlas instructor reads every Atlas team at Northport by default. The organization is the read boundary.
-- Drive (Atlas) and Facilities (Beacon) are peers. That edge adds one audience: Drive's supervisors may read Facilities' reports, and Facilities' may read Drive's — and nothing more.
-- An Atlas corporate supervisor holds grants over Drive at Northport and a team at Southport, belongs to neither team, and can supervise both while speaking for neither. Supervision never crossed an organization to get there.
+- A Council volunteer reads every Council team at Big Park by default. The organization is the read boundary.
+- Stage Ops (Council) and Board (Ampwire) are peers. That edge adds one audience: Stage Ops' managers may read the Board crew's log, and Board's may read Stage Ops' — and nothing more.
+- A Council duty manager holds grants over Stage Ops at Big Park and a crew at East Stage, belongs to neither team, and can manage both while speaking for neither. Supervision never crossed an organization to get there.
 
 ## What stays out
 
