@@ -19,8 +19,8 @@
 // This file is pure: no driver, no `node:*`, so it lives inside the fence
 // and runs over any adapter — SQLite, D1, or a fake in tests.
 import { AUTHOR, atScope, onTeam, reach, wearableAt, wornHat, } from "./core.js";
-function howWorn(hat, claimed) {
-    if (claimed !== null && hat.grant.id === claimed)
+function howWorn(hat, claim) {
+    if (claim !== null && (typeof claim === "string" ? hat.grant.id === claim : claim(hat)))
         return "claimed";
     if (hat.grant.default)
         return "default";
@@ -34,18 +34,28 @@ async function loadWorn(repo, request) {
     const held = request.organizationId != null
         ? allHeld.filter((h) => h.grant.organizationId === request.organizationId)
         : allHeld;
-    const worn = wornHat(wearableAt(held, request.scopePath), request.claimedHatId ?? null);
-    const claimed = request.claimedHatId ?? null;
-    return { target, held, worn, fallback: worn === null ? null : howWorn(worn, claimed) };
+    const claim = request.claimedHatId ?? null;
+    const worn = wornHat(wearableAt(held, request.scopePath), claim);
+    return {
+        target,
+        held,
+        worn,
+        fallback: worn === null ? null : howWorn(worn, claim),
+    };
+}
+/** The claim as the audit row wants it (see `DecisionCore.claimed`). */
+function claimRecorded(claim, worn, fallback) {
+    if (typeof claim === "string")
+        return claim;
+    return fallback === "claimed" && worn !== null ? worn.grant.id : null;
 }
 // --- the two decisions -------------------------------------------------------
 /** May the actor, wearing the hat in force, do this action on this target?
  * `can` split into its reasons: the role's capability, then the grant's
  * reach. */
 export async function decide(repo, request) {
-    const claimed = request.claimedHatId ?? null;
     const { target, held, worn, fallback } = await loadWorn(repo, request);
-    const base = { target, action: request.action, claimed };
+    const base = { target, action: request.action, claimed: claimRecorded(request.claimedHatId ?? null, worn, fallback) };
     if (held.length === 0)
         return { ok: false, reason: "unknown-actor", hat: null, fallback: null, ...base };
     if (worn === null)
@@ -63,9 +73,8 @@ export async function decide(repo, request) {
  * over it must carry AUTHOR. The worn hat need not itself author, so a lead
  * files on their own team without switching hats. */
 export async function decideSpeak(repo, request) {
-    const claimed = request.claimedHatId ?? null;
     const { target, held, worn, fallback } = await loadWorn(repo, request);
-    const base = { target, action: request.action, claimed };
+    const base = { target, action: request.action, claimed: claimRecorded(request.claimedHatId ?? null, worn, fallback) };
     if (held.length === 0)
         return { ok: false, reason: "unknown-actor", hat: null, fallback: null, ...base };
     if (worn === null)

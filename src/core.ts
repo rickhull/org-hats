@@ -45,10 +45,9 @@ export interface Grant {
  * fill these, which is what keeps every predicate below pure and
  * synchronous.
  *
- * **Structural and open.** A consumer may extend a hat — say with
- * `roleName`/`teamSlug`/`scopeSlug`, for a legible audit snapshot — and the
- * predicates accept any object with these fields. It is an interface on
- * purpose: do not seal it with an exact type, a nominal brand, or a class. */
+ * **Structural and open.** A consumer may extend a hat and the predicates
+ * accept any object with these fields. It is an interface on purpose: do not
+ * seal it with an exact type, a nominal brand, or a class. */
 export interface HeldHat {
   readonly grant: Grant;
   readonly actions: readonly string[];
@@ -56,6 +55,15 @@ export interface HeldHat {
    * A hat is wearable where its anchor covers, and reaches a scope target the
    * same way. */
   readonly anchorPath: string;
+  /** Display names for the legible snapshot (OH-QM-05): `supervisor:drive@north`
+   * is words, and ids cannot produce them. Optional and adapter-filled, from
+   * joins the adapter already makes; read by the predicates never. A host
+   * that needs more still extends — the interface stays open. */
+  readonly roleName?: string;
+  /** The team's name, for a team-bound hat. */
+  readonly teamName?: string;
+  /** The anchor scope's name — where the hat lives, whichever kind of grant. */
+  readonly scopeName?: string;
 }
 
 // --- scope paths -------------------------------------------------------------
@@ -67,6 +75,23 @@ export const childPath = (parentPath: string, id: Id): string => `${parentPath}$
 
 export const scopeCovers = (ancestorPath: string, descendantPath: string): boolean =>
   descendantPath.startsWith(ancestorPath);
+
+/** The reading half of the path rules: `childPath` builds, these parse. The
+ * format is the model's, and a host that reimplements its parsing gets it
+ * wrong the day the format changes — so the pair lives here, beside the
+ * builder. */
+
+/** The id of the scope a path names — its last segment. A root path names
+ * its root; `/` names nothing. */
+export const leafScopeId = (scopePath: string): string =>
+  scopePath.split("/").filter((segment) => segment !== "").at(-1) ?? "";
+
+/** The path of a scope's parent — the same path less its last segment. A
+ * root's parent is `/`, the outermost boundary; `/` is its own parent. */
+export const parentPath = (scopePath: string): string => {
+  const leaf = leafScopeId(scopePath);
+  return leaf === "" ? "/" : scopePath.slice(0, scopePath.length - leaf.length - 1);
+};
 
 // --- the predicates ----------------------------------------------------------
 
@@ -92,8 +117,15 @@ export function maySpeak(worn: HeldHat | null, target: Target, held: readonly He
   return held.some((h) => reach(h, target) && h.actions.includes(AUTHOR));
 }
 
-/** The hats offered at a scope: those whose anchor covers it. */
-export function wearableAt(hats: readonly HeldHat[], scopePath: string): HeldHat[] {
+/** What a session claims: the worn hat's grant id, or a matcher. A
+ * name-keyed claim — a UUID does not survive a re-seed, a name does — passes
+ * `(hat) => ...` and never translates through a shim. */
+export type HatClaim = Id | ((hat: HeldHat) => boolean);
+
+/** The hats offered at a scope: those whose anchor covers it. Selects from
+ * the array it is given, so it is generic in the hat type — a host's
+ * extended hat comes back as itself, not as `HeldHat`. */
+export function wearableAt<H extends HeldHat>(hats: readonly H[], scopePath: string): H[] {
   return hats.filter((h) => scopeCovers(h.anchorPath, scopePath));
 }
 
@@ -105,12 +137,11 @@ export function admitted(hats: readonly HeldHat[], scopePath: string): boolean {
 /** The hat in force: the claimed one if still held and wearable, else the
  * default, else the primary, else the first. `wearable` is already filtered to
  * this scope, so a revoked claim cannot be returned — the re-validation.
- * `claimedId` is an **id**; a host whose session claim is name-keyed (a UUID
- * does not survive a re-seed, a name does) maps name → id against the loaded
- * set before calling. */
-export function wornHat(wearable: readonly HeldHat[], claimedId: Id | null = null): HeldHat | null {
-  if (claimedId !== null) {
-    const held = wearable.find((h) => h.grant.id === claimedId);
+ * `claim` is a grant **id** or a matcher (a host whose session claim is
+ * name-keyed matches on the name here instead of translating ids). */
+export function wornHat<H extends HeldHat>(wearable: readonly H[], claim: HatClaim | null = null): H | null {
+  if (claim !== null) {
+    const held = wearable.find(typeof claim === "string" ? (h) => h.grant.id === claim : claim);
     if (held) return held;
   }
   return wearable.find((h) => h.grant.default) ?? wearable.find((h) => h.grant.primary) ?? wearable[0] ?? null;

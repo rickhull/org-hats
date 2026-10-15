@@ -46,18 +46,22 @@ export const onTeam: (team: Id, scopePath: string) => Target;
 export const atScope: (scopePath: string) => Target;
 
 export interface Grant { id: Id; roleId: Id; organizationId: Id; teamId: Id | null; scopeId: Id | null; primary: boolean; default: boolean; }
-export interface HeldHat { readonly grant: Grant; readonly actions: readonly string[]; readonly anchorPath: string; }
+export interface HeldHat { readonly grant: Grant; readonly actions: readonly string[]; readonly anchorPath: string;
+  readonly roleName?: string; readonly teamName?: string; readonly scopeName?: string; }
+export type HatClaim = Id | ((hat: HeldHat) => boolean);
 
 export const AUTHOR: "author"; // and READ, RESOLVE, CONFIGURE
 
 export const childPath: (parentPath: string, id: Id) => string;
+export const leafScopeId: (scopePath: string) => string;
+export const parentPath: (scopePath: string) => string;
 export const scopeCovers: (ancestorPath: string, descendantPath: string) => boolean;
 export function reach(hat: HeldHat, target: Target): boolean;
 export function can(hat: HeldHat | null, action: string, target: Target): boolean;
 export function maySpeak(worn: HeldHat | null, target: Target, held: readonly HeldHat[]): boolean;
-export function wearableAt(hats: readonly HeldHat[], scopePath: string): HeldHat[];
+export function wearableAt<H extends HeldHat>(hats: readonly H[], scopePath: string): H[];
 export function admitted(hats: readonly HeldHat[], scopePath: string): boolean;
-export function wornHat(hats: readonly HeldHat[], claimedId?: Id | null): HeldHat | null;
+export function wornHat<H extends HeldHat>(wearable: readonly H[], claim?: HatClaim | null): H | null;
 export function organizationsOf(hats: readonly HeldHat[]): Id[]; // team-bearing hats
 
 export const CONFORMANCE_CASES: readonly { id: string; description: string }[];
@@ -76,7 +80,7 @@ export class SqliteRepository implements OrgHatsRepository { /* ... */ }
 export function installSchema(db: DatabaseSync): void;
 ```
 
-`HeldHat` is the one derived record: the adapter joins `grant → role → capability` to fill `actions`, and `team → scope` to fill `anchorPath`. That is what lets every predicate stay pure and synchronous — the whole point of the split. It is **structural and open**: an interface, not a class; a consumer maps its own record onto it (or extends it) without ceremony.
+`HeldHat` is the one derived record: the adapter joins `grant → role → capability` to fill `actions`, and `team → scope` to fill `anchorPath`. That is what lets every predicate stay pure and synchronous — the whole point of the split. It is **structural and open**: an interface, not a class; a consumer maps its own record onto it (or extends it) without ceremony. The three optional name fields are the common extension, adapter-filled from joins the adapter already makes and read by the predicates never — the legible snapshot (`supervisor:drive@north`) is words, and ids cannot produce them. `wearableAt` and `wornHat` are generic in the hat type — they only select from the array they are given, so a host's extended hat comes back as itself — and `wornHat`'s claim is an id **or a matcher** (`HatClaim`), so a name-keyed session claim never translates through a shim.
 
 `anchorPath` is one path, not two, because a hat's *wearability* and its *reach* are the same test — coverage of the anchor scope:
 
@@ -89,14 +93,14 @@ scopeCovers(hat.anchorPath, target.scopePath)
 
 ```ts
 export interface OrgHatsRepository {
-  /** Every hat the actor holds in one operation, with actions and anchor path resolved. */
+  /** Every hat the actor holds in one operation — memoize per request. */
   hatsOf(actorId: Id, operationId: Id): Promise<readonly HeldHat[]>;
   /** The full read answer for a scope: the organization rule plus the host's peers. */
   readableTeamsAt(hats: readonly HeldHat[], operationId: Id, scopePath: string): Promise<readonly Id[]>;
 }
 ```
 
-Two questions, both async. The **org-side read rule** (`organizationsOf`, `scopeCovers`) is core, pure, and exported; the *query* and any peer union are the adapter's. The core never sees a driver. `src/node.ts` is the SQLite reference adapter; a host supplies its own (e.g. D1).
+Two questions, both async. The **org-side read rule** (`organizationsOf`, `scopeCovers`) is core, pure, and exported; the *query* and any peer union are the adapter's. The core never sees a driver. `src/node.ts` is the SQLite reference adapter; a host supplies its own (e.g. D1). Three notes for adapter writers, the last two learned from a consumer: **memoize `hatsOf` per request** — the port looks like a cheap pure function, but `decide` asks once per decision and a request path may decide several times (`/api/me`, dashboards); **an adapter may run under enforced foreign keys** (D1 enforces them; the reference turns them on explicitly), which orders inserts — the scope row precedes whatever references it; and the reference adapter's site filter is **`substr`, never `LIKE`** — a consumer measured D1 rejecting `LIKE` patterns of fifty characters and up, which UUID-built paths exceed one level below the root ([organization_model.md](organization_model.md) § *Efficiency*).
 
 ## The request spine
 

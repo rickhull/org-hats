@@ -1,4 +1,4 @@
-import { type HeldHat, type Id, type Target } from "./core.ts";
+import { type HatClaim, type HeldHat, type Id, type Target } from "./core.ts";
 import type { OrgHatsRepository } from "./port.ts";
 /** How the worn hat was chosen — rule 5's signal. A claim that did not
  * resolve reports `default` / `primary` / `first`, so the drift is auditable
@@ -28,22 +28,27 @@ export interface DecideRequest {
     readonly action: string;
     /** The team the act concerns; absent, the target is the scope itself. */
     readonly teamId?: Id | null;
-    /** The hat the session claims — a grant id, re-validated here (rule 7). */
-    readonly claimedHatId?: Id | null;
+    /** The hat the session claims — a grant id, or a matcher (`HatClaim`): a
+     * name-keyed claim passes `(hat) => hat.roleName === name` and never
+     * translates ids. Re-validated here against the *wearable* set (rule 7). */
+    readonly claimedHatId?: HatClaim | null;
     /** Optional organization context (C31): when present, only that
      * organization's hats are wearable. The organization is request context,
      * never session-global. */
     readonly organizationId?: Id | null;
 }
 /** What every decision carries, allowed or denied — the audit facts minus
- * time and names, which the host adds (a host may extend `HeldHat` with
- * names for a legible row; it is structural and open). */
+ * time and names, which the host adds (an adapter fills `roleName` /
+ * `teamName` / `scopeName`; a host may extend `HeldHat` further still). */
 export interface DecisionCore {
     readonly target: Target;
     readonly action: string;
     /** How the worn hat was chosen; `null` when none was. */
     readonly fallback: HatSource | null;
-    /** The claim as received, before validation. */
+    /** The claim as the audit row wants it: the id when the claim was an id;
+     * for a matcher claim, the grant id it resolved to when it resolved, and
+     * `null` when it fell back (the host records its own claim token
+     * alongside). */
     readonly claimed: Id | null;
 }
 export interface DecisionAllow extends DecisionCore {

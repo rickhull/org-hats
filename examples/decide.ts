@@ -10,6 +10,8 @@ import {
   decide,
   decideSpeak,
   fakeRepository,
+  leafScopeId,
+  parentPath,
   type Decision,
   type HeldHat,
   type Id,
@@ -22,9 +24,15 @@ function assert(cond: boolean, message: string): void {
 }
 
 const show = (d: Decision | SpeakDecision): string => {
-  const hat = d.hat === null ? "-" : `${d.hat.grant.roleId}:${d.hat.grant.teamId ?? d.hat.grant.scopeId}`;
+  const h = d.hat;
+  const hat =
+    h === null
+      ? "-"
+      : `${h.roleName ?? h.grant.roleId}:${h.teamName ?? h.grant.teamId ?? h.grant.scopeId}@${
+          h.scopeName ?? leafScopeId(h.anchorPath)
+        }`;
   const verdict = d.ok ? "allow" : `deny/${d.reason}`;
-  return `${verdict.padEnd(18)} worn=${hat.padEnd(16)} fallback=${d.fallback ?? "-"}`;
+  return `${verdict.padEnd(18)} worn=${hat.padEnd(24)} fallback=${d.fallback ?? "-"}`;
 };
 
 /** A one-line audit row — the shape a host records on every act (rule 5);
@@ -122,6 +130,12 @@ export async function runDecide(): Promise<void> {
     console.log(`adam speaks for drive      ${show(s2)}`);
     assert(!s2.ok && s2.reason === "not-affiliated", "a supervisor who is not a member is refused");
 
+    // 7b. The same claim by name — a matcher, not a translated id. The audit
+    //     records the grant the claim resolved to.
+    const s3 = await decideSpeak(repo, { actorId: cal, operationId: acme, scopePath: northPath, teamId: drive, action: AUTHOR, claimedHatId: (h) => h.roleName === "Supervisor" });
+    console.log(`cal claims \`Supervisor\`    ${show(s3)}`);
+    assert(s3.ok && s3.claimed === "g-cal-sup" && s3.fallback === "claimed", "a matcher claim resolves and is recorded by grant id");
+
     // 8. C31, taken as a position: the organization is request context. With
     //    beacon in force, Ellis's atlas primary is not even wearable.
     console.log("\n== the organization as request context (C31) ==");
@@ -138,11 +152,22 @@ export async function runDecide(): Promise<void> {
       grant: { id: "g-avery", actorId: "avery", roleId: "coach", organizationId: atlas, teamId: drive, scopeId: null, primary: true, default: true },
       actions: [AUTHOR],
       anchorPath: northPath,
+      roleName: "Coach",
+      teamName: "drive",
+      scopeName: "north",
     };
     const fake = fakeRepository(() => [hat]);
     const f1 = await decide(fake, { actorId: "avery", operationId: acme, scopePath: northPath, teamId: drive, action: AUTHOR });
     console.log(`avery, from literals       ${show(f1)}`);
-    assert(f1.ok && f1.hat.grant.id === "g-avery", "the spine runs over two functions and a record");
+    assert(f1.ok && f1.hat.grant.id === "g-avery" && f1.hat.roleName === "Coach", "the spine runs over two functions and a record");
+
+    // 10. The path readers — `childPath` builds, these parse, and the format
+    //     is spelled once, here.
+    console.log("\n== the path readers ==");
+    console.log(`leaf(${northPath}) = ${leafScopeId(northPath)}   parent(${northPath}) = ${parentPath(northPath)}`);
+    assert(leafScopeId(northPath) === north && leafScopeId("/acme/") === acme && leafScopeId("/") === "", "the leaf is the last segment");
+    assert(parentPath(northPath) === "/acme/" && parentPath("/acme/") === "/" && parentPath("/") === "/", "the parent is the path less its leaf");
+    assert(parentPath(northPath) + leafScopeId(northPath) + "/" === northPath, "parent + leaf + '/' rebuilds the path");
 
     console.log("\nall assertions passed (spine)");
   } finally {

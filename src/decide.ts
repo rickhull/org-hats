@@ -26,6 +26,7 @@ import {
   reach,
   wearableAt,
   wornHat,
+  type HatClaim,
   type HeldHat,
   type Id,
   type Target,
@@ -63,8 +64,10 @@ export interface DecideRequest {
   readonly action: string;
   /** The team the act concerns; absent, the target is the scope itself. */
   readonly teamId?: Id | null;
-  /** The hat the session claims — a grant id, re-validated here (rule 7). */
-  readonly claimedHatId?: Id | null;
+  /** The hat the session claims — a grant id, or a matcher (`HatClaim`): a
+   * name-keyed claim passes `(hat) => hat.roleName === name` and never
+   * translates ids. Re-validated here against the *wearable* set (rule 7). */
+  readonly claimedHatId?: HatClaim | null;
   /** Optional organization context (C31): when present, only that
    * organization's hats are wearable. The organization is request context,
    * never session-global. */
@@ -72,14 +75,17 @@ export interface DecideRequest {
 }
 
 /** What every decision carries, allowed or denied — the audit facts minus
- * time and names, which the host adds (a host may extend `HeldHat` with
- * names for a legible row; it is structural and open). */
+ * time and names, which the host adds (an adapter fills `roleName` /
+ * `teamName` / `scopeName`; a host may extend `HeldHat` further still). */
 export interface DecisionCore {
   readonly target: Target;
   readonly action: string;
   /** How the worn hat was chosen; `null` when none was. */
   readonly fallback: HatSource | null;
-  /** The claim as received, before validation. */
+  /** The claim as the audit row wants it: the id when the claim was an id;
+   * for a matcher claim, the grant id it resolved to when it resolved, and
+   * `null` when it fell back (the host records its own claim token
+   * alongside). */
   readonly claimed: Id | null;
 }
 
@@ -124,8 +130,8 @@ interface Worn {
   readonly fallback: HatSource | null;
 }
 
-function howWorn(hat: HeldHat, claimed: Id | null): HatSource {
-  if (claimed !== null && hat.grant.id === claimed) return "claimed";
+function howWorn(hat: HeldHat, claim: HatClaim | null): HatSource {
+  if (claim !== null && (typeof claim === "string" ? hat.grant.id === claim : claim(hat))) return "claimed";
   if (hat.grant.default) return "default";
   if (hat.grant.primary) return "primary";
   return "first";
@@ -139,9 +145,20 @@ async function loadWorn(repo: OrgHatsRepository, request: DecideRequest): Promis
     request.organizationId != null
       ? allHeld.filter((h) => h.grant.organizationId === request.organizationId)
       : allHeld;
-  const worn = wornHat(wearableAt(held, request.scopePath), request.claimedHatId ?? null);
-  const claimed = request.claimedHatId ?? null;
-  return { target, held, worn, fallback: worn === null ? null : howWorn(worn, claimed) };
+  const claim = request.claimedHatId ?? null;
+  const worn = wornHat(wearableAt(held, request.scopePath), claim);
+  return {
+    target,
+    held,
+    worn,
+    fallback: worn === null ? null : howWorn(worn, claim),
+  };
+}
+
+/** The claim as the audit row wants it (see `DecisionCore.claimed`). */
+function claimRecorded(claim: HatClaim | null, worn: HeldHat | null, fallback: HatSource | null): Id | null {
+  if (typeof claim === "string") return claim;
+  return fallback === "claimed" && worn !== null ? worn.grant.id : null;
 }
 
 // --- the two decisions -------------------------------------------------------
@@ -150,9 +167,8 @@ async function loadWorn(repo: OrgHatsRepository, request: DecideRequest): Promis
  * `can` split into its reasons: the role's capability, then the grant's
  * reach. */
 export async function decide(repo: OrgHatsRepository, request: DecideRequest): Promise<Decision> {
-  const claimed = request.claimedHatId ?? null;
   const { target, held, worn, fallback } = await loadWorn(repo, request);
-  const base = { target, action: request.action, claimed };
+  const base = { target, action: request.action, claimed: claimRecorded(request.claimedHatId ?? null, worn, fallback) };
   if (held.length === 0) return { ok: false, reason: "unknown-actor", hat: null, fallback: null, ...base };
   if (worn === null) return { ok: false, reason: "not-admitted", hat: null, fallback: null, ...base };
   if (!worn.actions.includes(request.action)) {
@@ -172,9 +188,8 @@ export async function decideSpeak(
   repo: OrgHatsRepository,
   request: DecideRequest,
 ): Promise<SpeakDecision> {
-  const claimed = request.claimedHatId ?? null;
   const { target, held, worn, fallback } = await loadWorn(repo, request);
-  const base = { target, action: request.action, claimed };
+  const base = { target, action: request.action, claimed: claimRecorded(request.claimedHatId ?? null, worn, fallback) };
   if (held.length === 0) return { ok: false, reason: "unknown-actor", hat: null, fallback: null, ...base };
   if (worn === null) return { ok: false, reason: "not-admitted", hat: null, fallback: null, ...base };
   if (!reach(worn, target)) {

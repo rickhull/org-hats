@@ -82,7 +82,7 @@ Deliberately outside the model: role hierarchy (RBAC1), declarative separation o
 
 A TypeScript package, published as `org-hats`:
 
-- **[`src/core.ts`](src/core.ts)** — the pure surface: the entities, `Target`, and the predicates (`can`, `reach`, `wornHat`, `wearableAt`, `admitted`, `scopeCovers`, `childPath`, `organizationsOf`). No runtime dependency and no `node:*`, enforced by [`tsconfig.core.json`](tsconfig.core.json).
+- **[`src/core.ts`](src/core.ts)** — the pure surface: the entities, `Target`, and the predicates (`can`, `reach`, `wornHat`, `wearableAt`, `admitted`, `scopeCovers`, `childPath`, `leafScopeId`, `parentPath`, `organizationsOf`) — optional display names on `HeldHat`, and `HatClaim` (a claim is an id or a matcher). No runtime dependency and no `node:*`, enforced by [`tsconfig.core.json`](tsconfig.core.json).
 - **[`src/port.ts`](src/port.ts)** — `OrgHatsRepository`, the one async persistence contract.
 - **[`src/conformance.ts`](src/conformance.ts)** — the shared `OH-QM-01` … `OH-QM-10` inventory, as data, plus `runConformance` — the harness that runs a host's bodies and diffs the ids against the inventory.
 - **[`src/decide.ts`](src/decide.ts)** — the request spine: `decide`/`decideSpeak` compose the port and the predicates in the order the rules require. A decision is data — allow, or deny with a reason.

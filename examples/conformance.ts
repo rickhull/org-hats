@@ -226,7 +226,7 @@ const cases: Record<string, Body> = {
     );
     assert(indexed(hatsPlan), `held hats should be an index search, got: ${hatsPlan}`);
     const readPlan = w.db.plan(
-      `SELECT t.id FROM team t JOIN scope s ON s.id = t.scope_id WHERE t.organization_id IN ('atlas') AND '/acme/north/' LIKE s.path || '%'`,
+      `SELECT t.id FROM team t JOIN scope s ON s.id = t.scope_id WHERE t.organization_id IN ('atlas') AND substr('/acme/north/', 1, length(s.path)) = s.path`,
     );
     assert(indexed(readPlan), `readable teams should be an index search, got: ${readPlan}`);
   },

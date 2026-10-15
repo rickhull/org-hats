@@ -119,6 +119,7 @@ A team is fielded by exactly one organization and works at exactly one scope; sc
 **Invariants**
 
 - A grant is over a team **xor** a scope.
+- **Which roles pair with which subject kind is application policy, and deliberately unstateable in schema.** A CHECK could say it only by naming roles — and a role the schema names is not opaque, which is the property the seam exists to keep. Assert the pairing as an audit probe instead. The failure is mild: a role held over the wrong kind of subject reaches nothing its capabilities apply to, so it is meaningless rather than dangerous.
 - At most one **primary** and one **default** per (actor, organization).
 - The first grant an actor receives in an organization is its primary — a write check, since SQL cannot require a row to exist.
 - Supervision never crosses organizations — a write check **and** a probe, because it spans two tables.
@@ -147,7 +148,7 @@ Let *n* be a table's size and *k* the rows returned. Every question is **one ind
 
 1. **One lookup, no fan-out.** An authorization question never joins across tables; edges are read separately and combined in memory over a handful of rows.
 2. **No hierarchy, so no traversal.** Capability is set membership in one role; there is no transitive closure to compute.
-3. **Reach is spatial and prefix-based.** Scope containment is a prefix test on a stored path, never a recursive walk at request time. In the site-filtered read the path is *compared*, not index-seeked: `team_by_org` carries the query and `? LIKE s.path || '%'` filters its rows — correct at this fan-out, and the plan to verify.
+3. **Reach is spatial and prefix-based.** Scope containment is a prefix test on a stored path, never a recursive walk at request time. In the site-filtered read the path is *compared*, not index-seeked: `team_by_org` carries the query and `substr(?, 1, length(s.path)) = s.path` filters its rows — correct at this fan-out, and the plan to verify. The `substr` form is the portable one, stated here for every host: a consumer measured Cloudflare D1 rejecting `LIKE` patterns of fifty characters and up (`LIKE or GLOB pattern too complex`), and a path built from UUID ids exceeds that one level below the root. The two forms return the same answer; only one of them is portable.
 4. **Context in columns, never in names.** Team, organization, and scope are values on the edge.
 5. **Ids are durable; labels are not keys.** Renaming an entity changes a label, never a reference.
 6. **Affiliation is read, not stored twice.** It is derived from a team-bound author grant, so a member is one row — no membership/grant pair to keep in step.
@@ -168,6 +169,7 @@ Points of discipline, not of model shape:
 6. **`grant_by_scope` has no caller.** It is retained deliberately for a scope-side trust view — which grants reach a scope — and is the one index the model keeps without a query: documented, not removed.
 7. **Affiliation is capability-derived.** Editing a role's capabilities changes *who is affiliated*, not only what they may do: empty the capability table and the roster empties while the directory still answers. That is the fold's one new coupling, and it is deliberate.
 8. **Every unique key survives a multi-operation host.** One database may hold many operations, so uniqueness is keyed on the operation (the root scope) wherever a name is client vocabulary: `organization` is unique per `(scope, name)`, teams per `(scope, name)`, and an actor's *name* is a label with no key at all. `role` and `capability` stay global on purpose — roles are platform vocabulary, seeded, not customer rows. The one rule a constraint cannot carry — that an organization's scope is a *root* — is the probe `organizations_not_at_a_root`.
+9. **`scope.name` is an example label, not a requirement.** A host whose sibling uniqueness is already guaranteed by construction — ids that are DNS labels, unique by themselves — may drop the column and the `scope_identity` index: the path is built from **ids, never names**, so nothing else moves. (A consumer did exactly this; the reference keeps `name` because its walkthroughs name scopes for the reader.)
 
 ## In the literature
 

@@ -24,6 +24,19 @@ export const CONFIGURE = "configure";
 // contain "/". Coverage is a prefix test, never a recursive walk.
 export const childPath = (parentPath, id) => `${parentPath}${id}/`;
 export const scopeCovers = (ancestorPath, descendantPath) => descendantPath.startsWith(ancestorPath);
+/** The reading half of the path rules: `childPath` builds, these parse. The
+ * format is the model's, and a host that reimplements its parsing gets it
+ * wrong the day the format changes — so the pair lives here, beside the
+ * builder. */
+/** The id of the scope a path names — its last segment. A root path names
+ * its root; `/` names nothing. */
+export const leafScopeId = (scopePath) => scopePath.split("/").filter((segment) => segment !== "").at(-1) ?? "";
+/** The path of a scope's parent — the same path less its last segment. A
+ * root's parent is `/`, the outermost boundary; `/` is its own parent. */
+export const parentPath = (scopePath) => {
+    const leaf = leafScopeId(scopePath);
+    return leaf === "" ? "/" : scopePath.slice(0, scopePath.length - leaf.length - 1);
+};
 // --- the predicates ----------------------------------------------------------
 /** Does this hat act on this target? A team grant reaches its team; a
  * scope-bound grant reaches a scope and never a team. */
@@ -48,7 +61,9 @@ export function maySpeak(worn, target, held) {
         return false;
     return held.some((h) => reach(h, target) && h.actions.includes(AUTHOR));
 }
-/** The hats offered at a scope: those whose anchor covers it. */
+/** The hats offered at a scope: those whose anchor covers it. Selects from
+ * the array it is given, so it is generic in the hat type — a host's
+ * extended hat comes back as itself, not as `HeldHat`. */
 export function wearableAt(hats, scopePath) {
     return hats.filter((h) => scopeCovers(h.anchorPath, scopePath));
 }
@@ -59,12 +74,11 @@ export function admitted(hats, scopePath) {
 /** The hat in force: the claimed one if still held and wearable, else the
  * default, else the primary, else the first. `wearable` is already filtered to
  * this scope, so a revoked claim cannot be returned — the re-validation.
- * `claimedId` is an **id**; a host whose session claim is name-keyed (a UUID
- * does not survive a re-seed, a name does) maps name → id against the loaded
- * set before calling. */
-export function wornHat(wearable, claimedId = null) {
-    if (claimedId !== null) {
-        const held = wearable.find((h) => h.grant.id === claimedId);
+ * `claim` is a grant **id** or a matcher (a host whose session claim is
+ * name-keyed matches on the name here instead of translating ids). */
+export function wornHat(wearable, claim = null) {
+    if (claim !== null) {
+        const held = wearable.find(typeof claim === "string" ? (h) => h.grant.id === claim : claim);
         if (held)
             return held;
     }

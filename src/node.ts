@@ -24,6 +24,9 @@ interface GrantRow {
   prim: number;
   dflt: number;
   anchor_path: string;
+  role_name: string;
+  team_name: string | null;
+  anchor_name: string | null;
 }
 
 export interface GrantInput {
@@ -46,9 +49,13 @@ export class SqliteRepository implements OrgHatsRepository {
     const rows = this.db.all<GrantRow>(
       `SELECT g.id, g.actor_id, g.role_id, g.organization_id, g.team_id, g.scope_id,
               g.is_primary AS prim, g.is_default AS dflt,
-              COALESCE(ts.path, ss.path) AS anchor_path
+              COALESCE(ts.path, ss.path) AS anchor_path,
+              COALESCE(ts.name, ss.name) AS anchor_name,
+              r.name AS role_name,
+              t.name AS team_name
          FROM grant g
          JOIN organization o ON o.id = g.organization_id
+         JOIN role r ON r.id = g.role_id
          LEFT JOIN team  t ON t.id = g.team_id
          LEFT JOIN scope ts ON ts.id = t.scope_id
          LEFT JOIN scope ss ON ss.id = g.scope_id
@@ -83,11 +90,17 @@ export class SqliteRepository implements OrgHatsRepository {
       },
       actions: actionsByRole.get(r.role_id) ?? [],
       anchorPath: r.anchor_path,
+      roleName: r.role_name,
+      teamName: r.team_name ?? undefined,
+      scopeName: r.anchor_name ?? undefined,
     }));
   }
 
   // The organization-side read rule. A host adapter unions its peers on top to
-  // own the whole answer.
+  // own the whole answer. The site filter is `substr`, never `LIKE`: a
+  // consumer measured Cloudflare D1 rejecting LIKE patterns of fifty
+  // characters and up, and a path of UUIDs exceeds that one level below the
+  // root. The two forms return the same answer; one of them is portable.
   async readableTeamsAt(hats: readonly HeldHat[], _operationId: Id, scopePath: string): Promise<string[]> {
     const orgs = organizationsOf(hats);
     if (orgs.length === 0) return [];
@@ -95,7 +108,7 @@ export class SqliteRepository implements OrgHatsRepository {
     return this.db
       .all<{ id: string }>(
         `SELECT t.id FROM team t JOIN scope s ON s.id = t.scope_id
-          WHERE t.organization_id IN (${marks}) AND ? LIKE s.path || '%'`,
+          WHERE t.organization_id IN (${marks}) AND substr(?, 1, length(s.path)) = s.path`,
         ...orgs,
         scopePath,
       )
