@@ -125,6 +125,7 @@ CI runs the same on every push — install, build, a **stale-`dist/` guard**, th
 - **[`docs/tutorial.md`](docs/tutorial.md)** — a guided build from one person to a multi-organization operation.
 - **[`docs/operations_layer.md`](docs/operations_layer.md)** — how an application maps operations, sites, and cooperation onto the model.
 - **[`docs/package.md`](docs/package.md)** — what the package ships and the rules that keep it one.
+- **[`docs/writes.md`](docs/writes.md)** — the write side: the transaction rule, the invariants statement by statement, and administration as an action — documentation and reference SQL for a host's own migrations, not port surface.
 - **[`docs/publishing.md`](docs/publishing.md)** — where it is published and how it mirrors.
 - **[`docs/concerns.md`](docs/concerns.md)** — the tracked review queue.
 - **[`plans/publish.md`](plans/publish.md)** — the remaining publishing work.

@@ -116,9 +116,10 @@ The contract, in three points:
 
 - **A decision is data, never an exception.** `{ ok, hat, reason?, fallback, claimed, target, action }` — one shape for the audit row on allow and deny (rule 5). Reason codes: `unknown-actor`, `not-admitted`, `no-capability`, `out-of-reach`, `no-held-action`. Mapping them to 404/403 is the host's; an unreadable thing is *not found*, never *forbidden* ([operations_layer.md](operations_layer.md)).
 - **A revoked claim falls back, and the drift is auditable.** `fallback` reports how the hat was chosen — `claimed | default | primary | first` — so OH-QM-04's fallback appears in the row instead of silently wearing the default.
-- **“The claim resolved” is not “the claim mattered.”** When a row needs to know whether the claim *changed* what was worn — not merely that it resolved to the hat the landing order would have picked anyway — compare against the landing hat: `wornHat(wearableAt(hats, scopePath))` against the decision's hat. Free under the memo, one line in the host. Promoted to a field only if an audit row proves to need it (a consumer is watching for exactly this and will report).
+- **“The claim resolved” is not “the claim mattered.”** When a row needs to know whether the claim *changed* what was worn — not merely that it resolved to the hat the landing order would have picked anyway — compare against the landing hat: `wornHat(wearableAt(hats, scopePath))` against the decision's hat. Free under the memo, one line in the host. The consumer has since looked (C65): no audit question has needed it, so the derivation is the standing answer — a field lands only if a row ever proves to need one.
 - **The organization is request context** — C31's position, taken: an optional `organizationId` filters wearability, so an actor's hats in other organizations are not even wearable. A host serving team routes passes the team's organization; a host that disagrees ignores the field.
 - **Enumeration is the port's; decision is the spine's.** RBAC96 answers “what can this user do?” with a union over activated roles; here that question is **enumeration** — `hatsOf` then `wearableAt`, names included — and the spine answers **one act at a time**. `/api/me` and dashboards are port questions; accumulation across hats is what the one-hat rule exists to prevent.
+- **Two questions on one route are two decisions.** The consumer's report creation asks the two-edge question first (`action: null, heldAction` — whose report is this?), then a capability question (`action: "resolve"` — is this reporter a supervisor?): different facts, one memoized read. The memo is what makes the pattern free.
 
 **Cost posture (C54):** one `hatsOf` per request; no cache — immediacy is conformance (OH-QM-03, OH-QM-04), and Zanzibar's bounded staleness is the opposite trade ([literature_review.md](literature_review.md) § Zanzibar). The scale answer is a **request-scoped snapshot**: `perRequest(repo)` answers a request's every decision from one consistent read, and never outlives the request — revocation lands on the *next* one.
 
@@ -154,6 +155,7 @@ The razor: **every artifact is either the published surface a consumer imports, 
 | The request spine | `src/decide.ts` → `org-hats` | published surface — the rules composed in order |
 | The conformance harness | `src/conformance.ts` → `org-hats` | published surface — a host proves the eleven against its own store |
 | The fake port | `src/testing.ts` → `org-hats` | published surface — tests without a driver |
+| The write side | `docs/writes.md` | reference documentation + SQL for a host's own migrations — not port surface (C53 concluded) |
 | SQLite reference adapter | `src/node.ts` → `org-hats/node` | reference; the only `node:*` |
 | Walkthroughs | `examples/` | prove the model; not shipped |
 | Operations layer (peers, operation entity) | `examples/operations.ts` | application concept; not shipped |

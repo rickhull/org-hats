@@ -13,6 +13,14 @@
 
 3. **Consumer handoff.** Send the pin — `git+https://codeberg.org/rickhull/org-hats.git#v0.1.0` — and note that the `OH-QM-01`…`10` ids are unchanged.
 
+4. **The 1.0 core freeze** (on the roadmap at the consumer's request — do not cut yet). Freezes: the five entities, `SCHEMA`'s shape, the port, `decide`/`DecideRequest`/`Decision`, `heldCarries`, and the `OH-QM` ids — additions-only after. **Entry criteria** (the consumer's):
+   - the write-side conference — **done** ([docs/writes.md](../docs/writes.md), C53 concluded);
+   - the C31 landing/default rule settled at the session layer;
+   - C34's organization half decided by a real customer read policy.
+   Until then: deliberate 0.x changes with a consumer conference, which has served both sides.
+
+5. **Tag hygiene.** Tag from the package version, never by hand: `git tag -a v$(node -p "require('./package.json').version") -m "v$(node -p "require('./package.json').version")"` — the `v4.0.0` accident on release day was this line not existing.
+
 ## Discipline now that something depends on us
 
 - **Tags are immutable.** Never move or delete `v0.1.0`; release by *adding* `v0.1.1`, never by rewriting a tagged commit. Force-pushing over a tag a consumer pinned is the one failure that breaks them silently.

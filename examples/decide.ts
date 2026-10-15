@@ -21,6 +21,7 @@ import { Db, SqliteRepository, installSchema } from "../src/node.ts";
 // The dispatch board's actions — this application's vocabulary.
 const SEND = "send";
 const RESOLVE = "resolve";
+const GRANT = "grant";
 
 function assert(cond: boolean, message: string): void {
   if (!cond) throw new Error(message);
@@ -62,8 +63,15 @@ export async function runDecide(): Promise<void> {
 
     const volunteer = repo.addRole("volunteer", "Volunteer");
     const stagemanager = repo.addRole("stagemanager", "Stage Manager");
+    const councilAdmin = repo.addRole("counciladmin", "Council Admin");
     repo.grantCapability(volunteer, SEND);
     repo.grantCapability(stagemanager, RESOLVE);
+    repo.grantCapability(councilAdmin, GRANT);
+
+    // Jaime administers the festival: a scope-bound hat over the whole
+    // operation, carrying `grant` — the administration-as-action demo (C53).
+    const jaime = repo.addActor("jaime", "Jaime Okafor");
+    repo.addGrant("g-jaime", jaime, councilAdmin, council, { scope: riverbend, primary: true });
 
     const blake = repo.addActor("blake", "Blake Rivera");
     repo.addGrant("g-blake-lead", blake, stagemanager, council, { team: stageops, primary: true });
@@ -189,6 +197,22 @@ export async function runDecide(): Promise<void> {
     const fresh = perRequest(counted);
     await decide(fresh, { actorId: "avery", operationId: riverbend, scopePath: bigparkPath, teamId: gate, action: SEND });
     assert(reads === 2, "a new request is a new snapshot — the memo never outlives its request");
+
+    // 12. Administration is an action (C53): granting is a decide call like
+    //     any other — a `grant` action, carried by a worn hat that reaches
+    //     the *site* the new grant lives at (the act's target is where; the
+    //     write's invariants are what — employer, xor, primary). No admin
+    //     API; no new concept.
+    console.log("\n== administration as an action ==");
+    const g1 = await decide(repo, { actorId: jaime, operationId: riverbend, scopePath: bigparkPath, action: GRANT, organizationId: council });
+    console.log(`jaime grants at big park      ${show(g1)}`);
+    assert(g1.ok && g1.hat.grant.id === "g-jaime", "a festival-scoped admin hat reaches every site and may grant there");
+    const g2 = await decide(repo, { actorId: blake, operationId: riverbend, scopePath: bigparkPath, action: GRANT });
+    console.log(`blake grants at big park      ${show(g2)}`);
+    assert(!g2.ok && g2.reason === "no-capability", "a role without the action cannot grant");
+    const g3 = await decide(repo, { actorId: robin, operationId: riverbend, scopePath: eastPath, action: GRANT });
+    console.log(`robin grants at east stage    ${show(g3)}`);
+    assert(!g3.ok && g3.reason === "not-admitted", "an admin's authority is also bounded by place");
 
     console.log("\nall assertions passed (spine)");
   } finally {

@@ -13,8 +13,10 @@ Shipped, all additive, all inside the fence (no `node:*`, zero runtime deps):
 
 Still open, deliberately:
 
-- **The write side as statements** — reference SQL for grant / revoke / primary / default, transaction-wrapped, carrying the invariant checks (first-grant-primary, employer-not-crossing, peer shape — C39). A host copies them into its migrations. The statements will also demonstrate **administration as action** (C53, resolved): granting is an act — a `grant` action whose worn hat reaches the new grant's target, plus the organization write-check — checked by the same spine, recorded in the same audit row. An admin *API* remains C53's former question, now answered as data rather than surface.
-- **A D1 adapter** — the port's two questions map directly; `src/node.ts` is the template. This is the artifact Quartermaster would actually install.
+- ~~The write side as statements~~ — **shipped as [docs/writes.md](../docs/writes.md)**, in the shape the consumer specified at the C53 conference: documentation + reference SQL a host adapts in its own transaction boundary — no port method, no admin API. Includes the administration-as-action demonstration (target the *site*; the team-level detail is the write's invariants), proven three ways in `examples/decide.ts`.
+- ~~A D1 adapter~~ — **retired (C66)**: the consumer's adapter is installed, exercised in workerd, and is the proof the port travels; a second maintained surface would duplicate it, and it carries Cloudflare types and host schema that the default entry must not.
+
+The remaining roadmap item is the **1.0 core freeze** (see [publish.md](publish.md)): entry criteria are the write-side conference (done), the C31 landing rule, and C34's organization half.
 
 ## The thesis
 

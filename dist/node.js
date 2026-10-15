@@ -109,7 +109,7 @@ export class SqliteRepository {
         if (team !== null && scope !== null)
             throw new Error("a grant is over a team or a scope, not both");
         if (team !== null && this.orgOfTeam(team) !== orgId)
-            throw new Error("a grant may not cross organizations");
+            throw new Error("a grant's employer must field the team — the actor may still hold grants in many organizations");
         const held = this.db.all("SELECT COUNT(*) AS n FROM grant WHERE actor_id = ? AND organization_id = ?", actorId, orgId);
         if (input.primary !== true && (held[0]?.n ?? 0) === 0) {
             throw new Error("an actor's first grant in an organization must be their primary");
