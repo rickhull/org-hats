@@ -5,8 +5,8 @@
 ## What ships
 
 ```
-org-hats         pure core + the async port    (bundler-safe; a Worker never sees node:sqlite)
-org-hats/node    SqliteRepository              (the reference adapter)
+org-hats         pure core + the spine + the port    (bundler-safe; a Worker never sees node:sqlite)
+org-hats/node    SqliteRepository                    (the reference adapter)
 ```
 
 Zero runtime dependencies. `dist/` is committed, so nothing builds at install. The package is ESM-only; the adapter needs Node ≥ 22.5 for `node:sqlite`, while the core is runtime-neutral — the default entry is verified to load and run in **workerd** (esbuild resolves the `exports` map, and the ES2023 emit needs nothing special).
@@ -17,18 +17,21 @@ Zero runtime dependencies. `dist/` is committed, so nothing builds at install. T
 src/
   core.ts        types, Target, predicates, childPath, SCHEMA, actions   (no node:*)
   port.ts        OrgHatsRepository — the async persistence port          (types only)
-  conformance.ts the OH-QM inventory as data + conformanceGaps           (no node:*)
+  conformance.ts the OH-QM inventory as data + the runConformance harness (no node:*)
+  decide.ts      the request spine — decide/decideSpeak over the port    (no node:*)
+  testing.ts     fakeRepository — a fake port for tests                  (no node:*)
   node.ts        SqliteRepository + installSchema                        (node:sqlite)
   db.ts          the thin DatabaseSync wrapper                           (node:sqlite)
-  index.ts       re-exports core + port + conformance
+  index.ts       re-exports core + conformance + port + decide + testing
 examples/
   model.ts       the core walkthrough, against SqliteRepository
   operations.ts  the operations-layer walkthrough
   conformance.ts the reference proof of the ten OH-QM cases
+  decide.ts      every decision shape, over the adapter and the fake port
   check.ts       runs them all, in order
 dist/            the committed build output (.js + .d.ts)
 bin/check        the neutrality fence, then the examples
-tsconfig.core.json  the fence: core + conformance + port, types: []
+tsconfig.core.json  the fence: core + conformance + port + decide + testing, types: []
 tsconfig.json       the build config (emits dist/)
 ```
 
@@ -59,6 +62,14 @@ export function organizationsOf(hats: readonly HeldHat[]): Id[]; // team-bearing
 
 export const CONFORMANCE_CASES: readonly { id: string; description: string }[];
 export function conformanceGaps(ran: Iterable<string>): { missing: readonly string[]; unknown: readonly string[] };
+export function runConformance(bodies: ConformanceBodies): Promise<ConformanceResult>;
+
+// the request spine — decisions as data, over any adapter
+export function decide(repo: OrgHatsRepository, request: DecideRequest): Promise<Decision>;
+export function decideSpeak(repo: OrgHatsRepository, request: DecideRequest): Promise<SpeakDecision>;
+
+// the fake port — two functions and a record, for tests
+export function fakeRepository(hats: FakeHats, read?: FakeRead): OrgHatsRepository;
 
 // org-hats/node
 export class SqliteRepository implements OrgHatsRepository { /* ... */ }
@@ -87,9 +98,23 @@ export interface OrgHatsRepository {
 
 Two questions, both async. The **org-side read rule** (`organizationsOf`, `scopeCovers`) is core, pure, and exported; the *query* and any peer union are the adapter's. The core never sees a driver. `src/node.ts` is the SQLite reference adapter; a host supplies its own (e.g. D1).
 
+## The request spine
+
+`src/decide.ts` composes the port and the predicates **once, in the order the rules require** — `hatsOf → wearableAt → wornHat(claim) → capability ∧ reach` — so the order is testable and the wrong order is inexpressible. Getting it wrong is how a revoked claim authorizes an act: the claim must be re-validated against the *wearable* set, not the held set (rule 7). Two functions over any adapter: `decide`, and `decideSpeak` — the two-edge rule (OH-QM-07), where the worn hat reaches and a *held* grant authors.
+
+The contract, in three points:
+
+- **A decision is data, never an exception.** `{ ok, hat, reason?, fallback, claimed, target, action }` — one shape for the audit row on allow and deny (rule 5). Reason codes: `unknown-actor`, `not-admitted`, `no-capability`, `out-of-reach` (and `not-affiliated`, for speaking). Mapping them to 404/403 is the host's; an unreadable thing is *not found*, never *forbidden* ([operations_layer.md](operations_layer.md)).
+- **A revoked claim falls back, and the drift is auditable.** `fallback` reports how the hat was chosen — `claimed | default | primary | first` — so OH-QM-04's fallback appears in the row instead of silently wearing the default.
+- **The organization is request context** — C31's position, taken: an optional `organizationId` filters wearability, so an actor's hats in other organizations are not even wearable. A host serving team routes passes the team's organization; a host that disagrees ignores the field.
+
+**Cost posture (C54):** one `hatsOf` per request; no cache — immediacy is conformance (OH-QM-03, OH-QM-04), and Zanzibar's bounded staleness is the opposite trade ([literature_review.md](literature_review.md) § Zanzibar). If a host ever accepts a staleness contract, the cache belongs behind the port, never around the spine.
+
+`src/testing.ts` ships `fakeRepository` — the port is two questions, so a fake is two functions — for testing route wiring without a driver. `examples/decide.ts` walks every decision shape, over the adapter and the fake.
+
 ## The fence
 
-`tsconfig.core.json` compiles `src/core.ts`, `src/conformance.ts`, and `src/port.ts` **alone**, with `types: []` and `lib: ["ES2023"]`. With no `@types/node`, a stray `import "node:sqlite"` in the pure core fails to compile — runtime-neutrality is enforced by the compiler, not by review. `bin/check` runs it first. (Proven: a file importing `node:sqlite` fails the fence; `src/core.ts` has no imports at all.)
+`tsconfig.core.json` compiles `src/core.ts`, `src/conformance.ts`, `src/port.ts`, `src/decide.ts`, and `src/testing.ts` **alone**, with `types: []` and `lib: ["ES2023"]`. With no `@types/node`, a stray `import "node:sqlite"` in the pure core fails to compile — runtime-neutrality is enforced by the compiler, not by review. `bin/check` runs it first. (Proven: a file importing `node:sqlite` fails the fence; `src/core.ts` has no imports at all.)
 
 `tsconfig.json` keeps `types: ["node"]` and includes everything; it is the *build* config.
 
@@ -112,6 +137,9 @@ The razor: **every artifact is either the published surface a consumer imports, 
 | --- | --- | --- |
 | Core types + predicates | `src/core.ts` → `org-hats` | the published surface |
 | The async port | `src/port.ts` → `org-hats` | the one persistence contract |
+| The request spine | `src/decide.ts` → `org-hats` | published surface — the rules composed in order |
+| The conformance harness | `src/conformance.ts` → `org-hats` | published surface — a host proves the ten against its own store |
+| The fake port | `src/testing.ts` → `org-hats` | published surface — tests without a driver |
 | SQLite reference adapter | `src/node.ts` → `org-hats/node` | reference; the only `node:*` |
 | Walkthroughs | `examples/` | prove the model; not shipped |
 | Operations layer (peers, operation entity) | `examples/operations.ts` | application concept; not shipped |

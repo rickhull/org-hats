@@ -80,3 +80,41 @@ export function conformanceGaps(ran: Iterable<string>): ConformanceGaps {
     unknown: [...seen].filter((id) => !known.has(id)),
   };
 }
+
+// --- the runner ---------------------------------------------------------------
+
+/** One case's proof: build a fixture, assert behavior, throw to fail. */
+export type ConformanceBody = () => void | Promise<void>;
+
+/** A suite: one body per inventory id. */
+export type ConformanceBodies = Readonly<Record<string, ConformanceBody>>;
+
+/** A body that ran and threw. A body never registered is not a failure; it
+ * is a gap. */
+export interface ConformanceFailure {
+  readonly id: string;
+  readonly error: unknown;
+}
+
+export interface ConformanceResult {
+  /** The drift check: inventory ids never registered, ids nobody knows. */
+  readonly gaps: ConformanceGaps;
+  /** Bodies that ran and threw. */
+  readonly failures: readonly ConformanceFailure[];
+}
+
+/** Run a suite against the published inventory: every body runs, a throw is
+ * recorded as a failure, and the ids ran are diffed against the inventory so
+ * drift fails the report. A host calls this in its own test run;
+ * `examples/conformance.ts` is the reference proof. */
+export async function runConformance(bodies: ConformanceBodies): Promise<ConformanceResult> {
+  const failures: ConformanceFailure[] = [];
+  for (const [id, body] of Object.entries(bodies)) {
+    try {
+      await body();
+    } catch (error) {
+      failures.push({ id, error });
+    }
+  }
+  return { gaps: conformanceGaps(Object.keys(bodies)), failures };
+}

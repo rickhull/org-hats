@@ -30,6 +30,7 @@
 | **C20** | No way to run both scripts together. | Added `bin/check`. |
 | **C21** | Foreign keys were declared but not enforced: each `Db` call is a new connection. | The adapter turns `PRAGMA foreign_keys = ON` on every connection. Found while fixing C18. |
 | **C22** | Root scope names were not unique, because SQLite treats NULLs in a unique index as distinct. | `scope_identity` uses `COALESCE(parent_id, -1)`. Found while fixing C16. |
+| **C55** | Rename `org-hats` to `acting-hats` (2026-10). | Declined. Four reasons: `org` is the domain word — the package is a *reusable organization model*, and the proposed name drops its only retrieval hook; *acting* carries the temporary-deputy connotation the model's explicit-grant principle exists to reject; it collides with two terms of art already in the repo — the **acting-hat snapshot** (OH-QM-05) and the *worn* hat; and it would orphan the frozen `OH-QM` ids and `OrgHatsRepository` for a pinned consumer. Recorded as D6 in [publishing.md](publishing.md). |
 
 ## Streamlining pass
 
@@ -50,7 +51,7 @@ Raised reviewing the model against a consumer's application. The open items are 
 | --- | --- | --- | --- |
 | **C29** | resolved | A scope-bound configuring grant added read reach: `organizations_of` counted every grant as affiliation, so a config-only actor read its organization's teams. | Read reach derives only from team-bearing affiliation (membership or team-bound grant); the walkthrough asserts a config actor reads nothing. |
 | **C30** | resolved | Where does the site live — on the team, or on the grant? | Reading **A** chosen (both sides): scope stays on the **team**, `team(scope, name)` unique per scope, `grant` team-xor-scope, `team_scope` deleted. `drive@north` and `drive@south` coexist; a team spanning sites is N rows, which no reader needs. |
-| **C31** | open | One primary per organization means a multi-organization actor has no defined landing hat. | **Storage taken by the consumer; the interaction stays open.** The schema is adopted (per-organization primary, `is_default`) and the landing rule is still owed at the session layer. Not resolved by adoption. |
+| **C31** | open | One primary per organization means a multi-organization actor has no defined landing hat. | **Storage taken by the consumer; the interaction stays open.** The schema is adopted (per-organization primary, `is_default`) and the landing rule is still owed at the session layer. Not resolved by adoption. The request spine (`src/decide.ts`, v0.2.0) takes a position — an optional `organizationId` filters wearability, so the organization is request context, never session-global — but the host's landing interaction is still its own. |
 | **C32** | resolved | Revocation deletes grants, so a grant id cannot reconstruct an act's hat. | A consumer records an immutable, legible snapshot on every act and proved it (OH-QM-05): close a report under a supervisor hat, delete the hat, the hat can no longer be worn (409), and the audit row keeps the recorded name — a legible `role:team@site`. |
 | **C33** | resolved (consumer) | Adopting roles + capabilities reverses an earlier deletion and the reservation of `role`. | The consumer adopts it: one CONFIGURE verb gates ten routes across four unrelated verb families, so the capacity split C33 awaited is visible in call sites. Its own decision entry; `role` stops being reserved. |
 | **C34** | open | The multi-organization read rule: union every organization served, or follow the worn hat's organization? | **Site half fixed structurally by reading A** — the path-prefix `readable_teams` is site-scoped, closing a defect where a bound site parameter was ignored. The **organization half stays open and is the consumer's**: does a multi-organization actor read every organization they serve, or the worn hat's? |
@@ -85,6 +86,15 @@ Raised agreeing the shared shape with the consumer.
 | **C47** | resolved | `organization.scope_id` references `scope(id)` generally, but the rule is "an organization belongs to a *root* scope"; nothing held it there. | A `CHECK` cannot say "this id is a root", so it is a probe — `organizations_not_at_a_root`, the same pattern used for the other invariants SQL cannot state. The walkthrough adds a site-scoped organization, shows the probe find it, and removes it. |
 | **C48** | resolved (decision) | Does the operations layer ship in the package? | No. It stays a reference example here: it names an application concept, and under C42 a package installs no schema. A consumer keeps its own peer table — canonical CHECK, site-local, one hop, supervisors-only — and owns its own topology; no `kind` column until something needs it. |
 
+## Literature review
+
+Raised by the [literature review](literature_review.md), October 2026. Both are named positions, not defects found.
+
+| Id | Status | Concern | Resolution / next |
+| --- | --- | --- | --- |
+| **C53** | open | Grant *administration* is unmodeled: the model constrains what a grant is, never who may write one — anyone a host's routes allow can grant anything. | ARBAC97 is the landing spot when a use case arrives; the organization boundary and scope coverage already carry the geometry of its administrative ranges. Named, not built. |
+| **C54** | open | Rule 7's immediacy has no stated cost: revocation takes effect at once *because* every request re-reads the grants, while Zanzibar buys global scale by trading exactly that away (bounded staleness). | State the posture — the per-request cost of `hatsOf`, and where a cache could live (the port's two questions) without violating OH-QM-04. The posture is now stated ([package.md](package.md) § *The request spine*): one `hatsOf` per request, no cache; the port is where a staleness contract would live if a host ever accepts one. |
+
 ## TypeScript module
 
 Turning the monolith into a package (see [`package.md`](package.md)).
@@ -109,6 +119,7 @@ These are not defects; they are the trade-offs the model names and deliberately 
 | **D5** | Projections and read auditing (what a supervisor actually read). | Not modeled; the audit log is the application's |
 | **D6** | Time-bounded grants and activation windows. | *Rules* 1, *Example* |
 | **D7** | A scope-side trust view — which grants reach a scope. | `grant_by_scope` is retained for it; no query asks yet |
+| **D8** | Negative grants — an exclusion edge (“everyone at this scope except…”). | *Outside the model*; see [literature_review.md](literature_review.md) |
 
 ## Raising a concern
 

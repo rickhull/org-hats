@@ -1,8 +1,8 @@
 {
   "name": "org-hats",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "A small, reusable organization model — types, predicates, and an async persistence port. SQLite reference adapter at org-hats/node.",
+  "description": "A small, reusable organization model — types, predicates, an async persistence port, and a request spine that composes them in the model's order. SQLite reference adapter at org-hats/node.",
   "license": "MIT",
   "author": "Rick <rick@thinkpad>",
   "repository": { "type": "git", "url": "git+https://codeberg.org/rickhull/org-hats.git" },

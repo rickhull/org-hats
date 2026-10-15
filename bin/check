@@ -12,7 +12,7 @@ fi
 echo "== fence: the pure core compiles without node types =="
 if [ -x node_modules/.bin/tsc ]; then
   node_modules/.bin/tsc -p tsconfig.core.json
-  echo "ok — src/core.ts and src/port.ts compile with types: []"
+  echo "ok — core, conformance, port, decide, testing compile with types: []"
 else
   echo "(skipped — run 'pnpm install' to enable the fence)"
 fi

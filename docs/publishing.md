@@ -61,6 +61,7 @@ Decisions taken:
 | D3 | `docs/concerns.md` | sanitized in place, kept public |
 | D4 | the integration memo | deleted |
 | D5 | Package name | `org-hats` |
+| D6 | Rename to `acting-hats` (2026-10) | declined — `org` is the domain word, and *acting* collides with the acting-hat snapshot (OH-QM-05) and the temporary-deputy connotation. See concerns.md C55 |
 
 ## Verified
 

@@ -72,11 +72,11 @@ The closest references, in order of closeness:
 
 - **Core RBAC.** ANSI/INCITS 359-2004; from Sandhu, Coyne, Feinstein & Youman (1996), *Role-Based Access Control Models* — the RBAC96 family, model RBAC0. Users, roles, permissions, sessions, and the two assignment relations. Read this first.
 - **Team context.** Thomas (1997), *Team-Based Access Control (TMAC)* — the team as the context of a role, beside the role rather than inside its name.
-- **Parameterized and contextual roles.** Giuri & Iglio (1997), *Role Templates for Content-Based Access Control*; Covington, Moyer & Ahamad (2001), *Generalized Role-Based Access Control*. The closest reference for a role scoped to a subject — a grant of a role *over* something.
+- **Parameterized and contextual roles.** Giuri & Iglio (1997), *Role Templates for Content-Based Access Control* — the closest reference for what a grant is: a role **instantiated over a target**; and Covington, Moyer & Ahamad, *Generalized Role-Based Access Control* — the environment dimension, *where an act happens*.
 - **The relationship graph.** Pang et al. (2019), *Zanzibar* — organizations, teams, and cross-organization peers as explicit edges rather than role names.
 - **The failure this avoids.** Kuhn, Coyne & Weil (2010), *Adding Attributes to Role-Based Access Control* — context in a role's name multiplies roles until auditing is impossible.
 
-Deliberately outside the model: role hierarchy (RBAC1), declarative separation of duty (RBAC2), and role administration (ARBAC97; Sandhu, Bhamidipati & Munawer, 1999). The full comparison — the RBAC mapping, the `can` split, and a reading list — is in [docs/rbac.md](docs/rbac.md).
+Deliberately outside the model: role hierarchy (RBAC1), declarative separation of duty (RBAC2), and role administration (ARBAC97; Sandhu, Bhamidipati & Munawer, 1999). The full comparison — the RBAC mapping, the `can` split, and a reading list — is in [docs/rbac.md](docs/rbac.md); the reference-by-reference review — what each supports here, where each disagrees, and the citation precision a practitioner should verify — is in [docs/literature_review.md](docs/literature_review.md).
 
 ## What is here
 
@@ -84,13 +84,15 @@ A TypeScript package, published as `org-hats`:
 
 - **[`src/core.ts`](src/core.ts)** — the pure surface: the entities, `Target`, and the predicates (`can`, `reach`, `wornHat`, `wearableAt`, `admitted`, `scopeCovers`, `childPath`, `organizationsOf`). No runtime dependency and no `node:*`, enforced by [`tsconfig.core.json`](tsconfig.core.json).
 - **[`src/port.ts`](src/port.ts)** — `OrgHatsRepository`, the one async persistence contract.
-- **[`src/conformance.ts`](src/conformance.ts)** — the shared `OH-QM-01` … `OH-QM-10` inventory, as data.
+- **[`src/conformance.ts`](src/conformance.ts)** — the shared `OH-QM-01` … `OH-QM-10` inventory, as data, plus `runConformance` — the harness that runs a host's bodies and diffs the ids against the inventory.
+- **[`src/decide.ts`](src/decide.ts)** — the request spine: `decide`/`decideSpeak` compose the port and the predicates in the order the rules require. A decision is data — allow, or deny with a reason.
+- **[`src/testing.ts`](src/testing.ts)** — `fakeRepository`, an in-memory port for tests: the port is two questions, so a fake is two functions.
 - **[`src/node.ts`](src/node.ts)** — the SQLite reference adapter (`org-hats/node`), the only place a driver is spoken to.
 - **[`examples/`](examples)** — the walkthroughs: the core, an operations layer that adds cross-organization peers, and the reference proof of the ten conformance cases.
 
 ```
-org-hats         pure core + the async port    (a Worker never sees node:sqlite)
-org-hats/node    SqliteRepository              (the reference adapter)
+org-hats         pure core + the spine + the port    (a Worker never sees node:sqlite)
+org-hats/node    SqliteRepository                    (the reference adapter)
 ```
 
 Zero runtime dependencies; `dist/` is committed, so nothing builds at install. See [docs/package.md](docs/package.md) for the layout, the port, and the build rules.
@@ -115,16 +117,18 @@ CI runs the same on every push — install, build, a **stale-`dist/` guard**, th
 
 - **[`docs/organization_model.md`](docs/organization_model.md)** — the full statement: entities, rules, boundaries, the permission seam, and complexity bounds.
 - **[`docs/rbac.md`](docs/rbac.md)** — this model in RBAC terms: the mapping, the `can` split, and the reading list.
+- **[`docs/literature_review.md`](docs/literature_review.md)** — the references in detail: per-paper consonance and dissonance, the uncited relatives (UCON, GEO-RBAC, TRBAC), and citation notes.
 - **[`docs/tutorial.md`](docs/tutorial.md)** — a guided build from one person to a multi-organization operation.
 - **[`docs/operations_layer.md`](docs/operations_layer.md)** — how an application maps operations, sites, and cooperation onto the model.
 - **[`docs/package.md`](docs/package.md)** — what the package ships and the rules that keep it one.
 - **[`docs/publishing.md`](docs/publishing.md)** — where it is published and how it mirrors.
 - **[`docs/concerns.md`](docs/concerns.md)** — the tracked review queue.
 - **[`plans/publish.md`](plans/publish.md)** — the remaining publishing work.
+- **[`plans/reference_impl.md`](plans/reference_impl.md)** — the reference implementation: what shipped in v0.2.0, what remains (write-side statements, D1 adapter), and the positions it takes.
 
 ## Status
 
-The model is frozen and exercised in the reference implementation. The permission layer is a seam — one `capability` table and one predicate — and is not yet wired into an application. [`docs/concerns.md`](docs/concerns.md) tracks the review queue.
+The model is frozen and exercised in the reference implementation. The permission layer is a seam — one `capability` table and one predicate — and is not yet wired into an application. `v0.2.0` adds the **request spine** (`decide`/`decideSpeak` — the rules composed in the order they require, decisions as data) and the **conformance harness** (`runConformance`), both additive and inside the fence. [`docs/concerns.md`](docs/concerns.md) tracks the review queue.
 
 ## License
 

@@ -12,5 +12,12 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["src/core.ts", "src/conformance.ts", "src/port.ts", "src/index.ts"]
+  "include": [
+    "src/core.ts",
+    "src/conformance.ts",
+    "src/port.ts",
+    "src/decide.ts",
+    "src/testing.ts",
+    "src/index.ts"
+  ]
 }

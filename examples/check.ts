@@ -6,6 +6,7 @@
 import { runModel } from "./model.ts";
 import { runOperations } from "./operations.ts";
 import { runConformance } from "./conformance.ts";
+import { runDecide } from "./decide.ts";
 
 console.log("== examples/model.ts ==");
 await runModel(false);
@@ -15,5 +16,8 @@ await runOperations(false);
 
 console.log("\n== examples/conformance.ts ==");
 await runConformance();
+
+console.log("\n== examples/decide.ts ==");
+await runDecide();
 
 console.log("\nall examples passed");

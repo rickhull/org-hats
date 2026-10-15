@@ -149,7 +149,7 @@ export class SqliteRepository implements OrgHatsRepository {
   addGrant(id: Id, actorId: Id, roleId: Id, orgId: Id, input: GrantInput): Grant {
     const team = input.team ?? null;
     const scope = input.scope ?? null;
-    if (team === null && scope === null) throw new Error("a grant needs a subject: a team or a scope");
+    if (team === null && scope === null) throw new Error("a grant needs a target: a team or a scope");
     if (team !== null && scope !== null) throw new Error("a grant is over a team or a scope, not both");
     if (team !== null && this.orgOfTeam(team) !== orgId) throw new Error("a grant may not cross organizations");
     const held = this.db.all<{ n: number }>(

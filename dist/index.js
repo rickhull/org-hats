@@ -4,3 +4,5 @@
 export * from "./core.js";
 export * from "./conformance.js";
 export * from "./port.js";
+export * from "./decide.js";
+export * from "./testing.js";

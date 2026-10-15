@@ -58,7 +58,7 @@ Primary is identity; default is the landing context and may be less privileged �
 ## Rules
 
 1. **Grant before activation.** Only a held hat may be worn, and only while its grant is valid.
-2. **One active hat.** Switching deactivates the previous one; capabilities never accumulate across hats.
+2. **One active hat.** Switching deactivates the previous one; capabilities never accumulate across hats. In RBAC terms this is dynamic separation of duty with the *universal* conflict set — every pair of held hats conflicts — enforced within one organization (C31).
 3. **Affiliation is capability-derived.** An actor is affiliated with a team by holding a grant over it whose role may author there. Switching hats changes no affiliation, and supervising a team never confers it.
 4. **Role gives capability; team and scope give reach.** Authorization consults the active grant's role and the target's team or scope. Scope is stated structurally, never in a role's name.
 5. **Switching is explicit and auditable.** Record actor, old hat, new hat, and time, with a reason where it matters. Record grants, revocations, and exceptional activations too.
@@ -102,7 +102,7 @@ An actor is affiliated with the **Drive** team — the **Coach** grant over it m
 - Primary: **Senior Lead Instructor**. Default: **Coach**.
 - Instructing: the worn hat is **Coach**; supervisory capabilities are not active.
 - Supervising: switch to **Senior Lead Instructor**.
-- Exceptional Logistics cover: take a time-limited, scoped **Supervisor** grant over **Logistics** and wear it. It makes the actor neither a Logistics member nor an organization-crosser.
+- Exceptional Logistics cover: take a time-limited, scoped **Supervisor** grant over **Logistics** and wear it. It makes the actor neither a Logistics member nor an organization-crosser. (Time-limited in the host's grant lifecycle; the model stores no validity interval — D6.)
 
 ## Data relationships
 
@@ -180,8 +180,10 @@ The organizational layer is what this model adds to RBAC: a **team** is a named 
 
 This model is not RBAC and does not try to be: it is the structural core an RBAC application is built on. [rbac.md](rbac.md) states that positioning in full — the closest references, the RBAC mapping, and the `can` split that replaces a role-per-object.
 
+Three signature rules have nearest relatives the reading list carries: rule 7's re-validation is what the usage-control literature calls **ongoing authorization** (UCON); rule 8's wearability is the cousin of **GEO-RBAC's** spatially enabled roles — with the difference that GEO-RBAC senses the *user's* position while a hat's wearability is anchored on the *grant*; and time-bounded hats are **TRBAC's** territory, deferred (D6). The full review — consonance and dissonance, reference by reference — is [literature_review.md](literature_review.md).
+
 ## Outside the model
 
-Reporting lines, team hierarchy, titles distinct from roles, multiple concurrent active hats, automatic inheritance, complex policy expressions, declarative separation-of-duty constraints, and full org-chart fidelity. Add one only when a use case requires it. Named container levels (*operation*, *region*, *site*) and multi-tenancy belong to the application, not the model — see [the operations layer](operations_layer.md) for the mapping.
+Reporting lines, team hierarchy, titles distinct from roles, multiple concurrent active hats, automatic inheritance, negative grants (there is no exclusion edge), complex policy expressions, declarative separation-of-duty constraints, and full org-chart fidelity. Add one only when a use case requires it. Named container levels (*operation*, *region*, *site*) and multi-tenancy belong to the application, not the model — see [the operations layer](operations_layer.md) for the mapping.
 
 **Design principles:** five entities; two relationships; one active hat; no hidden authority; permissions assigned to roles, never encoded in them.

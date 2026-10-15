@@ -25,7 +25,8 @@ import {
   organizationsOf,
   SCHEMA,
   CONFORMANCE_CASES,
-  conformanceGaps,
+  runConformance as runBodies,
+  type ConformanceBodies,
 } from "../src/index.ts";
 import { Db, SqliteRepository, installSchema } from "../src/node.ts";
 import { Ops, OPS_SCHEMA } from "./operations.ts";
@@ -132,7 +133,7 @@ function world(): World {
 
 type Body = (w: World) => Promise<void>;
 
-const bodies: Record<string, Body> = {
+const cases: Record<string, Body> = {
   "OH-QM-01": async (w) => {
     const hats = await w.repo.hatsOf("alice", w.op);
     const worn = wornHat(wearableAt(hats, w.northPath));
@@ -232,19 +233,30 @@ const bodies: Record<string, Body> = {
 };
 
 export async function runConformance(): Promise<void> {
-  const gaps = conformanceGaps(Object.keys(bodies));
-  assert(gaps.missing.length === 0, `unimplemented conformance cases: ${gaps.missing.join(", ")}`);
-  assert(gaps.unknown.length === 0, `unknown conformance ids: ${gaps.unknown.join(", ")}`);
+  // One fresh world per case, so cases cannot leak into one another — the
+  // harness runs the bodies; this file only supplies them.
+  const bodies: ConformanceBodies = Object.fromEntries(
+    Object.entries(cases).map(([id, body]) => [
+      id,
+      async () => {
+        const w = world();
+        try {
+          await body(w);
+        } finally {
+          w.db.close();
+        }
+      },
+    ]),
+  );
 
+  const result = await runBodies(bodies);
   for (const { id, description } of CONFORMANCE_CASES) {
-    const w = world();
-    try {
-      await bodies[id]!(w);
-    } finally {
-      w.db.close();
-    }
-    console.log(`  ${id}  ${description}`);
+    const failure = result.failures.find((f) => f.id === id);
+    console.log(`  ${id}  ${description}${failure === undefined ? "" : `  FAILED: ${String(failure.error)}`}`);
   }
+  assert(result.gaps.missing.length === 0, `unimplemented conformance cases: ${result.gaps.missing.join(", ")}`);
+  assert(result.gaps.unknown.length === 0, `unknown conformance ids: ${result.gaps.unknown.join(", ")}`);
+  assert(result.failures.length === 0, `${result.failures.length} conformance case(s) failed`);
   console.log(`\n${CONFORMANCE_CASES.length} conformance cases pass`);
 }
 

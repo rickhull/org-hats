@@ -63,3 +63,19 @@ export function conformanceGaps(ran) {
         unknown: [...seen].filter((id) => !known.has(id)),
     };
 }
+/** Run a suite against the published inventory: every body runs, a throw is
+ * recorded as a failure, and the ids ran are diffed against the inventory so
+ * drift fails the report. A host calls this in its own test run;
+ * `examples/conformance.ts` is the reference proof. */
+export async function runConformance(bodies) {
+    const failures = [];
+    for (const [id, body] of Object.entries(bodies)) {
+        try {
+            await body();
+        }
+        catch (error) {
+            failures.push({ id, error });
+        }
+    }
+    return { gaps: conformanceGaps(Object.keys(bodies)), failures };
+}
