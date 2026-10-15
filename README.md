@@ -40,7 +40,7 @@ Five entities and two relationships. The directory says who is who, on what team
 Two consequences carry most of the model:
 
 - **A grant is a hat.** An actor holds many hats and wears **one at a time** — separation of duty at its strongest. The worn hat is the capacity in force, re-checked on every request, so revocation takes effect immediately.
-- **Affiliation is not a third relationship.** Speaking on behalf of a team is inherent to teams — a team is a group that acts through its members — and the application names the act (`send`, `author`, `post`): an actor is on a team exactly when they hold a grant over it whose role carries the **speech act**. "Who is on this team" is derived, never stored — and supervising a team never makes one a member.
+- **Membership is not modeled — and that is the point.** The directory has no membership edge to drift out of step with a grant. An application defines its own roster rule over grants — commonly *a grant whose role carries a chosen action* (`heldCarries`) — and that rule is one atomic row, revocable in one delete. Supervising a team confers nothing the application has not said it confers.
 
 ## The permission seam
 
@@ -60,7 +60,7 @@ The role supplies the action; the grant supplies the reach — a **team** exactl
 - **One active hat.** Switching deactivates the last; capabilities never accumulate across hats.
 - **Enumeration is not accumulation.** “What can this actor do?” enumerates held hats, through the port; “may this act proceed?” goes through the spine, one act at a time.
 - **The role gives capability; team and scope give reach.**
-- **Affiliation is a member grant** — a grant over a team whose role carries the speech act. Supervising never makes one a member.
+- **Membership is the application's rule.** The model ships the halves — *presence* (the worn hat reaches) and *standing* (`heldCarries`: a held grant carries the action) — and the application composes what they mean.
 - **Context lives in columns, never in role names.**
 - **No hidden authority.** No inheritance, nothing implicit; every grant and every switch is explicit and auditable.
 - **Permissions are assigned to roles, never encoded in them.**
@@ -78,7 +78,7 @@ The closest references, in order of closeness:
 - **The failure this avoids.** Kuhn, Coyne & Weil (2010), *Adding Attributes to Role-Based Access Control* — context in a role's name multiplies roles until auditing is impossible.
 - **The signature rules' nearest relatives.** Rule 7's re-validation is usage control's **ongoing authorization** (UCON); rule 8's cousin is **GEO-RBAC** — which senses the *user's* position where this model anchors the *grant*; and time-bounded hats are **TRBAC** territory, landing — if ever wanted — in the adapter, never the core.
 
-Two Zanzibar relations carry the posture. `maySpeak` **is** Zanzibar's *intersection* operator — the worn hat reaches *and* a held grant speaks. And where Zanzibar trades immediacy for bounded staleness, this model keeps immediacy (a conformance case, not a tuning knob) and answers scale with a request-scoped snapshot (`perRequest`). The practical descendant question — *why not OpenFGA or SpiceDB?* — is answered in [docs/rbac.md](docs/rbac.md) § *The generic-graph question*.
+Two Zanzibar relations carry the posture. The two-edge rule — `decide` with `heldAction`, presence ∧ standing — **is** Zanzibar's *intersection* operator: the worn hat reaches *and* a held grant carries. And where Zanzibar trades immediacy for bounded staleness, this model keeps immediacy (a conformance case, not a tuning knob) and answers scale with a request-scoped snapshot (`perRequest`). The practical descendant question — *why not OpenFGA or SpiceDB?* — is answered in [docs/rbac.md](docs/rbac.md) § *The generic-graph question*.
 
 Deliberately outside the model: role hierarchy (RBAC1), declarative separation of duty (RBAC2), and negative grants (no exclusion edge). Role administration is not outside at all: **granting is an action** — a `grant` action whose worn hat reaches the new grant's target, plus the organization check — so ARBAC97 lands as data, not as a new concept (C53). The full comparison — the RBAC mapping, the `can` split, and a reading list — is in [docs/rbac.md](docs/rbac.md); the reference-by-reference review — what each supports here, where each disagrees, and the citation precision a practitioner should verify — is in [docs/literature_review.md](docs/literature_review.md).
 
@@ -86,10 +86,10 @@ Deliberately outside the model: role hierarchy (RBAC1), declarative separation o
 
 A TypeScript package, published as `org-hats`:
 
-- **[`src/core.ts`](src/core.ts)** — the pure surface: the entities, `Target`, and the predicates (`can`, `reach`, `affiliated`, `maySpeak`, `wornHat`, `wearableAt`, `admitted`, `scopeCovers`, `childPath`, `leafScopeId`, `parentPath`, `organizationsOf`) — optional display names on `HeldHat`, and `HatClaim` (a claim is an id or a matcher). The core names **zero actions** — the application names all of them, including its word for the speech act. No runtime dependency and no `node:*`, enforced by [`tsconfig.core.json`](tsconfig.core.json).
+- **[`src/core.ts`](src/core.ts)** — the pure surface: the entities, `Target`, and the predicates (`can`, `reach`, `heldCarries`, `wornHat`, `wearableAt`, `admitted`, `scopeCovers`, `childPath`, `leafScopeId`, `parentPath`, `organizationsOf`) — optional display names on `HeldHat`, and `HatClaim` (a claim is an id or a matcher). The core names **zero actions** and privileges none. No runtime dependency and no `node:*`, enforced by [`tsconfig.core.json`](tsconfig.core.json).
 - **[`src/port.ts`](src/port.ts)** — `OrgHatsRepository`, the one async persistence contract, plus `perRequest` — the request-scoped memo: one consistent read per request, however many decisions it makes.
 - **[`src/conformance.ts`](src/conformance.ts)** — the shared `OH-QM-01` … `OH-QM-11` inventory, as data, plus `runConformance` — the harness that runs a host's bodies and diffs the ids against the inventory.
-- **[`src/decide.ts`](src/decide.ts)** — the request spine: `decide`/`decideSpeak` compose the port and the predicates in the order the rules require. A decision is data — allow, or deny with a reason.
+- **[`src/decide.ts`](src/decide.ts)** — the request spine: `decide` composes the port and the predicates in the order the rules require, with the two-edge shape (`heldAction`) folded in. A decision is data — allow, or deny with a reason.
 - **[`src/testing.ts`](src/testing.ts)** — `fakeRepository`, an in-memory port for tests: the port is two questions, so a fake is two functions.
 - **[`src/node.ts`](src/node.ts)** — the SQLite reference adapter (`org-hats/node`), the only place a driver is spoken to.
 - **[`examples/`](examples)** — the walkthroughs: the core, an operations layer that adds cross-organization peers, the reference proof of the eleven conformance cases, and the request spine's every decision shape.
@@ -132,7 +132,7 @@ CI runs the same on every push — install, build, a **stale-`dist/` guard**, th
 
 ## Status
 
-The model is frozen and exercised in the reference implementation. The permission layer is a seam — one `capability` table and one predicate — and is not yet wired into an application. `v0.2.0` added the **request spine** and the **conformance harness**; `v0.2.1` carried the consumer review; `v0.2.2` added `perRequest`; `v0.2.3` added `OH-QM-11`. **`v0.3.0` is the abstraction release**: the core names zero actions (`affiliated` ships as the roster predicate, `maySpeak` takes the speech act as a parameter, the reporting-app constants are gone), and the fixtures become a festival. [`docs/concerns.md`](docs/concerns.md) tracks the review queue.
+The model is frozen and exercised in the reference implementation. The permission layer is a seam — one `capability` table and one predicate — and is not yet wired into an application. `v0.2.0`–`v0.2.3` grew the spine, the harness, the consumer-review surface, and `perRequest`; `v0.3.0` made the core name zero actions; **`v0.4.0` is the membership retreat**: membership is the application's policy, not a model concept — `heldCarries` ships as the standing half, `decide` gains `heldAction`/`no-held-action`, and `maySpeak`/`decideSpeak`/`affiliated` are gone. Decided jointly with the consumer. [`docs/concerns.md`](docs/concerns.md) tracks the review queue.
 
 ## License
 

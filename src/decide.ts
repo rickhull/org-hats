@@ -7,8 +7,10 @@
 // resolve the claim against the wearable set (not the held set — that is
 // rule 7), then compose capability with reach. Getting that order wrong is
 // how a revoked claim authorizes an act. `decide` composes it once so the
-// wrong order is inexpressible; `decideSpeak` does the same for the
-// two-edge rule (rule 3, OH-QM-07).
+// wrong order is inexpressible — including the two-edge shape: presence
+// (the worn hat reaches) and standing (a held grant carries `heldAction`),
+// the subtle held-versus-worn distinction hosts should not reimplement
+// (OH-QM-07).
 //
 // A decision is data, never an exception: a denial is a first-class outcome
 // with a reason, so the audit row (rule 5) has one shape for allow and deny.
@@ -20,8 +22,8 @@
 // and runs over any adapter — SQLite, D1, or a fake in tests.
 
 import {
-  affiliated,
   atScope,
+  heldCarries,
   onTeam,
   reach,
   wearableAt,
@@ -47,21 +49,27 @@ export type DenyReason =
   /** The worn hat's role lacks the action. */
   | "no-capability"
   /** The worn hat's grant does not reach the target. */
-  | "out-of-reach";
-
-/** Why `decideSpeak` refused. The membership half is `not-affiliated`: no
- * *held* grant over the target carries the speech act (rule 3). */
-export type SpeakDenyReason = "unknown-actor" | "not-admitted" | "out-of-reach" | "not-affiliated";
+  | "out-of-reach"
+  /** No *held* grant over the target carries `heldAction`. */
+  | "no-held-action";
 
 /** One request, one act. Everything here is the application's context; the
  * model supplies only the order it is consulted in. */
 export interface DecideRequest {
   readonly actorId: Id;
   readonly operationId: Id;
-  /** Where the request happens — a scope path, `/acme/north/`. */
+  /** Where the request happens — a scope path, `/riverbend/bigpark/`. */
   readonly scopePath: string;
-  /** The action — the application's vocabulary (`resolve`, `read_reports`). */
-  readonly action: string;
+  /** The action the worn hat must carry — the application's vocabulary
+   * (`resolve`, `read_log`). Absent when the act's only requirements are
+   * presence and standing: the two-edge shape, where the worn hat need only
+   * reach the target. */
+  readonly action?: string | null;
+  /** When set, additionally require a *held* grant over the target carrying
+   * this action — the standing half of the two-edge rule, checked against
+   * what the actor holds, not what is worn. What the action *means*
+   * (membership, filing, representation) is the application's policy. */
+  readonly heldAction?: string | null;
   /** The team the act concerns; absent, the target is the scope itself. */
   readonly teamId?: Id | null;
   /** The hat the session claims — a grant id, or a matcher (`HatClaim`): a
@@ -79,7 +87,8 @@ export interface DecideRequest {
  * `teamName` / `scopeName`; a host may extend `HeldHat` further still). */
 export interface DecisionCore {
   readonly target: Target;
-  readonly action: string;
+  /** The capacity action as received, or `null` in the two-edge shape. */
+  readonly action: string | null;
   /** How the worn hat was chosen; `null` when none was. */
   readonly fallback: HatSource | null;
   /** The claim as the audit row wants it: the id when the claim was an id;
@@ -102,19 +111,6 @@ export interface DecisionDeny extends DecisionCore {
 }
 
 export type Decision = DecisionAllow | DecisionDeny;
-
-export interface SpeakAllow extends DecisionCore {
-  readonly ok: true;
-  readonly hat: HeldHat;
-}
-
-export interface SpeakDeny extends DecisionCore {
-  readonly ok: false;
-  readonly reason: SpeakDenyReason;
-  readonly hat: HeldHat | null;
-}
-
-export type SpeakDecision = SpeakAllow | SpeakDeny;
 
 // --- the spine's shared head -------------------------------------------------
 //
@@ -161,43 +157,26 @@ function claimRecorded(claim: HatClaim | null, worn: HeldHat | null, fallback: H
   return fallback === "claimed" && worn !== null ? worn.grant.id : null;
 }
 
-// --- the two decisions -------------------------------------------------------
+// --- the decision ------------------------------------------------------------
 
-/** May the actor, wearing the hat in force, do this action on this target?
- * `can` split into its reasons: the role's capability, then the grant's
- * reach. */
+/** May the actor, wearing the hat in force, do this act on this target?
+ * `can` split into its reasons — the role's capability, then the grant's
+ * reach — with the two-edge shape folded in: set `heldAction` and the
+ * decision additionally requires a *held* grant over the target carrying
+ * it (presence from the worn hat, standing from a held one — OH-QM-07). */
 export async function decide(repo: OrgHatsRepository, request: DecideRequest): Promise<Decision> {
   const { target, held, worn, fallback } = await loadWorn(repo, request);
-  const base = { target, action: request.action, claimed: claimRecorded(request.claimedHatId ?? null, worn, fallback) };
+  const base = { target, action: request.action ?? null, claimed: claimRecorded(request.claimedHatId ?? null, worn, fallback) };
   if (held.length === 0) return { ok: false, reason: "unknown-actor", hat: null, fallback: null, ...base };
   if (worn === null) return { ok: false, reason: "not-admitted", hat: null, fallback: null, ...base };
-  if (!worn.actions.includes(request.action)) {
+  if (request.action != null && !worn.actions.includes(request.action)) {
     return { ok: false, reason: "no-capability", hat: worn, fallback, ...base };
   }
   if (!reach(worn, target)) {
     return { ok: false, reason: "out-of-reach", hat: worn, fallback, ...base };
   }
-  return { ok: true, hat: worn, fallback, ...base };
-}
-
-/** May the actor *speak on behalf of* the target, wearing the hat in force?
- * The two-edge rule (OH-QM-07): the worn hat must reach the target, and the
- * actor must be affiliated — a held grant over it carries the speech act,
- * which is the request's `action`. The worn hat need not itself carry it,
- * so a working lead speaks for their own team without switching hats. */
-export async function decideSpeak(
-  repo: OrgHatsRepository,
-  request: DecideRequest,
-): Promise<SpeakDecision> {
-  const { target, held, worn, fallback } = await loadWorn(repo, request);
-  const base = { target, action: request.action, claimed: claimRecorded(request.claimedHatId ?? null, worn, fallback) };
-  if (held.length === 0) return { ok: false, reason: "unknown-actor", hat: null, fallback: null, ...base };
-  if (worn === null) return { ok: false, reason: "not-admitted", hat: null, fallback: null, ...base };
-  if (!reach(worn, target)) {
-    return { ok: false, reason: "out-of-reach", hat: worn, fallback, ...base };
-  }
-  if (!affiliated(held, target, request.action)) {
-    return { ok: false, reason: "not-affiliated", hat: worn, fallback, ...base };
+  if (request.heldAction != null && !heldCarries(held, target, request.heldAction)) {
+    return { ok: false, reason: "no-held-action", hat: worn, fallback, ...base };
   }
   return { ok: true, hat: worn, fallback, ...base };
 }

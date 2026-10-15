@@ -43,7 +43,7 @@ Two relationships, both many-to-many.
 | **Grant** | Actor — Role | This actor may wear this role over a team or a scope. |
 | **Capability** | Role — Action | This role may perform this action. The deferred layer; actions are the application's. |
 
-A **grant** supplies the who and the where; the **role** supplies the capability. **Affiliation** is not a third edge: an actor is affiliated with a team by holding a grant over it whose role carries the application's **speech act** — the *member grant*. Speaking on behalf of a team is inherent to teams: a team is a group that acts through its members, and the application names the act (`send`, `author`, `post`). A member is a grant, and supervising a team never makes one a member.
+A **grant** supplies the who and the where; the **role** supplies the capability. There is no membership edge: an application derives its roster from grants however it defines membership — commonly *a grant whose role carries a chosen action* (`heldCarries`), which keeps a member one atomic row. What membership *means* is the application's policy; the model makes every derivation testable.
 
 ### The hat
 
@@ -59,7 +59,7 @@ Primary is identity; default is the landing context and may be less privileged �
 
 1. **Grant before activation.** Only a held hat may be worn, and only while its grant is valid.
 2. **One active hat.** Switching deactivates the previous one; capabilities never accumulate across hats. In RBAC terms this is dynamic separation of duty with the *universal* conflict set — every pair of held hats conflicts — enforced within one organization (C31).
-3. **Affiliation is capability-derived.** An actor is affiliated with a team by holding a grant over it whose role carries the application's speech act. Switching hats changes no affiliation, and supervising a team never confers it.
+3. **Membership is not modeled.** The directory has no membership edge; an application derives its roster from grants — commonly a grant whose role carries a chosen action (`heldCarries`). Switching hats changes no grant, and supervising a team confers only what the application's rule says it confers.
 4. **Role gives capability; team and scope give reach.** Authorization consults the active grant's role and the target's team or scope. Scope is stated structurally, never in a role's name.
 5. **Switching is explicit and auditable.** Record actor, old hat, new hat, and time, with a reason where it matters. Record grants, revocations, and exceptional activations too.
 6. **No implicit hierarchy.** A senior role inherits nothing from a junior one. A senior actor holds and wears the junior hat to do junior work.
@@ -68,11 +68,11 @@ Primary is identity; default is the landing context and may be less privileged �
 
 ## Boundaries
 
-**Organization** bounds authority. One organization fields a team, and every member of a team shares its organization; supervision never crosses organizations. An actor may be affiliated with more than one — a contractor, a volunteer, a board member — and their grants, primary, and default are stated per organization. An organization belongs to one **operation** — the outermost scope — so two operations hosted in one database may each field a team under the same name (a *Facilities* each); names are unique within an operation, never globally. That it belongs to a *root* scope is a **probe** (`organizations_not_at_a_root`), not a constraint: no `CHECK` can say "this id is a root", and a site-scoped organization would quietly let one operation hold two same-named orgs.
+**Organization** bounds authority. One organization fields a team, and every member of a team shares its organization; supervision never crosses organizations. An actor may belong to more than one — a contractor, a volunteer, a board member — and their grants, primary, and default are stated per organization. An organization belongs to one **operation** — the outermost scope — so two operations hosted in one database may each field a team under the same name (a *Gate Crew* each); names are unique within an operation, never globally. That it belongs to a *root* scope is a **probe** (`organizations_not_at_a_root`), not a constraint: no `CHECK` can say "this id is a root", and a site-scoped organization would quietly let one operation hold two same-named orgs.
 
 The organization is also the **read boundary**: an actor reads the teams of the organizations they are in **through a team** — a team-bound grant. A scope-bound configuring grant names an organization but puts the actor on no team, so it *admits and configures without adding read reach*.
 
-Read reach and affiliation are **different questions with similar names**, and they must not be confused: *read reach* follows any team-bearing grant, while *affiliation* — who may speak for a team — is a grant over that team whose role carries the speech act. A supervisor holds read reach over an organization's teams while being affiliated with none of them.
+Read reach and the roster rule are **different questions with similar names**, and they must not be confused: *read reach* follows any team-bearing grant, while *who is on the team* follows the application's rule over grants (commonly an action-carried grant — `heldCarries`). A supervisor holds read reach over an organization's teams while being on none of them.
 
 **A grant's organization is who employs the holder.** It is independent of whether the grant is aimed at a team or a scope — a scope-bound configuring grant still names an employer — which is why `grant.organization_id` is `NOT NULL`. A grant is never anonymous, even when it reaches a whole site. (A real consumer arrived with grants that had a subject and a scope but no employer; the non-null field is what caught it.)
 
@@ -87,7 +87,7 @@ An optional layer, shaped here so it can be added without moving anything beneat
 - **Capabilities are assigned to roles.** One relationship; the role's identity is untouched.
 - **One predicate.**
   `can(activeGrant, action, target) → bool`
-  Capability comes from the role, reach from the grant. The model names no action and no target; the application supplies both. The one act the model knows *of* without naming is speech — a member is one who may speak for the team, and the application names its word for the act (rule 3).
+  Capability comes from the role, reach from the grant. The model names no action and no target, and privileges none: presence and standing are structural (`reach`, `heldCarries`), and what any action *means* — membership, filing, representation — is the application's policy.
 - **It stays cheap.** One active hat means a check is set membership in one role's capabilities, scoped by the target: flat indexed lookups. With no role hierarchy there is no traversal, and *who can do this* is answerable from a row.
 - **Constraints are a separate concern.** *One active hat* is dynamic separation of duty at strength one. Declarative forms — two roles that may be held but not worn together, or may not both be held — are deferred, not denied.
 
@@ -97,7 +97,7 @@ The failure mode this model is built to avoid: context encoded in role names unt
 
 ## Example
 
-An actor is affiliated with the **Stage Ops** team — the **Volunteer** grant over it may send — and also holds the **Stage Manager** role over it.
+An actor is on the **Stage Ops** team by the dispatch board's rule — the **Volunteer** grant over it carries `send` — and also holds the **Stage Manager** role over it.
 
 - Primary: **Stage Manager**. Default: **Volunteer**.
 - Crewing: the worn hat is **Volunteer**; managing capabilities are not active.
@@ -134,14 +134,14 @@ Let *n* be a table's size and *k* the rows returned. Every question is **one ind
 | the primary grant of (actor, organization) | O(log n) | `grant_one_primary` (partial) |
 | the default grant of (actor, organization) | O(log n) | `grant_one_default` (partial) |
 | a team's grants — the trust view | O(log n + k) | `grant_by_team` |
-| a team's roster (affiliates) | O(log n + m) | `grant_by_team`, filtered by the speech act |
+| a team's roster (the application's rule) | O(log n + m) | `grant_by_team`, filtered by the chosen action |
 | does a role carry an action | O(log c) | `capability_identity` (covering) |
 | an organization's teams | O(log t + k) | `team_by_org` (covering) |
 | a team's organization | O(log t) | primary key |
 | does scope A cover B | O(log s) | two point lookups + **O(1) string prefix** |
 | is a hat wearable at a scope | O(log n + k) | `grant_by_actor`, one anchor lookup per hat |
 | `can(activeGrant, action, target)` | O(log c + log s) | capability + reach |
-| `maySpeak(activeGrant, team, held, action)` | O(log c + k) | worn reaches, a held grant speaks |
+| `heldCarries(held, target, action)` | O(log n + k) | a held grant carries the action |
 | the worn hat | O(log n + k), k ≈ 1 | `grant_by_actor`, filtered |
 
 **The rules that keep those bounds true**
@@ -151,7 +151,7 @@ Let *n* be a table's size and *k* the rows returned. Every question is **one ind
 3. **Reach is spatial and prefix-based.** Scope containment is a prefix test on a stored path, never a recursive walk at request time. In the site-filtered read the path is *compared*, not index-seeked: `team_by_org` carries the query and `substr(?, 1, length(s.path)) = s.path` filters its rows — correct at this fan-out, and the plan to verify. The `substr` form is the portable one, stated here for every host: a consumer measured Cloudflare D1 rejecting `LIKE` patterns of fifty characters and up (`LIKE or GLOB pattern too complex`), and a path built from UUID ids exceeds that one level below the root. The two forms return the same answer; only one of them is portable.
 4. **Context in columns, never in names.** Team, organization, and scope are values on the edge.
 5. **Ids are durable; labels are not keys.** Renaming an entity changes a label, never a reference.
-6. **Affiliation is read, not stored twice.** It is derived from a team-bound author grant, so a member is one row — no membership/grant pair to keep in step.
+6. **Rosters are derived, never stored.** Membership is the application's rule over grants (commonly an action-carried grant), so a member is one row — no membership/grant pair to keep in step.
 7. **Cross-entity invariants are checks *and* probes**, never silent assumptions.
 8. **Denormalization pays for an index or it doesn't exist.** `grant.organization_id` duplicates a team-bound grant's team organization to key the two per-organization partial indexes, and the layer's `team_link.scope_id` duplicates the teams' scope to keep cooperation site-local. Both are deliberate; each is kept honest by a write check, never treated as a second source of truth.
 
@@ -167,7 +167,7 @@ Points of discipline, not of model shape:
 4. **No hierarchy shifts coverage onto temporary grants.** Worth one stress test: a principal who must cover five functions.
 5. **Per-organization primary/default is exercised** for an actor spanning two organizations (Ellis Novak, in `examples/operations.ts`).
 6. **`grant_by_scope` has no caller.** It is retained deliberately for a scope-side trust view — which grants reach a scope — and is the one index the model keeps without a query: documented, not removed.
-7. **Affiliation is capability-derived.** Editing a role's capabilities changes *who is affiliated*, not only what they may do: empty the capability table and the roster empties while the directory still answers. That is the fold's one new coupling, and it is deliberate.
+7. **Membership policy lives in the application.** The model ships the halves — presence (`reach` of the worn hat) and standing (`heldCarries`) — and the app composes its meaning. Editing a role's capabilities can change *who passes the app's roster rule*: empty the capability table and an action-based roster matches no one while the directory still answers. That coupling belongs to whoever chose the rule.
 8. **Every unique key survives a multi-operation host.** One database may hold many operations, so uniqueness is keyed on the operation (the root scope) wherever a name is client vocabulary: `organization` is unique per `(scope, name)`, teams per `(scope, name)`, and an actor's *name* is a label with no key at all. `role` and `capability` stay global on purpose — roles are platform vocabulary, seeded, not customer rows. The one rule a constraint cannot carry — that an organization's scope is a *root* — is the probe `organizations_not_at_a_root`.
 9. **`scope.name` is an example label, not a requirement.** A host whose sibling uniqueness is already guaranteed by construction — ids that are DNS labels, unique by themselves — may drop the column and the `scope_identity` index: the path is built from **ids, never names**, so nothing else moves. (A consumer did exactly this; the reference keeps `name` because its walkthroughs name scopes for the reader.)
 
@@ -178,7 +178,7 @@ The permission layer is **Core RBAC** (INCITS 359-2004): users, roles, and permi
 - **No role hierarchy.** Inheritance turns a capability check into a traversal and *who could do this* into a graph query.
 - **No declarative separation of duty**, beyond the fixed one-active-hat rule.
 
-The organizational layer is what this model adds to RBAC: a **team** is a named affiliation and the unit a grant is scoped to, and **organization** and **scope** bound authority without living in a role's name. Everything kept is the standard mitigation for RBAC's known failure (§ *Role explosion*).
+The organizational layer is what this model adds to RBAC: a **team** is a named group — the unit a grant is aimed at — and **organization** and **scope** bound authority without living in a role's name. Everything kept is the standard mitigation for RBAC's known failure (§ *Role explosion*).
 
 This model is not RBAC and does not try to be: it is the structural core an RBAC application is built on. [rbac.md](rbac.md) states that positioning in full — the closest references, the RBAC mapping, and the `can` split that replaces a role-per-object.
 

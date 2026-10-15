@@ -18,7 +18,7 @@ src/
   core.ts        types, Target, predicates, childPath, SCHEMA, actions   (no node:*)
   port.ts        OrgHatsRepository + perRequest — the port and its memo   (no node:*)
   conformance.ts the OH-QM inventory as data + the runConformance harness (no node:*)
-  decide.ts      the request spine — decide/decideSpeak over the port    (no node:*)
+  decide.ts      the request spine — decide, with the two-edge heldAction shape (no node:*)
   testing.ts     fakeRepository — a fake port for tests                  (no node:*)
   node.ts        SqliteRepository + installSchema                        (node:sqlite)
   db.ts          the thin DatabaseSync wrapper                           (node:sqlite)
@@ -50,8 +50,8 @@ export interface HeldHat { readonly grant: Grant; readonly actions: readonly str
   readonly roleName?: string; readonly teamName?: string; readonly scopeName?: string; }
 export type HatClaim = Id | ((hat: HeldHat) => boolean);
 
-// The core names no action — the application names all of them, including
-// its word for the speech act that confers membership.
+// The core names no action and privileges none. Presence and standing are
+// structural; what any action means is the application's policy.
 
 export const childPath: (parentPath: string, id: Id) => string;
 export const leafScopeId: (scopePath: string) => string;
@@ -59,8 +59,7 @@ export const parentPath: (scopePath: string) => string;
 export const scopeCovers: (ancestorPath: string, descendantPath: string) => boolean;
 export function reach(hat: HeldHat, target: Target): boolean;
 export function can(hat: HeldHat | null, action: string, target: Target): boolean;
-export function maySpeak(worn: HeldHat | null, target: Target, held: readonly HeldHat[], action: string): boolean;
-export function affiliated(hats: readonly HeldHat[], target: Target, action: string): boolean;
+export function heldCarries(hats: readonly HeldHat[], target: Target, action: string): boolean;
 export function wearableAt<H extends HeldHat>(hats: readonly H[], scopePath: string): H[];
 export function admitted(hats: readonly HeldHat[], scopePath: string): boolean;
 export function wornHat<H extends HeldHat>(wearable: readonly H[], claim?: HatClaim | null): H | null;
@@ -72,7 +71,9 @@ export function runConformance(bodies: ConformanceBodies): Promise<ConformanceRe
 
 // the request spine — decisions as data, over any adapter
 export function decide(repo: OrgHatsRepository, request: DecideRequest): Promise<Decision>;
-export function decideSpeak(repo: OrgHatsRepository, request: DecideRequest): Promise<SpeakDecision>;
+// DecideRequest: action? (the worn hat's capacity check), heldAction? (a held
+// grant over the target must carry it — presence ∧ standing, the two-edge
+// shape), teamId?, claimedHatId? (id or matcher), organizationId?
 
 // the fake port — two functions and a record, for tests
 export function fakeRepository(hats: FakeHats, read?: FakeRead): OrgHatsRepository;
@@ -109,11 +110,11 @@ Two questions, both async. The **org-side read rule** (`organizationsOf`, `scope
 
 ## The request spine
 
-`src/decide.ts` composes the port and the predicates **once, in the order the rules require** — `hatsOf → wearableAt → wornHat(claim) → capability ∧ reach` — so the order is testable and the wrong order is inexpressible. Getting it wrong is how a revoked claim authorizes an act: the claim must be re-validated against the *wearable* set, not the held set (rule 7). Two functions over any adapter: `decide`, and `decideSpeak` — the two-edge rule (OH-QM-07), where the worn hat reaches and a *held* grant speaks; the request's `action` is the speech act.
+`src/decide.ts` composes the port and the predicates **once, in the order the rules require** — `hatsOf → wearableAt → wornHat(claim) → capability ∧ reach` — so the order is testable and the wrong order is inexpressible. Getting it wrong is how a revoked claim authorizes an act: the claim must be re-validated against the *wearable* set, not the held set (rule 7). One function over any adapter, with the **two-edge shape folded in**: set `heldAction` and the decision additionally requires a held grant over the target carrying it — presence from the worn hat, standing from a held one, the held-versus-worn distinction hosts should not reimplement (OH-QM-07). What `heldAction` *means* — membership, filing, representation — is the application's policy.
 
 The contract, in three points:
 
-- **A decision is data, never an exception.** `{ ok, hat, reason?, fallback, claimed, target, action }` — one shape for the audit row on allow and deny (rule 5). Reason codes: `unknown-actor`, `not-admitted`, `no-capability`, `out-of-reach` (and `not-affiliated`, for speaking). Mapping them to 404/403 is the host's; an unreadable thing is *not found*, never *forbidden* ([operations_layer.md](operations_layer.md)).
+- **A decision is data, never an exception.** `{ ok, hat, reason?, fallback, claimed, target, action }` — one shape for the audit row on allow and deny (rule 5). Reason codes: `unknown-actor`, `not-admitted`, `no-capability`, `out-of-reach`, `no-held-action`. Mapping them to 404/403 is the host's; an unreadable thing is *not found*, never *forbidden* ([operations_layer.md](operations_layer.md)).
 - **A revoked claim falls back, and the drift is auditable.** `fallback` reports how the hat was chosen — `claimed | default | primary | first` — so OH-QM-04's fallback appears in the row instead of silently wearing the default.
 - **“The claim resolved” is not “the claim mattered.”** When a row needs to know whether the claim *changed* what was worn — not merely that it resolved to the hat the landing order would have picked anyway — compare against the landing hat: `wornHat(wearableAt(hats, scopePath))` against the decision's hat. Free under the memo, one line in the host. Promoted to a field only if an audit row proves to need it (a consumer is watching for exactly this and will report).
 - **The organization is request context** — C31's position, taken: an optional `organizationId` filters wearability, so an actor's hats in other organizations are not even wearable. A host serving team routes passes the team's organization; a host that disagrees ignores the field.

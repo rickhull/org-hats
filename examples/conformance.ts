@@ -2,7 +2,7 @@
 // eleven OH-QM cases gets a body; the harness iterates the published
 // inventory, fails on a missing or unknown id, and runs every body against a
 // fresh fixture of the reference adapter — the festival world, where the
-// application is the dispatch board and `send` is the speech act.
+// application is the dispatch board and `send` is its membership action.
 //
 //   node examples/conformance.ts
 //
@@ -15,7 +15,7 @@ import {
   onTeam,
   atScope,
   can,
-  maySpeak,
+  heldCarries,
   wearableAt,
   admitted,
   wornHat,
@@ -190,13 +190,30 @@ const cases: Record<string, Body> = {
   },
 
   "OH-QM-07": async (w) => {
-    const hats = await w.repo.hatsOf("cal", w.op);
-    const worn = wornHat(wearableAt(hats, w.bigparkPath), "g-cal-sup");
-    assert(!worn!.actions.includes(SEND), "the supervisor hat does not itself speak");
-    assert(maySpeak(worn, onTeam(w.stageops, w.bigparkPath), hats, SEND), "a serving member speaks without switching hats");
-    const adamHats = await w.repo.hatsOf("adam", w.op);
-    const adamWorn = wornHat(wearableAt(adamHats, w.bigparkPath));
-    assert(!maySpeak(adamWorn, onTeam(w.stageops, w.bigparkPath), adamHats, SEND), "a non-member supervisor is refused");
+    // The consumer's membership policy — *theirs*, not the model's — proven
+    // through the spine's two-edge shape: the worn hat reaches (presence),
+    // a separately held grant carries the membership action (standing).
+    const calHats = await w.repo.hatsOf("cal", w.op);
+    assert(heldCarries(calHats, onTeam(w.stageops, w.bigparkPath), SEND), "the membership is a held send grant, atomic");
+    const d1 = await decide(w.repo, {
+      actorId: "cal",
+      operationId: w.op,
+      scopePath: w.bigparkPath,
+      teamId: w.stageops,
+      action: null,
+      heldAction: SEND,
+      claimedHatId: "g-cal-sup",
+    });
+    assert(d1.ok && d1.hat.grant.id === "g-cal-sup", "a serving member acts without switching hats");
+    const d2 = await decide(w.repo, {
+      actorId: "adam",
+      operationId: w.op,
+      scopePath: w.bigparkPath,
+      teamId: w.stageops,
+      action: null,
+      heldAction: SEND,
+    });
+    assert(!d2.ok && d2.reason === "no-held-action", "a supervisor who is not a member is refused");
   },
 
   "OH-QM-08": async (w) => {

@@ -1,14 +1,13 @@
 // The spine walkthrough — every decision shape the request spine produces,
 // exercised over the SQLite adapter and, once, over the fake port. The world
-// is the festival; the application is the dispatch board, and `send` is the
-// speech act — a member is one who may speak as their crew.
+// is the festival; the application is the dispatch board, and `send` is its
+// membership action — a member is one who may send as their crew.
 //
 //   node examples/decide.ts
 
 import { fileURLToPath } from "node:url";
 import {
   decide,
-  decideSpeak,
   fakeRepository,
   leafScopeId,
   parentPath,
@@ -16,7 +15,6 @@ import {
   type Decision,
   type HeldHat,
   type Id,
-  type SpeakDecision,
 } from "../src/index.ts";
 import { Db, SqliteRepository, installSchema } from "../src/node.ts";
 
@@ -28,7 +26,7 @@ function assert(cond: boolean, message: string): void {
   if (!cond) throw new Error(message);
 }
 
-const show = (d: Decision | SpeakDecision): string => {
+const show = (d: Decision): string => {
   const h = d.hat;
   const hat =
     h === null
@@ -40,8 +38,8 @@ const show = (d: Decision | SpeakDecision): string => {
 
 /** A one-line audit row — the shape a host records on every act (rule 5);
  * names ride on the host's extended HeldHat, not on the model's. */
-const audit = (d: Decision | SpeakDecision, actor: Id): string =>
-  `${actor}\t${d.action}\t${d.ok ? "allow" : `deny:${d.reason}`}\that=${d.hat?.grant.id ?? "-"}\tfallback=${d.fallback ?? "-"}\tclaimed=${d.claimed ?? "-"}`;
+const audit = (d: Decision, actor: Id): string =>
+  `${actor}\t${d.action ?? "-"}\t${d.ok ? "allow" : `deny:${d.reason}`}\that=${d.hat?.grant.id ?? "-"}\tfallback=${d.fallback ?? "-"}\tclaimed=${d.claimed ?? "-"}`;
 
 export async function runDecide(): Promise<void> {
   const db = new Db(":memory:");
@@ -123,19 +121,21 @@ export async function runDecide(): Promise<void> {
 
     console.log(`audit row (rule 5)         ${audit(d6, "blake")}`);
 
-    // 7. The two-edge rule: Cal wears Stage Manager but holds Volunteer, so
-    //    speaks; Adam wears Stage Manager and holds nothing that speaks.
-    console.log("\n== speaking: the worn hat reaches, a held grant speaks ==");
-    const s1 = await decideSpeak(repo, { actorId: cal, operationId: riverbend, scopePath: bigparkPath, teamId: stageops, action: SEND, claimedHatId: "g-cal-sup" });
-    console.log(`cal speaks for stage ops   ${show(s1)}`);
-    assert(s1.ok && s1.hat.grant.id === "g-cal-sup", "a member speaks without switching hats");
-    const s2 = await decideSpeak(repo, { actorId: adam, operationId: riverbend, scopePath: bigparkPath, teamId: stageops, action: SEND });
-    console.log(`adam speaks for stage ops  ${show(s2)}`);
-    assert(!s2.ok && s2.reason === "not-affiliated", "a supervisor who is not a member is refused");
+    // 7. The two-edge shape — presence from the worn hat, standing from a
+    //    held one. Cal wears Stage Manager but holds Volunteer (`send`), so
+    //    may send as stage ops without switching; Adam holds nothing that
+    //    sends. The board's policy; the model's halves.
+    console.log("\n== the two-edge shape: the worn hat reaches, a held grant carries ==");
+    const s1 = await decide(repo, { actorId: cal, operationId: riverbend, scopePath: bigparkPath, teamId: stageops, action: null, heldAction: SEND, claimedHatId: "g-cal-sup" });
+    console.log(`cal sends as stage ops      ${show(s1)}`);
+    assert(s1.ok && s1.hat.grant.id === "g-cal-sup", "a member acts without switching hats");
+    const s2 = await decide(repo, { actorId: adam, operationId: riverbend, scopePath: bigparkPath, teamId: stageops, action: null, heldAction: SEND });
+    console.log(`adam sends as stage ops     ${show(s2)}`);
+    assert(!s2.ok && s2.reason === "no-held-action", "a supervisor who holds no send grant is refused");
 
     // 7b. The same claim by name — a matcher, not a translated id. The audit
     //     records the grant the claim resolved to.
-    const s3 = await decideSpeak(repo, { actorId: cal, operationId: riverbend, scopePath: bigparkPath, teamId: stageops, action: SEND, claimedHatId: (h) => h.roleName === "Stage Manager" });
+    const s3 = await decide(repo, { actorId: cal, operationId: riverbend, scopePath: bigparkPath, teamId: stageops, action: null, heldAction: SEND, claimedHatId: (h) => h.roleName === "Stage Manager" });
     console.log(`cal claims \`Stage Manager\`  ${show(s3)}`);
     assert(s3.ok && s3.claimed === "g-cal-sup" && s3.fallback === "claimed", "a matcher claim resolves and is recorded by grant id");
 

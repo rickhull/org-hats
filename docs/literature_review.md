@@ -31,7 +31,7 @@ One section per reference, three questions each: **what it says**, **what it sup
 **Supports here.**
 
 - **Role-in-team-context is TMAC's primitive**, nearly verbatim: a grant row is TMAC's user–role–team triple, with a scope variant added. OH-QM-02 (the same-named team at another site is not reached) is exactly the collaboration problem TMAC was written for.
-- **Affiliation-as-grant** (rule 3, C44, OH-QM-06/07) is TMAC's fold too: being on a team *is* holding a team-scoped role, not a separate membership record.
+- **Roster-as-derived is TMAC's fold too**: being on a team *is* holding a team-scoped grant, not a separate membership record — now the application's policy (`heldCarries`), which is where a fold this good belongs.
 
 **Where it disagrees.**
 
@@ -73,7 +73,7 @@ One section per reference, three questions each: **what it says**, **what it sup
 **Supports here — including one consonance the docs missed.**
 
 - **Grants are relation tuples; peers are tuples without rewrites.** The four properties of the cooperation edge — mutual, read-only, scoped, non-transitive (OH-QM-09) — are exactly what falls out of *refusing* userset rewrites and transitive closure. Zanzibar users must impose that discipline by convention; this model bakes it in. That is a real differentiator.
-- **`maySpeak` is Zanzibar's intersection operator.** `reach(worn) ∧ affiliated(held, ·, action)` — the worn hat reaches the target *and* some held grant over it speaks — is literally an intersection of two userset computations, Zanzibar's `editor ∩ viewer` pattern. The strongest structural rhyme in the codebase.
+- **The two-edge rule is Zanzibar's intersection operator.** `reach(worn) ∧ heldCarries(held, ·, action)` — the worn hat reaches the target *and* some held grant over it carries the action — is literally an intersection of two userset computations, Zanzibar's `editor ∩ viewer` pattern. The strongest structural rhyme in the codebase.
 - **The trust view is Expand in miniature.** `grant_by_team` and the derived roster are Zanzibar's reverse query, answered from one index instead of a tree walk — because non-transitivity means there is never a tree to walk.
 - **OH-QM-05 answers the zookie's concern** — *what was true at decision time* — by storing the resolved, legible hat on the act rather than by point-in-time reads. Same accountability goal, opposite mechanism.
 
@@ -117,10 +117,10 @@ The four nearest published relatives of the signature rules, none previously cit
 | Reference | Strongest support here | Sharpest disagreement |
 | --- | --- | --- |
 | RBAC96 / ANSI Core | grant = UA, capability = PA, session = worn hat; immediacy *exceeds* the standard | the session is per organization (C31); universal DSD is a policy choice; flatness by structure, not inheritance |
-| TMAC | role-in-team-context; affiliation-as-grant | standing, org-fielded teams vs ad-hoc collaborations; one hat, not team-context activation |
+| TMAC | role-in-team-context; roster-as-derived (the application's rule) | standing, org-fielded teams vs ad-hoc collaborations; one hat, not team-context activation |
 | Giuri & Iglio | the grant = a role instantiated over a target | their parameters carry predicates; the condition language is deleted here |
 | GRBAC | the environment dimension; the conjunctive rule shape | environment *evaluated* vs scope *anchored*; venue unverified |
-| Zanzibar | tuples without rewrites (OH-QM-09); `maySpeak` = intersection; trust view = Expand | bounded staleness vs rule 7 (OH-QM-04 fails under Zanzibar defaults; C54); no negation (D8) |
+| Zanzibar | tuples without rewrites (OH-QM-09); the two-edge rule = intersection; trust view = Expand | bounded staleness vs rule 7 (OH-QM-04 fails under Zanzibar defaults; C54); no negation (D8) |
 | Kuhn, Coyne & Weil | the role-explosion diagnosis, verbatim | their cure is an attribute algebra; this model's is its deletion |
 | ARBAC97 | proto-administrative ranges already exist (org boundary, scope coverage) | administration *was* unmodeled — dissolved: *who may grant* is an action plus reach plus the org check (C53) |
 | UCON / GEO-RBAC / TRBAC | names for rules 7, 8, and D6 respectively | none — these are kin, not adversaries |

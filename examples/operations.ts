@@ -10,11 +10,13 @@ import { fileURLToPath } from "node:url";
 import { rmSync } from "node:fs";
 import {
   onTeam,
+  reach,
+  heldCarries,
   can,
-  maySpeak,
   wearableAt,
   wornHat,
   type HeldHat,
+  type Target,
 } from "../src/index.ts";
 import { Db, SqliteRepository, installSchema } from "../src/node.ts";
 
@@ -99,6 +101,10 @@ function assert(cond: boolean, message: string): void {
 function same(a: readonly string[], b: readonly string[]): boolean {
   return [...a].sort().join() === [...b].sort().join();
 }
+
+// The board's membership policy, composed in-app (see examples/model.ts).
+const speaksAs = (worn: HeldHat | null, target: Target, held: readonly HeldHat[]): boolean =>
+  worn !== null && reach(worn, target) && heldCarries(held, target, SEND);
 
 export async function runOperations(keep: boolean): Promise<void> {
   const path = fileURLToPath(new URL("../ops.db", import.meta.url));
@@ -191,7 +197,7 @@ export async function runOperations(keep: boolean): Promise<void> {
     assert(!(await o.readableTeamsAt(blakeHats, riverbend, bigparkPath)).includes(cart), "cooperation is not transitive");
     assert(can(blakeLead, RESOLVE, onTeam(stageops, bigparkPath)), "acting is unchanged by cooperation");
     assert(!can(blakeLead, RESOLVE, onTeam(board, bigparkPath)), "cooperation is read-only");
-    assert(!maySpeak(wornHat(wearableAt(await hatsOf(drew), bigparkPath)), onTeam(stageops, bigparkPath), await hatsOf(drew), SEND), "a non-affiliate supervises without speaking");
+    assert(!speaksAs(wornHat(wearableAt(await hatsOf(drew), bigparkPath)), onTeam(stageops, bigparkPath), await hatsOf(drew)), "a non-affiliate supervises without speaking");
     assert(same(await o.readableTeamsAt(await hatsOf(ellis), riverbend, bigparkPath), [gate, stageops, cart]), "an actor spanning orgs reads both");
 
     let refused = 0;

@@ -7,8 +7,10 @@
 // resolve the claim against the wearable set (not the held set — that is
 // rule 7), then compose capability with reach. Getting that order wrong is
 // how a revoked claim authorizes an act. `decide` composes it once so the
-// wrong order is inexpressible; `decideSpeak` does the same for the
-// two-edge rule (rule 3, OH-QM-07).
+// wrong order is inexpressible — including the two-edge shape: presence
+// (the worn hat reaches) and standing (a held grant carries `heldAction`),
+// the subtle held-versus-worn distinction hosts should not reimplement
+// (OH-QM-07).
 //
 // A decision is data, never an exception: a denial is a first-class outcome
 // with a reason, so the audit row (rule 5) has one shape for allow and deny.
@@ -18,7 +20,7 @@
 //
 // This file is pure: no driver, no `node:*`, so it lives inside the fence
 // and runs over any adapter — SQLite, D1, or a fake in tests.
-import { affiliated, atScope, onTeam, reach, wearableAt, wornHat, } from "./core.js";
+import { atScope, heldCarries, onTeam, reach, wearableAt, wornHat, } from "./core.js";
 function howWorn(hat, claim) {
     if (claim !== null && (typeof claim === "string" ? hat.grant.id === claim : claim(hat)))
         return "claimed";
@@ -49,42 +51,27 @@ function claimRecorded(claim, worn, fallback) {
         return claim;
     return fallback === "claimed" && worn !== null ? worn.grant.id : null;
 }
-// --- the two decisions -------------------------------------------------------
-/** May the actor, wearing the hat in force, do this action on this target?
- * `can` split into its reasons: the role's capability, then the grant's
- * reach. */
+// --- the decision ------------------------------------------------------------
+/** May the actor, wearing the hat in force, do this act on this target?
+ * `can` split into its reasons — the role's capability, then the grant's
+ * reach — with the two-edge shape folded in: set `heldAction` and the
+ * decision additionally requires a *held* grant over the target carrying
+ * it (presence from the worn hat, standing from a held one — OH-QM-07). */
 export async function decide(repo, request) {
     const { target, held, worn, fallback } = await loadWorn(repo, request);
-    const base = { target, action: request.action, claimed: claimRecorded(request.claimedHatId ?? null, worn, fallback) };
+    const base = { target, action: request.action ?? null, claimed: claimRecorded(request.claimedHatId ?? null, worn, fallback) };
     if (held.length === 0)
         return { ok: false, reason: "unknown-actor", hat: null, fallback: null, ...base };
     if (worn === null)
         return { ok: false, reason: "not-admitted", hat: null, fallback: null, ...base };
-    if (!worn.actions.includes(request.action)) {
+    if (request.action != null && !worn.actions.includes(request.action)) {
         return { ok: false, reason: "no-capability", hat: worn, fallback, ...base };
     }
     if (!reach(worn, target)) {
         return { ok: false, reason: "out-of-reach", hat: worn, fallback, ...base };
     }
-    return { ok: true, hat: worn, fallback, ...base };
-}
-/** May the actor *speak on behalf of* the target, wearing the hat in force?
- * The two-edge rule (OH-QM-07): the worn hat must reach the target, and the
- * actor must be affiliated — a held grant over it carries the speech act,
- * which is the request's `action`. The worn hat need not itself carry it,
- * so a working lead speaks for their own team without switching hats. */
-export async function decideSpeak(repo, request) {
-    const { target, held, worn, fallback } = await loadWorn(repo, request);
-    const base = { target, action: request.action, claimed: claimRecorded(request.claimedHatId ?? null, worn, fallback) };
-    if (held.length === 0)
-        return { ok: false, reason: "unknown-actor", hat: null, fallback: null, ...base };
-    if (worn === null)
-        return { ok: false, reason: "not-admitted", hat: null, fallback: null, ...base };
-    if (!reach(worn, target)) {
-        return { ok: false, reason: "out-of-reach", hat: worn, fallback, ...base };
-    }
-    if (!affiliated(held, target, request.action)) {
-        return { ok: false, reason: "not-affiliated", hat: worn, fallback, ...base };
+    if (request.heldAction != null && !heldCarries(held, target, request.heldAction)) {
+        return { ok: false, reason: "no-held-action", hat: worn, fallback, ...base };
     }
     return { ok: true, hat: worn, fallback, ...base };
 }

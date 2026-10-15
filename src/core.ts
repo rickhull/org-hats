@@ -7,9 +7,9 @@
 //
 // The model has five entities — Actor, Role, Team, Organization, Scope — and
 // two relationships: a **grant** (an actor may wear a role over a team or a
-// scope) and a **capability** (a role may perform an action). Affiliation is
-// not a third edge: an actor is affiliated with a team when they hold a grant
-// over it whose role carries the application's speech act.
+// scope) and a **capability** (a role may perform an action). There is no
+// membership edge: an application derives its roster from grants however it
+// defines membership — `heldCarries` is the check for the common derivation.
 
 /** Every id is caller-supplied and opaque — a UUID or a slug. */
 export type Id = string;
@@ -22,10 +22,11 @@ export type Target =
 export const onTeam = (team: Id, scopePath: string): Target => ({ kind: "team", team, scopePath });
 export const atScope = (scopePath: string): Target => ({ kind: "scope", scopePath });
 
-// The application names every action — this module names none. Speaking is
-// the one act the model knows *of* without naming: a team is a group that
-// acts through its members, and the membership questions (`affiliated`,
-// `maySpeak`) take the speech act as a parameter — send, author, post.
+// The application names every action — this module names none, and privileges
+// none. The nearest thing to an exception is structural, not communicative:
+// `heldCarries` checks an action against what an actor *holds* rather than
+// what they wear — the standing half of a two-edge rule. What that action
+// means (membership, filing, representation) is the application's policy.
 
 export interface Grant {
   id: Id;
@@ -107,24 +108,15 @@ export function can(hat: HeldHat | null, action: string, target: Target): boolea
   return reach(hat, target);
 }
 
-/** Is this actor on the target's team — the roster predicate? A member
- * holds a grant over the target whose role carries the application's speech
- * act. Membership is a standing, checked against *held* grants; no hat need
- * be worn, and revoking the grant removes the member in one row. */
-export function affiliated(hats: readonly HeldHat[], target: Target, action: string): boolean {
+/** Does any *held* grant over the target carry the action — `can` lifted
+ * from the worn hat to the held set? This is the standing half of a
+ * two-edge rule (the worn hat supplies presence; a held grant supplies
+ * standing), checked against what the actor holds rather than what is worn,
+ * so the right survives switching hats. What the action *means* —
+ * membership, filing, representation — is the application's policy; the
+ * model makes the check atomic and testable. */
+export function heldCarries(hats: readonly HeldHat[], target: Target, action: string): boolean {
   return hats.some((h) => reach(h, target) && h.actions.includes(action));
-}
-
-/** May the actor speak on behalf of the target, wearing this hat? Speaking
- * for a team is inherent to teams — a team is a group that acts through its
- * members — and the test is two-edged: the worn hat must *reach* the target
- * (the session is there), and the actor must be *affiliated* (a held grant
- * over it carries the speech act). The worn hat need not itself carry the
- * action, so a working lead speaks for their own team without switching
- * hats. The application names the speech act — send, author, post. */
-export function maySpeak(worn: HeldHat | null, target: Target, held: readonly HeldHat[], action: string): boolean {
-  if (worn === null || !reach(worn, target)) return false;
-  return affiliated(held, target, action);
 }
 
 /** What a session claims: the worn hat's grant id, or a matcher. A
@@ -163,9 +155,10 @@ export function wornHat<H extends HeldHat>(wearable: readonly H[], claim: HatCla
 /** The organizations an actor is in *through a team* — the read boundary. A
  * scope-bound configuring grant names an organization but adds no read reach.
  *
- * Read reach is **team-bearing** (this function); *authoring* affiliation is
- * **capability-derived** (`maySpeak`). Two correct rules one word apart: this
- * one answers "whose teams may I read", the other "may I speak for this". */
+ * Read reach is **team-bearing** (this function); the application's roster
+ * rule is **grant-derived** (`heldCarries`, commonly). Two correct rules one
+ * word apart: this one answers "whose teams may I read"; the app's answers
+ * "who is on this team". */
 export function organizationsOf(hats: readonly HeldHat[]): Id[] {
   return [...new Set(hats.filter((h) => h.grant.teamId !== null).map((h) => h.grant.organizationId))];
 }

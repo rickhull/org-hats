@@ -66,7 +66,7 @@ Core RBAC has users, roles, permissions, and sessions — and nothing that says 
 - **Organization** — who fields a team; the boundary authority cannot cross.
 - **Scope** — a nested place (operation → site → floor); where a grant reaches.
 - **Grant target** — a role is held *over* a team or a scope, not in the abstract.
-- **Affiliation** — a **member grant**: a team-bound grant whose role carries the application's **speech act**. Speaking on behalf of a team is inherent to teams — a team acts through its members — and the application names the act (`send`, `author`, `post`). It is what lets an actor *speak for* a team, and it is not a third edge — supervising never confers it.
+- **Membership** — not modeled. The application derives its roster from grants; the common derivation (an action-carried grant) is `heldCarries`. In RBAC terms, nothing beyond UA parameterized by target — the meaning of "member" is application policy.
 
 These are the "parameterized roles" of Giuri & Iglio and GRBAC, plus the relationship graph of Zanzibar, assembled so that context never becomes part of a role's identity.
 
@@ -89,7 +89,7 @@ The practical alternative today is not another RBAC paper but a Zanzibar descend
 - **immediate revocation** — rule 7, conformance-proved (OH-QM-03, OH-QM-04), not bounded staleness;
 - a **legible audit snapshot** — the hat recorded on the act (OH-QM-05), not a point-in-time reconstruction.
 
-And the one place this model already speaks Zanzibar's language: `maySpeak` is an **intersection** — the worn hat reaches the target *and* a held grant speaks — two userset computations, conjoined, exactly Zanzibar's `editor ∩ viewer` pattern.
+And the one place this model already speaks Zanzibar's language: the two-edge rule — `decide` with `heldAction`, `reach(worn) ∧ heldCarries(held, ·, action)` — is an **intersection**: the worn hat reaches the target *and* a held grant over it carries the action, exactly Zanzibar's `editor ∩ viewer` pattern.
 
 ## Building a Core RBAC application on it
 

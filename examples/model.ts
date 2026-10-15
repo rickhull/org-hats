@@ -12,19 +12,22 @@ import { rmSync } from "node:fs";
 import {
   onTeam,
   atScope,
+  reach,
+  heldCarries,
   scopeCovers,
   can,
-  maySpeak,
   wearableAt,
   admitted,
   wornHat,
   organizationsOf,
   type HeldHat,
+  type Target,
 } from "../src/index.ts";
 import { Db, SqliteRepository, installSchema } from "../src/node.ts";
 
 // The dispatch board's actions — this application's vocabulary, not the
-// model's. `send` is the speech act: to be on a crew is to speak as it.
+// model's. `send` is the board's *membership action* — its own policy: to be
+// on a crew is to may send as it. The model is indifferent.
 const SEND = "send";
 const READ_LOG = "read_log";
 const RESOLVE = "resolve";
@@ -45,6 +48,13 @@ function same(a: readonly string[], b: readonly string[]): boolean {
   return [...a].sort().join() === [...b].sort().join();
 }
 const hat = (hats: readonly HeldHat[], id: string): HeldHat => hats.find((h) => h.grant.id === id)!;
+
+// The board's membership policy — the *application's*, composed from the
+// model's primitives: a member is one who may send as the crew, and sending
+// needs the worn hat to reach the crew (presence) and a held grant over it
+// to carry `send` (standing). Org-hats ships the halves; the policy is ours.
+const speaksAs = (worn: HeldHat | null, target: Target, held: readonly HeldHat[]): boolean =>
+  worn !== null && reach(worn, target) && heldCarries(held, target, SEND);
 
 export async function runModel(keep: boolean): Promise<void> {
   const path = fileURLToPath(new URL("../org_hats.db", import.meta.url));
@@ -142,15 +152,15 @@ export async function runModel(keep: boolean): Promise<void> {
     assert(averyHats.length === 1, "Avery holds one grant");
     assert(averyHat.grant.primary && averyHat.grant.default, "Avery's primary is also his default");
     assert(!can(averyHat, RESOLVE, onTeam(gate, bigparkPath)), "a Volunteer must not resolve");
-    assert(maySpeak(wornHat(wearableAt(averyHats, bigparkPath)), onTeam(gate, bigparkPath), averyHats, SEND), "a Volunteer must speak, with a held send grant");
+    assert(speaksAs(wornHat(wearableAt(averyHats, bigparkPath)), onTeam(gate, bigparkPath), averyHats), "a Volunteer must speak, with a held send grant");
     assert(can(blakeLead, RESOLVE, onTeam(stageops, bigparkPath)), "a Stage Manager resolves their crew's log");
     assert(can(blakeLead, READ_LOG, onTeam(stageops, bigparkPath)), "a Stage Manager reads the crew's log");
-    assert(maySpeak(blakeLead, onTeam(stageops, bigparkPath), blakeHats, SEND), "a held volunteer grant lets the lead speak without switching");
-    assert(maySpeak(blakeVol, onTeam(stageops, bigparkPath), blakeHats, SEND), "a member's volunteer hat must speak");
-    assert(!maySpeak(blakeLead, onTeam(gate, bigparkPath), blakeHats, SEND), "a grant reaches only its team");
+    assert(speaksAs(blakeLead, onTeam(stageops, bigparkPath), blakeHats), "a held volunteer grant lets the lead speak without switching");
+    assert(speaksAs(blakeVol, onTeam(stageops, bigparkPath), blakeHats), "a member's volunteer hat must speak");
+    assert(!speaksAs(blakeLead, onTeam(gate, bigparkPath), blakeHats), "a grant reaches only its team");
     assert(can(robinStage, RESOLVE, onTeam(stageops, bigparkPath)), "supervision needs no affiliation");
-    assert(!maySpeak(robinStage, onTeam(stageops, bigparkPath), robinHats, SEND), "a non-affiliate must not speak");
-    assert(!maySpeak(drewBigpark, onTeam(stageops, bigparkPath), drewHats, SEND), "a covering manager supervises without speaking");
+    assert(!speaksAs(robinStage, onTeam(stageops, bigparkPath), robinHats), "a non-affiliate must not speak");
+    assert(!speaksAs(drewBigpark, onTeam(stageops, bigparkPath), drewHats), "a covering manager supervises without speaking");
     assert(!can(drewEast, RESOLVE, onTeam(stageops, bigparkPath)), "a team-bound grant reaches one team");
     assert(can(frankieCfg, CONFIGURE, atScope(mainstagePath)), "a festival-scope grant covers nested sites and stages");
     assert(!can(frankieCfg, RESOLVE, onTeam(gate, bigparkPath)), "configure must not resolve");
@@ -185,7 +195,7 @@ export async function runModel(keep: boolean): Promise<void> {
     const directorySurvives = blakeAfter.length > 0;
     const everyCheckFalse =
       !can(hat(blakeAfter, "g-blake-lead"), RESOLVE, onTeam(stageops, bigparkPath)) &&
-      !maySpeak(wornHat(wearableAt(blakeAfter, bigparkPath)), onTeam(stageops, bigparkPath), blakeAfter, SEND) &&
+      !speaksAs(wornHat(wearableAt(blakeAfter, bigparkPath)), onTeam(stageops, bigparkPath), blakeAfter) &&
       !can(hat(frankieAfter, "g-frankie-cfg"), CONFIGURE, atScope(bigparkPath));
     console.log(`== seam: directory answers=${directorySurvives}, every can? false=${everyCheckFalse} ==`);
     assert(directorySurvives, "the directory must survive an empty capability table");

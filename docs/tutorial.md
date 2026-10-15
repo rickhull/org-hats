@@ -45,22 +45,24 @@ The model names no action at all — `send`, `read_log`, `resolve` are the dispa
 
 **It cannot say:** whether Avery actually *speaks for* Gate Crew, or who else is on it. Holding a hat is a capacity, not a place in the group. That distinction is step 3.
 
-## 3. A team is people — the member grant
+## 3. A team is people — the roster rule
 
-A team is not just a name a hat points at; it is a group of people. Speaking on behalf of a team is inherent to teams — a team is exactly the kind of group that acts through its members — so the member's act on the dispatch board is the one that matters: a **member is one who may `send` as the crew**.
+A team is not just a name a hat points at; it is a group of people. But *who counts as a member* is organizational policy, and policy belongs to the application — so the model stores no membership edge and defines none. What it ships are the two halves every roster rule is made of:
+
+- **standing** — does a held grant over the team carry the action? (`heldCarries`)
+- **presence** — does the worn hat reach the team? (`reach`)
+
+The dispatch board composes its own rule: *a member is one who may `send` as the crew* — standing, in the board's own words.
 
 | Actor | Grant | Over |
 | --- | --- | --- |
 | Avery Quinn | Volunteer (`send`) | Gate Crew |
 
-**Affiliation is capability-derived**, not a separate edge: an actor is a member of a team when they hold a grant over it whose role carries the speech act — here, `send`. The two questions then divide cleanly:
+**Membership is derived, never stored**: Avery is on Gate Crew *because* his Volunteer grant carries `send` — one atomic row, revocable in one delete, and "Who is on Gate Crew?" is a query, not a table. A different application could define membership as any grant over the team, or a named role, or an action of its own; the model is indifferent.
 
-- **Speaking for a team** needs the worn hat to *reach* it and a held grant over it that speaks.
-- **Acting on a team's work** (resolving its log entries, say) needs only the right grant.
+One coupling to know, because the board chose an action-based rule: editing a role's capabilities changes *who passes the rule* — empty the capability table and the roster matches no one while the directory still answers. That coupling is the board's, not the model's.
 
-**It buys:** Avery can speak *as* Gate Crew — his Volunteer grant may `send`, so it is his membership. "Who is on Gate Crew?" is the roster of send-grant holders.
-
-One coupling to know: because affiliation is derived from capabilities, editing a role's capabilities changes *who is affiliated* — empty the capability table and the roster empties while the directory still answers.
+**It buys:** Avery can send *as* Gate Crew, and the roster is always exactly the send-grant holders.
 
 **It cannot say:** what happens when one person holds *two* hats. That is step 4.
 
@@ -77,7 +79,7 @@ An actor wears **one hat at a time**. Wearing the Volunteer hat, Blake can `send
 
 Note that the two hats must be able to coexist. A model that allowed only one hat per (actor, team) could not express a manager who must sometimes wear down to an ordinary crew member.
 
-Note also what *doesn't* change: Blake speaks for Stage Ops in either hat, because speaking rides on the **held** grant, not the worn one.
+Note also what *doesn't* change: Blake sends as Stage Ops in either hat, because standing rides on the **held** grant, not the worn one.
 
 **It buys:** a lead who can manage and can also step down; and an audit trail of which hat each act was done under.
 
@@ -92,7 +94,7 @@ Robin manages the Info Booth and also covers Stage Ops, and holds no send grant 
 | Booth manager | Stage Manager | Booth | no |
 | Stage Ops cover | Stage Manager | Stage Ops | no |
 
-**Managing a team never makes one a member, and there is no separate membership edge to set.** Affiliation is a held send grant, so Robin — who holds only managing grants — is affiliated with neither team and cannot speak for either, though she can `resolve` both.
+**Managing a team never makes one a member, and there is no separate membership edge to set.** Membership is the board's rule — a held send grant — so Robin, who holds only managing grants, is on neither team and cannot send as either, though she can `resolve` both.
 
 This is also why the model refuses a hierarchy: a senior hat gains nothing automatically. Robin's Stage Ops cover is an explicit grant, not an inheritance from her Booth role.
 
@@ -162,7 +164,7 @@ Avery's Gate Crew hat is anchored at Big Park, so he is admitted there and nowhe
 
 ## 9. One person, two organizations
 
-People do not always have one affiliation. Ellis volunteers for the Council and runs a cart for the food vendor.
+People do not always belong to one body. Ellis volunteers for the Council and runs a cart for the food vendor.
 
 | Hat | Role | Over | Organization | Primary? |
 | --- | --- | --- | --- | --- |

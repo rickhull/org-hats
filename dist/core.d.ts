@@ -63,19 +63,14 @@ export declare const parentPath: (scopePath: string) => string;
 export declare function reach(hat: HeldHat, target: Target): boolean;
 /** Can the active hat do this action, on this target? */
 export declare function can(hat: HeldHat | null, action: string, target: Target): boolean;
-/** Is this actor on the target's team — the roster predicate? A member
- * holds a grant over the target whose role carries the application's speech
- * act. Membership is a standing, checked against *held* grants; no hat need
- * be worn, and revoking the grant removes the member in one row. */
-export declare function affiliated(hats: readonly HeldHat[], target: Target, action: string): boolean;
-/** May the actor speak on behalf of the target, wearing this hat? Speaking
- * for a team is inherent to teams — a team is a group that acts through its
- * members — and the test is two-edged: the worn hat must *reach* the target
- * (the session is there), and the actor must be *affiliated* (a held grant
- * over it carries the speech act). The worn hat need not itself carry the
- * action, so a working lead speaks for their own team without switching
- * hats. The application names the speech act — send, author, post. */
-export declare function maySpeak(worn: HeldHat | null, target: Target, held: readonly HeldHat[], action: string): boolean;
+/** Does any *held* grant over the target carry the action — `can` lifted
+ * from the worn hat to the held set? This is the standing half of a
+ * two-edge rule (the worn hat supplies presence; a held grant supplies
+ * standing), checked against what the actor holds rather than what is worn,
+ * so the right survives switching hats. What the action *means* —
+ * membership, filing, representation — is the application's policy; the
+ * model makes the check atomic and testable. */
+export declare function heldCarries(hats: readonly HeldHat[], target: Target, action: string): boolean;
 /** What a session claims: the worn hat's grant id, or a matcher. A
  * name-keyed claim — a UUID does not survive a re-seed, a name does — passes
  * `(hat) => ...` and never translates through a shim. Compose enough names
@@ -98,8 +93,9 @@ export declare function wornHat<H extends HeldHat>(wearable: readonly H[], claim
 /** The organizations an actor is in *through a team* — the read boundary. A
  * scope-bound configuring grant names an organization but adds no read reach.
  *
- * Read reach is **team-bearing** (this function); *authoring* affiliation is
- * **capability-derived** (`maySpeak`). Two correct rules one word apart: this
- * one answers "whose teams may I read", the other "may I speak for this". */
+ * Read reach is **team-bearing** (this function); the application's roster
+ * rule is **grant-derived** (`heldCarries`, commonly). Two correct rules one
+ * word apart: this one answers "whose teams may I read"; the app's answers
+ * "who is on this team". */
 export declare function organizationsOf(hats: readonly HeldHat[]): Id[];
 export declare const SCHEMA = "\n  PRAGMA foreign_keys = ON;\n\n  -- Every id is TEXT and caller-supplied. A scope id must not contain \"/\".\n  CREATE TABLE scope (\n    id        TEXT PRIMARY KEY,\n    parent_id TEXT REFERENCES scope(id),\n    name      TEXT NOT NULL,\n    path      TEXT NOT NULL\n  );\n  CREATE UNIQUE INDEX scope_identity ON scope (COALESCE(parent_id, ''), name);\n\n  -- An organization belongs to one operation (a root scope).\n  CREATE TABLE organization (\n    id       TEXT PRIMARY KEY,\n    scope_id TEXT NOT NULL REFERENCES scope(id),\n    name     TEXT NOT NULL,\n    UNIQUE (scope_id, name)\n  );\n\n  -- A label, not a key.\n  CREATE TABLE actor (\n    id   TEXT PRIMARY KEY,\n    name TEXT NOT NULL\n  );\n\n  CREATE TABLE team (\n    id              TEXT PRIMARY KEY,\n    organization_id TEXT NOT NULL REFERENCES organization(id),\n    scope_id        TEXT NOT NULL REFERENCES scope(id),\n    name            TEXT NOT NULL,\n    UNIQUE (scope_id, name)\n  );\n  CREATE INDEX team_by_org ON team (organization_id);\n\n  CREATE TABLE role (\n    id   TEXT PRIMARY KEY,\n    name TEXT NOT NULL UNIQUE\n  );\n\n  CREATE TABLE capability (\n    role_id TEXT NOT NULL REFERENCES role(id),\n    action  TEXT NOT NULL\n  );\n  CREATE UNIQUE INDEX capability_identity ON capability (role_id, action);\n\n  CREATE TABLE grant (\n    id              TEXT PRIMARY KEY,\n    actor_id        TEXT NOT NULL REFERENCES actor(id),\n    role_id         TEXT NOT NULL REFERENCES role(id),\n    organization_id TEXT NOT NULL REFERENCES organization(id),\n    team_id         TEXT REFERENCES team(id),\n    scope_id        TEXT REFERENCES scope(id),\n    is_primary      INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1)),\n    is_default      INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),\n    CHECK ((team_id IS NULL) <> (scope_id IS NULL))\n  );\n  CREATE INDEX grant_by_actor ON grant (actor_id);\n  CREATE INDEX grant_by_team ON grant (team_id);\n  CREATE INDEX grant_by_scope ON grant (scope_id);\n  CREATE UNIQUE INDEX grant_one_primary ON grant (actor_id, organization_id) WHERE is_primary = 1;\n  CREATE UNIQUE INDEX grant_one_default ON grant (actor_id, organization_id) WHERE is_default = 1;\n  CREATE UNIQUE INDEX grant_identity\n    ON grant (actor_id, organization_id, role_id, COALESCE(team_id, ''), COALESCE(scope_id, ''));\n";

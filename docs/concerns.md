@@ -107,6 +107,14 @@ Raised by Quartermaster's v0.2.2 adoption report (October 2026). One entry; no r
 | --- | --- | --- | --- |
 | **C62** | resolved | `perRequest`'s one-request lifetime was documented prose, proved only in the consumer's own suite — the reference's OH-QM-05 body reads the store directly, so a host wiring the memo across requests would pass every upstream case. | **OH-QM-11** (v0.2.3): two requests, two memos, a revocation between them — the hat is worn by the first and not by the second, and the claim's fallback shows the drift. The inventory grows by design; a host reports the id missing until it adds a body. The consumer's measurement (three concurrent asks → one read; the promise is memoized, not the result) is now stated in [package.md](package.md) § *The port*. |
 
+## The membership retreat (v0.4.0)
+
+Raised by the maintainer and settled jointly with the consumer over the channel (`~/git/quartermaster/org-hats.txt`, mirrored in [`quartermaster.txt`](../quartermaster.txt)): *Quartermaster's "member" is a product policy, not a fact org-hats should define.* One entry.
+
+| Id | Status | Concern | Resolution |
+| --- | --- | --- | --- |
+| **C64** | resolved | The speech-act concept survived v0.3.0's abstraction: `affiliated`/`maySpeak`/`decideSpeak` still defined member := one-who-may-speak-for-the-team, and the docs claimed speaking inherent to teams — while membership and representation are independent (members without voice; voices without membership). | **Membership is the application's policy; the model ships the halves.** `heldCarries(hats, target, action)` replaces `affiliated` (standing, no membership claim); `maySpeak` is gone (compose `reach ∧ heldCarries`, as the examples now demonstrate in-app); `decideSpeak` is folded into `decide` as `heldAction?: string` with deny reason `no-held-action` — the consumer's naming, chosen because "Standing" is *their* role word. OH-QM-06/07 remain the consumer's cases, proven against the neutral primitives; ids and descriptions unchanged. The consumer confirmed: member := author-grant is their policy, not a load-bearing model invariant, and a future non-filing roster member or authorized delegate is plausible — baking in the coincidence would have been a mistake. |
+
 ## The abstraction release (v0.3.0)
 
 Raised by the maintainer (October 2026): the repo spun off a reporting app, and the reporting app's vocabulary came with it. One entry.
