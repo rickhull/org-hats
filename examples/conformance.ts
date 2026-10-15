@@ -25,6 +25,8 @@ import {
   organizationsOf,
   SCHEMA,
   CONFORMANCE_CASES,
+  decide,
+  perRequest,
   runConformance as runBodies,
   type ConformanceBodies,
 } from "../src/index.ts";
@@ -44,7 +46,7 @@ function refuses(fn: () => void): boolean {
 }
 
 /** One fresh fixture per case: a single operation, two sites, three
- * organizations, the teams and roles the ten cases name. In-memory, so cases
+ * organizations, the teams and roles the eleven cases name. In-memory, so cases
  * cannot leak into one another. */
 interface World {
   db: Db;
@@ -229,6 +231,36 @@ const cases: Record<string, Body> = {
       `SELECT t.id FROM team t JOIN scope s ON s.id = t.scope_id WHERE t.organization_id IN ('atlas') AND substr('/acme/north/', 1, length(s.path)) = s.path`,
     );
     assert(indexed(readPlan), `readable teams should be an index search, got: ${readPlan}`);
+  },
+
+  "OH-QM-11": async (w) => {
+    // Two requests, two memos. The claim is worn by the first; the grant is
+    // revoked between them; the second request — a fresh `perRequest` — must
+    // neither wear nor serve it. A memo outliving its request is the bug this
+    // case exists to catch (raised by a consumer whose own body did double
+    // duty; this makes the guarantee shared).
+    const request1 = perRequest(w.repo);
+    const d1 = await decide(request1, {
+      actorId: "bob",
+      operationId: w.op,
+      scopePath: w.northPath,
+      teamId: w.drive,
+      action: RESOLVE,
+      claimedHatId: "g-bob-drive",
+    });
+    assert(d1.ok && d1.hat.grant.id === "g-bob-drive" && d1.fallback === "claimed", "the claim is worn while held");
+    w.repo.revokeGrant("g-bob-drive");
+    const request2 = perRequest(w.repo);
+    const d2 = await decide(request2, {
+      actorId: "bob",
+      operationId: w.op,
+      scopePath: w.northPath,
+      teamId: w.drive,
+      action: RESOLVE,
+      claimedHatId: "g-bob-drive",
+    });
+    assert(!d2.ok && d2.hat?.grant.id !== "g-bob-drive", "a hat revoked after one request is not worn by the next");
+    assert(d2.claimed === "g-bob-drive" && d2.fallback !== "claimed", "the revoked claim falls back, and the row shows the drift");
   },
 };
 

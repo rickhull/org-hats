@@ -7,7 +7,7 @@
 Shipped, all additive, all inside the fence (no `node:*`, zero runtime deps):
 
 - **The request spine** — `src/decide.ts`: `decide` / `decideSpeak` over the port, composing the predicates in the order the rules require. Decisions are **data, never exceptions**, with reason codes and a `fallback` field (rule 5's signal).
-- **The conformance harness** — `runConformance(bodies)` in `src/conformance.ts`: every body runs, a throw is a failure, and the ids ran are diffed against the published inventory so drift fails the report. A host proves the ten against *its own* store in one call.
+- **The conformance harness** — `runConformance(bodies)` in `src/conformance.ts`: every body runs, a throw is a failure, and the ids ran are diffed against the published inventory so drift fails the report. A host proves the eleven against *its own* store in one call.
 - **The fake port** — `src/testing.ts`: `fakeRepository(hats, read?)`; route wiring and decision mapping testable without a driver.
 - **The request-scoped memo** — `perRequest(repo)` in `src/port.ts` (v0.2.2): the executable form of the port's memoize instruction — one consistent read per request, never shared across requests (C54).
 

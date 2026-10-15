@@ -41,7 +41,7 @@
 | **C25** | `membership_by_team` had no query either. | Added `members_of` — now capability-derived (author-grant holders over the team), so the membership table and its index were removed entirely (C44). |
 | **C26** | The operations layer used `resolve` as a proxy for "supervises". | Defined an explicit `read_reports` action; `supervises?` uses it, so a supervisor is whoever may read the team's reports. |
 | **C27** | Primary versus default was stated abstractly. | Added the illustration: the chief executive's primary hat is *CEO*, and their default may be *Janitor*. |
-| **C28** | C24 removed `grant_by_scope`, leaving no index for a scope-side trust view. | Reinstated it as a documented, no-caller index, retained for the deferred scope-side query (D7). |
+| **C28** | C24 removed `grant_by_scope`, leaving no index for a scope-side trust view. | Reinstated it as a documented, no-caller index, retained for the deferred scope-side query (D7). (A consumer runs the same razor the other way — no index without a caller, per C24 — and defers its trust-view index until the queries exist, its phase 8. Both readings are one discipline: an index earns its keep or it goes.) |
 
 ## Consumer review
 
@@ -98,6 +98,14 @@ Raised by Quartermaster's review of v0.2.0 (October 2026), delivered over the co
 | **C59** | resolved | `childPath` built a path but nothing read one — a host carried its own `leafScopeId` to parse paths back into ids, and would get it wrong the day the format changed. | `leafScopeId` and `parentPath` are exported beside `childPath`: the format is the model's, so its parser ships with its builder. |
 | **C60** | resolved | The documented site filter — `? LIKE s.path || '%'` — is not portable: a consumer measured Cloudflare D1 rejecting LIKE patterns of fifty characters and up, and UUID-built paths exceed that one level below the root. The reference's `node:sqlite` limit is far higher, so the failure was invisible upstream. | The reference adapter now compares with `substr(?, 1, length(s.path)) = s.path` — same answer, no pattern — and the model doc states `substr` as the portable form with the D1 measurement ([organization_model.md](organization_model.md) § *Efficiency*). |
 | **C61** | resolved | The port's docs read as a cheap pure function — the naive wiring re-queries `hatsOf` several times per request — and said nothing about foreign keys. | Both stated in `src/port.ts` and [package.md](package.md) § *The port*: memoize `hatsOf` per request in the adapter; an adapter may run under enforced foreign keys (D1 enforces them), which orders inserts — the scope row precedes what references it. |
+
+## Consumer review, round three
+
+Raised by Quartermaster's v0.2.2 adoption report (October 2026). One entry; no requests, one observation made contractual.
+
+| Id | Status | Concern | Resolution |
+| --- | --- | --- | --- |
+| **C62** | resolved | `perRequest`'s one-request lifetime was documented prose, proved only in the consumer's own suite — the reference's OH-QM-05 body reads the store directly, so a host wiring the memo across requests would pass every upstream case. | **OH-QM-11** (v0.2.3): two requests, two memos, a revocation between them — the hat is worn by the first and not by the second, and the claim's fallback shows the drift. The inventory grows by design; a host reports the id missing until it adds a body. The consumer's measurement (three concurrent asks → one read; the promise is memoized, not the result) is now stated in [package.md](package.md) § *The port*. |
 
 ## Literature review
 

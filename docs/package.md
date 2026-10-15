@@ -26,7 +26,7 @@ src/
 examples/
   model.ts       the core walkthrough, against SqliteRepository
   operations.ts  the operations-layer walkthrough
-  conformance.ts the reference proof of the ten OH-QM cases
+  conformance.ts the reference proof of the eleven OH-QM cases
   decide.ts      every decision shape, over the adapter and the fake port
   check.ts       runs them all, in order
 dist/            the committed build output (.js + .d.ts)
@@ -103,7 +103,7 @@ export interface OrgHatsRepository {
 }
 ```
 
-Two questions, both async. The **org-side read rule** (`organizationsOf`, `scopeCovers`) is core, pure, and exported; the *query* and any peer union are the adapter's. The core never sees a driver. `src/node.ts` is the SQLite reference adapter; a host supplies its own (e.g. D1). Three notes for adapter writers, the last two learned from a consumer: **memoize `hatsOf` per request** — the port looks like a cheap pure function, but `decide` asks once per decision and a request path may decide several times (`/api/me`, dashboards); `perRequest(repo)` is that instruction in executable form; **an adapter may run under enforced foreign keys** (D1 enforces them; the reference turns them on explicitly), which orders inserts — the scope row precedes whatever references it; and the reference adapter's site filter is **`substr`, never `LIKE`** — a consumer measured D1 rejecting `LIKE` patterns of fifty characters and up, which UUID-built paths exceed one level below the root ([organization_model.md](organization_model.md) § *Efficiency*).
+Two questions, both async. The **org-side read rule** (`organizationsOf`, `scopeCovers`) is core, pure, and exported; the *query* and any peer union are the adapter's. The core never sees a driver. `src/node.ts` is the SQLite reference adapter; a host supplies its own (e.g. D1). Three notes for adapter writers, the last two learned from a consumer: **memoize `hatsOf` per request** — the port looks like a cheap pure function, but `decide` asks once per decision and a request path may decide several times (`/api/me`, dashboards); `perRequest(repo)` is that instruction in executable form, and it memoizes the *promise*, not the result, so concurrent asks within a request still read once (a consumer measured three concurrent login-path asks → one read); **an adapter may run under enforced foreign keys** (D1 enforces them; the reference turns them on explicitly), which orders inserts — the scope row precedes whatever references it; and the reference adapter's site filter is **`substr`, never `LIKE`** — a consumer measured D1 rejecting `LIKE` patterns of fifty characters and up, which UUID-built paths exceed one level below the root ([organization_model.md](organization_model.md) § *Efficiency*).
 
 ## The request spine
 
@@ -135,7 +135,7 @@ The contract, in three points:
 
 ## The conformance inventory
 
-`src/conformance.ts` carries `OH-QM-01` … `OH-QM-10` as **data** (`CONFORMANCE_CASES`) plus `conformanceGaps`, which fails a run on a missing or unknown id. The `OH` is this package, `QM` the first consumer's suite; the ids are kept stable so the two cannot drift. A host runs a body per id against its own adapter; `examples/conformance.ts` is the reference proof of all ten, run by `bin/check`.
+`src/conformance.ts` carries `OH-QM-01` … `OH-QM-11` as **data** (`CONFORMANCE_CASES`) plus `conformanceGaps`, which fails a run on a missing or unknown id. The `OH` is this package, `QM` the first consumer's suite; the ids are kept stable so the two cannot drift. A host runs a body per id against its own adapter; `examples/conformance.ts` is the reference proof of all eleven, run by `bin/check`. `OH-QM-11` grew the inventory by design — a consumer observed that the memo's one-request lifetime was proved only in *its* suite; now two requests, two memos, and a revocation between them are the shared contract.
 
 ## What stays out
 
@@ -146,7 +146,7 @@ The razor: **every artifact is either the published surface a consumer imports, 
 | Core types + predicates | `src/core.ts` → `org-hats` | the published surface |
 | The async port | `src/port.ts` → `org-hats` | the one persistence contract |
 | The request spine | `src/decide.ts` → `org-hats` | published surface — the rules composed in order |
-| The conformance harness | `src/conformance.ts` → `org-hats` | published surface — a host proves the ten against its own store |
+| The conformance harness | `src/conformance.ts` → `org-hats` | published surface — a host proves the eleven against its own store |
 | The fake port | `src/testing.ts` → `org-hats` | published surface — tests without a driver |
 | SQLite reference adapter | `src/node.ts` → `org-hats/node` | reference; the only `node:*` |
 | Walkthroughs | `examples/` | prove the model; not shipped |

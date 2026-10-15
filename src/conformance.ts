@@ -1,6 +1,6 @@
 // The shared conformance inventory — the cases a host proves.
 //
-// The ids are `OH-QM-01` … `OH-QM-10`: `OH` is this package, `QM` the first
+// The ids are `OH-QM-01` … `OH-QM-11`: `OH` is this package, `QM` the first
 // consumer's suite, kept stable so the two cannot drift into disagreeing about
 // what a case *is*. The data is the contract: each side iterates
 // CONFORMANCE_CASES, runs a body keyed by id, and fails on a missing id (see
@@ -56,6 +56,10 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
   {
     id: "OH-QM-10",
     description: "Every indexed cost claimed by the adapter has an EXPLAIN QUERY PLAN assertion.",
+  },
+  {
+    id: "OH-QM-11",
+    description: "A request-scoped memo never outlives its request — a hat revoked after one request is not worn by the next.",
   },
 ];
 

@@ -10,9 +10,9 @@ It is a component to embed in an application, not a product or a service. The mo
 
 | | |
 | --- | --- |
-| **What it buys** | Roles that do not grow with the org chart. Access that can be enumerated and reviewed. Revocation that is immediate and explicit. A core small enough to read, test, and audit in an afternoon. No dependence on a particular database, cloud, or vendor. |
+| **What it buys** | Roles that do not grow with the org chart. Access that can be enumerated and reviewed. Revocation that is immediate and explicit. Decisions as data — allow, or deny with a reason. A core small enough to read, test, and audit in an afternoon. No dependence on a particular database, cloud, or vendor. |
 | **What it costs** | You supply the parts that are yours — identities, the objects being protected, the list of actions, and the audit log. This is the authorization core, not the whole system. |
-| **What it leaves out** | Role hierarchy, separation-of-duty rules, and role administration. Each is deferred on purpose, with the seam named, rather than half-built. |
+| **What it leaves out** | Role hierarchy, declarative separation-of-duty constraints, and negative grants — each refused on purpose, the seam named, not half-built. Role *administration* is not an omission at all: granting is an action like any other, checked by the same rule and audited in the same row. |
 | **Maturity** | The model is frozen and exercised; the package is published under the MIT license; the public surface is small and stable. |
 
 ## The problem
@@ -39,7 +39,7 @@ Five entities and two relationships. The directory says who is who, on what team
 
 Two consequences carry most of the model:
 
-- **A grant is a hat.** An actor holds many hats and wears **one at a time**; the worn hat is the capacity in force, re-checked on every request, so revocation takes effect immediately.
+- **A grant is a hat.** An actor holds many hats and wears **one at a time** — in RBAC terms, separation of duty with the *universal* conflict set. The worn hat is the capacity in force, re-checked on every request — what the usage-control literature calls *ongoing authorization* — so revocation takes effect immediately.
 - **Affiliation is not a third relationship.** An actor is affiliated with a team by holding a grant over it whose role may author. "Who is on this team" is derived — and supervising a team never makes one a member.
 
 ## The permission seam
@@ -58,6 +58,7 @@ The role supplies the action; the grant supplies the reach — a **team** exactl
 ## Principles
 
 - **One active hat.** Switching deactivates the last; capabilities never accumulate across hats.
+- **Enumeration is not accumulation.** “What can this actor do?” enumerates held hats, through the port; “may this act proceed?” goes through the spine, one act at a time.
 - **The role gives capability; team and scope give reach.**
 - **Affiliation is a member grant** — a team-bound grant whose role may author. Supervising never makes one a member.
 - **Context lives in columns, never in role names.**
@@ -66,17 +67,20 @@ The role supplies the action; the grant supplies the reach — a **team** exactl
 
 ## Relation to the literature
 
-This is **Core RBAC's structural half** — who holds which capacity, over what — without its permission matrix, which belongs to the application. It does not compete with role-based access control; it is a component for building it.
+This is **Core RBAC's structural half** — who holds which capacity, over what — without its permission matrix, which belongs to the application. It does not compete with role-based access control; it is a component for building it. And it is a **position taken among these papers, not a synthesis of them**. The review's verdict: the literature forces no structural change here — every disagreement is a refusal the literature itself endorses, a deferral with a named landing spot, or a seam the vocabulary already expresses ([literature_review.md](docs/literature_review.md) § *What the review changed*).
 
 The closest references, in order of closeness:
 
-- **Core RBAC.** ANSI/INCITS 359-2004; from Sandhu, Coyne, Feinstein & Youman (1996), *Role-Based Access Control Models* — the RBAC96 family, model RBAC0. Users, roles, permissions, sessions, and the two assignment relations. Read this first.
+- **Core RBAC.** ANSI/INCITS 359-2004; from Sandhu, Coyne, Feinstein & Youman (1996), *Role-Based Access Control Models* — the RBAC96 family, model RBAC0. Read this first.
 - **Team context.** Thomas (1997), *Team-Based Access Control (TMAC)* — the team as the context of a role, beside the role rather than inside its name.
 - **Parameterized and contextual roles.** Giuri & Iglio (1997), *Role Templates for Content-Based Access Control* — the closest reference for what a grant is: a role **instantiated over a target**; and Covington, Moyer & Ahamad, *Generalized Role-Based Access Control* — the environment dimension, *where an act happens*.
 - **The relationship graph.** Pang et al. (2019), *Zanzibar* — organizations, teams, and cross-organization peers as explicit edges rather than role names.
 - **The failure this avoids.** Kuhn, Coyne & Weil (2010), *Adding Attributes to Role-Based Access Control* — context in a role's name multiplies roles until auditing is impossible.
+- **The signature rules' nearest relatives.** Rule 7's re-validation is usage control's **ongoing authorization** (UCON); rule 8's cousin is **GEO-RBAC** — which senses the *user's* position where this model anchors the *grant*; and time-bounded hats are **TRBAC** territory, landing — if ever wanted — in the adapter, never the core.
 
-Deliberately outside the model: role hierarchy (RBAC1), declarative separation of duty (RBAC2), and role administration (ARBAC97; Sandhu, Bhamidipati & Munawer, 1999). The full comparison — the RBAC mapping, the `can` split, and a reading list — is in [docs/rbac.md](docs/rbac.md); the reference-by-reference review — what each supports here, where each disagrees, and the citation precision a practitioner should verify — is in [docs/literature_review.md](docs/literature_review.md).
+Two Zanzibar relations carry the posture. `maySpeak` **is** Zanzibar's *intersection* operator — the worn hat reaches *and* a held grant authors. And where Zanzibar trades immediacy for bounded staleness, this model keeps immediacy (a conformance case, not a tuning knob) and answers scale with a request-scoped snapshot (`perRequest`). The practical descendant question — *why not OpenFGA or SpiceDB?* — is answered in [docs/rbac.md](docs/rbac.md) § *The generic-graph question*.
+
+Deliberately outside the model: role hierarchy (RBAC1), declarative separation of duty (RBAC2), and negative grants (no exclusion edge). Role administration is not outside at all: **granting is an action** — a `grant` action whose worn hat reaches the new grant's target, plus the organization check — so ARBAC97 lands as data, not as a new concept (C53). The full comparison — the RBAC mapping, the `can` split, and a reading list — is in [docs/rbac.md](docs/rbac.md); the reference-by-reference review — what each supports here, where each disagrees, and the citation precision a practitioner should verify — is in [docs/literature_review.md](docs/literature_review.md).
 
 ## What is here
 
@@ -84,11 +88,11 @@ A TypeScript package, published as `org-hats`:
 
 - **[`src/core.ts`](src/core.ts)** — the pure surface: the entities, `Target`, and the predicates (`can`, `reach`, `wornHat`, `wearableAt`, `admitted`, `scopeCovers`, `childPath`, `leafScopeId`, `parentPath`, `organizationsOf`) — optional display names on `HeldHat`, and `HatClaim` (a claim is an id or a matcher). No runtime dependency and no `node:*`, enforced by [`tsconfig.core.json`](tsconfig.core.json).
 - **[`src/port.ts`](src/port.ts)** — `OrgHatsRepository`, the one async persistence contract, plus `perRequest` — the request-scoped memo: one consistent read per request, however many decisions it makes.
-- **[`src/conformance.ts`](src/conformance.ts)** — the shared `OH-QM-01` … `OH-QM-10` inventory, as data, plus `runConformance` — the harness that runs a host's bodies and diffs the ids against the inventory.
+- **[`src/conformance.ts`](src/conformance.ts)** — the shared `OH-QM-01` … `OH-QM-11` inventory, as data, plus `runConformance` — the harness that runs a host's bodies and diffs the ids against the inventory.
 - **[`src/decide.ts`](src/decide.ts)** — the request spine: `decide`/`decideSpeak` compose the port and the predicates in the order the rules require. A decision is data — allow, or deny with a reason.
 - **[`src/testing.ts`](src/testing.ts)** — `fakeRepository`, an in-memory port for tests: the port is two questions, so a fake is two functions.
 - **[`src/node.ts`](src/node.ts)** — the SQLite reference adapter (`org-hats/node`), the only place a driver is spoken to.
-- **[`examples/`](examples)** — the walkthroughs: the core, an operations layer that adds cross-organization peers, and the reference proof of the ten conformance cases.
+- **[`examples/`](examples)** — the walkthroughs: the core, an operations layer that adds cross-organization peers, the reference proof of the eleven conformance cases, and the request spine's every decision shape.
 
 ```
 org-hats         pure core + the spine + the port    (a Worker never sees node:sqlite)
@@ -128,7 +132,7 @@ CI runs the same on every push — install, build, a **stale-`dist/` guard**, th
 
 ## Status
 
-The model is frozen and exercised in the reference implementation. The permission layer is a seam — one `capability` table and one predicate — and is not yet wired into an application. `v0.2.0` adds the **request spine** (`decide`/`decideSpeak` — the rules composed in the order they require, decisions as data) and the **conformance harness** (`runConformance`); `v0.2.1` carries the consumer review (names on `HeldHat`, generic selectors, `HatClaim`, the path readers, the D1-portable prefix test — C56–C61); `v0.2.2` adds `perRequest`, the request-scoped memo. [`docs/concerns.md`](docs/concerns.md) tracks the review queue.
+The model is frozen and exercised in the reference implementation. The permission layer is a seam — one `capability` table and one predicate — and is not yet wired into an application. `v0.2.0` adds the **request spine** (`decide`/`decideSpeak` — the rules composed in the order they require, decisions as data) and the **conformance harness** (`runConformance`); `v0.2.1` carries the consumer review (names on `HeldHat`, generic selectors, `HatClaim`, the path readers, the D1-portable prefix test — C56–C61); `v0.2.2` adds `perRequest`, the request-scoped memo; `v0.2.3` adds `OH-QM-11` — the memo's lifetime is conformance, not prose. [`docs/concerns.md`](docs/concerns.md) tracks the review queue.
 
 ## License
 
