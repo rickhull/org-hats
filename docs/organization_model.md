@@ -87,7 +87,7 @@ An optional layer, shaped here so it can be added without moving anything beneat
 - **Capabilities are assigned to roles.** One relationship; the role's identity is untouched.
 - **One predicate.**
   `can(activeGrant, action, target) → bool`
-  Capability comes from the role, reach from the grant. The model names no action and no target; the application supplies both.
+  Capability comes from the role, reach from the grant. The model names no action and no target; the application supplies both — one exception: `author`, whose name the model reads as the affiliation bit (rule 3).
 - **It stays cheap.** One active hat means a check is set membership in one role's capabilities, scoped by the target: flat indexed lookups. With no role hierarchy there is no traversal, and *who can do this* is answerable from a row.
 - **Constraints are a separate concern.** *One active hat* is dynamic separation of duty at strength one. Declarative forms — two roles that may be held but not worn together, or may not both be held — are deferred, not denied.
 

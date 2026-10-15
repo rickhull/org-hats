@@ -39,12 +39,12 @@ Five entities and two relationships. The directory says who is who, on what team
 
 Two consequences carry most of the model:
 
-- **A grant is a hat.** An actor holds many hats and wears **one at a time** — in RBAC terms, separation of duty with the *universal* conflict set. The worn hat is the capacity in force, re-checked on every request — what the usage-control literature calls *ongoing authorization* — so revocation takes effect immediately.
-- **Affiliation is not a third relationship.** An actor is affiliated with a team by holding a grant over it whose role may author. "Who is on this team" is derived — and supervising a team never makes one a member.
+- **A grant is a hat.** An actor holds many hats and wears **one at a time** — separation of duty at its strongest. The worn hat is the capacity in force, re-checked on every request, so revocation takes effect immediately.
+- **Affiliation is not a third relationship.** One action — `author`, the act of speaking *as* the team rather than over it — is the membership bit: an actor is on a team exactly when they hold a grant over it whose role carries `author`. "Who is on this team" is derived, never stored — and supervising a team never makes one a member.
 
 ## The permission seam
 
-The model names no action and no object; the application names both. Authority is two questions, composed:
+The model names no action and no object; the application names both — with one exception, already met above: `author`, whose name the model reads as the membership bit. Authority is two questions, composed:
 
 ```
 can(hat, action, target)  =  capability(hat.role, action)  ∧  reach(hat.grant, target)
@@ -60,7 +60,7 @@ The role supplies the action; the grant supplies the reach — a **team** exactl
 - **One active hat.** Switching deactivates the last; capabilities never accumulate across hats.
 - **Enumeration is not accumulation.** “What can this actor do?” enumerates held hats, through the port; “may this act proceed?” goes through the spine, one act at a time.
 - **The role gives capability; team and scope give reach.**
-- **Affiliation is a member grant** — a team-bound grant whose role may author. Supervising never makes one a member.
+- **Affiliation is a member grant** — a grant over a team whose role carries `author`. Supervising never makes one a member.
 - **Context lives in columns, never in role names.**
 - **No hidden authority.** No inheritance, nothing implicit; every grant and every switch is explicit and auditable.
 - **Permissions are assigned to roles, never encoded in them.**
