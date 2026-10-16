@@ -15,7 +15,7 @@ Zero runtime dependencies. `dist/` is committed, so nothing builds at install. T
 
 ```
 src/
-  core.ts        types, Target, predicates, childPath, SCHEMA, actions   (no node:*)
+  core.ts        types, Target, predicates, path helpers, SCHEMA      (no node:*)
   port.ts        OrgHatsRepository + perRequest — the port and its memo   (no node:*)
   conformance.ts the OH-QM inventory as data + the runConformance harness (no node:*)
   decide.ts      the request spine — decide, with the two-edge heldAction shape (no node:*)
@@ -28,6 +28,7 @@ examples/
   operations.ts  the operations-layer walkthrough
   conformance.ts the reference proof of the eleven OH-QM cases
   decide.ts      every decision shape, over the adapter and the fake port
+  _assert.ts     the shared assert/refuses/same helpers
   check.ts       runs them all, in order
 dist/            the committed build output (.js + .d.ts)
 bin/check        the neutrality fence, then the examples
@@ -63,6 +64,8 @@ export function heldCarries(hats: readonly HeldHat[], target: Target, action: st
 export function wearableAt<H extends HeldHat>(hats: readonly H[], scopePath: string): H[];
 export function admitted(hats: readonly HeldHat[], scopePath: string): boolean;
 export function wornHat<H extends HeldHat>(wearable: readonly H[], claim?: HatClaim | null): H | null;
+export type HatSource = "claimed" | "default" | "primary" | "first";
+export function selectWorn<H extends HeldHat>(wearable: readonly H[], claim?: HatClaim | null): { hat: H | null; source: HatSource | null };
 export function organizationsOf(hats: readonly HeldHat[]): Id[]; // team-bearing hats
 
 export const CONFORMANCE_CASES: readonly { id: string; description: string }[];
@@ -135,7 +138,7 @@ The contract, in three points:
 
 - `rewriteRelativeImportExtensions` (TypeScript 5.7+) rewrites `./core.ts` → `./core.js` on emit, so the source keeps `.ts` specifiers — `node examples/model.ts` runs directly under Node 24 — **and** the build emits a correct `dist/`.
 - `tsc -p tsconfig.json` emits `dist/`; **it is committed**, so no `prepare`/build runs at install.
-- `package.json`: `exports` `"."` and `"./node"`, `files: ["dist"]`, `dependencies: {}`, `version 0.1.0`, `license: MIT`, and `repository`/`homepage`/`bugs` pointing at the canonical repo (see [publishing.md](publishing.md)).
+- `package.json`: `exports` `"."` and `"./node"`, `files: ["dist"]`, `dependencies: {}`, `version 0.4.2`, `license: MIT`, and `repository`/`homepage`/`bugs` pointing at the canonical repo (see [publishing.md](publishing.md)).
 - **Distribution is a git tag**, not a registry — the shortest path for a zero-dependency package with one consumer.
 
 ## The conformance inventory

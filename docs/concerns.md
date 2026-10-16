@@ -30,7 +30,7 @@
 | **C20** | No way to run both scripts together. | Added `bin/check`. |
 | **C21** | Foreign keys were declared but not enforced: each `Db` call is a new connection. | The adapter turns `PRAGMA foreign_keys = ON` on every connection. Found while fixing C18. |
 | **C22** | Root scope names were not unique, because SQLite treats NULLs in a unique index as distinct. | `scope_identity` uses `COALESCE(parent_id, -1)`. Found while fixing C16. |
-| **C55** | Rename `org-hats` to `acting-hats` (2026-10). | Declined. Four reasons: `org` is the domain word — the package is a *reusable organization model*, and the proposed name drops its only retrieval hook; *acting* carries the temporary-deputy connotation the model's explicit-grant principle exists to reject; it collides with two terms of art already in the repo — the **acting-hat snapshot** (OH-QM-05) and the *worn* hat; and it would orphan the frozen `OH-QM` ids and `OrgHatsRepository` for a pinned consumer. Recorded as D6 in [publishing.md](publishing.md). |
+| **C55** | Rename `org-hats` to `acting-hats` (2026-10). | Declined. Four reasons: `org` is the domain word — the package is a *reusable organization model*, and the proposed name drops its only retrieval hook; *acting* carries the temporary-deputy connotation the model's explicit-grant principle exists to reject; it collides with two terms of art already in the repo — the **acting-hat snapshot** (OH-QM-05) and the *worn* hat; and it would orphan the frozen `OH-QM` ids and `OrgHatsRepository` for a pinned consumer. Recorded as P6 in [publishing.md](publishing.md). |
 
 ## Streamlining pass
 
@@ -109,7 +109,7 @@ Raised by Quartermaster's v0.2.2 adoption report (October 2026). One entry; no r
 
 ## The membership retreat (v0.4.0)
 
-Raised by the maintainer and settled jointly with the consumer over the channel (`~/git/quartermaster/org-hats.txt`, mirrored in [`quartermaster.txt`](../quartermaster.txt)): *Quartermaster's "member" is a product policy, not a fact org-hats should define.* One entry.
+Raised by the maintainer and settled jointly with the consumer over the channel: *Quartermaster's "member" is a product policy, not a fact org-hats should define.* One entry.
 
 | Id | Status | Concern | Resolution |
 | --- | --- | --- | --- |

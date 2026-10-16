@@ -155,7 +155,7 @@ Let *n* be a table's size and *k* the rows returned. Every question is **one ind
 7. **Cross-entity invariants are checks *and* probes**, never silent assumptions.
 8. **Denormalization pays for an index or it doesn't exist.** `grant.organization_id` duplicates a team-bound grant's team organization to key the two per-organization partial indexes, and the layer's `team_link.scope_id` duplicates the teams' scope to keep cooperation site-local. Both are deliberate; each is kept honest by a write check, never treated as a second source of truth.
 
-The `examples/model.ts` walkthrough checks eight of these bounds against `EXPLAIN QUERY PLAN` and fails if the planner reports a scan. The toy adapter runs one `sqlite3` process per statement, so these bounds describe the schema, not latency.
+The `examples/model.ts` walkthrough checks six of these bounds against `EXPLAIN QUERY PLAN` and fails if the planner reports a scan. The bounds describe the schema, not latency — the reference adapter prepares each statement per call.
 
 ## Implementation notes
 

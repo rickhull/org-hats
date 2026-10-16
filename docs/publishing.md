@@ -28,14 +28,14 @@ CI runs on the **mirror**: GitHub Actions, [`.github/workflows/check.yml`](../.g
 
 ## The release
 
-`v0.1.0` — a single sanitized commit, tagged on both hosts.
+Releases are tagged from `package.json` and pushed to both hosts. The current release is `v0.4.2`; `v0.1.0` was the initial sanitized publication.
 
 A consumer pins one of:
 
 | Host | Dependency spec |
 | --- | --- |
-| Codeberg (canonical, immediate) | `git+https://codeberg.org/rickhull/org-hats.git#v0.1.0` |
-| GitHub (mirror, lagging) | `github:rickhull/org-hats#v0.1.0` |
+| Codeberg (canonical, immediate) | `git+https://codeberg.org/rickhull/org-hats.git#v0.4.2` |
+| GitHub (mirror, lagging) | `github:rickhull/org-hats#v0.4.2` |
 
 Prefer the Codeberg pin: the mirror's interval then never affects the consumer. The `github:` shorthand resolves only GitHub; a consumer whose CI is already GitHub-native may pin the mirror.
 
@@ -48,7 +48,7 @@ Prefer the Codeberg pin: the mirror's interval then never affects the consumer. 
 Recorded here so no one has to reconstruct it:
 
 - **History was squashed to a single root commit** and the old objects purged, so no prior state (or the names in it) survives in the published object store.
-- **Fixtures were substituted** to an obviously fictional world — operation **Acme Freight**, organizations **Atlas / Beacon / Cobalt**, sites **Northport / Southport**, and invented personal names — across `examples/`, the narrative docs, and (before it was dropped) the Ruby appendix.
+- **Fixtures were substituted to an obviously fictional world with invented names**, across `examples/` and the narrative docs (the world is now the Riverbend festival).
 - **The previous consumer's confidential tier was removed**: its product name, private repo path, internal doc names, and decision ids. Only the **`OH-QM` initialism** was kept, with one line explaining it, because the conformance ids are a shared interface.
 - **The Ruby appendix was dropped** from the public repo.
 
@@ -56,17 +56,17 @@ Decisions taken:
 
 | # | Decision | Taken |
 | --- | --- | --- |
-| D1 | License | MIT — `Copyright (c) 2026 Rick <rick@thinkpad>` |
-| D2 | Ruby appendix | dropped |
-| D3 | `docs/concerns.md` | sanitized in place, kept public |
-| D4 | the integration memo | deleted |
-| D5 | Package name | `org-hats` |
-| D6 | Rename to `acting-hats` (2026-10) | declined — `org` is the domain word, and *acting* collides with the acting-hat snapshot (OH-QM-05) and the temporary-deputy connotation. See concerns.md C55 |
+| P1 | License | MIT — `Copyright (c) 2026 Rick <rick@thinkpad>` |
+| P2 | Ruby appendix | dropped |
+| P3 | `docs/concerns.md` | sanitized in place, kept public |
+| P4 | the integration memo | deleted |
+| P5 | Package name | `org-hats` |
+| P6 | Rename to `acting-hats` (2026-10) | declined — `org` is the domain word, and *acting* collides with the acting-hat snapshot (OH-QM-05) and the temporary-deputy connotation. See concerns.md C55 |
 
 ## Verified
 
-- A fresh clone of Codeberg, with no dependencies installed, runs `node examples/check.ts` → all examples pass (including the ten conformance cases).
-- `main` and `v0.1.0` are **identical on both hosts** (same commit, same annotated tag).
+- A fresh clone of Codeberg, with no dependencies installed, runs `node examples/check.ts` → all examples pass (including the eleven conformance cases).
+- The current release is tagged identically on both hosts (canonical and mirror agree on commit and annotated tag).
 - The tree is free of the forbidden strings (the consumer's tier and the old fixtures).
 
 See [package.md](package.md) for what the package ships, and [`../plans/publish.md`](../plans/publish.md) for the work that remains.
