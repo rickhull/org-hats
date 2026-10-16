@@ -11,7 +11,7 @@
    - **JSR:** publish TypeScript directly; consumers use `npx jsr add`. Needs a scope and a small `jsr.json`.
    - **Neither:** keep the git tag, which is already working.
 
-3. **Consumer handoff.** Send the pin — `git+https://codeberg.org/rickhull/org-hats.git#v0.4.2` — and note that the `OH-QM-01`…`11` ids are unchanged.
+3. **Consumer handoff.** Send the pin — `git+https://codeberg.org/rickhull/org-hats.git#v0.4.4` — and note that the `OH-QM-01`…`11` ids are unchanged.
 
 4. **The 1.0 core freeze** (on the roadmap at the consumer's request — do not cut yet). Freezes: the five entities, `SCHEMA`'s shape, the port, `decide`/`DecideRequest`/`Decision`, `heldCarries`, and the `OH-QM` ids — additions-only after. **Entry criteria** (the consumer's):
    - the write-side conference — **done** ([docs/writes.md](../docs/writes.md));

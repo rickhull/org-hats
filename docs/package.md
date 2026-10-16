@@ -138,7 +138,7 @@ The contract, in three points:
 
 - `rewriteRelativeImportExtensions` (TypeScript 5.7+) rewrites `./core.ts` → `./core.js` on emit, so the source keeps `.ts` specifiers — `node examples/model.ts` runs directly under Node 24 — **and** the build emits a correct `dist/`.
 - `tsc -p tsconfig.json` emits `dist/`; **it is committed**, so no `prepare`/build runs at install.
-- `package.json`: `exports` `"."` and `"./node"`, `files: ["dist"]`, `dependencies: {}`, `version 0.4.2`, `license: MIT`, and `repository`/`homepage`/`bugs` pointing at the canonical repo (see [publishing.md](publishing.md)).
+- `package.json`: `exports` `"."` and `"./node"`, `files: ["dist"]`, `dependencies: {}`, `version 0.4.4`, `license: MIT`, and `repository`/`homepage`/`bugs` pointing at the canonical repo (see [publishing.md](publishing.md)).
 - **Distribution is a git tag**, not a registry — the shortest path for a zero-dependency package with one consumer.
 
 ## The conformance inventory

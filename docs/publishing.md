@@ -28,14 +28,14 @@ CI runs on the **mirror**: GitHub Actions, [`.github/workflows/check.yml`](../.g
 
 ## The release
 
-Releases are tagged from `package.json` and pushed to both hosts. The current release is `v0.4.2`; `v0.1.0` was the initial sanitized publication.
+Releases are tagged from `package.json` and pushed to both hosts. The current release is `v0.4.4`; `v0.1.0` was the initial sanitized publication.
 
 A consumer pins one of:
 
 | Host | Dependency spec |
 | --- | --- |
-| Codeberg (canonical, immediate) | `git+https://codeberg.org/rickhull/org-hats.git#v0.4.2` |
-| GitHub (mirror, lagging) | `github:rickhull/org-hats#v0.4.2` |
+| Codeberg (canonical, immediate) | `git+https://codeberg.org/rickhull/org-hats.git#v0.4.4` |
+| GitHub (mirror, lagging) | `github:rickhull/org-hats#v0.4.4` |
 
 Prefer the Codeberg pin: the mirror's interval then never affects the consumer. The `github:` shorthand resolves only GitHub; a consumer whose CI is already GitHub-native may pin the mirror.
 
