@@ -2,9 +2,9 @@
 
 *How a host writes grants: the transaction rule, the invariants statement by statement, and administration as an action. Documentation and reference SQL for a host's own migrations — deliberately not port surface.*
 
-Settled at the write-side conference with the consumer (C53, concluded): they asked for **documentation plus reference SQLite SQL that a host adapts in its own migration and transaction boundary** — not a generic write method. Their framing, adopted as the boundary: *writes are where dialect, transaction, and product policy become real; a generic port method would pretend otherwise.* The port stays two read questions. The reference adapter (`src/node.ts`) implements these checks read-then-write for the walkthroughs; what follows is what a host copies into its own transaction.
+Settled at the write-side conference with the consumer: they asked for **documentation plus reference SQLite SQL that a host adapts in its own migration and transaction boundary** — not a generic write method. Their framing, adopted as the boundary: *writes are where dialect, transaction, and product policy become real; a generic port method would pretend otherwise.* The port stays two read questions. The reference adapter (`src/node.ts`) implements these checks read-then-write for the walkthroughs; what follows is what a host copies into its own transaction.
 
-## The transaction rule (C39)
+## The transaction rule
 
 Every grant or revoke, and its audit row, is **one transaction** — no half-grants, no revoked hat without its record. The reference adapter runs under a single serialized writer, where read-then-write is safe; a host with concurrent writers wraps each statement in its database's transaction (D1: a `batch`). That is the whole atomicity contract.
 
@@ -44,7 +44,7 @@ Two `UPDATE`s inside the same partial-unique invariants: setting a new primary c
 
 **scopes → organizations → teams → actors → grants.** D1 enforces foreign keys; the reference turns them on explicitly (`PRAGMA foreign_keys = ON`). A consumer's onboarding tool is deliberately ordered this way, and its upserts **add** grants and never silently revoke — re-running onboarding grows the directory; only an explicit revoke shrinks it.
 
-## Administration is an action (C53, demonstrated)
+## Administration is an action (demonstrated)
 
 Who may grant is not a concept — it is a `decide` call like any other:
 

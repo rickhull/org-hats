@@ -80,7 +80,7 @@ The closest references, in order of closeness:
 
 Two Zanzibar relations carry the posture. The two-edge rule — `decide` with `heldAction`, presence ∧ standing — **is** Zanzibar's *intersection* operator: the worn hat reaches *and* a held grant carries. And where Zanzibar trades immediacy for bounded staleness, this model keeps immediacy (a conformance case, not a tuning knob) and answers scale with a request-scoped snapshot (`perRequest`). The practical descendant question — *why not OpenFGA or SpiceDB?* — is answered in [docs/rbac.md](docs/rbac.md) § *The generic-graph question*.
 
-Deliberately outside the model: role hierarchy (RBAC1), declarative separation of duty (RBAC2), and negative grants (no exclusion edge). Role administration is not outside at all: **granting is an action** — a `grant` action whose worn hat reaches the new grant's target, plus the organization check — so ARBAC97 lands as data, not as a new concept (C53). The full comparison — the RBAC mapping, the `can` split, and a reading list — is in [docs/rbac.md](docs/rbac.md); the reference-by-reference review — what each supports here, where each disagrees, and the citation precision a practitioner should verify — is in [docs/literature_review.md](docs/literature_review.md).
+Deliberately outside the model: role hierarchy (RBAC1), declarative separation of duty (RBAC2), and negative grants (no exclusion edge). Role administration is not outside at all: **granting is an action** — a `grant` action whose worn hat reaches the new grant's target, plus the organization check — so ARBAC97 lands as data, not as a new concept. The full comparison — the RBAC mapping, the `can` split, and a reading list — is in [docs/rbac.md](docs/rbac.md); the reference-by-reference review — what each supports here, where each disagrees, and the citation precision a practitioner should verify — is in [docs/literature_review.md](docs/literature_review.md).
 
 ## What is here
 
@@ -127,13 +127,11 @@ CI runs the same on every push — install, build, a **stale-`dist/` guard**, th
 - **[`docs/package.md`](docs/package.md)** — what the package ships and the rules that keep it one.
 - **[`docs/writes.md`](docs/writes.md)** — the write side: the transaction rule, the invariants statement by statement, and administration as an action — documentation and reference SQL for a host's own migrations, not port surface.
 - **[`docs/publishing.md`](docs/publishing.md)** — where it is published and how it mirrors.
-- **[`docs/concerns.md`](docs/concerns.md)** — the tracked review queue.
 - **[`plans/publish.md`](plans/publish.md)** — the remaining publishing work.
-- **[`plans/reference_impl.md`](plans/reference_impl.md)** — the reference implementation: what shipped in v0.2.0, what remains (write-side statements, D1 adapter), and the positions it takes.
 
 ## Status
 
-The model is frozen and exercised in the reference implementation. The permission layer is a seam — one `capability` table and one predicate — and is not yet wired into an application. `v0.2.0`–`v0.2.3` grew the spine, the harness, the consumer-review surface, and `perRequest`; `v0.3.0` made the core name zero actions; **`v0.4.0` is the membership retreat**: membership is the application's policy, not a model concept — `heldCarries` ships as the standing half, `decide` gains `heldAction`/`no-held-action`, and `maySpeak`/`decideSpeak`/`affiliated` are gone. Decided jointly with the consumer. `v0.4.2` is a review pass: `decide` reports `not-admitted`, not `unknown-actor`, for an actor holding nothing in the requested organization; the path parsers are total; `selectWorn`/`HatSource` replace the duplicated worn-hat ladder; and two strictness flags land ([plans/typescript_review.md](plans/typescript_review.md)). [`docs/concerns.md`](docs/concerns.md) tracks the review queue.
+The model is frozen, and the reference implementation exercises every rule. The permission layer is a seam — one `capability` table and one predicate — left for the application to fill, so the package is a component, not a product. The two open questions are the host's to settle, not the model's: the per-organization session's landing rule and the multi-organization read rule ([plans/publish.md](plans/publish.md) § *The 1.0 core freeze*).
 
 ## License
 

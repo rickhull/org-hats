@@ -221,6 +221,6 @@ Switching hats, granting, and revoking are all explicit and auditable — actor,
 
 - **Read the model**: [`organization_model.md`](organization_model.md) — eight rules, the boundaries, the permission seam, and the efficiency bounds.
 - **Run it**: `bin/check` runs the examples and asserts every rule above. `examples/model.ts` is steps 1–8; `examples/operations.ts` is steps 9–10.
-- **Extend it**: [`operations_layer.md`](operations_layer.md) shows how an application adds its own concepts without touching the core; [`concerns.md`](concerns.md) records what was decided and what is deferred.
+- **Extend it**: [`operations_layer.md`](operations_layer.md) shows how an application adds its own concepts without touching the core; [`organization_model.md`](organization_model.md) § *Deferred by design* records the model's deliberate omissions.
 
 The through-line, in one sentence: **people hold capacities over groups, bounded by who fields them and where they work; one hat is worn at a time; and permissions are assigned to roles, never encoded in them.**

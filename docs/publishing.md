@@ -43,30 +43,4 @@ Prefer the Codeberg pin: the mirror's interval then never affects the consumer. 
 
 `package.json` carries `license: MIT`, `author: Rick <rick@thinkpad>`, and the three Codeberg URLs. `files: ["dist"]` means the installable tarball is `dist/` plus the README, LICENSE, and `package.json`. Zero runtime dependencies.
 
-## How this repo was made publishable
-
-Recorded here so no one has to reconstruct it:
-
-- **History was squashed to a single root commit** and the old objects purged, so no prior state (or the names in it) survives in the published object store.
-- **Fixtures were substituted to an obviously fictional world with invented names**, across `examples/` and the narrative docs (the world is now the Riverbend festival).
-- **The previous consumer's confidential tier was removed**: its product name, private repo path, internal doc names, and decision ids. Only the **`OH-QM` initialism** was kept, with one line explaining it, because the conformance ids are a shared interface.
-- **The Ruby appendix was dropped** from the public repo.
-
-Decisions taken:
-
-| # | Decision | Taken |
-| --- | --- | --- |
-| P1 | License | MIT — `Copyright (c) 2026 Rick <rick@thinkpad>` |
-| P2 | Ruby appendix | dropped |
-| P3 | `docs/concerns.md` | sanitized in place, kept public |
-| P4 | the integration memo | deleted |
-| P5 | Package name | `org-hats` |
-| P6 | Rename to `acting-hats` (2026-10) | declined — `org` is the domain word, and *acting* collides with the acting-hat snapshot (OH-QM-05) and the temporary-deputy connotation. See concerns.md C55 |
-
-## Verified
-
-- A fresh clone of Codeberg, with no dependencies installed, runs `node examples/check.ts` → all examples pass (including the eleven conformance cases).
-- The current release is tagged identically on both hosts (canonical and mirror agree on commit and annotated tag).
-- The tree is free of the forbidden strings (the consumer's tier and the old fixtures).
-
 See [package.md](package.md) for what the package ships, and [`../plans/publish.md`](../plans/publish.md) for the work that remains.

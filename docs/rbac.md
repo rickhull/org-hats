@@ -14,7 +14,7 @@ This repository defines no permissions over objects. It defines **who** acts (Ac
 - **Contextual roles — Covington, Moyer & Ahamad, *Generalized Role-Based Access Control* (GRBAC).** The precedent for an **environment** dimension in authorization — the idea that *where an act happens* participates in the decision. Their environment roles are *evaluated* (time of day, sensed place); a scope here is a static anchor on the grant. (Exact venue unverified — see [literature_review.md](literature_review.md).)
 - **Zanzibar — Pang et al. (USENIX ATC, 2019).** Relationship-based rather than role-based, but the closest industry model for the **directory graph**: organizations, teams, and cross-organization peers as explicit edges rather than role names. Two sharp divergences — staleness and negation — are detailed in [literature_review.md](literature_review.md).
 - **Kuhn, Coyne & Weil, *Adding Attributes to Role-Based Access Control* (IEEE Computer 43(6), 2010).** The clearest statement of the problem this model avoids: context that lives in a role's *name* multiplies roles until auditing is impossible. Same diagnosis, different cure: they generalize the condition algebra (the ABAC direction); this model deletes it — context is structural, never a predicate.
-- **ARBAC97 — Sandhu, Bhamidipati & Munawer (ACM TISSEC 2(1), 1999).** Role *administration* (who may grant roles). Explicitly outside this model; the application or a later layer — though the organization boundary and scope coverage already carry the geometry ARBAC97 used for its administrative ranges (C53). And the model can say *who may grant* with the vocabulary it already has: an action (`grant`) whose worn hat reaches the new grant's target, plus the organization write-check. Administration lands as data, not as a new concept.
+- **ARBAC97 — Sandhu, Bhamidipati & Munawer (ACM TISSEC 2(1), 1999).** Role *administration* (who may grant roles). Explicitly outside this model; the application or a later layer — though the organization boundary and scope coverage already carry the geometry ARBAC97 used for its administrative ranges. And the model can say *who may grant* with the vocabulary it already has: an action (`grant`) whose worn hat reaches the new grant's target, plus the organization write-check. Administration lands as data, not as a new concept.
 
 The permission layer here is Core RBAC almost exactly. The directory layer is the parameterized-role and relationship-graph literature.
 
@@ -30,7 +30,7 @@ The permission layer here is Core RBAC almost exactly. The directory layer is th
 | UA (users → roles) | **Grant** — actor → role over a target |
 | PA (permissions → roles) | **Capability** — role → action (the *operation half* of a permission) |
 | Session | the **active grant** (the hat), re-validated each request |
-| `session_roles(s)` | **one** active grant **per organization** — DSD with the *universal* conflict set: every pair of held hats conflicts (C31) |
+| `session_roles(s)` | **one** active grant **per organization** — DSD with the *universal* conflict set: every pair of held hats conflicts |
 | Role hierarchy (RH) | omitted, deliberately |
 | SSD / DSD constraints | the one-active-hat rule is DSD at its strongest — the universal conflict set, per organization; declarative forms deferred (D2) |
 
@@ -54,7 +54,7 @@ This is what lets one `Stage Manager` role serve every team and site, instead of
 
 - **Target is the object's reach, not the object.** The application holds the object (a report, a resource); what `can` receives is where that object lives — a team or a scope. A permission is `capability(role, action)` composed with `reach(grant, object's reach)`.
 - **“Operation” is overloaded.** In this repository an *operation* is a customer and its envelope — the root scope — and never RBAC's operation. RBAC's operation is called an **action** here (`author`, `resolve`, `configure`).
-- **The active grant is one per organization, not one per realm.** `wornHat` over the request's organization selects the capacity in force; an actor who spans organizations has one active grant in each, and the session's organization is the application's context. (That multi-organization landing is an open decision — see `concerns.md` C31 — and is the one part of the session mapping that is not a clean RBAC0 correspondence.)
+- **The active grant is one per organization, not one per realm.** `wornHat` over the request's organization selects the capacity in force; an actor who spans organizations has one active grant in each, and the session's organization is the application's context. (That multi-organization landing is the one part of the session mapping that is not a clean RBAC0 correspondence; the host settles it — a 1.0-freeze criterion, [plans/publish.md](../plans/publish.md).)
 - **“Subject” means the accessor in the wider literature.** This repository says **target** for what a grant aims at — the `Target` type — and reserves *actor* for the one who acts. A grant is *over* a target; it is never “scoped to a subject.”
 - **Enumeration is the port's; decision is the spine's.** RBAC96 answers “what can this user do?” with the union of the activated roles' permissions; here that question is **enumeration** — `hatsOf` then `wearableAt`, names included — and the spine answers **one act at a time**. `/api/me` and dashboards are port questions; accumulation across hats is what the one-hat rule exists to prevent.
 
@@ -76,7 +76,7 @@ These are the "parameterized roles" of Giuri & Iglio and GRBAC, plus the relatio
 - **The permission matrix** — the seam is defined and empty; the application fills the `capability` table.
 - **Role hierarchy (RBAC1)** — omitted on purpose. Inheritance turns a capability check into a traversal; a senior actor holds the junior hat explicitly instead.
 - **Declarative constraints (RBAC2 SSD/DSD)** — only the fixed one-active-hat rule is built; the rest is deferred.
-- **Role administration (ARBAC)** — deferred; the application grants and revokes (C53).
+- **Role administration (ARBAC)** — deferred; the application grants and revokes.
 - **Negative grants** — there is no exclusion operator: “everyone at this scope *except* that actor” is inexpressible as an edge. A restructure or an app-side denial — never a negation in the graph (D8).
 - **Sessions and audit** — the application stores them; the model treats the active grant as session state and re-validates it.
 

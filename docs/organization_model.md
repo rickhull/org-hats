@@ -58,7 +58,7 @@ Primary is identity; default is the landing context and may be less privileged �
 ## Rules
 
 1. **Grant before activation.** Only a held hat may be worn, and only while its grant is valid.
-2. **One active hat.** Switching deactivates the previous one; capabilities never accumulate across hats. In RBAC terms this is dynamic separation of duty with the *universal* conflict set — every pair of held hats conflicts — enforced within one organization (C31).
+2. **One active hat.** Switching deactivates the previous one; capabilities never accumulate across hats. In RBAC terms this is dynamic separation of duty with the *universal* conflict set — every pair of held hats conflicts — enforced within one organization.
 3. **Membership is not modeled.** The directory has no membership edge; an application derives its roster from grants — commonly a grant whose role carries a chosen action (`heldCarries`). Switching hats changes no grant, and supervising a team confers only what the application's rule says it confers.
 4. **Role gives capability; team and scope give reach.** Authorization consults the active grant's role and the target's team or scope. Scope is stated structurally, never in a role's name.
 5. **Switching is explicit and auditable.** Record actor, old hat, new hat, and time, with a reason where it matters. Record grants, revocations, and exceptional activations too.
@@ -189,3 +189,18 @@ Three signature rules have nearest relatives the reading list carries: rule 7's 
 Reporting lines, team hierarchy, titles distinct from roles, multiple concurrent active hats, automatic inheritance, negative grants (there is no exclusion edge), complex policy expressions, declarative separation-of-duty constraints, and full org-chart fidelity. Add one only when a use case requires it. Named container levels (*operation*, *region*, *site*) and multi-tenancy belong to the application, not the model — see [the operations layer](operations_layer.md) for the mapping.
 
 **Design principles:** five entities; two relationships; one active hat; no hidden authority; permissions assigned to roles, never encoded in them.
+
+## Deferred by design
+
+Deliberate trade-offs, each with the landing spot a future case would go to — decided, not open. (The ids are permanent addresses.)
+
+| Id | Deferred | Landing spot |
+| --- | --- | --- |
+| **D1** | Role hierarchy — inheritance. | *In the literature*, *Outside the model* |
+| **D2** | Declarative separation of duty (beyond one active hat). | *Permissions*, *In the literature* |
+| **D3** | Dropping `is_default` to collapse the three-level worn resolution. | An open simplification, not yet taken |
+| **D4** | A closure table for scopes, if scopes move often. | *Implementation notes* |
+| **D5** | Projections and read auditing (what a supervisor actually read). | Not modeled; the audit log is the application's |
+| **D6** | Time-bounded grants and activation windows. | *Rules* 1, *Example*; the adapter, never the core — read-side filtering in `hatsOf`. See [literature_review.md](literature_review.md) § GRBAC |
+| **D7** | A scope-side trust view — which grants reach a scope. | `grant_by_scope` is retained for it; no query asks yet |
+| **D8** | Negative grants — an exclusion edge ("everyone at this scope except…"). | *Outside the model*; see [literature_review.md](literature_review.md) |
