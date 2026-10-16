@@ -29,24 +29,13 @@ import {
 } from "../src/index.ts";
 import { Db, SqliteRepository, installSchema } from "../src/node.ts";
 import { Ops, OPS_SCHEMA } from "./operations.ts";
+import { assert, refuses } from "./_assert.ts";
 
 // The dispatch board's actions — this application's vocabulary.
 const SEND = "send";
 const READ_LOG = "read_log";
 const RESOLVE = "resolve";
 const CONFIGURE = "configure";
-
-function assert(cond: boolean, message: string): void {
-  if (!cond) throw new Error(message);
-}
-function refuses(fn: () => void): boolean {
-  try {
-    fn();
-    return false;
-  } catch {
-    return true;
-  }
-}
 
 /** One fresh fixture per case: a single operation, two sites, three
  * organizations, the teams and roles the eleven cases name. In-memory, so cases

@@ -52,8 +52,8 @@ export class SqliteRepository {
             actions: actionsByRole.get(r.role_id) ?? [],
             anchorPath: r.anchor_path,
             roleName: r.role_name,
-            teamName: r.team_name ?? undefined,
-            scopeName: r.anchor_name ?? undefined,
+            ...(r.team_name !== null ? { teamName: r.team_name } : {}),
+            ...(r.anchor_name !== null ? { scopeName: r.anchor_name } : {}),
         }));
     }
     // The organization-side read rule. A host adapter unions its peers on top to
@@ -76,7 +76,9 @@ export class SqliteRepository {
         return this.db.get("SELECT path FROM scope WHERE id = ?", scopeId)?.path ?? null;
     }
     addScope(id, parent = null, name = id) {
-        const parentPath = parent === null ? "/" : (this.scopePath(parent) ?? "/");
+        const parentPath = parent === null ? "/" : this.scopePath(parent);
+        if (parentPath === null)
+            throw new Error(`no such parent scope: ${parent}`);
         this.db.run("INSERT INTO scope (id, parent_id, name, path) VALUES (?, ?, ?, ?)", id, parent, name, childPath(parentPath, id));
         return id;
     }

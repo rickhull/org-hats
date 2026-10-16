@@ -20,16 +20,7 @@
 //
 // This file is pure: no driver, no `node:*`, so it lives inside the fence
 // and runs over any adapter — SQLite, D1, or a fake in tests.
-import { atScope, heldCarries, onTeam, reach, wearableAt, wornHat, } from "./core.js";
-function howWorn(hat, claim) {
-    if (claim !== null && (typeof claim === "string" ? hat.grant.id === claim : claim(hat)))
-        return "claimed";
-    if (hat.grant.default)
-        return "default";
-    if (hat.grant.primary)
-        return "primary";
-    return "first";
-}
+import { atScope, heldCarries, onTeam, reach, selectWorn, wearableAt, } from "./core.js";
 async function loadWorn(repo, request) {
     const target = request.teamId != null ? onTeam(request.teamId, request.scopePath) : atScope(request.scopePath);
     const allHeld = await repo.hatsOf(request.actorId, request.operationId);
@@ -37,12 +28,13 @@ async function loadWorn(repo, request) {
         ? allHeld.filter((h) => h.grant.organizationId === request.organizationId)
         : allHeld;
     const claim = request.claimedHatId ?? null;
-    const worn = wornHat(wearableAt(held, request.scopePath), claim);
+    const { hat: worn, source: fallback } = selectWorn(wearableAt(held, request.scopePath), claim);
     return {
         target,
         held,
+        known: allHeld.length > 0,
         worn,
-        fallback: worn === null ? null : howWorn(worn, claim),
+        fallback,
     };
 }
 /** The claim as the audit row wants it (see `DecisionCore.claimed`). */
@@ -58,9 +50,9 @@ function claimRecorded(claim, worn, fallback) {
  * decision additionally requires a *held* grant over the target carrying
  * it (presence from the worn hat, standing from a held one — OH-QM-07). */
 export async function decide(repo, request) {
-    const { target, held, worn, fallback } = await loadWorn(repo, request);
+    const { target, held, known, worn, fallback } = await loadWorn(repo, request);
     const base = { target, action: request.action ?? null, claimed: claimRecorded(request.claimedHatId ?? null, worn, fallback) };
-    if (held.length === 0)
+    if (!known)
         return { ok: false, reason: "unknown-actor", hat: null, fallback: null, ...base };
     if (worn === null)
         return { ok: false, reason: "not-admitted", hat: null, fallback: null, ...base };

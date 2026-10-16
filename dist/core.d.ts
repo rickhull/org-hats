@@ -28,7 +28,11 @@ export interface Grant {
  *
  * **Structural and open.** A consumer may extend a hat and the predicates
  * accept any object with these fields. It is an interface on purpose: do not
- * seal it with an exact type, a nominal brand, or a class. */
+ * seal it with an exact type, a nominal brand, or a class. An extension
+ * beyond the fields here survives the generic selectors (`wearableAt`,
+ * `wornHat`) but not the port or the spine — both speak `HeldHat`, and
+ * `Decision.hat` is one — so the three names below are what a decision
+ * carries. */
 export interface HeldHat {
     readonly grant: Grant;
     readonly actions: readonly string[];
@@ -56,7 +60,10 @@ export declare const scopeCovers: (ancestorPath: string, descendantPath: string)
  * its root; `/` names nothing. */
 export declare const leafScopeId: (scopePath: string) => string;
 /** The path of a scope's parent — the same path less its last segment. A
- * root's parent is `/`, the outermost boundary; `/` is its own parent. */
+ * root's parent is `/`, the outermost boundary; `/` is its own parent. Total
+ * in its input: a path that lacks the canonical trailing slash is treated as
+ * naming its own leaf, so the result is still a canonical path rather than a
+ * truncated string. */
 export declare const parentPath: (scopePath: string) => string;
 /** Does this hat act on this target? A team grant reaches its team; a
  * scope-bound grant reaches a scope and never a team. */
@@ -84,11 +91,22 @@ export type HatClaim = Id | ((hat: HeldHat) => boolean);
 export declare function wearableAt<H extends HeldHat>(hats: readonly H[], scopePath: string): H[];
 /** Is the actor admitted here at all? Any wearable hat admits. */
 export declare function admitted(hats: readonly HeldHat[], scopePath: string): boolean;
-/** The hat in force: the claimed one if still held and wearable, else the
- * default, else the primary, else the first. `wearable` is already filtered to
- * this scope, so a revoked claim cannot be returned — the re-validation.
- * `claim` is a grant **id** or a matcher (a host whose session claim is
- * name-keyed matches on the name here instead of translating ids). */
+/** How the worn hat was chosen — rule 5's signal. A claim that did not
+ * resolve reports `default` / `primary` / `first`, so the drift is auditable
+ * (OH-QM-04: a revoked claim falls back; it does not fail). */
+export type HatSource = "claimed" | "default" | "primary" | "first";
+/** The hat in force and how it was chosen, in one place: the claimed one if
+ * still held and wearable, else the default, else the primary, else the
+ * first. `wearable` is already filtered to this scope, so a revoked claim
+ * cannot be returned — the re-validation. `claim` is a grant **id** or a
+ * matcher (a host whose session claim is name-keyed matches on the name here
+ * instead of translating ids). The spine needs the provenance as well as the
+ * hat, so both read this one ladder rather than re-deriving it. */
+export declare function selectWorn<H extends HeldHat>(wearable: readonly H[], claim?: HatClaim | null): {
+    readonly hat: H | null;
+    readonly source: HatSource | null;
+};
+/** The hat in force. `selectWorn` without the provenance. */
 export declare function wornHat<H extends HeldHat>(wearable: readonly H[], claim?: HatClaim | null): H | null;
 /** The organizations an actor is in *through a team* — the read boundary. A
  * scope-bound configuring grant names an organization but adds no read reach.

@@ -17,15 +17,12 @@ import {
   type Id,
 } from "../src/index.ts";
 import { Db, SqliteRepository, installSchema } from "../src/node.ts";
+import { assert } from "./_assert.ts";
 
 // The dispatch board's actions — this application's vocabulary.
 const SEND = "send";
 const RESOLVE = "resolve";
 const GRANT = "grant";
-
-function assert(cond: boolean, message: string): void {
-  if (!cond) throw new Error(message);
-}
 
 const show = (d: Decision): string => {
   const h = d.hat;
@@ -156,6 +153,11 @@ export async function runDecide(): Promise<void> {
     const e2 = await decide(repo, { actorId: ellis, operationId: riverbend, scopePath: bigparkPath, teamId: stageops, action: RESOLVE, organizationId: ampwire });
     console.log(`ellis/ampwire, stage ops   ${show(e2)}`);
     assert(!e2.ok && e2.reason === "out-of-reach", "another organization's team stays out of reach");
+    // 8b. Known to the operation, but holding nothing in the requested
+    //     organization: not-admitted, never unknown-actor (C67).
+    const e3 = await decide(repo, { actorId: robin, operationId: riverbend, scopePath: bigparkPath, teamId: stageops, action: RESOLVE, organizationId: ampwire });
+    console.log(`robin/ampwire, no hat      ${show(e3)}`);
+    assert(!e3.ok && e3.reason === "not-admitted", "holding nothing in the organization is not-admitted, not unknown-actor");
 
     // 9. The spine over a fake port — no driver anywhere, pure fixtures.
     console.log("\n== the spine over a fake port ==");

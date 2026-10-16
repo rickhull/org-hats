@@ -24,6 +24,7 @@ import {
   type Target,
 } from "../src/index.ts";
 import { Db, SqliteRepository, installSchema } from "../src/node.ts";
+import { assert, refuses, same } from "./_assert.ts";
 
 // The dispatch board's actions — this application's vocabulary, not the
 // model's. `send` is the board's *membership action* — its own policy: to be
@@ -33,20 +34,6 @@ const READ_LOG = "read_log";
 const RESOLVE = "resolve";
 const CONFIGURE = "configure";
 
-function assert(cond: boolean, message: string): void {
-  if (!cond) throw new Error(message);
-}
-function refuses(fn: () => void): boolean {
-  try {
-    fn();
-    return false;
-  } catch {
-    return true;
-  }
-}
-function same(a: readonly string[], b: readonly string[]): boolean {
-  return [...a].sort().join() === [...b].sort().join();
-}
 const hat = (hats: readonly HeldHat[], id: string): HeldHat => hats.find((h) => h.grant.id === id)!;
 
 // The board's membership policy — the *application's*, composed from the

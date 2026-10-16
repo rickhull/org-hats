@@ -26,10 +26,14 @@ export const scopeCovers = (ancestorPath, descendantPath) => descendantPath.star
  * its root; `/` names nothing. */
 export const leafScopeId = (scopePath) => scopePath.split("/").filter((segment) => segment !== "").at(-1) ?? "";
 /** The path of a scope's parent — the same path less its last segment. A
- * root's parent is `/`, the outermost boundary; `/` is its own parent. */
+ * root's parent is `/`, the outermost boundary; `/` is its own parent. Total
+ * in its input: a path that lacks the canonical trailing slash is treated as
+ * naming its own leaf, so the result is still a canonical path rather than a
+ * truncated string. */
 export const parentPath = (scopePath) => {
-    const leaf = leafScopeId(scopePath);
-    return leaf === "" ? "/" : scopePath.slice(0, scopePath.length - leaf.length - 1);
+    const trimmed = scopePath.endsWith("/") ? scopePath.slice(0, -1) : scopePath;
+    const cut = trimmed.lastIndexOf("/");
+    return cut <= 0 ? "/" : trimmed.slice(0, cut + 1);
 };
 // --- the predicates ----------------------------------------------------------
 /** Does this hat act on this target? A team grant reaches its team; a
@@ -65,20 +69,29 @@ export function wearableAt(hats, scopePath) {
 }
 /** Is the actor admitted here at all? Any wearable hat admits. */
 export function admitted(hats, scopePath) {
-    return wearableAt(hats, scopePath).length > 0;
+    return hats.some((h) => scopeCovers(h.anchorPath, scopePath));
 }
-/** The hat in force: the claimed one if still held and wearable, else the
- * default, else the primary, else the first. `wearable` is already filtered to
- * this scope, so a revoked claim cannot be returned — the re-validation.
- * `claim` is a grant **id** or a matcher (a host whose session claim is
- * name-keyed matches on the name here instead of translating ids). */
-export function wornHat(wearable, claim = null) {
+/** The hat in force and how it was chosen, in one place: the claimed one if
+ * still held and wearable, else the default, else the primary, else the
+ * first. `wearable` is already filtered to this scope, so a revoked claim
+ * cannot be returned — the re-validation. `claim` is a grant **id** or a
+ * matcher (a host whose session claim is name-keyed matches on the name here
+ * instead of translating ids). The spine needs the provenance as well as the
+ * hat, so both read this one ladder rather than re-deriving it. */
+export function selectWorn(wearable, claim = null) {
     if (claim !== null) {
         const held = wearable.find(typeof claim === "string" ? (h) => h.grant.id === claim : claim);
         if (held)
-            return held;
+            return { hat: held, source: "claimed" };
     }
-    return wearable.find((h) => h.grant.default) ?? wearable.find((h) => h.grant.primary) ?? wearable[0] ?? null;
+    const hat = wearable.find((h) => h.grant.default) ?? wearable.find((h) => h.grant.primary) ?? wearable[0] ?? null;
+    if (hat === null)
+        return { hat: null, source: null };
+    return { hat, source: hat.grant.default ? "default" : hat.grant.primary ? "primary" : "first" };
+}
+/** The hat in force. `selectWorn` without the provenance. */
+export function wornHat(wearable, claim = null) {
+    return selectWorn(wearable, claim).hat;
 }
 /** The organizations an actor is in *through a team* — the read boundary. A
  * scope-bound configuring grant names an organization but adds no read reach.

@@ -139,4 +139,4 @@ That buys checked index access across `wearable[0]`, `held[0]?.n`, and every arr
 4. **C71, C70** — remove the duplicate precedence; state the extension line where the port and spine meet.
 5. **C73, C74** — tidy, as the examples are touched.
 
-When any of these closes, file it in [`docs/concerns.md`](../docs/concerns.md) under *Resolved* with its id — the ids above are proposed and unused.
+When any of these closes, file it in [`docs/concerns.md`](../docs/concerns.md) under its id. `C67`–`C73` are resolved there as of v0.4.2; `C74` is partial.

@@ -19,6 +19,7 @@ import {
   type Target,
 } from "../src/index.ts";
 import { Db, SqliteRepository, installSchema } from "../src/node.ts";
+import { assert, same } from "./_assert.ts";
 
 // The dispatch board's actions — this application's vocabulary.
 const SEND = "send";
@@ -93,13 +94,6 @@ export class Ops {
     const peer = supervised.flatMap((t) => this.peersOf(t));
     return [...new Set([...own, ...peer])].sort();
   }
-}
-
-function assert(cond: boolean, message: string): void {
-  if (!cond) throw new Error(message);
-}
-function same(a: readonly string[], b: readonly string[]): boolean {
-  return [...a].sort().join() === [...b].sort().join();
 }
 
 // The board's membership policy, composed in-app (see examples/model.ts).

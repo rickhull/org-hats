@@ -1,9 +1,5 @@
-import { type HatClaim, type HeldHat, type Id, type Target } from "./core.ts";
+import { type HatClaim, type HatSource, type HeldHat, type Id, type Target } from "./core.ts";
 import type { OrgHatsRepository } from "./port.ts";
-/** How the worn hat was chosen — rule 5's signal. A claim that did not
- * resolve reports `default` / `primary` / `first`, so the drift is auditable
- * (OH-QM-04: a revoked claim falls back; it does not fail). */
-export type HatSource = "claimed" | "default" | "primary" | "first";
 /** Why `decide` refused. The host maps these to its own responses. */
 export type DenyReason = 
 /** The actor holds no grant in the operation. */

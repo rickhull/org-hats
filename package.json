@@ -1,6 +1,6 @@
 {
   "name": "org-hats",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "type": "module",
   "description": "A small, reusable organization model — types, predicates, an async persistence port, and a request spine that composes them in the model's order. SQLite reference adapter at org-hats/node.",
   "license": "MIT",

@@ -133,7 +133,7 @@ CI runs the same on every push — install, build, a **stale-`dist/` guard**, th
 
 ## Status
 
-The model is frozen and exercised in the reference implementation. The permission layer is a seam — one `capability` table and one predicate — and is not yet wired into an application. `v0.2.0`–`v0.2.3` grew the spine, the harness, the consumer-review surface, and `perRequest`; `v0.3.0` made the core name zero actions; **`v0.4.0` is the membership retreat**: membership is the application's policy, not a model concept — `heldCarries` ships as the standing half, `decide` gains `heldAction`/`no-held-action`, and `maySpeak`/`decideSpeak`/`affiliated` are gone. Decided jointly with the consumer. [`docs/concerns.md`](docs/concerns.md) tracks the review queue.
+The model is frozen and exercised in the reference implementation. The permission layer is a seam — one `capability` table and one predicate — and is not yet wired into an application. `v0.2.0`–`v0.2.3` grew the spine, the harness, the consumer-review surface, and `perRequest`; `v0.3.0` made the core name zero actions; **`v0.4.0` is the membership retreat**: membership is the application's policy, not a model concept — `heldCarries` ships as the standing half, `decide` gains `heldAction`/`no-held-action`, and `maySpeak`/`decideSpeak`/`affiliated` are gone. Decided jointly with the consumer. `v0.4.2` is a review pass: `decide` reports `not-admitted`, not `unknown-actor`, for an actor holding nothing in the requested organization; the path parsers are total; `selectWorn`/`HatSource` replace the duplicated worn-hat ladder; and two strictness flags land ([plans/typescript_review.md](plans/typescript_review.md)). [`docs/concerns.md`](docs/concerns.md) tracks the review queue.
 
 ## License
 

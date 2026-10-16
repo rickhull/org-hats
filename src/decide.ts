@@ -26,19 +26,15 @@ import {
   heldCarries,
   onTeam,
   reach,
+  selectWorn,
   wearableAt,
-  wornHat,
   type HatClaim,
+  type HatSource,
   type HeldHat,
   type Id,
   type Target,
 } from "./core.ts";
 import type { OrgHatsRepository } from "./port.ts";
-
-/** How the worn hat was chosen — rule 5's signal. A claim that did not
- * resolve reports `default` / `primary` / `first`, so the drift is auditable
- * (OH-QM-04: a revoked claim falls back; it does not fail). */
-export type HatSource = "claimed" | "default" | "primary" | "first";
 
 /** Why `decide` refused. The host maps these to its own responses. */
 export type DenyReason =
@@ -122,15 +118,12 @@ export type Decision = DecisionAllow | DecisionDeny;
 interface Worn {
   readonly target: Target;
   readonly held: readonly HeldHat[];
+  /** The actor holds at least one grant in the operation, before the
+   * organization filter — the difference between "unknown" and "known but not
+   * admitted in this organization". */
+  readonly known: boolean;
   readonly worn: HeldHat | null;
   readonly fallback: HatSource | null;
-}
-
-function howWorn(hat: HeldHat, claim: HatClaim | null): HatSource {
-  if (claim !== null && (typeof claim === "string" ? hat.grant.id === claim : claim(hat))) return "claimed";
-  if (hat.grant.default) return "default";
-  if (hat.grant.primary) return "primary";
-  return "first";
 }
 
 async function loadWorn(repo: OrgHatsRepository, request: DecideRequest): Promise<Worn> {
@@ -142,12 +135,13 @@ async function loadWorn(repo: OrgHatsRepository, request: DecideRequest): Promis
       ? allHeld.filter((h) => h.grant.organizationId === request.organizationId)
       : allHeld;
   const claim = request.claimedHatId ?? null;
-  const worn = wornHat(wearableAt(held, request.scopePath), claim);
+  const { hat: worn, source: fallback } = selectWorn(wearableAt(held, request.scopePath), claim);
   return {
     target,
     held,
+    known: allHeld.length > 0,
     worn,
-    fallback: worn === null ? null : howWorn(worn, claim),
+    fallback,
   };
 }
 
@@ -165,9 +159,9 @@ function claimRecorded(claim: HatClaim | null, worn: HeldHat | null, fallback: H
  * decision additionally requires a *held* grant over the target carrying
  * it (presence from the worn hat, standing from a held one — OH-QM-07). */
 export async function decide(repo: OrgHatsRepository, request: DecideRequest): Promise<Decision> {
-  const { target, held, worn, fallback } = await loadWorn(repo, request);
+  const { target, held, known, worn, fallback } = await loadWorn(repo, request);
   const base = { target, action: request.action ?? null, claimed: claimRecorded(request.claimedHatId ?? null, worn, fallback) };
-  if (held.length === 0) return { ok: false, reason: "unknown-actor", hat: null, fallback: null, ...base };
+  if (!known) return { ok: false, reason: "unknown-actor", hat: null, fallback: null, ...base };
   if (worn === null) return { ok: false, reason: "not-admitted", hat: null, fallback: null, ...base };
   if (request.action != null && !worn.actions.includes(request.action)) {
     return { ok: false, reason: "no-capability", hat: worn, fallback, ...base };
