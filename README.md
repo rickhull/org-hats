@@ -133,11 +133,10 @@ CI runs the same on every push — install, build, a **stale-`dist/` guard**, th
 - **[`docs/package.md`](docs/package.md)** — what the package ships and the rules that keep it one.
 - **[`docs/writes.md`](docs/writes.md)** — the write side: the transaction rule, the invariants statement by statement, and administration as an action — documentation and reference SQL for a host's own migrations, not port surface.
 - **[`docs/publishing.md`](docs/publishing.md)** — where it is published and how it mirrors.
-- **[`plans/publish.md`](plans/publish.md)** — the remaining publishing work.
 
 ## Status
 
-The model is frozen, and the reference implementation exercises every rule. The permission layer is a seam — one `capability` table and one predicate — left for the application to fill, so the package is a component, not a product. The two open questions are the host's to settle, not the model's: the per-organization session's landing rule and the multi-organization read rule ([plans/publish.md](plans/publish.md)).
+The model is frozen, and the reference implementation exercises every rule. The permission layer is a seam — one `capability` table and one predicate — left for the application to fill, so the package is a component, not a product.
 
 ## License
 

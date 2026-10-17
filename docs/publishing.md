@@ -74,5 +74,3 @@ From a clean `main`:
 ## Metadata
 
 `package.json` carries `license: MIT`, `author: Rick <rick@thinkpad>`, and the three Codeberg URLs. `files: ["dist"]` means the installable tarball is `dist/` plus the README, LICENSE, and `package.json`. Zero runtime dependencies.
-
-See [package.md](package.md) for what the package ships, and [`../plans/publish.md`](../plans/publish.md) for the work that remains.
