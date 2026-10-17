@@ -1,0 +1,53 @@
+#!/usr/bin/env sh
+# Pre-push gate: validate every version tag being pushed, run bin/check, and
+# refuse to publish a stale dist/.
+#
+# Install once per clone:
+#   git config core.hooksPath .githooks
+#
+# git passes one line per ref on stdin:
+#   <local ref> <local sha> <remote ref> <remote sha>
+set -eu
+cd "$(dirname "$0")/.." || exit 1
+
+fail=0
+
+# 1. Every version tag being pushed must match the manifest in its own commit.
+while read -r local_ref local_sha remote_ref remote_sha; do
+	case $local_sha in
+		*[!0]*) ;;
+		*) continue ;; # a deletion has an all-zero local sha
+	esac
+	case $remote_ref in
+		refs/tags/v[0-9]*)
+			bin/check-version "${remote_ref#refs/tags/}" || fail=1
+			;;
+	esac
+done
+
+# 2. The checkout itself: the fence, the tag at HEAD (if any), the examples.
+#    Quiet on success; the full output is shown only when it fails.
+if ! out=$(bin/check 2>&1); then printf '%s\n' "$out" >&2; fail=1; fi
+
+# 3. dist/ must match src/. CI checks this too, but CI is on the mirror and
+#    lags the canonical host, so a stale dist would be public before it runs.
+if [ -x node_modules/.bin/tsc ]; then
+	if command -v pnpm >/dev/null 2>&1; then
+		if ! out=$(pnpm build 2>&1); then printf '%s\n' "$out" >&2; fail=1; fi
+	else
+		if ! out=$(node_modules/.bin/tsc -p tsconfig.json 2>&1); then printf '%s\n' "$out" >&2; fail=1; fi
+	fi
+	if [ -n "$(git status --porcelain -- dist)" ]; then
+		printf 'pre-push: dist/ is stale — commit the rebuilt dist/\n' >&2
+		git --no-pager diff --stat -- dist >&2
+		fail=1
+	fi
+else
+	printf 'pre-push: skipping the dist/ freshness check (run pnpm install)\n' >&2
+fi
+
+if [ "$fail" -ne 0 ]; then
+	printf 'pre-push: push refused\n' >&2
+	exit 1
+fi
+printf 'pre-push: ok\n'

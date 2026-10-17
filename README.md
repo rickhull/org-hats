@@ -107,7 +107,11 @@ Zero runtime dependencies; `dist/` is committed, so nothing builds at install. S
 bin/check            # the neutrality fence, the tag guard, then the examples
 bin/check-version    # standalone: a vX.Y.Z tag must match package.json
 bin/release patch    # cut a release: bump, build, commit, tag (minor, major, or X.Y.Z)
+git config core.hooksPath .githooks   # once per clone: the pre-push gate
 ```
+
+The pre-push gate validates every tag being pushed, runs `bin/check`, and
+refuses a stale `dist/`; CI (on the mirror) repeats all of it as the backstop.
 
 `bin/check` needs only `node` — Node 24 runs `.ts` directly — and, for the fence, the dev dependencies:
 
@@ -133,7 +137,7 @@ CI runs the same on every push — install, build, a **stale-`dist/` guard**, th
 
 ## Status
 
-The model is frozen, and the reference implementation exercises every rule. The permission layer is a seam — one `capability` table and one predicate — left for the application to fill, so the package is a component, not a product. The two open questions are the host's to settle, not the model's: the per-organization session's landing rule and the multi-organization read rule ([plans/publish.md](plans/publish.md) § *The 1.0 core freeze*).
+The model is frozen, and the reference implementation exercises every rule. The permission layer is a seam — one `capability` table and one predicate — left for the application to fill, so the package is a component, not a product. The two open questions are the host's to settle, not the model's: the per-organization session's landing rule and the multi-organization read rule ([plans/publish.md](plans/publish.md)).
 
 ## License
 
