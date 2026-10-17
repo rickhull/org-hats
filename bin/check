@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-# The module check: the runtime-neutrality fence, then the examples.
-# A failure anywhere fails the run.
+# The module check: the runtime-neutrality fence, the release-metadata guard,
+# then the examples. A failure anywhere fails the run.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -16,6 +16,10 @@ if [ -x node_modules/.bin/tsc ]; then
 else
   echo "(skipped — run 'pnpm install' to enable the fence)"
 fi
+
+echo
+echo "== release metadata: a version tag matches package.json =="
+"$(dirname "$0")/check-version"
 
 echo
 echo "== examples =="

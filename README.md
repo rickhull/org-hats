@@ -104,7 +104,9 @@ Zero runtime dependencies; `dist/` is committed, so nothing builds at install. S
 ## Running
 
 ```
-bin/check            # the neutrality fence, then the examples
+bin/check            # the neutrality fence, the tag guard, then the examples
+bin/check-version    # standalone: a vX.Y.Z tag must match package.json
+bin/release patch    # cut a release: bump, build, commit, tag (minor, major, or X.Y.Z)
 ```
 
 `bin/check` needs only `node` — Node 24 runs `.ts` directly — and, for the fence, the dev dependencies:

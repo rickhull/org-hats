@@ -19,26 +19,33 @@
    - the **multi-organization read rule** decided: the site half is structural (read reach follows team-bearing grants at the site); whether to union every organization served or follow the worn hat is host policy, settled by a real read policy.
    Until then: deliberate 0.x changes with a consumer conference, which has served both sides.
 
-5. **Tag hygiene.** Tag from the package version, never by hand: `git tag -a v$(node -p "require('./package.json').version") -m "v$(node -p "require('./package.json').version")"` — the `v4.0.0` accident on release day was this line not existing.
+5. **Tag hygiene.** Never tag by hand — use `bin/release`, which takes the tag from `package.json` and sweeps every doc that pins the version, so the manifest, the docs, and the tag are one act. The `v4.0.0` and `v0.4.3` misfires were a hand-set tag and an unbumped manifest.
 
 ## Discipline now that something depends on us
 
 - **Tags are immutable.** Never move or delete `v0.1.0`; release by *adding* `v0.1.1`, never by rewriting a tagged commit. Force-pushing over a tag a consumer pinned is the one failure that breaks them silently.
+- **A version tag must match the manifest.** `bin/check-version` fails if a `vX.Y.Z` tag disagrees with `package.json` (it also audits any tag: `bin/check-version v0.4.3`). `bin/check` runs it, so CI enforces it on every push; `bin/release` keeps the two equal by construction.
 - **`dist/` must be fresh.** `bin/check` runs the fence but does not emit; only `pnpm build` does. **CI enforces it** on the mirror (`.github/workflows/check.yml`, GitHub Actions): on every push it builds, fails if `git diff --quiet -- dist` is non-empty, then runs `bin/check`.
 - **CI rides the mirror.** sync-on-commit makes it timely, but the CI system *is* the mirror — a rotated PAT or a stalled sync silently stops CI as well as reach. Check the mirror after any credential change.
 - **Know which host the consumer pins.** Codeberg is canonical and immediate; GitHub trails by the sync. Prefer Codeberg.
 
 ## Release ritual
 
-1. Bump `version` in `package.json`.
-2. `pnpm build`, then commit **source, `dist/`, and the version together**.
-3. Tag and push to the canonical host:
+From a clean `main`:
+
+1. Cut it:
    ```sh
-   git tag -a vX.Y.Z -m "vX.Y.Z"
+   bin/release patch        # or minor, major, or an explicit X.Y.Z
+   ```
+   That bumps `package.json`, updates every doc that pins the version, runs
+   `bin/check`, rebuilds `dist/`, commits `vX.Y.Z`, and tags it — the manifest,
+   the docs, and the tag in one act. `--dry-run` previews; `--push` also pushes.
+2. Push to the canonical host (skip if `--push`ed):
+   ```sh
    git push origin main
    git push origin vX.Y.Z
    ```
-4. Let the mirror sync (immediate on commit; otherwise *Sync now*), confirm **CI is green**, then verify both hosts show the same commit and tag:
+3. Let the mirror sync (immediate on commit; otherwise *Sync now*), confirm **CI is green**, then verify both hosts show the same commit and tag:
    ```sh
    git ls-remote --heads --tags git@codeberg.org:rickhull/org-hats.git
    git ls-remote --heads --tags https://github.com/rickhull/org-hats.git

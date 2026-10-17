@@ -24,11 +24,11 @@ Keep these true:
 
 ## CI
 
-CI runs on the **mirror**: GitHub Actions, [`.github/workflows/check.yml`](../.github/workflows/check.yml). On every push it installs, builds, **fails if the committed `dist/` is stale**, and runs `bin/check`. Because it lives on the mirror, a stalled sync stops CI as well as reach — check the mirror after any credential change.
+CI runs on the **mirror**: GitHub Actions, [`.github/workflows/check.yml`](../.github/workflows/check.yml). On every push it installs, builds, **fails if the committed `dist/` is stale**, and runs `bin/check`; a tag push additionally fails if the tag does not match `package.json` — `bin/check-version`, run by `bin/check` and as its own early step. Because it lives on the mirror, a stalled sync stops CI as well as reach — check the mirror after any credential change.
 
 ## The release
 
-Releases are tagged from `package.json` and pushed to both hosts. The current release is `v0.4.4`; `v0.1.0` was the initial sanitized publication.
+Releases are cut with `bin/release` (bump → build → commit → tag; the tag comes from `package.json`) and pushed to both hosts. The current release is `v0.4.4`; `v0.1.0` was the first.
 
 A consumer pins one of:
 

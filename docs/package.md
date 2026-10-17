@@ -31,7 +31,9 @@ examples/
   _assert.ts     the shared assert/refuses/same helpers
   check.ts       runs them all, in order
 dist/            the committed build output (.js + .d.ts)
-bin/check        the neutrality fence, then the examples
+bin/check        the neutrality fence, the tag guard, then the examples
+bin/check-version  a `vX.Y.Z` tag must match package.json (static; also run by bin/check)
+bin/release      bump, build, commit, and tag a release (from package.json)
 tsconfig.core.json  the fence: core + conformance + port + decide + testing, types: []
 tsconfig.json       the build config (emits dist/)
 ```

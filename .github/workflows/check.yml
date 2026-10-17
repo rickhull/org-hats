@@ -1,6 +1,7 @@
 # GitHub Actions. This repository on GitHub is a push mirror of Codeberg, and
 # sync-on-commit is on, so CI trails a Codeberg push by the mirror sync —
 # minutes. Same job as `bin/check`, plus the guard that matters for a consumer:
+#   - a version tag must match package.json (bin/check-version)
 #   - build dist/ from src/, and fail if the committed dist/ is stale
 #   - run the neutrality fence and the examples
 #
@@ -25,6 +26,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      - name: Release metadata (a version tag matches package.json)
+        run: bin/check-version
 
       - name: Install pnpm
         run: npm install --global pnpm@11
