@@ -171,9 +171,9 @@ People do not always belong to one body. Ellis volunteers for the Council and ru
 | Gate volunteer | Volunteer | Gate Crew | Riverbend Arts Council | ● |
 | Cart concessionaire | Concessionaire | Cart | Long Table | ● |
 
-One actor, one login, and a **primary per organization** — their principal capacity at the Council differs from their principal capacity at Long Table, and neither leaks into the other. Grants are stated per organization, and supervision still never crosses a boundary.
+One durable actor — authenticated and resolved by the host — and a **primary per organization** — their principal capacity at the Council differs from their principal capacity at Long Table, and neither leaks into the other. Grants are stated per organization, and supervision still never crosses a boundary.
 
-**It buys:** volunteers who also vend, contractors who also perform, board members who also crew — without two logins and without authority bleeding between them.
+**It buys:** volunteers who also vend, contractors who also perform, board members who also crew — without duplicating the person or letting authority bleed between them.
 
 **It cannot say:** how two organizations' teams, sharing a site, are allowed to *see each other's work*. That is step 10.
 

@@ -80,6 +80,26 @@ Read reach and the roster rule are **different questions with similar names**, a
 
 The outermost scope is the boundary the application supplies. Whether that boundary is a tenancy isolation unit is the application's concern, not the model's.
 
+## Identity and authentication
+
+An **actor** is a durable, caller-supplied authorization subject, not a login. The model never sees a password, token, OIDC claim, magic link, passkey, or session, and it offers no operation to verify one. Authentication happens before the model is consulted: a host authenticates the request, resolves the verified credential to an actor id, and passes only that id to the port and the spine.
+
+```
+verified credential → host identity resolution → durable actor id → org-hats
+```
+
+Login identity is **host policy**. One durable actor may have zero, one, or many host-managed verified login identities — an OIDC `(issuer, subject)` pair, a local credential, or both — and the host may link, replace, revoke, and recover them without changing the actor id. What the model requires is that the id stays durable: grants, primary and default, worn-hat history, and audit rows reference it, so a second verified login method must resolve to the same id rather than mint a second actor.
+
+A host that needs the relation keeps it in its own schema, beside the actor row:
+
+```sql
+actor_identity (actor_id, issuer, subject, ...)  -- one row per verified login identity
+```
+
+with the external principal uniquely keyed (`(issuer, subject)` for OIDC, or the local credential's own natural key) and `actor_id` a foreign key into the host's actors. That table is an application table, not a sixth core entity: its key, lifecycle, linking rules, recovery, and audit detail are host concerns, and no provider claim, group, or email domain ever becomes a grant or a hat.
+
+The seam is deliberate. The port's first argument is already an `actorId` (`hatsOf(actorId, operationId)`), and `DecideRequest` carries `actorId`, not a credential, so authentication cannot become an authority input by accident. A host that later swaps providers or adds a local fallback changes its identity resolution, not the model, its schema, or its callers.
+
 ## Permissions
 
 An optional layer, shaped here so it can be added without moving anything beneath it.

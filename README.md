@@ -6,12 +6,12 @@
 
 `org-hats` is a small, dependency-free component that answers one question — **who may act, in what capacity, over which group, and where** — in a shape that stays small as the organization grows. It separates the *capacity* (a role such as Supervisor) from the *context* (the team, the organization, the place), so the number of roles stays flat while teams, sites, and organizations multiply.
 
-It is a component to embed in an application, not a product or a service. The model is five entities and two relationships, and the decision rule is one line of logic; there are no runtime dependencies and no lock-in — SQLite today, Cloudflare D1 or anything else tomorrow. It sits *inside* role-based access control rather than beside it: the structural core an RBAC application is built on, not a replacement for one.
+It is a component to embed in an application, not a product or a service. The model is five entities and two relationships, and the decision rule is one line of logic; there are no runtime dependencies and no lock-in — SQLite today, Cloudflare D1 or anything else tomorrow. It sits *inside* role-based access control rather than beside it: the structural core an RBAC application is built on, not a replacement for one. Authentication is not part of the model: a host authenticates first and passes a durable actor id, so identity-provider details never become an authority input ([organization_model.md](docs/organization_model.md) § *Identity and authentication*).
 
 | | |
 | --- | --- |
 | **What it buys** | Roles that do not grow with the org chart. Access that can be enumerated and reviewed. Revocation that is immediate and explicit. Decisions as data — allow, or deny with a reason. A core small enough to read, test, and audit in an afternoon. No dependence on a particular database, cloud, or vendor. |
-| **What it costs** | You supply the parts that are yours — identities, the objects being protected, the list of actions, and the audit log. This is the authorization core, not the whole system. |
+| **What it costs** | You supply the parts that are yours — identities (durable actor ids, resolved by your own authentication), the objects being protected, the list of actions, and the audit log. This is the authorization core, not the whole system. |
 | **What it leaves out** | Role hierarchy, declarative separation-of-duty constraints, and negative grants — each refused on purpose, the seam named, not half-built. Role *administration* is not an omission at all: granting is an action like any other, checked by the same rule and audited in the same row. |
 | **Maturity** | The model is frozen and exercised; the package is published under the MIT license; the public surface is small and stable. |
 

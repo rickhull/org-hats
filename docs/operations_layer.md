@@ -66,7 +66,7 @@ Cooperation widens *audience*, never *authority*. A peer team's supervisor can r
 - A team names exactly one organization and exactly one scope.
 - Cooperation is mutual, read-only, scoped, non-transitive, cross-organization, and per-team.
 - Reading follows the organization; acting follows the worn grant.
-- Multi-organization is ordinary: one actor, one login, grants stated per organization.
+- Multi-organization is ordinary: one durable actor, host-managed login identities, grants stated per organization.
 
 ## Efficiency
 
