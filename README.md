@@ -7,7 +7,7 @@ reference runtime.*
 the v0.4 surface.** The v0.4 organization model — predicates, persistence
 port, request spine, and the Node SQLite adapter — is not here; it lives on
 `main` at its tags, and content returns to this branch only by being
-re-specified, never copied. The current version is `1.0.0-alpha.1` (the
+re-specified, never copied. The current version is `1.0.0` (the
 vertical path and the conformance inventory are in place; the 1.0.0 release
 is prepared).
 

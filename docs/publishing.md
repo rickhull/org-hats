@@ -28,7 +28,7 @@ CI runs on the **mirror**: GitHub Actions, [`.github/workflows/check.yml`](../.g
 
 ## The release
 
-Releases are cut with `bin/release` (bump → build → commit → tag; the tag comes from `package.json`) and pushed to both hosts. `v0.4.4` is the last v0.4 release on `main`; the v1 line is prepared at `1.0.0-alpha.1` and tags from `v1`. `v0.1.0` was the first release.
+Releases are cut with `bin/release` (bump → build → commit → tag; the tag comes from `package.json`) and pushed to both hosts. `v0.4.4` is the last v0.4 release on `main`; the v1 line is prepared at `1.0.0` and tags from `v1`. `v0.1.0` was the first release.
 
 A consumer pins one of:
 

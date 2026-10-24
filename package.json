@@ -1,6 +1,6 @@
 {
   "name": "org-hats",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0",
   "type": "module",
   "description": "A portable organizational authority subsystem — use-case authority runtime, signed access envelopes, and a verification-only access module. v1 in development on the v1 branch; the v0.4 organization model lives on main at its tags.",
   "license": "MIT",
