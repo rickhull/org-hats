@@ -43,8 +43,27 @@ boots and resets the coordinators from `CONFORMANCE_WORLD`, and the full
 25-case portable inventory now runs against them in workerd. The Worker
 exposes `/ops/verification-keys` for the public signing key.
 
-The signer is ephemeral per isolate; stable key configuration, rotation, ops
-authentication, export/restore, and complete context presentation are T6.5.
+## T6.5 — ops and state lifecycle
+
+`OPS_TOKEN` authenticates the `/ops/*` routes:
+
+- `POST /ops/organization/bootstrap`
+- `POST /ops/operation/bootstrap`
+- `GET  /ops/schema-status?coordinator=organization|operation&id=…`
+- `GET  /ops/export?coordinator=…&id=…` — canonical JSON
+- `POST /ops/restore` — `{ coordinator, id, snapshot }`
+- `GET  /ops/verification-keys` — public, no token
+
+Set `AUTHORITY_SIGNING_KEY` (pkcs8 base64), `AUTHORITY_SIGNING_PUBLIC_KEY`
+(raw base64), and `AUTHORITY_SIGNING_KEY_ID` for a stable signer. Add
+additional `AUTHORITY_VERIFICATION_KEYS` (`keyId:base64`, comma-separated) to
+install the next key before the issuer switches; remove the old entry after
+its last envelope expires. Without the signing-key variables the runtime
+generates an ephemeral dev key per isolate.
+
+Export is canonical JSON per coordinator, not a SQLite-file copy; restore is
+typed and atomic. The restore drill covers the operation and organization
+coordinators, and context returns names, wearable hats, and the selected hat.
 
 ## Portability constraint
 

@@ -10,6 +10,9 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-24",
   "workers_dev": false,
+  // Local/test ops credential only. A deployment sets a secret of the same
+  // name instead of committing a value.
+  "vars": { "OPS_TOKEN": "test-ops-token" },
   "durable_objects": {
     "bindings": [
       { "name": "COUNTER", "class_name": "Counter" },

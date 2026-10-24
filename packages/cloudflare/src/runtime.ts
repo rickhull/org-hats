@@ -10,11 +10,13 @@ import {
   type AuthorityContext,
   type AuthorityRuntime,
   type CommandResult,
+  type ContextRequest,
   type Failure,
   type RefreshInput,
   type SignedAccessEnvelope,
 } from "org-hats/authority";
 import {
+  base64Decode,
   base64Encode,
   base64UrlEncode,
   ed25519VerifyKey,
@@ -47,6 +49,60 @@ export const createEphemeralSigner = async (keyId = `key-${crypto.randomUUID()}`
 
 export const verificationKeyOf = async (signer: CloudflareSigner): Promise<VerifyKey> =>
   ed25519VerifyKey(signer.keyId, await signer.publicKey());
+
+/** A signer from deployment configuration, or the ephemeral dev signer. */
+export const signerFromEnv = async (env: Env): Promise<CloudflareSigner> => {
+  if (
+    env.AUTHORITY_SIGNING_KEY === undefined ||
+    env.AUTHORITY_SIGNING_PUBLIC_KEY === undefined ||
+    env.AUTHORITY_SIGNING_KEY_ID === undefined
+  ) {
+    return createEphemeralSigner();
+  }
+  const privateKey = await crypto.subtle.importKey(
+    "pkcs8",
+    base64Decode(env.AUTHORITY_SIGNING_KEY),
+    { name: "Ed25519" },
+    false,
+    ["sign"],
+  );
+  const publicKey = (await crypto.subtle.importKey(
+    "raw",
+    base64Decode(env.AUTHORITY_SIGNING_PUBLIC_KEY),
+    { name: "Ed25519" },
+    false,
+    ["verify"],
+  )) as CryptoKey;
+  const publicKeyBase64 = env.AUTHORITY_SIGNING_PUBLIC_KEY;
+  const keyId = env.AUTHORITY_SIGNING_KEY_ID;
+  return {
+    keyId,
+    sign: async (payload) =>
+      base64UrlEncode(new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, privateKey, utf8(payload)))),
+    publicKey: async () => publicKeyBase64,
+  };
+};
+
+/** The verifier map: configured rotation keys plus the current signer. */
+export const verificationKeys = async (
+  env: Env,
+  signer: CloudflareSigner,
+): Promise<ReadonlyMap<string, VerifyKey>> => {
+  const keys = new Map<string, VerifyKey>();
+  for (const entry of (env.AUTHORITY_VERIFICATION_KEYS ?? "").split(",")) {
+    const trimmed = entry.trim();
+    if (trimmed.length === 0) continue;
+    const split = trimmed.indexOf(":");
+    if (split <= 0 || split === trimmed.length - 1) {
+      throw new Error("AUTHORITY_VERIFICATION_KEYS entries must be keyId:base64");
+    }
+    const keyId = trimmed.slice(0, split);
+    keys.set(keyId, await ed25519VerifyKey(keyId, trimmed.slice(split + 1)));
+  }
+  const signing = await verificationKeyOf(signer);
+  keys.set(signing.keyId, signing);
+  return keys;
+};
 
 const now = (): number => Math.floor(Date.now() / 1000);
 
@@ -223,21 +279,63 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     return { envelope: await sign(issued.value.claims), refresh: issued.value.refresh };
   };
 
-  const context = async (input: { interfaceVersion: number; envelope: SignedAccessEnvelope }): Promise<AuthorityContext | Failed> => {
+  const context = async (input: ContextRequest): Promise<AuthorityContext | Failed> => {
     if (input.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) return failed({ kind: "wrong-interface-version" });
     const verified = await verify(input.envelope, keys, { now: now() });
     if ("failure" in verified) return failed(verified.failure);
     const claims = verified.claims;
+    const actor = await call<{ actorId: string; displayName?: string; disabled: boolean }>(
+      organization(claims.actor.organizationId),
+      "GET",
+      `/actor?actorId=${encodeURIComponent(claims.actor.actorId)}`,
+    );
+    const org = await call<{ organizationId: string; displayName: string | null }>(
+      organization(claims.actor.organizationId),
+      "GET",
+      "/organization",
+    );
+    const op = await call<{
+      operationId: string;
+      operationDisplayName?: string;
+      participation: "invited" | "accepted" | "active" | "revoked";
+      wearableHats: readonly {
+        role: string;
+        actions: readonly string[];
+        teamId?: string;
+        siteId?: string;
+        primary: boolean;
+      }[];
+    }>(operation(claims.operationId), "POST", "/context", {
+      organizationId: claims.actor.organizationId,
+      actorId: claims.actor.actorId,
+      role: claims.hat.role,
+    });
+    if (!op.ok || op.value === undefined) return failed(op.failure ?? { kind: "unavailable" });
+    const selected = op.value.wearableHats.find((hat) => hat.role === claims.hat.role);
     return {
-      actor: { organizationId: claims.actor.organizationId, actorId: claims.actor.actorId },
-      operationId: claims.operationId,
-      participation: "active",
-      wearableHats: [],
-      selectedHat: {
-        role: claims.hat.role,
-        actions: [...claims.hat.actions],
-        primary: true,
+      actor: {
+        organizationId: claims.actor.organizationId,
+        actorId: claims.actor.actorId,
+        ...(actor.value?.displayName === undefined ? {} : { displayName: actor.value.displayName }),
       },
+      ...(org.value?.displayName === null || org.value?.displayName === undefined
+        ? {}
+        : { organizationDisplayName: org.value.displayName }),
+      operationId: claims.operationId,
+      ...(op.value.operationDisplayName === undefined ? {} : { operationDisplayName: op.value.operationDisplayName }),
+      participation: op.value.participation,
+      wearableHats: op.value.wearableHats,
+      ...(selected === undefined
+        ? {}
+        : {
+            selectedHat: {
+              role: claims.hat.role,
+              actions: [...claims.hat.actions],
+              ...(selected.teamId === undefined ? {} : { teamId: selected.teamId }),
+              ...(selected.siteId === undefined ? {} : { siteId: selected.siteId }),
+              primary: selected.primary,
+            },
+          }),
       sites: claims.sites,
     };
   };

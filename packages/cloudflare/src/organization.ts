@@ -5,6 +5,13 @@ import {
   type JsonValue,
 } from "org-hats/authority";
 import type { Env } from "./env";
+import {
+  organizationTables,
+  readTables,
+  restoreTables,
+  type ExportSnapshot,
+  type StateRow,
+} from "./state";
 
 /** One organization authority. The object owns the facts that stay stable
  * while the organization participates in several operations: actors,
@@ -529,6 +536,31 @@ export class OrganizationAuthority extends DurableObject<Env> {
     return { delivered, pending };
   }
 
+  private exportSnapshot(): ExportSnapshot {
+    return {
+      schemaVersion: String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0"),
+      coordinator: "organization",
+      tables: readTables(this.ctx.storage.sql, organizationTables),
+    };
+  }
+
+  private restoreSnapshot(input: unknown): Result<{ restored: boolean }> {
+    if (typeof input !== "object" || input === null) return failure("invalid-command", "snapshot must be an object");
+    const snapshot = input as Partial<ExportSnapshot>;
+    if (snapshot.coordinator !== "organization") return failure("invalid-command", "snapshot is not organization state");
+    const version = String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0");
+    if (snapshot.schemaVersion !== version) return failure("invalid-command", "snapshot schema version does not match");
+    if (typeof snapshot.tables !== "object" || snapshot.tables === null) return failure("invalid-command", "snapshot has no tables");
+    this.ctx.storage.transactionSync(() => {
+      restoreTables(
+        this.ctx.storage.sql,
+        organizationTables,
+        snapshot.tables as Readonly<Record<string, readonly StateRow[]>>,
+      );
+    });
+    return value({ restored: true });
+  }
+
   async alarm(): Promise<void> {
     await this.drain();
   }
@@ -644,6 +676,25 @@ export class OrganizationAuthority extends DurableObject<Env> {
         return json(value({ admin: this.isAdmin(actorId) }));
       }
 
+      if (request.method === "GET" && url.pathname === "/actor") {
+        const actorId = asString(url.searchParams.get("actorId"), "actorId");
+        const actor = this.actor(actorId);
+        return actor === undefined
+          ? json(failure("unauthenticated", "unknown actor"), 404)
+          : json(value(actor));
+      }
+
+      if (request.method === "GET" && url.pathname === "/organization") {
+        const organizationId = this.organizationId();
+        const organization = organizationId === undefined
+          ? undefined
+          : this.one("SELECT display_name FROM organization WHERE organization_id = ?", organizationId);
+        return json(value({
+          organizationId: organizationId ?? null,
+          displayName: organization?.["display_name"] ?? null,
+        }));
+      }
+
       if (request.method === "POST" && url.pathname === "/reset") {
         for (const table of ["organization", "actors", "principal_links", "org_admins", "invitations", "audit", "claims", "outbox"]) {
           this.ctx.storage.sql.exec(`DELETE FROM ${table}`);
@@ -653,6 +704,14 @@ export class OrganizationAuthority extends DurableObject<Env> {
 
       if (request.method === "GET" && url.pathname === "/status") {
         return json(value(this.status()));
+      }
+
+      if (request.method === "GET" && url.pathname === "/export") {
+        return json(value(this.exportSnapshot()));
+      }
+
+      if (request.method === "POST" && url.pathname === "/restore") {
+        return json(this.restoreSnapshot(await request.json()));
       }
 
       if (request.method === "GET" && url.pathname === "/audit") {

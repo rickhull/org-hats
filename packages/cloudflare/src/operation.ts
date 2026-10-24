@@ -7,6 +7,7 @@ import {
   validatePolicyBundle,
   type AccessEnvelopeClaimsV1,
   type FailureKind,
+  type HatSummary,
   type JsonValue,
   type PolicyBundle,
   type RefreshHandleOutcome,
@@ -19,6 +20,13 @@ import {
   type Snapshot,
 } from "org-hats";
 import type { Env } from "./env";
+import {
+  operationTables,
+  readTables,
+  restoreTables,
+  type ExportSnapshot,
+  type StateRow,
+} from "./state";
 
 /** One operation authority. The object owns operation-local facts: sites,
  * teams, grants, participation, policy, refresh records, audit, claims, and
@@ -1033,6 +1041,66 @@ export class OperationAuthority extends DurableObject<Env> {
     return value({ reset: true });
   }
 
+  private context(organizationId: string, actorId: string, role: string): Result<{
+    readonly operationId: string;
+    readonly operationDisplayName?: string;
+    readonly participation: "invited" | "accepted" | "active" | "revoked";
+    readonly wearableHats: readonly HatSummary[];
+  }> {
+    const operation = this.one("SELECT operation_id, display_name FROM operation LIMIT 1");
+    if (operation === undefined) return failure("unavailable", "operation is not bootstrapped");
+    const policy = this.policy();
+    if (policy === undefined) return failure("unavailable", "operation has no policy");
+    const participation = this.one(
+      "SELECT status FROM participations WHERE organization_id = ?",
+      organizationId,
+    );
+    const status = participation === undefined ? "revoked" : String(participation["status"]);
+    const wearable = this.rows(
+      "SELECT role, target_kind, team_id, site_id, is_primary FROM grants WHERE organization_id = ? AND actor_id = ? AND revoked = 0 ORDER BY grant_id",
+      organizationId,
+      actorId,
+    ).map((row) => ({
+      role: String(row["role"]),
+      actions: [...(actionsOf(policy, String(row["role"])) ?? [])],
+      ...(row["target_kind"] === "team"
+        ? { teamId: String(row["team_id"]) }
+        : { siteId: String(row["site_id"]) }),
+      primary: Number(row["is_primary"]) === 1,
+    }));
+    return value({
+      operationId: String(operation["operation_id"]),
+      ...(operation["display_name"] === null ? {} : { operationDisplayName: String(operation["display_name"]) }),
+      participation: status as "invited" | "accepted" | "active" | "revoked",
+      wearableHats: wearable,
+    });
+  }
+
+  private exportSnapshot(): ExportSnapshot {
+    return {
+      schemaVersion: String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0"),
+      coordinator: "operation",
+      tables: readTables(this.ctx.storage.sql, operationTables),
+    };
+  }
+
+  private restoreSnapshot(input: unknown): Result<{ restored: boolean }> {
+    if (typeof input !== "object" || input === null) return failure("invalid-command", "snapshot must be an object");
+    const snapshot = input as Partial<ExportSnapshot>;
+    if (snapshot.coordinator !== "operation") return failure("invalid-command", "snapshot is not operation state");
+    const version = String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0");
+    if (snapshot.schemaVersion !== version) return failure("invalid-command", "snapshot schema version does not match");
+    if (typeof snapshot.tables !== "object" || snapshot.tables === null) return failure("invalid-command", "snapshot has no tables");
+    this.ctx.storage.transactionSync(() => {
+      restoreTables(
+        this.ctx.storage.sql,
+        operationTables,
+        snapshot.tables as Readonly<Record<string, readonly StateRow[]>>,
+      );
+    });
+    return value({ restored: true });
+  }
+
   async alarm(): Promise<void> {
     await this.drain();
   }
@@ -1220,11 +1288,22 @@ export class OperationAuthority extends DurableObject<Env> {
         }));
       }
 
+      if (request.method === "POST" && url.pathname === "/context") {
+        const body = await readBody();
+        return json(this.context(
+          asString(body["organizationId"], "organizationId"),
+          asString(body["actorId"], "actorId"),
+          asString(body["role"], "role"),
+        ));
+      }
+
       if (request.method === "POST" && url.pathname === "/drain") {
         return json(value(await this.drain()));
       }
 
       if (request.method === "GET" && url.pathname === "/status") return json(value(this.status()));
+      if (request.method === "GET" && url.pathname === "/export") return json(value(this.exportSnapshot()));
+      if (request.method === "POST" && url.pathname === "/restore") return json(this.restoreSnapshot(await request.json()));
       if (request.method === "GET" && url.pathname === "/snapshot") return json(value(this.snapshot()));
       if (request.method === "GET" && url.pathname === "/audit") {
         return json(value(this.rows("SELECT seq, at, actor, fact FROM audit ORDER BY seq")));
