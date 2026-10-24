@@ -1,7 +1,6 @@
-// M3 tests: the in-memory authority engine — issuance, refresh outcomes,
-// the participation workflow with visible partial states and retry, command
-// idempotency and authorization, and the bounded revocation window
-// (plans/v1.md T3.2–T3.4).
+// The in-memory authority engine — issuance, refresh outcomes, the
+// participation workflow with visible partial states and retry, command
+// idempotency and authorization, and the bounded revocation window.
 
 import test from "node:test";
 import assert from "node:assert/strict";

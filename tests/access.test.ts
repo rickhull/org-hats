@@ -1,6 +1,6 @@
-// M4 tests: the neutral access verifier and the fixed vectors
-// (plans/v1.md T4.1/T4.2). Vector data is committed at
-// fixtures/envelope-vectors.json — byte-exact across implementations.
+// The neutral access verifier and the fixed vectors. Vector data is
+// committed at fixtures/envelope-vectors.json — byte-exact across
+// implementations.
 
 import test from "node:test";
 import assert from "node:assert/strict";

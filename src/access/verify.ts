@@ -1,5 +1,5 @@
 // The verification-only module's engine: a signed envelope in, neutral
-// authority facts out (docs/authority_redesign.md § Access; plans/v1.md M4).
+// authority facts out (docs/authority_redesign.md § Access).
 //
 // The verifier checks signature, interface and format versions, expiry, and
 // the caller's expected operation/site binding — in that order of trust —

@@ -1,6 +1,6 @@
-// M1 tests: the envelope contract's executable half — canonical JSON is the
-// encoding both issuer and verifier will call (M3/M4); determinism is the
-// property that makes signatures stable across implementations.
+// The envelope contract's executable half — canonical JSON is the encoding
+// both issuer and verifier call; determinism is the property that makes
+// signatures stable across implementations.
 
 import test from "node:test";
 import assert from "node:assert/strict";

@@ -7,8 +7,7 @@
 // product entity: product verbs — a host's `mayReadReport`, for example —
 // are host code that maps product facts onto these targets.
 //
-// The verifier that produces this from a signed envelope ships beside it
-// (plans/v1.md M4).
+// The verifier that produces this from a signed envelope ships beside it.
 
 import type {
   AccessEnvelopeClaimsV1,

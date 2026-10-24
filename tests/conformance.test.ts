@@ -1,6 +1,6 @@
-// M5 tests: the public conformance inventory (plans/v1.md T5.1). The
-// inventory is the specification; this file only runs it against the
-// in-memory world and reports every failure with its id.
+// The public conformance inventory. The inventory is the specification; this
+// file only runs it against the in-memory world and reports every failure
+// with its id.
 
 import test from "node:test";
 import assert from "node:assert/strict";

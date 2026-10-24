@@ -56,9 +56,9 @@ line is `main` (frozen at its tags); the authority redesign work happens on
   (Professional Operation, Festival), and real fixtures live in the
   consumer's private repository.
 - `docs/authority_redesign.md` is the normative architecture and
-  `plans/v1.md` the development plan; read the relevant section before
-  changing the seam, the authority engine, or the access module.  The v0.4
-  public surface is frozen at its tags; post-M1 interface changes are
+  `plans/v1.md` the forward plan; read the relevant section before changing
+  the seam, the authority engine, or the access module.  The v0.4 public
+  surface is frozen at its tags; post-alpha interface changes are
   additive-only or re-reviewed with the consumer.
 - Distribution stays on git tags; no registry publication.
 - Commentary states the invariant that must hold, present tense; history

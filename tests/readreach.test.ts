@@ -1,6 +1,6 @@
-// M2 tests: read reach under both policies — concrete twin cases plus
-// generated snapshots proving the structural properties hold for arbitrary
-// grant shapes (plans/v1.md T2.2).
+// Read reach under both policies — concrete twin cases plus generated
+// snapshots proving the structural properties hold for arbitrary grant
+// shapes.
 
 import test from "node:test";
 import assert from "node:assert/strict";

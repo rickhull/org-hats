@@ -7,9 +7,9 @@
 // internal seam; the in-memory adapter ships beside it in this package and
 // no adapter SPI is published.
 //
-// M1 (plans/v1.md) ships the normative specification: the runtime surface,
-// the policy-bundle vocabulary, and the synthetic twins as data. The
-// in-memory engine (M3) implements these types; nothing here is speculative.
+// The normative specification: the runtime surface, the policy-bundle
+// vocabulary, and the synthetic twins as data. The in-memory engine
+// implements these types; nothing here is speculative.
 export { AUTHORITY_INTERFACE_VERSION } from "./types.js";
 export { actionsOf, validatePolicyBundle } from "../policy.js";
 export { DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION, TWINS, } from "./twins.js";

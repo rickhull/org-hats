@@ -1,5 +1,5 @@
-// The vertical path that gates the alpha tag (plans/v1.md): evidence →
-// engine issuance → public-key distribution → verification-only access →
+// The vertical public path: evidence → engine issuance → public-key
+// distribution → verification-only access →
 // neutral predicates. No authority internals cross to the consumer side
 // except the envelope and the public key.
 

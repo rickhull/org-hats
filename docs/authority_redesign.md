@@ -2,7 +2,7 @@
 
 **Status:** Normative architecture for the v1 authority subsystem. It states
 the target shape and the settled interfaces; [plans/v1.md](../plans/v1.md)
-records implementation progress.
+records the remaining work.
 
 This repository is the normative source for the authority seam. The consuming
 product's architecture document states consumer requirements and deployment
@@ -333,6 +333,17 @@ Quartermaster does not receive authority storage bindings, grant queries,
 Durable Object namespaces, or authority database rows. It does not reconstruct
 reach, fallback, participation, or worn-hat rules from envelope claims, and
 its product verbs map onto neutral access facts rather than extending them.
+
+The accepted contract is authority interface `1` and access envelope `1`,
+recorded in Quartermaster's `specs/login.md`. The portable v1 line implements
+it; the Cloudflare runtime binding is planned in
+[plans/v1.md](../plans/v1.md). Quartermaster's `apps/authority-dev` and
+`packages/access` are temporary stand-ins and are deleted together when the
+real binding lands, so the consumer never grows a second envelope
+implementation. The review items that preceded the alpha are settled in the
+shipped contract: `supervisedTeamIds` is absent, the read policy is an axis
+structure, `PrincipalEvidence.email` is absent, and the twins use `reviewer`
+rather than a people-management title.
 
 Ordinary established requests should use a short-lived signed access
 projection and reach one reporting object. Login, refresh, authority changes,

@@ -46,6 +46,8 @@ after the suites.
 
 Normative documents:
 
+- [`docs/README.md`](docs/README.md) — the docs index and the docs/plans
+  split.
 - [`docs/authority_redesign.md`](docs/authority_redesign.md) — the
   architecture; § Authority and § Access point at the shipped spec types.
 - [`docs/envelope.md`](docs/envelope.md) — the v1 access-envelope format
@@ -54,7 +56,8 @@ Normative documents:
   this repository uses, and the ones it rejects.
 - [`docs/migration-v1.md`](docs/migration-v1.md) — the 0.4 → 1.0 deltas.
 - [`SECURITY.md`](SECURITY.md) — reporting and coordinated disclosure.
-- [`plans/v1.md`](plans/v1.md) — the development plan this branch executes.
+- [`plans/v1.md`](plans/v1.md) — the remaining work: release, consumer
+  handoff, Cloudflare runtime, and demo.
 
 Background (phase-1 toeholds; the bodies return by re-specification):
 

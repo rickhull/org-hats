@@ -1,6 +1,6 @@
-// M2 tests: the decision rule and worn-hat selection — every denial reason,
-// the primary/fallback behavior, revoked and disabled handling, and the
-// participation state machine (plans/v1.md T2.1).
+// The decision rule and worn-hat selection — every denial reason, the
+// primary/fallback behavior, revoked and disabled handling, and the
+// participation state machine.
 
 import test from "node:test";
 import assert from "node:assert/strict";

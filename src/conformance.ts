@@ -1,6 +1,6 @@
 // The public conformance inventory — the executable specification of the
 // portable authority and access behaviour (docs/authority_redesign.md
-// § Verification strategy; plans/v1.md T5.1).
+// § Verification strategy).
 //
 // Every case runs through the public surface only: the model, the
 // AuthorityRuntime, the synthetic twins, and the access verifier. A case

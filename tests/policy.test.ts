@@ -1,5 +1,5 @@
-// M1 tests: the policy-bundle vocabulary validates what the twins exercise
-// and rejects what they do not (plans/v1.md T1.3).
+// The policy-bundle vocabulary validates what the twins exercise and rejects
+// what they do not.
 
 import test from "node:test";
 import assert from "node:assert/strict";

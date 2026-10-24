@@ -1,5 +1,5 @@
-// The synthetic structural twins — public conformance data (plans/v1.md
-// T1.4), retargeted onto the v1 model (T2.1). They carry the structural
+// The synthetic structural twins — public conformance data. They carry the
+// structural
 // properties of the reference consumer's two design tests without any of its
 // names: a persistent multi-site professional operation, and a time-bounded,
 // multi-venue festival burst. One organization and one of its actors

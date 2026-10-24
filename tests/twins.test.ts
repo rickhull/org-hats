@@ -1,7 +1,6 @@
-// M1/M2 tests: the synthetic twins carry the structural properties the
-// conformance inventory will exercise — multi-organization participation,
-// site independence, the team burst, and one organization actor joining a
-// second operation (plans/v1.md T1.4/T2.1).
+// The synthetic twins carry the structural properties the conformance
+// inventory exercises — multi-organization participation, site independence,
+// the team burst, and one organization actor joining a second operation.
 
 import test from "node:test";
 import assert from "node:assert/strict";

@@ -1,5 +1,5 @@
 // The portable authority engine, in memory — the reference implementation of
-// `AuthorityRuntime` (docs/authority_redesign.md § Authority; plans/v1.md M3).
+// `AuthorityRuntime` (docs/authority_redesign.md § Authority).
 //
 // Two coordinators mirror the deployed shape: an organization authority
 // (actors, principal links, org-side participation) and an operation

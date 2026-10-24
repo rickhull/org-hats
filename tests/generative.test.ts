@@ -1,4 +1,4 @@
-// M5 tests: invariant and generative coverage (plans/v1.md T5.2). The
+// Invariant and generative coverage. The
 // generator builds valid-by-construction states and checks the model's
 // claims over them; the workflow cases replay commands and outbox deliveries
 // to prove idempotency and partial-failure convergence. No network, no
