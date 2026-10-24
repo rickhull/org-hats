@@ -13,8 +13,9 @@
 
 3. **Consumer handoff.** Send the pin — `git+https://codeberg.org/rickhull/org-hats.git#v0.4.4` — and note that the `OH-QM-01`…`11` ids are unchanged.
 
-4. **The 1.0 core freeze** (on the roadmap at the consumer's request — do not cut yet). Freezes: the five entities, `SCHEMA`'s shape, the port, `decide`/`DecideRequest`/`Decision`, `heldCarries`, and the `OH-QM` ids — additions-only after. **Entry criteria** (the consumer's):
-   - the write-side conference — **done** ([docs/writes.md](../docs/writes.md));
-   - the **landing rule** settled at the session layer: one primary per organization, so a multi-organization actor's landing hat is a host decision — the spine takes a position (`organizationId` as request context) but the interaction is the host's;
-   - the **multi-organization read rule** decided: the site half is structural (read reach follows team-bearing grants at the site); whether to union every organization served or follow the worn hat is host policy, settled by a real read policy.
-   Until then: deliberate 0.x changes with a consumer conference, which has served both sides.
+4. **~~The 1.0 core freeze~~ — superseded.** The consumer has chosen a
+   clean-slate second system, and 1.0 now means the authority-subsystem
+   redesign: one clean breaking version, rough edges accepted. See
+   [plans/v1.md](v1.md). The v0.4 tags and the `OH-QM-01…11` ids remain
+   frozen as published; the v1 work happens on a fresh branch with a new
+   conformance id scheme.
