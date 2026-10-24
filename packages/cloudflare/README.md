@@ -24,7 +24,19 @@ identity-provider configuration is stored opaquely and never exposed. The
 test suite exercises bootstrap and principal resolution, invite → accept,
 duplicate and mismatched claims, early acceptance, disable, and revoke.
 
-The operation coordinator, alarms, and outbox delivery are T6.3/T6.4.
+## T6.3 — OperationAuthority
+
+`src/operation.ts` owns the operation-local facts: sites, teams, grants,
+participation, policy, refresh records, audit, claims, and the outbox that
+carries invitations to organization authority. Organization and operation
+outboxes drain through namespace stubs; a failed delivery stays pending and
+an alarm retries it. The tests cover invite → accept through both
+coordinators, alarm retry, grants/select/revoke with idempotency,
+refresh-record revocation, cross-coordinator actor-disable, and
+operation-side participation revoke.
+
+The full conformance inventory, the public `AuthorityRuntime` binding, and
+the ops entrypoints are T6.4.
 
 ```sh
 pnpm --filter org-hats-cloudflare typecheck
@@ -39,5 +51,5 @@ between tests: use unique object names or explicit reset, and assert deltas
 rather than absolute values. The organization tests use unique object names;
 the counter test asserts `second === first + 1`.
 
-T6.3–T6.4 add `OperationAuthority` and the runtime/ops entrypoints. This
-package is `private` until the demo milestone decides how it is distributed.
+T6.4 adds the runtime/ops entrypoints. This package is `private` until the
+demo milestone decides how it is distributed.

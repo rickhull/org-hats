@@ -314,6 +314,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
   }
 
   private invite(invitationId: string, operationId: string): Result<{ invitationId: string }> {
+    if (this.organizationId() === undefined) return failure("unavailable", "organization is not bootstrapped");
     const at = now();
     return this.ctx.storage.transactionSync(() => {
       const existing = this.one(
@@ -496,6 +497,42 @@ export class OrganizationAuthority extends DurableObject<Env> {
     return value({ delivered: true });
   }
 
+  /** Deliver queued messages to operation authority. A failure leaves the
+   * message pending and schedules a retry; the operation's `/intake` is the
+   * only receiver. */
+  private async drain(): Promise<{ delivered: number; pending: number }> {
+    let delivered = 0;
+    for (const message of this.outboxRows()) {
+      const kind = String(message["kind"]);
+      const payload = message["payload"] as Record<string, unknown>;
+      const targets = kind === "actor-disabled"
+        ? [...new Set(this.rows("SELECT DISTINCT operation_id FROM invitations").map((row) => String(row["operation_id"])))]
+        : [String(message["target"])];
+      let ok = true;
+      for (const target of targets) {
+        if (target.length === 0) continue;
+        const stub = this.env.OPERATION.get(this.env.OPERATION.idFromName(target));
+        const response = await stub.fetch("https://operation.internal/intake", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...payload, messageId: String(message["id"]) }),
+        });
+        if (!response.ok) ok = false;
+      }
+      if (ok) {
+        this.markDelivered(String(message["id"]));
+        delivered += 1;
+      }
+    }
+    const pending = this.outboxRows().length;
+    if (pending > 0) await this.ctx.storage.setAlarm(Date.now() + 1000);
+    return { delivered, pending };
+  }
+
+  async alarm(): Promise<void> {
+    await this.drain();
+  }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const json = (body: unknown, status = 200): Response =>
@@ -543,6 +580,36 @@ export class OrganizationAuthority extends DurableObject<Env> {
           asString(body["invitationId"], "invitationId"),
           asString(body["operationId"], "operationId"),
         ));
+      }
+
+      if (request.method === "POST" && url.pathname === "/intake") {
+        const body = await readBody();
+        const kind = asString(body["kind"], "kind");
+        if (kind === "invitation") {
+          const result = this.invite(
+            asString(body["invitationId"], "invitationId"),
+            asString(body["operationId"], "operationId"),
+          );
+          return json(result, result.ok ? 200 : 503);
+        }
+        if (kind === "participation-revoked") {
+          const operationId = asString(body["operationId"], "operationId");
+          const at = now();
+          return json(this.ctx.storage.transactionSync(() => {
+            this.ctx.storage.sql.exec(
+              "UPDATE invitations SET status = 'revoked', updated_at = ? WHERE operation_id = ? AND status IN ('pending', 'accepted')",
+              at,
+              operationId,
+            );
+            this.audit("operation", `participation in ${operationId} revoked by operation`, at);
+            return value({ applied: true });
+          }));
+        }
+        return json(failure("invalid-command", `unknown intake kind ${kind}`), 400);
+      }
+
+      if (request.method === "POST" && url.pathname === "/drain") {
+        return json(value(await this.drain()));
       }
 
       if (request.method === "POST" && url.pathname === "/accept") {

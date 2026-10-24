@@ -2,6 +2,7 @@ import type { Env } from "./env";
 
 export { Counter } from "./counter";
 export { OrganizationAuthority } from "./organization";
+export { OperationAuthority } from "./operation";
 
 /** A minimal fetch surface for the harness: route to the singleton counter. */
 export default {
