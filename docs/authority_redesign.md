@@ -1,0 +1,567 @@
+# Authority subsystem redesign
+
+**Status:** Proposed architecture for review. This document describes the
+target shape in broad strokes. It does not authorize implementation, migration,
+or a breaking release.
+
+This repository is the normative source for the authority seam. The consuming
+product's architecture document states consumer requirements and deployment
+illustrations; it does not define `org-hats` methods, result types, packages,
+persistence interfaces, or compatibility policy. Implementation is expected
+to begin from a deliberately small fresh branch rather than by accreting the
+current working tree.
+
+## Purpose
+
+Quartermaster needs more than isolated authorization predicates. It needs an
+authority subsystem that owns organizational state, applies authority rules in
+the right order, records changes, and issues a compact projection that the
+reporting application can verify locally.
+
+At the same time, `org-hats` should remain useful outside Quartermaster. Its
+organizational model is not inherently tied to Cloudflare, Durable Objects, or
+Reporting.Stream. The redesign therefore has two goals:
+
+1. preserve a small, portable library that can be reused in other systems; and
+2. provide a well-supported Cloudflare implementation that makes the intended
+   operational shape easy to adopt without making it mandatory.
+
+The governing posture is:
+
+> Portable semantics, Cloudflare paved road.
+
+Cloudflare is the reference deployment and receives first-class tooling. It is
+not part of the organizational model and is not required by the portable
+interfaces.
+
+## Decision summary
+
+The repository will contain four logical modules arranged in two distributable
+layers:
+
+```text
+org-hats
+  ├── core          pure organizational model and decision rules
+  ├── authority     portable authority engine and use cases
+  └── access        portable verification of signed access projections
+          │
+          ▼
+org-hats-cloudflare
+  └── Cloudflare adapters, runtime entrypoints, storage, and operations tooling
+```
+
+The public package names are `org-hats` and `org-hats-cloudflare`; the exact
+portable subpath names can be settled during specification. The important
+decision is the dependency direction: Cloudflare depends on the portable
+modules, and the portable modules never depend on Cloudflare.
+
+The existing `org-hats` package remains published at its pinned versions, but
+it is not an evergreen compatibility anchor: the authority redesign crosses
+one clean pre-1.0 version boundary with a migration note. Its root export
+continues to provide the generic model. The authority engine and access
+verifier can initially be separate subpath exports. Cloudflare support should
+be a separate package so that Cloudflare types, tooling, and dependencies never
+enter a generic consumer's installation or compilation path.
+
+## Design principles
+
+### Complete use cases at the external seam
+
+Application callers should ask the authority subsystem to perform a business
+act or answer a complete authority question. They should not receive a grant
+repository and reconstruct decisions themselves.
+
+The current `OrgHatsRepository` is useful as a small library interface, but it
+is too shallow to be Quartermaster's long-term seam. It leaves request
+ordering, mutations, policy application, audit, sessions, and projection in
+the host. The redesigned authority module owns that coordination.
+
+### Runtime-neutral semantics
+
+The core model, state transitions, commands, decisions, and access-envelope
+meaning must be expressible without Cloudflare types. No portable interface
+mentions Workers, bindings, Durable Objects, alarms, Wrangler, `Request`, or
+`Response`.
+
+### Operational guidance without false portability
+
+The project will not build an abstraction for every Cloudflare feature. It
+will define only the capabilities the portable authority engine actually
+needs, such as atomic state changes, time, signing, and durable outbox work.
+Cloudflare adapters implement those capabilities directly.
+
+Another runtime is supported when it can provide equivalent guarantees; it
+does not need to resemble Durable Objects internally. The project may describe
+non-Cloudflare adapters without promising equal tooling or operational support.
+
+### One writer for each fact
+
+Each mutable fact has one authoritative owner. Repository manifests may create
+bootstrap state, but ordinary deployment does not overwrite customer-managed
+state. Reporting data does not become authority data, and authority data does
+not move into Quartermaster's reporting objects.
+
+### The interface is the test surface
+
+Conformance cases exercise the same portable interfaces used by real callers.
+Adapters prove that they preserve the portable semantics. Quartermaster tests
+its wiring and product policy rather than maintaining a second implementation
+of authority rules.
+
+## Logical modules
+
+### Core
+
+The core is the smallest reusable statement of the organization model. It
+owns:
+
+- actors, organizations, operations, sites or scopes, teams, roles, and hats;
+- grants, capabilities, reach, admission, and worn-hat selection;
+- operation-local authority and organization-local actor identity;
+- policy-bundle validation and decision reason values;
+- pure state-machine transitions and invariant checks where those transitions
+  are independent of storage; and
+- the portable conformance inventory.
+
+The familiar rule remains visible inside the model:
+
+```text
+may act = role carries the action x grant reaches the target
+```
+
+It is an implementation rule, not the primary interface presented to
+Quartermaster.
+
+The core has no runtime dependencies, performs no I/O, and imports no database,
+web framework, identity provider, or cloud SDK. A compiler fence should
+continue to enforce this rather than relying on review alone.
+
+### Authority
+
+The authority module is the portable, deep module. It turns core rules into
+complete organizational use cases. It owns:
+
+- organization actors and their lifecycle;
+- links from verified external principals to organization actors;
+- organization participation in multiple operations;
+- sites, teams, roles, policy versions, hats, and grants within an operation;
+- invitations, acceptance, admission, access requests, grant, revoke, and hat
+  selection workflows;
+- idempotency, audit facts, and explicit partial states for multi-owner
+  workflows;
+- refresh/session authority and access-projection issuance; and
+- versioned snapshots, invariant probes, and canonical export semantics.
+
+Its public interface expresses use cases rather than storage operations. The
+final types require a separate interface-design pass; the shape below is
+illustrative and deliberately not frozen:
+
+```ts
+interface AuthorityRuntime {
+  // typed, verified principal evidence → organization actor, participation,
+  // wearable hats, and a signed access envelope
+  accessFromEvidence(input: PrincipalEvidence): Promise<AccessIssue>;
+  // a new envelope plus an explicit refresh-handle outcome
+  refresh(input: RefreshInput): Promise<AccessIssue>;
+  context(input: ContextRequest): Promise<AuthorityContext>;
+  command(input: AuthorityCommand): Promise<CommandResult>;
+}
+```
+
+`AccessIssue` carries the signed envelope and the refresh-handle outcome —
+kept, rotated, or revoked — together, so a host never infers session state.
+"Access request" keeps its organizational meaning, a person asking to be
+admitted, and is never reused as the name of an issuance input.
+
+Commands are typed discriminated unions with consistent results and error
+semantics. Mutating commands carry an idempotency key derived from the caller's
+intent. The authority module validates a complete command before asking an
+adapter to commit it. The session and command surfaces share one closed
+failure taxonomy — unavailable, unauthenticated, not-admitted, expired, wrong
+interface version, wrong operation/site binding, invalid signature — and the
+deploying host owns the product response to each kind. A closed taxonomy
+cannot grow silently: new failure kinds are interface-version changes.
+
+Persistence interfaces are internal seams of the authority module in the
+first version. The in-memory adapter shipped with `org-hats` and the
+Cloudflare adapter shipped with `org-hats-cloudflare` live in one repository
+and exercise the same internal conformance inventory; no adapter SPI is
+published and no adapter compatibility matrix is maintained. Application
+callers cannot query grants or write rows through these seams. A public
+adapter interface is justified only by a second committed runtime
+implementation with a real author.
+
+### Access
+
+The access module is a small, verification-only consumer module. It accepts a
+signed, versioned authority projection and exposes neutral authority facts:
+
+```ts
+interface NeutralAccess {
+  binding: { operationId: OperationId; sites: SiteBinding[] };
+  mayAct(action: string, target: TargetRef): boolean;
+  readableOrganizationIds(): OrganizationId[];
+  readableTeamIds(): TeamId[]; // exceptional team grants only
+  mayConfigure(scope: ScopeRef): boolean;
+}
+```
+
+The vocabulary is fixed and domain-neutral: operation and site binding, the
+selected hat's actions over a neutral target, the organization and exceptional
+team ids whose work is readable under the active policy, and configuration
+reach. The module never names a product entity. Product verbs — a host's
+`mayReadReport`, for example — are host code in a thin module that maps
+product facts onto these neutral targets. The important properties are:
+
+- callers do not interpret raw claims;
+- verification checks signature, issuer, interface version, expiry,
+  operation, and site binding before returning access;
+- read reach is computed by authority from the active policy bundle before
+  issuance; the verifier evaluates binding and the selected hat locally and
+  never rebuilds organization unions, peer reach, fallback, or worn-hat rules;
+- the projection contains permanent identifiers and only the compact facts
+  needed for local product decisions; and
+- unsupported versions fail closed.
+
+The module uses portable cryptographic interfaces or Web Platform primitives.
+It does not know how sessions are transported and does not import Cloudflare
+bindings.
+
+### Cloudflare expansion
+
+The Cloudflare package is the reference operational implementation. It owns:
+
+- the authority Worker and its typed runtime entrypoint;
+- organization-authority and operation-authority Durable Object classes;
+- Durable Object SQLite schemas, migrations, transactions, and indexes;
+- alarms, durable outboxes, retries, and bounded housekeeping;
+- signing-key storage and rotation adapters;
+- identity-provider adapters and browser-protocol helpers where useful;
+- an authenticated, narrow operations entrypoint;
+- bootstrap, schema status, export, restore, and invariant-check tooling;
+- Wrangler templates, binding declarations, local-development support, and
+  deployment documentation; and
+- integration tests using the real Cloudflare runtime rather than mocks.
+
+It does not own organizational semantics. A rule that affects whether an actor
+may act belongs in the portable modules and must be tested there first.
+
+## Identity boundary
+
+Authentication evidence and organizational authority remain distinct.
+
+The portable authority module may own the durable relationship between a
+verified principal and an organization actor, along with actor status and the
+effect of disabling that actor. It does not implement a browser redirect,
+parse an arbitrary provider response, or require a particular identity
+protocol.
+
+An identity adapter verifies external evidence and supplies a typed, validated
+principal to authority. Two arrangements are supported, and the portable
+interface is the same either way: a host may verify evidence itself and
+submit typed principal claims, or the identity adapter may run inside the
+authority runtime where provider secrets are sealed. In the reference
+deployment the provider token exchange executes inside the authority runtime
+— organization authority owns sealed identity-provider configuration — so
+what crosses the runtime seam during a browser login is provider exchange
+material handled by runtime surface, not by the portable interface. The
+Cloudflare expansion may provide supported OIDC, passkey, or
+local-authentication helpers; those helpers are runtime surface and do not
+change the portable seam. Browser redirects, provider callbacks, CSRF and
+state handling, and cookies belong to the host. Other hosts may supply
+different adapters without changing the authority model.
+
+Authentication never creates participation or a hat implicitly. Admission and
+granting remain explicit, idempotent, and auditable authority commands.
+
+## State ownership
+
+The reference Cloudflare deployment uses two authority coordinators.
+
+### Organization authority
+
+One organization-authority instance owns the facts that remain stable when an
+organization participates in several operations:
+
+- organization presentation and status;
+- organization actors and profiles;
+- verified-principal links and actor status;
+- organization administrators;
+- participation invitations and acceptances from the organization's side; and
+- identity, roster, and organization-administration audit events.
+
+An actor is addressed by `(organization_id, actor_id)`. Equal email addresses
+do not create a platform-global person.
+
+### Operation authority
+
+One operation-authority instance owns operation-local authority:
+
+- participating organization identifiers and participation status;
+- sites and their permanent identifiers;
+- teams, roles, policy version, hats, and grants;
+- operation-local admission and access requests;
+- refresh/session authority and access-projection issuance; and
+- operation-administration audit events.
+
+Removing an actor from one operation does not remove the actor from their
+organization or another operation.
+
+Work spanning the two coordinators is an explicit, retryable workflow with
+idempotent messages and visible partial states. It is not presented as a
+distributed transaction. The organization owns whether its administrator
+accepted an invitation; the operation's participation status is canonical for
+whether that organization may receive operation authority.
+
+## Quartermaster integration
+
+Quartermaster owns reporting behavior and depends only on the authority
+runtime interface and access verifier:
+
+```text
+browser
+   │
+   ▼
+Quartermaster Worker
+   ├── authority binding ──► org-hats Cloudflare authority runtime
+   ├── site objects ───────► reports, resources, attachments, office actions
+   └── access verifier ────► local verification and product predicates
+```
+
+Quartermaster owns:
+
+- Reporting.Stream's action vocabulary and role-to-action policy bundle;
+- HTTP routes, forms, cookies, and product response policy;
+- the browser login protocol — redirects, provider callbacks, CSRF and state
+  handling, and cookie transport — while authority resolves typed evidence;
+- reports, resources, attachments, and office workflows;
+- site-local presentation snapshots retained with historical records; and
+- the product response for every closed failure kind, and the choice to map
+  unreadable records to `404` or another product response.
+
+Quartermaster does not receive authority storage bindings, grant queries,
+Durable Object namespaces, or authority database rows. It does not reconstruct
+reach, fallback, participation, or worn-hat rules from token claims, and its
+product verbs map onto neutral access facts rather than extending them.
+
+Ordinary established requests should use a short-lived signed access
+projection and reach one reporting object. Login, refresh, authority changes,
+and deliberately privileged operations call the authority runtime. The access
+lifetime defines a bounded revocation window; operations that require fresher
+authority may call authority directly.
+
+## Policy and configuration
+
+The generic modules define how a valid policy bundle is represented and
+applied. Quartermaster supplies Reporting.Stream's versioned bundle: actions,
+role titles, role-to-action mappings, and relevant read or reach policy. An
+authenticated operations command publishes a validated bundle to an operation,
+which records the active version. Customer administrators manage assignments
+under that policy; arbitrary customer-defined roles or policy rules are not an
+initial capability.
+
+The distinction between platform and customer configuration is explicit:
+
+| Configuration | Owner after onboarding |
+| --- | --- |
+| Organizational semantics and state machines | `org-hats` source |
+| Reporting.Stream policy bundle | Quartermaster source |
+| Deployed authority runtime | deploying operator: pinned version, instances, bindings, routes, jurisdiction, release cadence |
+| Deployment topology and migrations | deploying operator, using runtime-package tooling |
+| Bootstrap intent | deploying consumer's protected input, applied once or explicitly reapplied |
+| Customer-edited organizations, teams, hats, and labels | owning authority state |
+| Real rosters and principal links | organization authority state |
+| Secrets and signing keys | deploying operator's secret management or sealed runtime state |
+| Verification-key rollout | deploying operator: distribute verify keys first, activate at the issuer second, retain the old key until its last envelope expires |
+
+Bootstrap is a typed, idempotent command with a manifest identifier, version,
+and content hash. Reapplying platform configuration never silently restores a
+customer-renamed label or revoked grant. Production secrets, customer names,
+and real-person rosters do not enter this public repository; real bootstrap
+material stays in the deploying consumer's protected, untracked input and
+becomes state owned by the appropriate authority object after provisioning.
+
+In this document, source ownership and deployed-state ownership are distinct.
+The `org-hats` repository owns the rules and interfaces. A particular
+organization- or operation-authority instance owns the mutable customer facts
+committed under those rules.
+
+## Portability contract
+
+A non-Cloudflare implementation need not reproduce Durable Objects. It must
+provide the guarantees required by the authority engine:
+
+- atomic enforcement of invariants within one state owner;
+- stable, opaque identifiers;
+- idempotent command claims with payload checking;
+- a durable audit record committed with the fact it describes;
+- durable outbox or equivalent recovery for cross-owner work;
+- a trustworthy clock and cryptographic signer;
+- versioned schema migration and canonical export/restore; and
+- bounded, observable retry behavior.
+
+An in-memory adapter should ship for fast tests and examples. Additional
+production adapters should be added only when a real consumer needs them.
+One hypothetical adapter is not a reason to introduce another public seam.
+The honest positioning is "portable semantics, one reference runtime": a
+non-Cloudflare host inherits the obligations above with a single reference
+implementation to study, and packaging and documentation must not imply
+drop-in portability.
+
+## Stewardship
+
+The authority engine and its Cloudflare reference runtime remain open source.
+This repository must carry a security-reporting and coordinated-disclosure
+policy before it protects production data, and consumers pin reviewed commits
+rather than floating ranges.
+
+This repository ships source, release artifacts, and deployment templates. It
+does not deploy anything: every running authority instance, its pinned
+version, bindings, secrets, jurisdiction, rollout, recovery, and
+verification-key rotation belong to the deploying operator.
+
+## Packaging and compatibility
+
+The repository may become a workspace, but package layout follows logical
+ownership rather than forcing a package per source directory.
+
+The initial distribution target is:
+
+- `org-hats`: existing generic root export plus portable `authority`, `access`,
+  and testing subpaths; and
+- `org-hats-cloudflare`: optional Cloudflare implementation and tooling.
+
+This keeps generic installation free of Cloudflare dependencies while avoiding
+an unnecessary family of tiny packages. If independent release cadence or
+dependency pressure later justifies splitting the portable subpaths, that is a
+packaging change rather than an architectural change.
+
+The redesign crosses a clean pre-1.0 version boundary with a migration note.
+The current predicates, request spine, repository port, and Node SQLite
+adapter remain available at their pinned versions; Quartermaster is the only
+known consumer and pins a commit, so a standing deprecation period, a legacy
+adapter matrix, and a permanent compatibility layer would buy no present user
+anything. That machinery is added only if a second external consumer makes it
+real. New Quartermaster integration should use the authority seam rather than
+extending the shallow repository seam.
+
+The compatibility contract is:
+
+- the authority redesign lands as one version boundary with a migration note,
+  not as an evergreen support commitment to the v0.x surface;
+- the legacy SQLite schema is not silently reinterpreted as authority storage;
+- the in-memory and Cloudflare implementations run the same internal
+  conformance inventory in this repository; there is no published adapter SPI
+  and no pairing matrix to maintain; and
+- authority issuers and access verifiers declare projection-version overlap.
+  A rolling upgrade first deploys a verifier that accepts the old and new
+  versions, then deploys the issuer, and retires the old version only after its
+  maximum lifetime has elapsed. Verification keys follow the same order:
+  distribute to verifiers first, activate at the issuer second, retain the old
+  key until its last envelope has expired.
+
+## Coexistence and cutover
+
+The existing library and the new authority modules can coexist because they
+serve different integration seams. Existing consumers continue using the
+current root and Node adapter while new Quartermaster work targets the
+authority interface.
+
+They must not both write the same authority facts. A greenfield operation is
+created in the new authority store. Moving an existing operation requires an
+explicit export/import procedure: stop or fence legacy writes, export and
+validate canonical state, import it through the new operations interface, run
+invariant and count checks, then switch the caller. Dual-writing is not the
+default migration strategy because it would violate the one-writer rule.
+
+Rollback before caller cutover may route the caller back to the legacy path.
+After the new store accepts post-import authority mutations, rollback requires
+a deliberate reverse migration or a forward repair; it is not a routing
+toggle. A focused migration plan must define this procedure before any
+existing production operation moves.
+
+## Verification strategy
+
+The shared suite is the executable specification of authority behavior:
+
+- table-driven cases cover every allow and denial reason, reach edge, fallback
+  order, one organization actor participating in several operations, read
+  reach under an active policy bundle, and invite/accept/revoke transition;
+- invariant and generative tests cover arbitrary valid state, duplicate
+  commands, reordered messages, and partial workflow failure;
+- adapter conformance runs the same cases against in-memory and Cloudflare
+  implementations;
+- fixed vectors cover projection serialization, signing, expiry, key rotation,
+  operation/site binding, and version refusal;
+- snapshot/restore tests preserve permanent identifiers, pending workflows,
+  audit history, and policy versions; and
+- Quartermaster contract tests cover its routes, cookies, accepted versions,
+  failure-kind-to-product-response mapping, and use of neutral access facts
+  rather than claim interpretation.
+
+The pure-module compiler fence remains. A separate fence should prove that the
+portable authority and access modules do not import Cloudflare or Node-only
+types, and the portable packages' test suites must run green without
+Cloudflare, workerd, or a Cloudflare account; runtime-specific integration
+stays with the Cloudflare package.
+
+## Delivery sequence
+
+This is sequencing guidance, not approval to begin a rollout. Each slice must
+leave the repository buildable and prove behavior through the interface it
+introduces.
+
+| Slice | Deliverable | Exit evidence |
+| --- | --- | --- |
+| Package fences | Source-level `core`, `authority`, and `access` boundaries without publishing new exports | Existing checks pass; portable modules compile without Cloudflare or Node-only types and their suites run without workerd |
+| Portable authority | Command/result contract, closed failure taxonomy, internal adapter seams, and in-memory implementation | The synthetic Professional Operation and Festival scenarios pass the shared conformance inventory in memory |
+| Access projection | Versioned claims, neutral-access verifier, and fixed vectors | Expiry, key rotation, binding, version refusal, refresh-handle outcomes, and rolling issuer/verifier upgrades pass |
+| Consumer pilot | The consumer's login-to-authorized-report slice runs against the in-memory authority through the same interface | The consumer reads no authority rows or raw claims; cookies, neutral-access mapping, and failure responses are proven before persistence hardens the design |
+| Cloudflare expansion | Durable Objects, SQLite migrations, alarms, outboxes, runtime and operations entrypoints, and deployment tools | Conformance and recovery tests pass under the real local Cloudflare runtime; the pilot swaps its in-memory binding for the authority runtime with no consumer code change |
+| Migration and expansion | Remaining authority flows and any approved existing-operation imports move to the new seam | Per-operation reconciliation passes and the old path has no writers for migrated facts |
+| Second-consumer decision | Whether compatibility and adapter machinery become real | Recorded only when a second external consumer or adapter author exists; until then the version boundary stands |
+
+The public conformance inventory uses synthetic structural twins of
+Quartermaster's two concrete design tests: a persistent multi-site
+professional operation and a time-bounded, multi-venue festival burst. The
+twins carry the structural properties — multi-organization participation,
+site independence, short-lived teams, enrollment bursts — that prevent design
+for an imaginary generic customer. The real operations, their names, and
+their detailed fixtures remain in Quartermaster's private repository and load
+through the same public interfaces.
+
+## Explicit non-goals
+
+This design does not require or introduce:
+
+- Cloudflare as a prerequisite for using the generic library;
+- a platform-global person record or automatic linking by email address;
+- a general policy language, negative grants, or arbitrary role inheritance;
+- one deployment, binding, or Worker per customer organization or site;
+- raw SQL, generic `exec`, or repository access across the authority seam;
+- synchronous transactions across organization and operation state owners;
+- immediate revocation for every ordinary reporting request;
+- a global transactional customer database;
+- Git reconciliation as a second writer of customer-managed facts; or
+- speculative adapters for runtimes without a real consumer; and
+- a published adapter SPI or adapter compatibility matrix before a second
+  committed runtime implementation exists.
+
+## Open decisions for specification
+
+The architecture leaves a small number of details for focused design work:
+
+- the exact portable authority command and result types;
+- the final names and grouping of the portable `authority`, `access`, and
+  testing subpath exports;
+- the access-projection encoding, signing algorithms, and compatibility rules;
+- the typed shape of principal evidence and of the exchange material handled
+  by runtime identity adapters;
+- the initial access lifetime and which privileged commands require live
+  authority or fresh authentication; and
+- the smallest policy vocabulary required by the two structural design twins,
+  given that read reach is computed by authority under the active bundle.
+
+Those decisions should be made against concrete product flows. They should not
+weaken the central shape: a portable, deep authority module with Cloudflare as
+its best-supported adapter rather than its hidden foundation.
