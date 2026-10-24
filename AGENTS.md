@@ -15,6 +15,22 @@ Codeberg is canonical (remote `origin`); GitHub is a push mirror.  The v0.4
 line is `main` (frozen at its tags); the authority redesign work happens on
 `v1`.
 
+## The Quartermaster relay
+
+Cross-repository work with Quartermaster uses exactly two ignored note files:
+write only `~/git/quartermaster/notes/from-org-hats.md`; read only
+`notes/from-quartermaster.md`.  Do not edit anything else in that repository
+— not source, tests, docs, or its dependency pin.  A change obviously right
+from this side is still a change made without its owner's review; ask in the
+note and let Quartermaster make it.
+
+Append dated sections, newest last, or clear a finished thread.  Read before
+appending: a wiped note is a different conversation.  Nothing binding lives
+only in a note; contracts move into `docs/` or `plans/` here, and into
+Quartermaster's `docs/`, `specs/`, or `plans/` there.  Assume both notes are
+publishable: `notes/` is gitignored, but a gitignore is one `git add -f` from
+not applying.  No customer names, roster material, secrets, or key material.
+
 ## Tooling
 
 - Node + pnpm come from nixpkgs (thinkpad flake, `nixos/devbox.nix`).

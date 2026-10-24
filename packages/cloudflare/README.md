@@ -34,5 +34,10 @@ pnpm --filter org-hats-cloudflare test
 The portable suite remains `pnpm check` at the repository root; it never
 needs workerd, a Cloudflare account, or a network.
 
+The plugin has no `isolatedStorage` option. Do not assume a fresh store
+between tests: use unique object names or explicit reset, and assert deltas
+rather than absolute values. The organization tests use unique object names;
+the counter test asserts `second === first + 1`.
+
 T6.3–T6.4 add `OperationAuthority` and the runtime/ops entrypoints. This
 package is `private` until the demo milestone decides how it is distributed.

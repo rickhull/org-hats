@@ -10,9 +10,11 @@ const increment = async (): Promise<number> => {
 
 describe("the workerd harness", () => {
   it("runs a request through a SQLite-backed Durable Object", async () => {
+    // The plugin has no `isolatedStorage` option. Assert the durable delta
+    // rather than a fresh-store absolute value, so the harness does not
+    // depend on storage being reset between runs.
     const first = await increment();
     const second = await increment();
-    expect(first).toBe(1);
-    expect(second).toBe(2);
+    expect(second).toBe(first + 1);
   });
 });
