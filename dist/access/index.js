@@ -1,6 +1,6 @@
 // The verification-only consumer module.
 //
-// Charter (docs/quartermaster_redesign.md § Access): it accepts a signed,
+// Charter (docs/authority_redesign.md § Access): it accepts a signed,
 // versioned authority projection and exposes neutral authority facts —
 // operation and site binding, the selected hat's actions over a neutral
 // target, readable organization and team ids, configuration reach. It never

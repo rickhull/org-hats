@@ -1,6 +1,6 @@
 // The portable authority engine — a deep module, not a repository.
 //
-// Charter (docs/quartermaster_redesign.md § Authority): it owns the complete
+// Charter (docs/authority_redesign.md § Authority): it owns the complete
 // organizational use cases — participation workflows, admission and grants,
 // hat selection, evidence resolution, refresh and envelope issuance — behind
 // one runtime interface with a closed failure taxonomy. Persistence is an
