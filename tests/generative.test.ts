@@ -65,7 +65,7 @@ const snapshotFor = (seed: number): Snapshot => {
   const rng = mulberry32(seed);
   const operationId = `op-generated-${seed}`;
   const organizations = Array.from({ length: 2 + Math.floor(rng() * 3) }, (_, i) => ({
-    id: `org-${seed}-${i}`,
+    organizationId: `org-${seed}-${i}`,
   }));
   const sites = Array.from({ length: 1 + Math.floor(rng() * 3) }, (_, i) => ({
     siteId: `site-${seed}-${i}`,
@@ -77,20 +77,20 @@ const snapshotFor = (seed: number): Snapshot => {
     return Array.from({ length: count }, (_, i) => ({
       teamId: `team-${seed}-${site.siteId}-${i}`,
       siteId: site.siteId,
-      organizationId: pick(rng, organizations).id,
+      organizationId: pick(rng, organizations).organizationId,
       displayName: `Team ${i}`,
     }));
   });
   const actors = organizations.flatMap((organization) =>
     Array.from({ length: 1 + Math.floor(rng() * 3) }, (_, i) => ({
-      organizationId: organization.id,
-      actorId: `actor-${seed}-${organization.id}-${i}`,
+      organizationId: organization.organizationId,
+      actorId: `actor-${seed}-${organization.organizationId}-${i}`,
       ...(rng() < 0.15 ? { disabled: true } : {}),
     })),
   );
   const statuses = ["active", "active", "active", "invited", "accepted", "revoked"] as const;
   const participations = organizations.map((organization) => ({
-    organizationId: organization.id,
+    organizationId: organization.organizationId,
     operationId,
     status: pick(rng, statuses),
   }));

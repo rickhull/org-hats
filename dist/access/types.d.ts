@@ -1,4 +1,4 @@
-import type { AccessEnvelopeClaimsV1, OperationId, OrganizationId, SiteBinding, SiteId, TeamId } from "../contract.ts";
+import type { AccessEnvelopeClaimsV1, OperationId, OrganizationId, SiteBinding, SiteId, TeamId } from "../contract.js";
 /** Where an act lands. `operation` is the whole undertaking; `site` and
  * `team` narrow it. Hosts map their own records onto these — a report's
  * team, a page's site — and never widen a target the envelope did not name. */

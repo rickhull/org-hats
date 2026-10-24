@@ -26,6 +26,14 @@ fi
 echo "ok — no cloudflare imports"
 
 echo
+echo "== fence: published declarations use runtime specifiers =="
+if grep -RIn --include='*.d.ts' -E 'from "\.{1,2}/[^"]+\.ts"' dist; then
+  echo "fail — a .d.ts imports a .ts specifier; consumers without skipLibCheck break" >&2
+  exit 1
+fi
+echo "ok — dist declarations use .js specifiers"
+
+echo
 echo "== v1 suites (node:test) =="
 node --test tests/*.test.ts
 

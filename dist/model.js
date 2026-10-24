@@ -160,7 +160,7 @@ export const readReach = (snapshot, bundle, organizationId, actorId, operationId
 /** One sentence per violation. An empty list is the only healthy snapshot. */
 export const invariantProblems = (snapshot, bundle) => {
     const problems = [];
-    const orgs = new Set(snapshot.organizations.map((o) => o.id));
+    const orgs = new Set(snapshot.organizations.map((o) => o.organizationId));
     const actors = new Set(snapshot.actors.map((a) => `${a.organizationId}/${a.actorId}`));
     const sites = new Map(snapshot.sites.map((s) => [s.siteId, s]));
     const teams = new Map(snapshot.teams.map((t) => [t.teamId, t]));

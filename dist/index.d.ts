@@ -1,2 +1,2 @@
-export * from "./model.ts";
-export * from "./policy.ts";
+export * from "./model.js";
+export * from "./policy.js";

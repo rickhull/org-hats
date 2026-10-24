@@ -1,8 +1,25 @@
 # Migrating from org-hats v0.4 to v1
 
-**Status:** draft, growing until the 1.0 release. The v0.4 surface remains
-available at its tags (`v0.4.4`); the `v1` branch carries no v0.4 code, and
-everything below is the delta a v0.4 consumer crosses.
+**Status:** `v0.4` and `v1.0.0` are historical. The v0.4 surface remains
+available at its tags (`v0.4.4`); the current v1 line targets `1.1.0`, a
+coordinated break with the sole consumer. Everything below records the
+deltas a consumer crosses.
+
+## 1.0 → 1.1
+
+`1.1.0` is a deliberate break; `1.0.0` is frozen and receives no patches.
+
+- `Organization.id` is now `Organization.organizationId`, matching the
+  `(organizationId, actorId)` pair and the grant/participant refs. Snapshot
+  producers and destructuring consumers change one field.
+- `participation-accept` takes `{ operationId }` only. The
+  `{ invitationId }` form is gone; the invitation id was not reachable
+  through the public runtime.
+- `createInMemoryAuthority` defaults to the wall clock; tests inject a fixed
+  clock. Its default signer now has a distinct key id per engine, and the
+  public signer type no longer exposes `privateKey()`.
+- Published declarations import `.js` specifiers, so consumers may set
+  `skipLibCheck: false` without reading TypeScript through `dist/`.
 
 ## Model
 

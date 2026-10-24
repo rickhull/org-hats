@@ -1,5 +1,5 @@
-import type { Snapshot } from "../model.ts";
-import type { PolicyBundle } from "../policy.ts";
+import type { Snapshot } from "../model.js";
+import type { PolicyBundle } from "../policy.js";
 export interface TwinFixture {
     readonly name: "professional" | "festival";
     readonly snapshot: Snapshot;

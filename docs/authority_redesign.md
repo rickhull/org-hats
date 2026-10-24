@@ -494,6 +494,13 @@ The shared suite is the executable specification of authority behavior. It
 ships as `org-hats/conformance` (`src/conformance.ts`); another runtime runs
 the same cases by supplying its own world factory.
 
+Consumers bootstrapping tests should use `CONFORMANCE_WORLD` and
+`createInMemoryConformanceWorld()` from `org-hats/conformance`: the authority
+subpath carries the types and the twins' data, not the principal-link or
+org-admin bootstrap. The conformance world returns a built verifier map,
+which is right for exercising verification; use `verificationKey()` material
+when the test is key-configuration parsing.
+
 - table-driven cases cover every allow and denial reason, reach edge, fallback
   order, one organization actor participating in several operations, read
   reach under an active policy bundle, and invite/accept/revoke transition;

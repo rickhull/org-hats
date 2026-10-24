@@ -56,7 +56,7 @@ import type {
   PrincipalEvidence,
   RefreshInput,
 } from "./types.ts";
-import { counter, fixedClock, sha256Hex, webCryptoSigner, type Clock, type Signer } from "./internal.ts";
+import { counter, sha256Hex, systemClock, webCryptoSigner, type Clock, type Signer } from "./internal.ts";
 
 // --- configuration ---------------------------------------------------------------
 
@@ -76,7 +76,13 @@ export interface InMemoryAuthorityConfig {
     readonly organizationId: OrganizationId;
     readonly actorId: ActorId;
   }[];
+  /** Defaults to the wall clock. Tests inject a fixed clock for
+   * determinism; verifiers should pass `now` when the issuer's clock is
+   * not the verifier's. */
   readonly clock?: ClockLike;
+  /** Defaults to a fresh Ed25519 key with a distinct id per engine. The
+   * in-memory engine is single-signer; rotation is the Cloudflare runtime's
+   * concern (T6.4). */
   readonly signer?: SignerLike;
   readonly envelopeLifetimeSeconds?: number;
   /** Actions that confer site-configuration reach (default `["configure"]`). */
@@ -174,6 +180,7 @@ export interface InMemoryAuthorityHandle {
 }
 
 const V = AUTHORITY_INTERFACE_VERSION;
+const nextSigningKey = counter();
 const failed = (failure: Failure): Failed => ({ failure });
 const fail = (kind: Failure["kind"], detail?: string): { ok: false; failure: Failure } => ({
   ok: false,
@@ -196,8 +203,8 @@ const defaultHat = (grants: readonly Grant[], bundle: PolicyBundle) => {
 export const createInMemoryAuthority = async (
   config: InMemoryAuthorityConfig = {},
 ): Promise<InMemoryAuthorityHandle> => {
-  const clock = config.clock ?? fixedClock(1_700_000_000);
-  const signer = config.signer ?? (await webCryptoSigner("key-1"));
+  const clock = config.clock ?? systemClock();
+  const signer = config.signer ?? (await webCryptoSigner(`key-${nextSigningKey()}`));
   const lifetime = config.envelopeLifetimeSeconds ?? 900;
   const configureActions = config.configureActions ?? ["configure"];
   const adminRoles = config.adminRoles ?? {};
@@ -209,7 +216,7 @@ export const createInMemoryAuthority = async (
   const outbox: OutboxMessage[] = [];
   const delivered = new Set<string>();
   const nextId = counter();
-  const allOrganizations: { id: OrganizationId; displayName?: string }[] = [];
+  const allOrganizations: { organizationId: OrganizationId; displayName?: string }[] = [];
   const allActors: { organizationId: OrganizationId; actorId: ActorId; displayName?: string; disabled?: boolean }[] = [];
 
   for (const fixture of config.fixtures ?? []) {
@@ -231,17 +238,17 @@ export const createInMemoryAuthority = async (
       claims: new Map(),
     });
     for (const organization of fixture.snapshot.organizations) {
-      if (!orgs.has(organization.id)) {
-        orgs.set(organization.id, {
-          organizationId: organization.id,
+      if (!orgs.has(organization.organizationId)) {
+        orgs.set(organization.organizationId, {
+          organizationId: organization.organizationId,
           ...(organization.displayName !== undefined ? { displayName: organization.displayName } : {}),
           actors: [],
           principalLinks: new Map(),
           invitations: new Map(),
-          audit: [{ at: clock.now(), by: "bootstrap", fact: `organization ${organization.id} created` }],
+          audit: [{ at: clock.now(), by: "bootstrap", fact: `organization ${organization.organizationId} created` }],
           claims: new Map(),
         });
-        allOrganizations.push({ id: organization.id, ...(organization.displayName !== undefined ? { displayName: organization.displayName } : {}) });
+        allOrganizations.push({ organizationId: organization.organizationId, ...(organization.displayName !== undefined ? { displayName: organization.displayName } : {}) });
       }
     }
     for (const actor of fixture.snapshot.actors) {
@@ -641,14 +648,11 @@ export const createInMemoryAuthority = async (
           if (!principalOrFailure.adminOfOrganization) return fail("denied", "the caller does not administer this organization");
           const replay = checkClaim(org.claims, inputCommand);
           if (replay !== undefined) return replay;
-          const byId = "invitationId" in inputCommand ? org.invitations.get(inputCommand.invitationId) : undefined;
-          const byOperation = "operationId" in inputCommand
-            ? [...org.invitations.entries()].find(([, invitation]) => invitation.operationId === inputCommand.operationId)
-            : undefined;
-          const invitationId = byId !== undefined && "invitationId" in inputCommand
-            ? inputCommand.invitationId
-            : byOperation?.[0];
-          const invitation = byId ?? byOperation?.[1];
+          const found = [...org.invitations.entries()].find(
+            ([, invitation]) => invitation.operationId === inputCommand.operationId,
+          );
+          const invitationId = found?.[0];
+          const invitation = found?.[1];
           if (invitationId === undefined || invitation === undefined) return fail("denied", "no such invitation");
           if (invitation.status !== "pending") return fail("denied", `invitation already ${invitation.status}`);
           commitClaim(org.claims, inputCommand);

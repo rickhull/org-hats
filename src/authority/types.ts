@@ -114,11 +114,8 @@ interface CommandShell extends Versioned {
 
 export type ParticipationCommand =
   | { readonly kind: "participation-invite"; readonly operationId: OperationId; readonly organizationId: OrganizationId }
-  /** The organization accepts its pending invitation. Address it by operation
-   * id (the host-facing form) or by the invitation id when the host already
-   * holds one; the two forms are equivalent. */
+  /** The organization accepts its pending invitation for this operation. */
   | { readonly kind: "participation-accept"; readonly operationId: OperationId }
-  | { readonly kind: "participation-accept"; readonly invitationId: string }
   | { readonly kind: "participation-revoke"; readonly operationId: OperationId; readonly organizationId: OrganizationId; readonly by: "operation" | "organization" };
 
 export type AdmissionCommand =

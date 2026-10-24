@@ -30,7 +30,7 @@
   "scripts": {
     "check": "bin/check",
     "typecheck": "tsc -p tsconfig.authority.json && tsc -p tsconfig.json --noEmit",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json && node bin/fix-dts.mjs"
   },
   "dependencies": {},
   "devDependencies": {

@@ -26,7 +26,7 @@ import { actionsOf } from "./policy.ts";
 // --- entities ------------------------------------------------------------------
 
 export interface Organization {
-  readonly id: OrganizationId;
+  readonly organizationId: OrganizationId;
   readonly displayName?: string;
 }
 
@@ -336,7 +336,7 @@ export const readReach = (
 /** One sentence per violation. An empty list is the only healthy snapshot. */
 export const invariantProblems = (snapshot: Snapshot, bundle: PolicyBundle): readonly string[] => {
   const problems: string[] = [];
-  const orgs = new Set(snapshot.organizations.map((o) => o.id));
+  const orgs = new Set(snapshot.organizations.map((o) => o.organizationId));
   const actors = new Set(snapshot.actors.map((a) => `${a.organizationId}/${a.actorId}`));
   const sites = new Map(snapshot.sites.map((s) => [s.siteId, s]));
   const teams = new Map(snapshot.teams.map((t) => [t.teamId, t]));

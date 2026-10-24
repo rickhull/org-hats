@@ -54,7 +54,7 @@ test("the festival is bounded and materializes the booth burst deterministically
 
 test("Harbor Logistics and Dana Okafor join both operations with different hats", () => {
   for (const { snapshot } of TWINS) {
-    assert.ok(snapshot.organizations.some((o) => o.id === HARBOR_LOGISTICS));
+    assert.ok(snapshot.organizations.some((o) => o.organizationId === HARBOR_LOGISTICS));
     assert.ok(snapshot.actors.some((a) => a.actorId === DANA_OKAFOR));
   }
   const meridianHat = PROFESSIONAL_OPERATION.snapshot.grants.find((g) => g.actorId === DANA_OKAFOR);

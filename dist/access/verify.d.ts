@@ -1,5 +1,5 @@
-import { type AccessEnvelopeClaimsV1, type Failed, type OperationId, type SiteId, type SignedAccessEnvelope } from "../contract.ts";
-import type { NeutralAccess } from "./types.ts";
+import { type AccessEnvelopeClaimsV1, type Failed, type OperationId, type SiteId, type SignedAccessEnvelope } from "../contract.js";
+import type { NeutralAccess } from "./types.js";
 /** A verification-only key, keyed by id. Rotation is two live keys in the
  * map; retirement is removing the old one after its last envelope expires. */
 export interface VerifyKey {

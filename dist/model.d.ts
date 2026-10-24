@@ -1,7 +1,7 @@
-import type { ActorId, OperationId, OrganizationId, SiteId, TeamId } from "./contract.ts";
-import type { PolicyBundle } from "./policy.ts";
+import type { ActorId, OperationId, OrganizationId, SiteId, TeamId } from "./contract.js";
+import type { PolicyBundle } from "./policy.js";
 export interface Organization {
-    readonly id: OrganizationId;
+    readonly organizationId: OrganizationId;
     readonly displayName?: string;
 }
 /** An actor is a person known to one organization. The pair with

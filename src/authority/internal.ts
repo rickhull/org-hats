@@ -28,6 +28,9 @@ export const fixedClock = (start: number): Clock & { advance(seconds: number): v
   };
 };
 
+/** The wall clock: the in-memory runtime's real-time default. */
+export const systemClock = (): Clock => ({ now: () => Math.floor(Date.now() / 1000) });
+
 /** Opaque key material; the engine never inspects it. */
 interface KeyLike {
   readonly type: string;
@@ -39,7 +42,7 @@ interface SubtleLike {
     extractable: boolean,
     usages: readonly string[],
   ): Promise<{ privateKey: KeyLike; publicKey: KeyLike }>;
-  exportKey(format: "raw" | "pkcs8", key: KeyLike): Promise<ArrayBuffer>;
+  exportKey(format: "raw", key: KeyLike): Promise<ArrayBuffer>;
   sign(algorithm: { name: "Ed25519" }, key: KeyLike, data: Uint8Array): Promise<ArrayBuffer>;
   verify(algorithm: { name: "Ed25519" }, key: KeyLike, signature: Uint8Array, data: Uint8Array): Promise<boolean>;
   digest(algorithm: "SHA-256", data: Uint8Array): Promise<ArrayBuffer>;
@@ -55,8 +58,6 @@ export interface Signer {
   verify(payload: string, signature: string): Promise<boolean>;
   /** The public key, base64 raw bytes — what verifiers receive first. */
   publicKey(): Promise<string>;
-  /** The private key, base64 pkcs8 — for committed test vectors only. */
-  privateKey(): Promise<string>;
 }
 
 const signerFromKeys = (
@@ -67,7 +68,6 @@ const signerFromKeys = (
   keyId,
   algorithm: "Ed25519",
   publicKey: async () => base64Encode(new Uint8Array(await subtle.exportKey("raw", pair.publicKey))),
-  privateKey: async () => base64Encode(new Uint8Array(await subtle.exportKey("pkcs8", pair.privateKey))),
   sign: async (payload) =>
     base64UrlEncode(new Uint8Array(await subtle.sign({ name: "Ed25519" }, pair.privateKey, utf8(payload)))),
   verify: async (payload, signature) => {

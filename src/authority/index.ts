@@ -10,6 +10,12 @@
 // The normative specification: the runtime surface, the policy-bundle
 // vocabulary, and the synthetic twins as data. The in-memory engine
 // implements these types; nothing here is speculative.
+//
+// Bootstrapping a test or local world: `org-hats/conformance` exposes
+// CONFORMANCE_WORLD (fixtures, principal links, org admins) and
+// createInMemoryConformanceWorld(). That world returns a built verifier
+// map, which is right for exercising verification; use `verificationKey()`
+// material when the test is key-configuration parsing.
 
 export type {
   AccessFromEvidenceInput,

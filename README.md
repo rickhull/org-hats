@@ -3,13 +3,13 @@
 *A portable organizational authority subsystem — portable semantics, one
 reference runtime.*
 
-**The `v1` branch is the 1.0 development branch and a deliberate break with
+**The `v1` branch is the 1.x development line and a deliberate break with
 the v0.4 surface.** The v0.4 organization model — predicates, persistence
 port, request spine, and the Node SQLite adapter — is not here; it lives on
 `main` at its tags, and content returns to this branch only by being
-re-specified, never copied. The current version is `1.0.0` (the
-vertical path and the conformance inventory are in place; the 1.0.0 release
-is prepared).
+re-specified, never copied. The released line is the latest `v1.x` tag;
+`1.0.0` is historical. The current development target is in
+[`plans/v1.md`](plans/v1.md); the Cloudflare runtime and demo remain.
 
 What ships here:
 
@@ -26,8 +26,10 @@ What ships here:
   envelope under verification keys and get neutral authority facts; fixed
   vectors pin the format byte-exactly.
 - **`org-hats/conformance`** — the executable inventory: table-driven cases
-  over the synthetic twins, run through the public interface only. Another
-  runtime runs the same inventory by supplying its own world factory.
+  over the synthetic twins, run through the public interface only.
+  `CONFORMANCE_WORLD` carries the synthetic fixtures, principal links, and
+  org-admin bootstrap; another runtime runs the same inventory by supplying
+  its own world factory.
 
 Everything under `src/` compiles with `types: []` and imports nothing
 Cloudflare — `bin/check` enforces both fences. The Cloudflare reference

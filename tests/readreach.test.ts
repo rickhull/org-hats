@@ -58,19 +58,19 @@ test("generated snapshots: invariants clean, read reach structurally sound", () 
     const rng = mulberry32(seed);
     const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rng() * xs.length)] as T;
 
-    const orgs = [1, 2, 3].map((i) => ({ id: `org-${i}` }));
+    const orgs = [1, 2, 3].map((i) => ({ organizationId: `org-${i}` }));
     const actors = orgs.flatMap((o) =>
-      [1, 2].map((j) => ({ organizationId: o.id, actorId: `actor-${seed}-${j}` })),
+      [1, 2].map((j) => ({ organizationId: o.organizationId, actorId: `actor-${seed}-${j}` })),
     );
     const sites = [1, 2].map((i) => ({ siteId: `site-${i}`, operationId: "op-1", aliases: [] }));
     const teams = sites.flatMap((s) =>
       orgs.slice(0, 1 + Math.floor(rng() * 3)).map((o, i) => ({
-        teamId: `${s.siteId}-team-${i}`, siteId: s.siteId, organizationId: o.id,
+        teamId: `${s.siteId}-team-${i}`, siteId: s.siteId, organizationId: o.organizationId,
       })),
     );
     const activeOrgs = orgs.filter(() => rng() > 0.25);
-    const participations = activeOrgs.map((o) => ({ organizationId: o.id, operationId: "op-1", status: "active" as const }));
-    const eligible = actors.filter((a) => activeOrgs.some((o) => o.id === a.organizationId));
+    const participations = activeOrgs.map((o) => ({ organizationId: o.organizationId, operationId: "op-1", status: "active" as const }));
+    const eligible = actors.filter((a) => activeOrgs.some((o) => o.organizationId === a.organizationId));
     const grants = eligible.map((a, i) => ({
       grantId: `g-${i}`, operationId: "op-1",
       organizationId: a.organizationId, actorId: a.actorId,

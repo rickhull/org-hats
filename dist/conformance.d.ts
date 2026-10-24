@@ -1,7 +1,7 @@
-import { type ActorId, type OrganizationId } from "./contract.ts";
-import type { AuthorityRuntime, PrincipalEvidence } from "./authority/types.ts";
-import { type TwinFixture } from "./authority/twins.ts";
-import { type VerifyKey } from "./access/verify.ts";
+import { type ActorId, type OrganizationId } from "./contract.js";
+import type { AuthorityRuntime, PrincipalEvidence } from "./authority/types.js";
+import { type TwinFixture } from "./authority/twins.js";
+import { type VerifyKey } from "./access/verify.js";
 export interface ConformancePrincipal {
     readonly label: string;
     readonly evidence: PrincipalEvidence;

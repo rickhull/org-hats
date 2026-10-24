@@ -22,12 +22,13 @@ export const fixedClock = (start) => {
         },
     };
 };
+/** The wall clock: the in-memory runtime's real-time default. */
+export const systemClock = () => ({ now: () => Math.floor(Date.now() / 1000) });
 const subtle = globalThis.crypto?.subtle;
 const signerFromKeys = (subtle, keyId, pair) => ({
     keyId,
     algorithm: "Ed25519",
     publicKey: async () => base64Encode(new Uint8Array(await subtle.exportKey("raw", pair.publicKey))),
-    privateKey: async () => base64Encode(new Uint8Array(await subtle.exportKey("pkcs8", pair.privateKey))),
     sign: async (payload) => base64UrlEncode(new Uint8Array(await subtle.sign({ name: "Ed25519" }, pair.privateKey, utf8(payload)))),
     verify: async (payload, signature) => {
         try {

@@ -1,5 +1,5 @@
-import type { Failed, ActorId, AuthorityInterfaceVersion, Failure, IdempotencyKey, OperationId, OrganizationId, RefreshHandle, RefreshHandleOutcome, SignedAccessEnvelope, SiteBinding, SiteId, TeamId } from "../contract.ts";
-export { AUTHORITY_INTERFACE_VERSION } from "../contract.ts";
+import type { Failed, ActorId, AuthorityInterfaceVersion, Failure, IdempotencyKey, OperationId, OrganizationId, RefreshHandle, RefreshHandleOutcome, SignedAccessEnvelope, SiteBinding, SiteId, TeamId } from "../contract.js";
+export { AUTHORITY_INTERFACE_VERSION } from "../contract.js";
 /** Typed, verified principal evidence — what an identity adapter (or a host
  * that verified evidence itself) supplies to authority. Authority resolves
  * the durable `(organizationId, actorId)` link behind it; evidence is never
@@ -78,15 +78,10 @@ export type ParticipationCommand = {
     readonly operationId: OperationId;
     readonly organizationId: OrganizationId;
 }
-/** The organization accepts its pending invitation. Address it by operation
- * id (the host-facing form) or by the invitation id when the host already
- * holds one; the two forms are equivalent. */
+/** The organization accepts its pending invitation for this operation. */
  | {
     readonly kind: "participation-accept";
     readonly operationId: OperationId;
-} | {
-    readonly kind: "participation-accept";
-    readonly invitationId: string;
 } | {
     readonly kind: "participation-revoke";
     readonly operationId: OperationId;
@@ -138,7 +133,7 @@ export interface CommandReceipt {
      * command was a safe retry, not a second application. */
     readonly applied: boolean;
 }
-export type { Failed } from "../contract.ts";
+export type { Failed } from "../contract.js";
 export type CommandResult = {
     readonly ok: true;
     readonly receipt: CommandReceipt;

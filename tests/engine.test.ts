@@ -31,7 +31,7 @@ const invitee: TwinFixture = {
   policy: PROFESSIONAL_OPERATION.policy,
   snapshot: {
     operations: [{ operationId: "op-dummy", displayName: "Dummy Home Op" }],
-    organizations: [{ id: "org-invitee", displayName: "Cedar Works" }],
+    organizations: [{ organizationId: "org-invitee", displayName: "Cedar Works" }],
     actors: [
       { organizationId: "org-invitee", actorId: "actor-inv-admin", displayName: "Nia Fields" },
     ],
@@ -176,7 +176,7 @@ test("participation: invite → accept → active, with a visible partial state 
   const before = engine.snapshotOf(OP);
   assert.equal(before?.participations.find((p) => p.organizationId === "org-invitee")?.status, "invited");
   const earlyAccept = await engine.runtime.command(cmd(
-    { kind: "participation-accept", invitationId: "inv-none" },
+    { kind: "participation-accept", operationId: OP },
     { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
     "accept-early",
   ));
@@ -184,10 +184,9 @@ test("participation: invite → accept → active, with a visible partial state 
 
   const delivered = await engine.drainOutbox();
   assert.equal(delivered, 1);
-  const invitationId = [...engine.invitationsOf("org-invitee").keys()][0];
-  assert.ok(invitationId !== undefined);
+  assert.equal(engine.invitationsOf("org-invitee").size, 1);
   const accept = await engine.runtime.command(cmd(
-    { kind: "participation-accept", invitationId },
+    { kind: "participation-accept", operationId: OP },
     { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
     "accept-1",
   ));
@@ -199,7 +198,7 @@ test("participation: invite → accept → active, with a visible partial state 
 
   // duplicate accept and second invite are both refused
   const dupAccept = await engine.runtime.command(cmd(
-    { kind: "participation-accept", invitationId },
+    { kind: "participation-accept", operationId: OP },
     { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
     "accept-2",
   ));

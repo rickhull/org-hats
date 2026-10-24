@@ -54,9 +54,9 @@ export const PROFESSIONAL_OPERATION: TwinFixture = {
   snapshot: {
     operations: [{ operationId: OP, displayName: "Meridian Field Services" }],
     organizations: [
-      { id: "org-2b7c41de", displayName: "Northline Electrical" },
-      { id: HARBOR_LOGISTICS, displayName: "Harbor Logistics" },
-      { id: "org-a53e90f7", displayName: "Atlas Facilities" },
+      { organizationId: "org-2b7c41de", displayName: "Northline Electrical" },
+      { organizationId: HARBOR_LOGISTICS, displayName: "Harbor Logistics" },
+      { organizationId: "org-a53e90f7", displayName: "Atlas Facilities" },
     ],
     actors: [
       { organizationId: "org-2b7c41de", actorId: "actor-11c2f8ab", displayName: "Priya Nandi" },
@@ -164,9 +164,9 @@ export const FESTIVAL: TwinFixture = {
   snapshot: {
     operations: [{ operationId: FOP, displayName: "Riverbend Fest", bounded: true }],
     organizations: [
-      { id: "org-d94b1c6e", displayName: "Ciders Guild" },
-      { id: "org-08f7a2b5", displayName: "Park Stewards" },
-      { id: HARBOR_LOGISTICS, displayName: "Harbor Logistics" },
+      { organizationId: "org-d94b1c6e", displayName: "Ciders Guild" },
+      { organizationId: "org-08f7a2b5", displayName: "Park Stewards" },
+      { organizationId: HARBOR_LOGISTICS, displayName: "Harbor Logistics" },
     ],
     actors: [
       { organizationId: "org-d94b1c6e", actorId: "actor-40e9d1a7", displayName: "Iris Bell" },

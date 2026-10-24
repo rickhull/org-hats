@@ -15,8 +15,9 @@
 import { canonicalJson, ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, AUTHORITY_INTERFACE_VERSION, } from "../contract.js";
 import { invariantProblems, readReach, wearableGrants, } from "../model.js";
 import { actionsOf } from "../policy.js";
-import { counter, fixedClock, sha256Hex, webCryptoSigner } from "./internal.js";
+import { counter, sha256Hex, systemClock, webCryptoSigner } from "./internal.js";
 const V = AUTHORITY_INTERFACE_VERSION;
+const nextSigningKey = counter();
 const failed = (failure) => ({ failure });
 const fail = (kind, detail) => ({
     ok: false,
@@ -35,8 +36,8 @@ const defaultHat = (grants, bundle) => {
     return { grant: chosen, actions: actionsOf(bundle, chosen.role) ?? [] };
 };
 export const createInMemoryAuthority = async (config = {}) => {
-    const clock = config.clock ?? fixedClock(1_700_000_000);
-    const signer = config.signer ?? (await webCryptoSigner("key-1"));
+    const clock = config.clock ?? systemClock();
+    const signer = config.signer ?? (await webCryptoSigner(`key-${nextSigningKey()}`));
     const lifetime = config.envelopeLifetimeSeconds ?? 900;
     const configureActions = config.configureActions ?? ["configure"];
     const adminRoles = config.adminRoles ?? {};
@@ -69,17 +70,17 @@ export const createInMemoryAuthority = async (config = {}) => {
             claims: new Map(),
         });
         for (const organization of fixture.snapshot.organizations) {
-            if (!orgs.has(organization.id)) {
-                orgs.set(organization.id, {
-                    organizationId: organization.id,
+            if (!orgs.has(organization.organizationId)) {
+                orgs.set(organization.organizationId, {
+                    organizationId: organization.organizationId,
                     ...(organization.displayName !== undefined ? { displayName: organization.displayName } : {}),
                     actors: [],
                     principalLinks: new Map(),
                     invitations: new Map(),
-                    audit: [{ at: clock.now(), by: "bootstrap", fact: `organization ${organization.id} created` }],
+                    audit: [{ at: clock.now(), by: "bootstrap", fact: `organization ${organization.organizationId} created` }],
                     claims: new Map(),
                 });
-                allOrganizations.push({ id: organization.id, ...(organization.displayName !== undefined ? { displayName: organization.displayName } : {}) });
+                allOrganizations.push({ organizationId: organization.organizationId, ...(organization.displayName !== undefined ? { displayName: organization.displayName } : {}) });
             }
         }
         for (const actor of fixture.snapshot.actors) {
@@ -486,14 +487,9 @@ export const createInMemoryAuthority = async (config = {}) => {
                     const replay = checkClaim(org.claims, inputCommand);
                     if (replay !== undefined)
                         return replay;
-                    const byId = "invitationId" in inputCommand ? org.invitations.get(inputCommand.invitationId) : undefined;
-                    const byOperation = "operationId" in inputCommand
-                        ? [...org.invitations.entries()].find(([, invitation]) => invitation.operationId === inputCommand.operationId)
-                        : undefined;
-                    const invitationId = byId !== undefined && "invitationId" in inputCommand
-                        ? inputCommand.invitationId
-                        : byOperation?.[0];
-                    const invitation = byId ?? byOperation?.[1];
+                    const found = [...org.invitations.entries()].find(([, invitation]) => invitation.operationId === inputCommand.operationId);
+                    const invitationId = found?.[0];
+                    const invitation = found?.[1];
                     if (invitationId === undefined || invitation === undefined)
                         return fail("denied", "no such invitation");
                     if (invitation.status !== "pending")

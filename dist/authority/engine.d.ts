@@ -1,8 +1,8 @@
-import { type ActorId, type OperationId, type OrganizationId } from "../contract.ts";
-import { type Snapshot } from "../model.ts";
-import type { TwinFixture } from "./twins.ts";
-import type { AuthorityRuntime } from "./types.ts";
-import { type Clock, type Signer } from "./internal.ts";
+import { type ActorId, type OperationId, type OrganizationId } from "../contract.js";
+import { type Snapshot } from "../model.js";
+import type { TwinFixture } from "./twins.js";
+import type { AuthorityRuntime } from "./types.js";
+import { type Clock, type Signer } from "./internal.js";
 export interface SignerLike extends Signer {
 }
 export interface ClockLike extends Clock {
@@ -20,7 +20,13 @@ export interface InMemoryAuthorityConfig {
         readonly organizationId: OrganizationId;
         readonly actorId: ActorId;
     }[];
+    /** Defaults to the wall clock. Tests inject a fixed clock for
+     * determinism; verifiers should pass `now` when the issuer's clock is
+     * not the verifier's. */
     readonly clock?: ClockLike;
+    /** Defaults to a fresh Ed25519 key with a distinct id per engine. The
+     * in-memory engine is single-signer; rotation is the Cloudflare runtime's
+     * concern (T6.4). */
     readonly signer?: SignerLike;
     readonly envelopeLifetimeSeconds?: number;
     /** Actions that confer site-configuration reach (default `["configure"]`). */

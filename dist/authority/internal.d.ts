@@ -6,6 +6,8 @@ export type Clock = {
 export declare const fixedClock: (start: number) => Clock & {
     advance(seconds: number): void;
 };
+/** The wall clock: the in-memory runtime's real-time default. */
+export declare const systemClock: () => Clock;
 /** What the engine signs envelopes with and verifies against. */
 export interface Signer {
     readonly keyId: string;
@@ -14,8 +16,6 @@ export interface Signer {
     verify(payload: string, signature: string): Promise<boolean>;
     /** The public key, base64 raw bytes — what verifiers receive first. */
     publicKey(): Promise<string>;
-    /** The private key, base64 pkcs8 — for committed test vectors only. */
-    privateKey(): Promise<string>;
 }
 /** Ed25519 via Web Platform crypto — the one algorithm v1 ships. */
 export declare const webCryptoSigner: (keyId: string) => Promise<Signer>;

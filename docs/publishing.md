@@ -28,7 +28,7 @@ CI runs on the **mirror**: GitHub Actions, [`.github/workflows/check.yml`](../.g
 
 ## The release
 
-Releases are cut with `bin/release` (bump → build → commit → tag; the tag comes from `package.json`) and pushed to both hosts. `v0.4.4` is the last v0.4 release on `main`; the v1 line is prepared at `1.0.0` and tags from `v1`. `v0.1.0` was the first release.
+Releases are cut with `bin/release` (bump → build → commit → tag; the tag comes from `package.json`) and pushed to both hosts. `v0.4.4` is the last v0.4 release on `main`; the v1 line tags from `v1`, starting at `v1.0.0`, which is historical. `v0.1.0` was the first release.
 
 A consumer pins one of:
 
@@ -37,21 +37,21 @@ A consumer pins one of:
 | Codeberg (canonical, immediate) | `git+https://codeberg.org/rickhull/org-hats.git#vX.Y.Z` |
 | GitHub (mirror, lagging) | `github:rickhull/org-hats#vX.Y.Z` |
 
-Replace `vX.Y.Z` with the release tag. `v0.4.4` remains the last frozen v0.4 pin; v1 releases start at `v1.0.0`. Prefer the Codeberg pin: the mirror's interval then never affects the consumer. The `github:` shorthand resolves only GitHub; a consumer whose CI is already GitHub-native may pin the mirror.
+Replace `vX.Y.Z` with the release tag. `v0.4.4` remains the last frozen v0.4 pin; v1 releases start at `v1.0.0`, and the current target is in [`plans/v1.md`](../plans/v1.md). Prefer the Codeberg pin: the mirror's interval then never affects the consumer. The `github:` shorthand resolves only GitHub; a consumer whose CI is already GitHub-native may pin the mirror.
 
 ## Release ritual
 
-From a clean release branch (`main` for v0.4, `v1` for the 1.0 line):
+From a clean release branch (`main` for v0.4, `v1` for the 1.x line):
 
 1. Cut it:
    ```sh
    bin/release patch        # or minor, major, or an explicit X.Y.Z
    ```
-   That bumps `package.json`, updates every doc that pins the version, runs
-   `bin/check`, rebuilds `dist/`, commits `vX.Y.Z`, and tags it — the manifest,
-   the docs, and the tag in one act. `--dry-run` previews; `--push` also pushes.
-   **Never tag by hand:** the tag comes from the manifest, so the two cannot
-   disagree.
+   That bumps `package.json`, runs `bin/check`, rebuilds `dist/`, commits
+   `vX.Y.Z`, and tags it — the manifest and the tag in one act. Docs name the
+   latest tag rather than a literal, so a release never rewrites history.
+   `--dry-run` previews; `--push` also pushes. **Never tag by hand:** the tag
+   comes from the manifest, so the two cannot disagree.
 2. Push to the canonical host (skip if `--push`ed):
    ```sh
    git push origin <branch>
