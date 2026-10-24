@@ -1,0 +1,46 @@
+{
+  "note": "Committed test vectors. The key pair is TEST-ONLY and was never used for real authority; vec-key-1 exists so signatures are byte-exact across implementations.",
+  "keyId": "vec-key-1",
+  "publicKeyBase64": "AGOlS6MM/cZqYwKpL3QdIHNSuRIszSAF9hzbiEHWCP4=",
+  "privateKeyPkcs8Base64": "MC4CAQAwBQYDK2VwBCIEILLlHP8tr8yh6CvlgLs4fL7JsE7i80ocfH9douy4/FhQ",
+  "claims": {
+    "v": 1,
+    "interfaceVersion": 1,
+    "operationId": "op-9f2e6ad4",
+    "actor": {
+      "organizationId": "org-4c1f9a2e",
+      "actorId": "actor-8d3b77c1"
+    },
+    "hat": {
+      "role": "coordinator",
+      "actions": [
+        "review",
+        "resolve"
+      ],
+      "teamIds": [
+        "team-2e8c64b9"
+      ],
+      "siteIds": []
+    },
+    "memberTeamIds": [
+      "team-2e8c64b9"
+    ],
+    "sites": [
+      {
+        "siteId": "site-b8d620fa",
+        "aliases": [
+          "west"
+        ]
+      }
+    ],
+    "readableOrganizationIds": [
+      "org-4c1f9a2e"
+    ],
+    "readableTeamIds": [],
+    "configurableSiteIds": [],
+    "iat": 1700000000,
+    "exp": 1700000900
+  },
+  "canonical": "{\"actor\":{\"actorId\":\"actor-8d3b77c1\",\"organizationId\":\"org-4c1f9a2e\"},\"configurableSiteIds\":[],\"exp\":1700000900,\"hat\":{\"actions\":[\"review\",\"resolve\"],\"role\":\"coordinator\",\"siteIds\":[],\"teamIds\":[\"team-2e8c64b9\"]},\"iat\":1700000000,\"interfaceVersion\":1,\"memberTeamIds\":[\"team-2e8c64b9\"],\"operationId\":\"op-9f2e6ad4\",\"readableOrganizationIds\":[\"org-4c1f9a2e\"],\"readableTeamIds\":[],\"sites\":[{\"aliases\":[\"west\"],\"siteId\":\"site-b8d620fa\"}],\"v\":1}",
+  "signature": "64aVo6oOvpFJlatDJxc5YmQh5JawzGEbAsji7q_mrOZXn0vzCy1PgNZpq_c5c1Wc4WFiQf9Axt6iI_YGdPwiBg"
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-# The module check: the runtime-neutrality fence, the release-metadata guard,
-# then the examples. A failure anywhere fails the run.
+# The module check: the portable fence, the cloudflare-import guard, the
+# v1 suites, then the release-metadata guard. A failure anywhere fails the run.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -9,27 +9,18 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "== fence: the pure core compiles without node types =="
-if [ -x node_modules/.bin/tsc ]; then
-  node_modules/.bin/tsc -p tsconfig.core.json
-  echo "ok — core, conformance, port, decide, testing compile with types: []"
-else
-  echo "(skipped — run 'pnpm install' to enable the fence)"
-fi
-
-echo
-echo "== fence: portable authority and access compile without node or cloudflare types =="
+echo "== fence: all of src compiles without node or cloudflare types =="
 if [ -x node_modules/.bin/tsc ]; then
   node_modules/.bin/tsc -p tsconfig.authority.json
-  echo "ok — authority and access compile with types: []"
+  echo "ok — contract, authority, and access compile with types: []"
 else
   echo "(skipped — run 'pnpm install' to enable the fence)"
 fi
 
 echo
-echo "== fence: no cloudflare imports in the portable modules =="
-if grep -Rn -e "cloudflare:" -e "@cloudflare/" src/authority src/access; then
-  echo "fail — the portable modules must not import cloudflare" >&2
+echo "== fence: no cloudflare imports anywhere in src =="
+if grep -Rn -e "cloudflare:" -e "@cloudflare/" src; then
+  echo "fail — src must not import cloudflare" >&2
   exit 1
 fi
 echo "ok — no cloudflare imports"
@@ -39,12 +30,12 @@ echo "== v1 suites (node:test) =="
 node --test tests/*.test.ts
 
 echo
-echo "== release metadata: a version tag matches package.json =="
-"$(dirname "$0")/check-version"
+echo "== portable example =="
+node examples/pilot.ts
 
 echo
-echo "== examples =="
-node examples/check.ts
+echo "== release metadata: a version tag matches package.json =="
+"$(dirname "$0")/check-version"
 
 echo
 echo "all checks passed"

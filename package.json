@@ -1,8 +1,8 @@
 {
   "name": "org-hats",
-  "version": "0.4.4",
+  "version": "1.0.0-alpha.1",
   "type": "module",
-  "description": "A small, reusable organization model — types, predicates, an async persistence port, and a request spine that composes them in the model's order. SQLite reference adapter at org-hats/node.",
+  "description": "A portable organizational authority subsystem — use-case authority runtime, signed access envelopes, and a verification-only access module. v1 in development on the v1 branch; the v0.4 organization model lives on main at its tags.",
   "license": "MIT",
   "author": "Rick <rick@thinkpad>",
   "repository": { "type": "git", "url": "git+https://codeberg.org/rickhull/org-hats.git" },
@@ -13,16 +13,23 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./node": {
-      "types": "./dist/node.d.ts",
-      "default": "./dist/node.js"
+    "./authority": {
+      "types": "./dist/authority/index.d.ts",
+      "default": "./dist/authority/index.js"
+    },
+    "./access": {
+      "types": "./dist/access/index.d.ts",
+      "default": "./dist/access/index.js"
+    },
+    "./conformance": {
+      "types": "./dist/conformance.d.ts",
+      "default": "./dist/conformance.js"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "SECURITY.md"],
   "scripts": {
     "check": "bin/check",
-    "examples": "node examples/check.ts",
-    "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.authority.json && tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {},

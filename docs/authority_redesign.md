@@ -1,15 +1,16 @@
 # Authority subsystem redesign
 
-**Status:** Proposed architecture for review. This document describes the
-target shape in broad strokes. It does not authorize implementation, migration,
-or a breaking release.
+**Status:** Normative architecture for the v1 authority subsystem. It states
+the target shape and the settled interfaces; [plans/v1.md](../plans/v1.md)
+records implementation progress.
 
 This repository is the normative source for the authority seam. The consuming
 product's architecture document states consumer requirements and deployment
 illustrations; it does not define `org-hats` methods, result types, packages,
-persistence interfaces, or compatibility policy. Implementation is expected
-to begin from a deliberately small fresh branch rather than by accreting the
-current working tree.
+persistence interfaces, or compatibility policy. Terminology is normative in
+[lexicon.md](lexicon.md); this document uses those terms. The `v1` branch
+implements this architecture; legacy `v0.4` content lives on `main` at its
+tags.
 
 ## Purpose
 
@@ -57,9 +58,10 @@ modules, and the portable modules never depend on Cloudflare.
 
 The existing `org-hats` package remains published at its pinned versions, but
 it is not an evergreen compatibility anchor: the authority redesign crosses
-one clean pre-1.0 version boundary with a migration note. Its root export
-continues to provide the generic model. The authority engine and access
-verifier can initially be separate subpath exports. Cloudflare support should
+one clean pre-1.0 version boundary with a migration note. The root export
+again provides the generic model (landed: `src/model.ts`), and the authority
+engine and access verifier are separate subpath exports — `./authority` and
+`./access`, settled by the specification pass. Cloudflare support should
 be a separate package so that Cloudflare types, tooling, and dependencies never
 enter a generic consumer's installation or compilation path.
 
@@ -86,9 +88,9 @@ mentions Workers, bindings, Durable Objects, alarms, Wrangler, `Request`, or
 ### Operational guidance without false portability
 
 The project will not build an abstraction for every Cloudflare feature. It
-will define only the capabilities the portable authority engine actually
-needs, such as atomic state changes, time, signing, and durable outbox work.
-Cloudflare adapters implement those capabilities directly.
+defines only the surface the portable authority engine actually needs, such
+as atomic state changes, time, signing, and durable outbox work. Cloudflare
+adapters implement that surface directly.
 
 Another runtime is supported when it can provide equivalent guarantees; it
 does not need to resemble Durable Objects internally. The project may describe
@@ -115,8 +117,8 @@ of authority rules.
 The core is the smallest reusable statement of the organization model. It
 owns:
 
-- actors, organizations, operations, sites or scopes, teams, roles, and hats;
-- grants, capabilities, reach, admission, and worn-hat selection;
+- actors, organizations, operations, sites, teams, roles, and hats;
+- grants, actions, reach, admission, and worn-hat selection;
 - operation-local authority and organization-local actor identity;
 - policy-bundle validation and decision reason values;
 - pure state-machine transitions and invariant checks where those transitions
@@ -152,35 +154,32 @@ complete organizational use cases. It owns:
 - refresh/session authority and access-projection issuance; and
 - versioned snapshots, invariant probes, and canonical export semantics.
 
-Its public interface expresses use cases rather than storage operations. The
-final types require a separate interface-design pass; the shape below is
-illustrative and deliberately not frozen:
+Its public interface expresses use cases rather than storage operations.
+The specification pass is done: the normative surface is
+`src/authority/types.ts` (`AuthorityRuntime`), shipped from the
+`org-hats/authority` subpath alongside the in-memory engine that implements
+it. The properties that matter:
 
-```ts
-interface AuthorityRuntime {
-  // typed, verified principal evidence → organization actor, participation,
-  // wearable hats, and a signed access envelope
-  accessFromEvidence(input: PrincipalEvidence): Promise<AccessIssue>;
-  // a new envelope plus an explicit refresh-handle outcome
-  refresh(input: RefreshInput): Promise<AccessIssue>;
-  context(input: ContextRequest): Promise<AuthorityContext>;
-  command(input: AuthorityCommand): Promise<CommandResult>;
-}
-```
-
-`AccessIssue` carries the signed envelope and the refresh-handle outcome —
-kept, rotated, or revoked — together, so a host never infers session state.
-"Access request" keeps its organizational meaning, a person asking to be
-admitted, and is never reused as the name of an issuance input.
+- `accessFromEvidence` takes typed, verified principal evidence bound to an
+  operation and returns an `AccessIssue` — the signed envelope plus the
+  explicit refresh-handle outcome (kept, rotated, revoked) together, so a
+  host never infers session state;
+- `refresh` returns the same pair and revokes affected refresh records in
+  the same commit as a grant change;
+- `context` yields presentation facts for the envelope's actor;
+- `command` executes a typed, idempotent command — "access request" keeps
+  its organizational meaning and is never an issuance input's name.
 
 Commands are typed discriminated unions with consistent results and error
-semantics. Mutating commands carry an idempotency key derived from the caller's
-intent. The authority module validates a complete command before asking an
-adapter to commit it. The session and command surfaces share one closed
-failure taxonomy — unavailable, unauthenticated, not-admitted, expired, wrong
-interface version, wrong operation/site binding, invalid signature — and the
-deploying host owns the product response to each kind. A closed taxonomy
-cannot grow silently: new failure kinds are interface-version changes.
+semantics. Mutating commands carry an idempotency key derived from the
+caller's intent; the claim commits with its mutation, so a denied command
+cannot poison its key. The authority module validates a complete command
+before committing it. The session and command surfaces share one closed
+failure taxonomy — unavailable, unauthenticated, not-admitted, expired,
+wrong interface version, wrong operation/site binding, invalid signature,
+invalid-command, denied — documented kind by kind in `src/contract.ts`; the
+deploying host owns the product response to each, and new failure kinds are
+interface-version changes.
 
 Persistence interfaces are internal seams of the authority module in the
 first version. The in-memory adapter shipped with `org-hats` and the
@@ -193,25 +192,16 @@ implementation with a real author.
 
 ### Access
 
-The access module is a small, verification-only consumer module. It accepts a
-signed, versioned authority projection and exposes neutral authority facts:
-
-```ts
-interface NeutralAccess {
-  binding: { operationId: OperationId; sites: SiteBinding[] };
-  mayAct(action: string, target: TargetRef): boolean;
-  readableOrganizationIds(): OrganizationId[];
-  readableTeamIds(): TeamId[]; // exceptional team grants only
-  mayConfigure(scope: ScopeRef): boolean;
-}
-```
-
-The vocabulary is fixed and domain-neutral: operation and site binding, the
-selected hat's actions over a neutral target, the organization and exceptional
-team ids whose work is readable under the active policy, and configuration
-reach. The module never names a product entity. Product verbs — a host's
-`mayReadReport`, for example — are host code in a thin module that maps
-product facts onto these neutral targets. The important properties are:
+The access module is a small, verification-only consumer module. Its
+interface is specified and shipped: `NeutralAccess` in
+`src/access/types.ts`, produced by `verify` in `src/access/verify.ts`, from
+the `org-hats/access` subpath. The vocabulary is fixed and domain-neutral:
+operation and site binding, the selected hat's actions over a neutral
+target, the organization and exceptional team ids readable under the active
+policy, and configuration reach. The module never names a product entity;
+product verbs — a host's `mayReadReport`, for example — are host code in a
+thin module that maps product facts onto these neutral targets. The
+important properties are:
 
 - callers do not interpret raw claims;
 - verification checks signature, issuer, interface version, expiry,
@@ -261,7 +251,7 @@ principal to authority. Two arrangements are supported, and the portable
 interface is the same either way: a host may verify evidence itself and
 submit typed principal claims, or the identity adapter may run inside the
 authority runtime where provider secrets are sealed. In the reference
-deployment the provider token exchange executes inside the authority runtime
+deployment the provider code exchange executes inside the authority runtime
 — organization authority owns sealed identity-provider configuration — so
 what crosses the runtime seam during a browser login is provider exchange
 material handled by runtime surface, not by the portable interface. The
@@ -341,8 +331,8 @@ Quartermaster owns:
 
 Quartermaster does not receive authority storage bindings, grant queries,
 Durable Object namespaces, or authority database rows. It does not reconstruct
-reach, fallback, participation, or worn-hat rules from token claims, and its
-product verbs map onto neutral access facts rather than extending them.
+reach, fallback, participation, or worn-hat rules from envelope claims, and
+its product verbs map onto neutral access facts rather than extending them.
 
 Ordinary established requests should use a short-lived signed access
 projection and reach one reporting object. Login, refresh, authority changes,
@@ -359,6 +349,13 @@ authenticated operations command publishes a validated bundle to an operation,
 which records the active version. Customer administrators manage assignments
 under that policy; arbitrary customer-defined roles or policy rules are not an
 initial capability.
+
+The read policy is a structure of independent axes, one per dimension of
+reach — not a scalar enum. v1 defines the organization axis
+(`granted-teams` or `all-participating`). A team-audience axis is an additive
+property of the same structure: it changes neither the bundle format nor the
+meaning of the organization axis, and unknown axes fail closed until the
+runtime implements them.
 
 The distinction between platform and customer configuration is explicit:
 
@@ -427,8 +424,8 @@ ownership rather than forcing a package per source directory.
 
 The initial distribution target is:
 
-- `org-hats`: existing generic root export plus portable `authority`, `access`,
-  and testing subpaths; and
+- `org-hats`: the generic root export plus portable `authority`, `access`, and
+  `conformance` subpaths; and
 - `org-hats-cloudflare`: optional Cloudflare implementation and tooling.
 
 This keeps generic installation free of Cloudflare dependencies while avoiding
@@ -482,7 +479,9 @@ existing production operation moves.
 
 ## Verification strategy
 
-The shared suite is the executable specification of authority behavior:
+The shared suite is the executable specification of authority behavior. It
+ships as `org-hats/conformance` (`src/conformance.ts`); another runtime runs
+the same cases by supplying its own world factory.
 
 - table-driven cases cover every allow and denial reason, reach edge, fallback
   order, one organization actor participating in several operations, read
@@ -549,18 +548,19 @@ This design does not require or introduce:
 
 ## Open decisions for specification
 
-The architecture leaves a small number of details for focused design work:
+The specification pass settled most of the earlier list into shipped types:
+the authority command and result types (`src/authority/types.ts`), the
+subpath names (`./authority`, `./access`, the evolved root), the
+access-projection encoding and signing (docs/envelope.md, with committed
+vectors), the typed shape of principal evidence, and the policy vocabulary
+the design twins exercise. What remains open:
 
-- the exact portable authority command and result types;
-- the final names and grouping of the portable `authority`, `access`, and
-  testing subpath exports;
-- the access-projection encoding, signing algorithms, and compatibility rules;
-- the typed shape of principal evidence and of the exchange material handled
-  by runtime identity adapters;
-- the initial access lifetime and which privileged commands require live
-  authority or fresh authentication; and
-- the smallest policy vocabulary required by the two structural design twins,
-  given that read reach is computed by authority under the active bundle.
+- the production access lifetime and which privileged commands require live
+  authority or fresh authentication — the engine defaults to 900 seconds,
+  configurable; the consumer's security review owns the number; and
+- the exchange-material shape handled by runtime identity adapters when
+  provider secrets are sealed inside the authority runtime (Cloudflare
+  expansion surface).
 
 Those decisions should be made against concrete product flows. They should not
 weaken the central shape: a portable, deep authority module with Cloudflare as

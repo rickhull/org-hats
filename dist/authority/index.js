@@ -7,8 +7,11 @@
 // internal seam; the in-memory adapter ships beside it in this package and
 // no adapter SPI is published.
 //
-// This file is the M0 fence placeholder: the module compiles inside the
-// portable fence (no Node-only types, no Cloudflare imports) before any of
-// that exists. The normative types land in M1 (plans/v1.md) and are reviewed
-// with the consumer before the engine hardens behind them.
-export {};
+// M1 (plans/v1.md) ships the normative specification: the runtime surface,
+// the policy-bundle vocabulary, and the synthetic twins as data. The
+// in-memory engine (M3) implements these types; nothing here is speculative.
+export { AUTHORITY_INTERFACE_VERSION } from "./types.js";
+export { actionsOf, validatePolicyBundle } from "../policy.js";
+export { DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION, TWINS, } from "./twins.js";
+export { createInMemoryAuthority } from "./engine.js";
+export { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, canonicalJson, } from "../contract.js";

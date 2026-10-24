@@ -28,20 +28,20 @@ CI runs on the **mirror**: GitHub Actions, [`.github/workflows/check.yml`](../.g
 
 ## The release
 
-Releases are cut with `bin/release` (bump → build → commit → tag; the tag comes from `package.json`) and pushed to both hosts. The current release is `v0.4.4`; `v0.1.0` was the first.
+Releases are cut with `bin/release` (bump → build → commit → tag; the tag comes from `package.json`) and pushed to both hosts. `v0.4.4` is the last v0.4 release on `main`; the v1 line is prepared at `1.0.0-alpha.1` and tags from `v1`. `v0.1.0` was the first release.
 
 A consumer pins one of:
 
 | Host | Dependency spec |
 | --- | --- |
-| Codeberg (canonical, immediate) | `git+https://codeberg.org/rickhull/org-hats.git#v0.4.4` |
-| GitHub (mirror, lagging) | `github:rickhull/org-hats#v0.4.4` |
+| Codeberg (canonical, immediate) | `git+https://codeberg.org/rickhull/org-hats.git#vX.Y.Z` |
+| GitHub (mirror, lagging) | `github:rickhull/org-hats#vX.Y.Z` |
 
-Prefer the Codeberg pin: the mirror's interval then never affects the consumer. The `github:` shorthand resolves only GitHub; a consumer whose CI is already GitHub-native may pin the mirror.
+Replace `vX.Y.Z` with the release tag. `v0.4.4` remains the last frozen v0.4 pin; v1 releases start at `v1.0.0`. Prefer the Codeberg pin: the mirror's interval then never affects the consumer. The `github:` shorthand resolves only GitHub; a consumer whose CI is already GitHub-native may pin the mirror.
 
 ## Release ritual
 
-From a clean `main`:
+From a clean release branch (`main` for v0.4, `v1` for the 1.0 line):
 
 1. Cut it:
    ```sh
@@ -54,7 +54,7 @@ From a clean `main`:
    disagree.
 2. Push to the canonical host (skip if `--push`ed):
    ```sh
-   git push origin main
+   git push origin <branch>
    git push origin vX.Y.Z
    ```
 3. Let the mirror sync (immediate on commit; otherwise *Sync now*), confirm **CI is green**, then verify both hosts show the same commit and tag:
@@ -73,4 +73,8 @@ From a clean `main`:
 
 ## Metadata
 
-`package.json` carries `license: MIT`, `author: Rick <rick@thinkpad>`, and the three Codeberg URLs. `files: ["dist"]` means the installable tarball is `dist/` plus the README, LICENSE, and `package.json`. Zero runtime dependencies.
+`package.json` carries `license: MIT`, `author: Rick <rick@thinkpad>`, and the three Codeberg URLs. `files: ["dist", "SECURITY.md"]` means the installable tarball is `dist/` plus the README, LICENSE, SECURITY.md, and `package.json`. Zero runtime dependencies.
+
+## Open
+
+- **GitHub repository cosmetics.** Set the mirror's description to *"Canonical: https://codeberg.org/rickhull/org-hats — a portable organizational authority subsystem"*; disable **Issues**, **Wiki**, **Discussions** on the mirror (PRs can't be disabled); add topics — `authorization`, `access-control`, `rbac`, `permissions`, `typescript`, `cloudflare-workers`, `ed25519`.

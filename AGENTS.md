@@ -31,9 +31,8 @@ line is `main` (frozen at its tags); the authority redesign work happens on
 
 - When a change affects executable code, configuration, or tests, run
   `pnpm check` and `pnpm typecheck`; report what both said.  `pnpm check`
-  runs the compiler fences, the cloudflare-import guard, the examples, and
-  the `node --test` suites; a single suite is
-  `node --test tests/<file>.test.ts`.
+  runs the compiler fence, the cloudflare-import guard, and the `node --test`
+  suites; a single suite is `node --test tests/<file>.test.ts`.
 - When every changed path is documentation (`*.md`), do not run application
   typechecks or tests; inspect the changed text and report that no automated
   check applies.
@@ -45,10 +44,13 @@ line is `main` (frozen at its tags); the authority redesign work happens on
 
 ## Conventions
 
-- The portable fence is law: `src/core.ts` and everything under
-  `src/authority/` and `src/access/` compile with `types: []` and import
-  nothing Cloudflare.  `bin/check` enforces it; when code and the fence
-  disagree, fix the code.
+- The portable fence is law: everything under `src/` compiles with
+  `types: []` and imports nothing Cloudflare.  `bin/check` enforces it; when
+  code and the fence disagree, fix the code.
+- This branch is a clean break with v0.4: its model, port, spine, adapter,
+  examples, and docs live on `main` at its tags, and content returns only by
+  being re-specified against `docs/authority_redesign.md` — never copied
+  from the old tree.
 - This is a public repository.  No customer or real-person names, no real
   rosters or manifests, anywhere — design tests are the synthetic twins
   (Professional Operation, Festival), and real fixtures live in the

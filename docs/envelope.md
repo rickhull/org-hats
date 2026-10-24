@@ -1,0 +1,79 @@
+# The access envelope
+
+*The v1 format contract for `SignedAccessEnvelope`. The TypeScript types in
+`src/contract.ts` are the normative shape; this document records the
+encoding, signing, and compatibility rules the types cannot. The format is
+owned by `org-hats`; issuers and verifiers declare version overlap and
+neither invents fields silently (see
+[authority_redesign.md](authority_redesign.md) § Access).*
+
+## Envelope
+
+```
+SignedAccessEnvelope {
+  format: "org-hats.access"     // constant; anything else is not ours
+  v: 1                          // envelope format version
+  keyId: string                 // names the signing key that made signature
+  claims: AccessEnvelopeClaimsV1
+  signature: string             // base64url, below
+}
+```
+
+The envelope is opaque to product code. Hosts transport it (typically a
+cookie value, base64url of the whole envelope) and hand it to the
+verification-only `org-hats/access` module; nobody but the verifier reads
+claims and nobody but the issuer writes them.
+
+## Claims
+
+| Claim | Meaning |
+| --- | --- |
+| `v`, `interfaceVersion` | envelope format and authority interface versions; mismatches fail closed |
+| `operationId` | the one operation this envelope is scoped to |
+| `actor` | `(organizationId, actorId)` — the organization-scoped actor |
+| `hat` | the selected, worn hat: role title, its actions, and the team/site ids it reaches |
+| `memberTeamIds` | site-local views without a grant query: the teams the actor's wearable grants reach |
+| `sites` | admitted sites: permanent id first, aliases as routing decoration |
+| `readableOrganizationIds` | read reach, **computed by the issuer** under the active policy bundle |
+| `readableTeamIds` | exceptional team grants only — a reached team whose organization is not in `readableOrganizationIds`; never an expanded list of every readable team |
+| `configurableSiteIds` | where the holder may configure |
+| `iat`, `exp` | epoch seconds; `exp` bounds the revocation window |
+
+Read reach is an issuer computation, not a verifier reconstruction: the
+verifier compares ids and evaluates the selected hat locally; it never
+rebuilds organization unions, peer reach, fallback, or worn-hat rules.
+
+## Encoding and signature
+
+Signed bytes are the UTF-8 encoding of `canonicalJson(claims)`:
+
+- object keys sorted (UTF-16 code-unit order), no whitespace;
+- arrays keep their order; numbers and strings render as JSON renders them;
+- `canonicalJson` in `src/contract.ts` is the single implementation — both
+  issuer and verifier call it, and a host never reimplements it.
+
+Signature: **Ed25519** (WebCrypto `Ed25519`), encoded unpadded base64url
+(RFC 4648 §5), over the signed bytes; `keyId` names the key. One algorithm
+in v1; another is a format-version change, not a bundle option.
+
+## Version and key compatibility
+
+- Verifier-first rollout: deploy a verifier accepting old and new versions,
+  then the issuer, and retire the old version only after its maximum
+  envelope lifetime has elapsed.
+- Key rotation follows the same order: distribute the new verification key
+  everywhere, then activate it at the issuer, and retain the old key until
+  its last possible envelope has expired.
+- Unsupported versions, wrong operation/site binding, expiry, and failed
+  signatures are closed failure kinds (`wrong-interface-version`,
+  `wrong-binding`, `expired`, `invalid-signature`); the deploying host owns
+  the product response to each.
+
+## Fixed vectors
+
+Committed as data at `tests/fixtures/envelope-vectors.json` (a clearly
+labeled test-only keypair, so signatures are byte-exact across
+implementations) and exercised by `tests/access.test.ts`: canonical
+serialization; expiry; wrong interface version; wrong operation binding;
+wrong site binding; forged signature; tampered claims; unknown key id; key
+rotation and retirement.

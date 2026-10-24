@@ -1,9 +1,7 @@
-// The published surface: pure core + the persistence port.
-// The SQLite reference adapter is at ./node.ts, behind the `org-hats/node`
-// subpath, so a Worker bundle never pulls it in.
+// The root export: the v1 generic organization model and the policy-bundle
+// vocabulary (docs/authority_redesign.md § Core). The authority engine and
+// the access verifier are separate subpaths — `org-hats/authority`,
+// `org-hats/access` — and nothing here knows about them.
 
-export * from "./core.ts";
-export * from "./conformance.ts";
-export * from "./port.ts";
-export * from "./decide.ts";
-export * from "./testing.ts";
+export * from "./model.ts";
+export * from "./policy.ts";

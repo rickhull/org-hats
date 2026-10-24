@@ -1,40 +1,60 @@
+import { type ActorId, type OrganizationId } from "./contract.ts";
+import type { AuthorityRuntime, PrincipalEvidence } from "./authority/types.ts";
+import { type TwinFixture } from "./authority/twins.ts";
+import { type VerifyKey } from "./access/verify.ts";
+export interface ConformancePrincipal {
+    readonly label: string;
+    readonly evidence: PrincipalEvidence;
+    readonly organizationId: OrganizationId;
+    readonly actorId: ActorId;
+}
+/** The synthetic principals the inventory resolves. A host bootstraps the
+ * matching links before running the cases. */
+export declare const CONFORMANCE_PRINCIPALS: {
+    readonly dana: ConformancePrincipal;
+    readonly priya: ConformancePrincipal;
+    readonly marco: ConformancePrincipal;
+    readonly sam: ConformancePrincipal;
+    readonly len: ConformancePrincipal;
+    readonly iris: ConformancePrincipal;
+    readonly rosa: ConformancePrincipal;
+    readonly inviteeAdmin: ConformancePrincipal;
+};
+/** An organization that exists but does not participate in Meridian — the
+ * invite target. It is conformance data, not a customer fixture. */
+export declare const CONFORMANCE_INVITEE: TwinFixture;
+export declare const CONFORMANCE_FIXTURES: readonly TwinFixture[];
+export interface ConformanceWorldDescription {
+    readonly fixtures: readonly TwinFixture[];
+    readonly principalLinks: readonly {
+        readonly provider: string;
+        readonly subject: string;
+        readonly organizationId: OrganizationId;
+        readonly actorId: ActorId;
+    }[];
+    readonly orgAdmins: Readonly<Record<OrganizationId, readonly ActorId[]>>;
+}
+/** The world every adapter bootstraps before running the inventory. */
+export declare const CONFORMANCE_WORLD: ConformanceWorldDescription;
+export interface ConformanceWorld {
+    readonly runtime: AuthorityRuntime;
+    readonly keys: ReadonlyMap<string, VerifyKey>;
+}
+export type ConformanceWorldFactory = () => Promise<ConformanceWorld>;
+/** The in-memory world, used by the default runner and by tests. */
+export declare const createInMemoryConformanceWorld: () => Promise<ConformanceWorld>;
 export interface ConformanceCase {
-    /** Stable. Never renumbered and never reused — two suites compare these. */
     readonly id: string;
-    /** One sentence of behavior, not of mechanism. */
-    readonly description: string;
+    readonly title: string;
+    readonly run: (world: ConformanceWorld) => Promise<void>;
 }
 export declare const CONFORMANCE_CASES: readonly ConformanceCase[];
-export declare const CONFORMANCE_IDS: readonly string[];
-export interface ConformanceGaps {
-    /** Inventory ids the host did not run. Non-empty means non-conformant. */
-    readonly missing: readonly string[];
-    /** Ids the host ran that the inventory does not name — stale or invented. */
-    readonly unknown: readonly string[];
-}
-/** The one rule both sides share: a host that has run its bodies passes the
- * ids it ran; a non-empty `missing` or `unknown` fails the run. It grows
- * safely — adding a case here makes every host report it missing until it is
- * implemented, instead of passing quietly. */
-export declare function conformanceGaps(ran: Iterable<string>): ConformanceGaps;
-/** One case's proof: build a fixture, assert behavior, throw to fail. */
-export type ConformanceBody = () => void | Promise<void>;
-/** A suite: one body per inventory id. */
-export type ConformanceBodies = Readonly<Record<string, ConformanceBody>>;
-/** A body that ran and threw. A body never registered is not a failure; it
- * is a gap. */
-export interface ConformanceFailure {
-    readonly id: string;
-    readonly error: unknown;
-}
 export interface ConformanceResult {
-    /** The drift check: inventory ids never registered, ids nobody knows. */
-    readonly gaps: ConformanceGaps;
-    /** Bodies that ran and threw. */
-    readonly failures: readonly ConformanceFailure[];
+    readonly id: string;
+    readonly title: string;
+    readonly ok: boolean;
+    readonly error?: string;
 }
-/** Run a suite against the published inventory: every body runs, a throw is
- * recorded as a failure, and the ids ran are diffed against the inventory so
- * drift fails the report. A host calls this in its own test run;
- * `examples/conformance.ts` is the reference proof. */
-export declare function runConformance(bodies: ConformanceBodies): Promise<ConformanceResult>;
+/** Run every case in a fresh world, so one case's mutations cannot mask
+ * another's. The default world is the in-memory authority. */
+export declare const runConformance: (makeWorld?: ConformanceWorldFactory) => Promise<readonly ConformanceResult[]>;
