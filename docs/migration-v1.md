@@ -1,9 +1,10 @@
 # Migrating from org-hats v0.4 to v1
 
 **Status:** `v0.4` and `v1.0.0` are historical. The v0.4 surface remains
-available at its tags (`v0.4.4`); the current v1 line targets `1.1.0`, a
-coordinated break with the sole consumer. Everything below records the
-deltas a consumer crosses.
+available at its tags (`v0.4.4`); the line has since released `1.1.0` — the
+coordinated break recorded below — and `1.2.0`, which is additive (the
+verification-key set and the `amr`/`auth_time` claims; no migration).
+Everything below records the deltas a consumer crosses.
 
 ## 1.0 → 1.1
 

@@ -8,8 +8,8 @@ The v0.4 organization model — predicates, persistence port, request spine,
 and the Node SQLite adapter — is not here; it lives at its tags (`v0.4.4`
 last), and content returns only by being re-specified, never copied. The
 released line is the latest `v1.x` tag;
-`1.0.0` is historical. The Cloudflare runtime and demo are in place; the
-plan in [`plans/v1.md`](plans/v1.md) is complete.
+`1.0.0` is historical. The Cloudflare runtime and demo are in place; what
+remains is consumer adoption ([`plans/v1.md`](plans/v1.md)).
 
 What ships here:
 
@@ -23,8 +23,9 @@ What ships here:
   in-memory engine with its synthetic design twins, ready for consumer
   pilots and tests.
 - **`org-hats/access`** — the verification-only module: `verify` a signed
-  envelope under verification keys and get neutral authority facts; fixed
-  vectors pin the format byte-exactly.
+  envelope under verification keys and get neutral authority facts; keys
+  travel as the canonical `VerifyKeySet` (serialize, parse, build), and
+  fixed vectors pin the format byte-exactly.
 - **`org-hats/conformance`** — the executable inventory: table-driven cases
   over the synthetic twins, run through the public interface only.
   `CONFORMANCE_WORLD` carries the synthetic fixtures, principal links, and
@@ -61,10 +62,10 @@ Normative documents:
   contract.
 - [`docs/lexicon.md`](docs/lexicon.md) — the normative vocabulary: the words
   this repository uses, and the ones it rejects.
-- [`docs/migration-v1.md`](docs/migration-v1.md) — the 0.4 → 1.0 deltas.
+- [`docs/migration-v1.md`](docs/migration-v1.md) — the 0.4 → v1 deltas.
 - [`SECURITY.md`](SECURITY.md) — reporting and coordinated disclosure.
-- [`plans/v1.md`](plans/v1.md) — the completed 1.1 plan: release, consumer
-  handoff, and the Cloudflare runtime and demo.
+- [`plans/v1.md`](plans/v1.md) — the forward plan: consumer adoption of
+  `v1.2.0` and the decisions still open.
 
 Background (phase-1 toeholds; the bodies return by re-specification):
 

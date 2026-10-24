@@ -20,7 +20,8 @@ public `org-hats` docs are normative for the seam.
   canonical encoding, signature transport, version and key compatibility.
 - [`lexicon.md`](lexicon.md) — the normative vocabulary; it wins over loose
   usage elsewhere.
-- [`migration-v1.md`](migration-v1.md) — every 0.4 → 1.0 break.
+- [`migration-v1.md`](migration-v1.md) — the 0.4 → v1 crossing, including
+  the 1.1 break.
 - [`publishing.md`](publishing.md) — canonical host, mirror, CI, and the
   release ritual.
 

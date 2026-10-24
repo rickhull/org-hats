@@ -1,8 +1,8 @@
 # Authority subsystem redesign
 
 **Status:** Normative architecture for the v1 authority subsystem. It states
-the target shape and the settled interfaces; [plans/v1.md](../plans/v1.md)
-records the remaining work.
+the shape and the settled interfaces; [plans/v1.md](../plans/v1.md)
+records consumer adoption and the decisions still open.
 
 This repository is the normative source for the authority seam. The consuming
 product's architecture document states consumer requirements and deployment
@@ -352,11 +352,11 @@ reach, fallback, participation, or worn-hat rules from envelope claims, and
 its product verbs map onto neutral access facts rather than extending them.
 
 The accepted contract is authority interface `1` and access envelope `1`,
-recorded in Quartermaster's `specs/login.md`. The portable v1 line implements
-it; the Cloudflare runtime binding is planned in
+recorded in Quartermaster's `specs/login.md`. The portable v1 line and the
+Cloudflare reference runtime implement it; consumer adoption is recorded in
 [plans/v1.md](../plans/v1.md). Quartermaster's `apps/authority-dev` and
 `packages/access` are temporary stand-ins and are deleted together when the
-real binding lands, so the consumer never grows a second envelope
+consumer adopts the runtime binding, so it never grows a second envelope
 implementation. The review items that preceded the alpha are settled in the
 shipped contract: `supervisedTeamIds` is absent, the read policy is an axis
 structure, `PrincipalEvidence.email` is absent, and the twins use `reviewer`
@@ -489,10 +489,10 @@ The compatibility contract is:
 
 ## Coexistence and cutover
 
-The existing library and the new authority modules can coexist because they
-serve different integration seams. Existing consumers continue using the
-current root and Node adapter while new Quartermaster work targets the
-authority interface.
+The v0.4 library at its tags and the v1 authority modules can coexist
+because they serve different integration seams. A consumer still on v0.4
+keeps its root and Node adapter while its new work targets the authority
+interface.
 
 They must not both write the same authority facts. A greenfield operation is
 created in the new authority store. Moving an existing operation requires an
