@@ -1,8 +1,7 @@
-export { Counter } from "./counter";
+import type { Env } from "./env";
 
-interface Env {
-  readonly COUNTER: DurableObjectNamespace;
-}
+export { Counter } from "./counter";
+export { OrganizationAuthority } from "./organization";
 
 /** A minimal fetch surface for the harness: route to the singleton counter. */
 export default {

@@ -1,7 +1,8 @@
 // The Cloudflare reference runtime's test Worker.
 //
 // T6.1 proves the real local runtime and a SQLite-backed Durable Object;
-// the authority entrypoints and namespace layout arrive in T6.2–T6.4.
+// T6.2 adds the organization coordinator. The operation coordinator and the
+// public authority entrypoints arrive in T6.3–T6.4.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "org-hats-cloudflare-test",
@@ -9,7 +10,10 @@
   "compatibility_date": "2026-10-24",
   "workers_dev": false,
   "durable_objects": {
-    "bindings": [{ "name": "COUNTER", "class_name": "Counter" }]
+    "bindings": [
+      { "name": "COUNTER", "class_name": "Counter" },
+      { "name": "ORGANIZATION", "class_name": "OrganizationAuthority" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Counter"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Counter", "OrganizationAuthority"] }]
 }

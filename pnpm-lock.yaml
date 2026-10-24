@@ -16,6 +16,10 @@ importers:
         version: 5.9.3
 
   packages/cloudflare:
+    dependencies:
+      org-hats:
+        specifier: workspace:*
+        version: link:../..
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.4.7

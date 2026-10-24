@@ -3,14 +3,12 @@
 // them resolve; it is the same arrangement Quartermaster uses.
 /// <reference types="@cloudflare/vitest-plugin/types" />
 
-interface Env {
-  readonly COUNTER: DurableObjectNamespace;
-}
+type WorkerEnv = import("../src/env").Env;
 
 declare namespace Cloudflare {
-  interface Env extends globalThis.Env {}
+  interface Env extends WorkerEnv {}
   interface GlobalProps {
     mainModule: typeof import("../src/index");
-    durableNamespaces: "Counter";
+    durableNamespaces: "Counter" | "OrganizationAuthority";
   }
 }

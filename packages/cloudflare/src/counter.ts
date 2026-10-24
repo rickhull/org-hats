@@ -1,9 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
+import type { Env } from "./env";
 
 /** The T6.1 harness object: one SQLite-backed Durable Object, one durable
  * count. It proves storage survives across requests; the authority
  * coordinators replace it in T6.2–T6.3. */
-export class Counter extends DurableObject {
+export class Counter extends DurableObject<Env> {
   async increment(): Promise<number> {
     this.ctx.storage.sql.exec(
       "CREATE TABLE IF NOT EXISTS counter (id INTEGER PRIMARY KEY CHECK (id = 1), value INTEGER NOT NULL)",

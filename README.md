@@ -33,8 +33,9 @@ What ships here:
 
 Everything under `src/` compiles with `types: []` and imports nothing
 Cloudflare — `bin/check` enforces both fences. The Cloudflare reference
-runtime is scaffolded in `packages/cloudflare` as a separate 0.x workspace
-package, with real-workerd tests; its authority entrypoints land there.
+runtime lives in `packages/cloudflare` as a separate 0.x workspace package;
+its `OrganizationAuthority` coordinator is real SQLite/workerd, and the
+operation coordinator plus public entrypoints land there next.
 
 ## Proof
 

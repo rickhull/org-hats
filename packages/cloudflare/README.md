@@ -12,7 +12,19 @@ This package starts as a real workerd harness, not a mock:
 - `src/index.ts` routes one request through the object.
 - `test/counter.test.ts` runs inside workerd via `@cloudflare/vitest-plugin`
   and proves the value survives across requests.
-- `wrangler.jsonc` declares the binding and the SQLite migration.
+- `wrangler.jsonc` declares the bindings and the SQLite migration.
+
+## T6.2 — OrganizationAuthority
+
+`src/organization.ts` owns the organization-side facts in SQLite:
+organizations, actors, verified-principal links, organization administrators,
+invitations, audit, idempotency claims, and the outbox. A mutation and its
+audit/claim/outbox rows commit inside `transactionSync`; the sealed
+identity-provider configuration is stored opaquely and never exposed. The
+test suite exercises bootstrap and principal resolution, invite → accept,
+duplicate and mismatched claims, early acceptance, disable, and revoke.
+
+The operation coordinator, alarms, and outbox delivery are T6.3/T6.4.
 
 ```sh
 pnpm --filter org-hats-cloudflare typecheck
@@ -22,6 +34,5 @@ pnpm --filter org-hats-cloudflare test
 The portable suite remains `pnpm check` at the repository root; it never
 needs workerd, a Cloudflare account, or a network.
 
-T6.2–T6.4 replace the counter with `OrganizationAuthority`,
-`OperationAuthority`, and the runtime/ops entrypoints. This package is
-`private` until the demo milestone decides how it is distributed.
+T6.3–T6.4 add `OperationAuthority` and the runtime/ops entrypoints. This
+package is `private` until the demo milestone decides how it is distributed.
