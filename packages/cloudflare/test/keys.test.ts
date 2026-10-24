@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { base64Encode } from "org-hats/access";
+import { base64Encode, serializeVerifyKeySet } from "org-hats/access";
 import type { Env } from "../src/env";
 import { signerFromEnv, verificationKeys } from "../src/runtime";
 
@@ -21,7 +21,10 @@ describe("configured signing keys", () => {
       AUTHORITY_SIGNING_KEY: a.privateKey,
       AUTHORITY_SIGNING_PUBLIC_KEY: a.publicKey,
       AUTHORITY_SIGNING_KEY_ID: "key-a",
-      AUTHORITY_VERIFICATION_KEYS: `key-a:${a.publicKey},key-b:${b.publicKey}`,
+      AUTHORITY_VERIFICATION_KEYS: serializeVerifyKeySet([
+        { keyId: "key-a", algorithm: "Ed25519", publicKey: a.publicKey },
+        { keyId: "key-b", algorithm: "Ed25519", publicKey: b.publicKey },
+      ]),
     } as Env;
 
     const signer = await signerFromEnv(configured);

@@ -1,4 +1,4 @@
-import { type ActorId, type OperationId, type OrganizationId } from "../contract.js";
+import { type ActorId, type OperationId, type OrganizationId, type VerificationKeyMaterial } from "../contract.js";
 import { type Snapshot } from "../model.js";
 import type { TwinFixture } from "./twins.js";
 import type { AuthorityRuntime } from "./types.js";
@@ -36,14 +36,7 @@ export interface InMemoryAuthorityConfig {
     /** Fault injection: the first N outbox deliveries fail and stay pending. */
     readonly transportFailures?: number;
 }
-/** What verifiers receive before issuance: the public half of the signing
- * key. The private key never leaves the engine. */
-export interface VerificationKeyMaterial {
-    readonly keyId: string;
-    readonly algorithm: string;
-    /** Standard base64 raw public bytes. */
-    readonly publicKey: string;
-}
+export type { VerificationKeyMaterial } from "../contract.js";
 export interface InMemoryAuthorityHandle {
     readonly runtime: AuthorityRuntime;
     /** The public verification key to distribute to verifiers before issuance. */

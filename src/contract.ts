@@ -129,6 +129,15 @@ export interface AccessEnvelopeClaimsV1 {
   readonly exp: number;
 }
 
+/** The public half of a signing key, as an operator distributes it. The
+ * private key never leaves the issuer. */
+export interface VerificationKeyMaterial {
+  readonly keyId: string;
+  readonly algorithm: string;
+  /** Standard base64 raw public bytes. */
+  readonly publicKey: string;
+}
+
 /** The signed envelope as it travels: opaque to product code, verified by the
  * access module. The signature is unpadded base64url Ed25519 over the UTF-8
  * bytes of `canonicalJson(claims)`, with `keyId` naming the signing key. */

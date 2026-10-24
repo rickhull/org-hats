@@ -1,4 +1,5 @@
 import { SELF } from "cloudflare:test";
+import { parseVerifyKeySet } from "org-hats/access";
 import { describe, expect, it } from "vitest";
 
 const OPS = { authorization: "Bearer test-ops-token" };
@@ -130,8 +131,9 @@ describe("typed ops routes", () => {
   it("exposes the verification keys without the ops token", async () => {
     const response = await SELF.fetch("https://authority.internal/ops/verification-keys");
     expect(response.status).toBe(200);
-    const body = await response.json() as { signingKeyId: string; keys: { keyId: string }[] };
+    const body = await response.json() as { signingKeyId: string; keySet: string };
     expect(body.signingKeyId.length).toBeGreaterThan(0);
-    expect(body.keys.some((key) => key.keyId === body.signingKeyId)).toBe(true);
+    const set = parseVerifyKeySet(body.keySet);
+    expect(set.keys.some((key) => key.keyId === body.signingKeyId)).toBe(true);
   });
 });

@@ -8,8 +8,8 @@ the v0.4 surface.** The v0.4 organization model — predicates, persistence
 port, request spine, and the Node SQLite adapter — is not here; it lives on
 `main` at its tags, and content returns to this branch only by being
 re-specified, never copied. The released line is the latest `v1.x` tag;
-`1.0.0` is historical. The current development target is in
-[`plans/v1.md`](plans/v1.md); the Cloudflare runtime and demo remain.
+`1.0.0` is historical. The Cloudflare runtime and demo are in place; the
+plan in [`plans/v1.md`](plans/v1.md) is complete.
 
 What ships here:
 
@@ -36,9 +36,9 @@ Cloudflare — `bin/check` enforces both fences. The Cloudflare reference
 runtime lives in `packages/cloudflare` as a separate 0.x workspace package;
 its `OrganizationAuthority` and `OperationAuthority` coordinators are real
 SQLite/workerd, the `AuthorityRuntime` service binding is in place, the
-portable conformance inventory passes against them, and the ops/state
-lifecycle (keys, export/restore, restore drill, context) is complete. The
-self-contained demo is next.
+portable conformance inventory passes against them, the ops/state lifecycle
+(keys, export/restore, restore drill, context) is complete, and the
+self-contained demo runs with `pnpm --filter org-hats-cloudflare demo`.
 
 ## Proof
 
@@ -63,8 +63,8 @@ Normative documents:
   this repository uses, and the ones it rejects.
 - [`docs/migration-v1.md`](docs/migration-v1.md) — the 0.4 → 1.0 deltas.
 - [`SECURITY.md`](SECURITY.md) — reporting and coordinated disclosure.
-- [`plans/v1.md`](plans/v1.md) — the remaining work: release, consumer
-  handoff, Cloudflare runtime, and demo.
+- [`plans/v1.md`](plans/v1.md) — the completed 1.1 plan: release, consumer
+  handoff, and the Cloudflare runtime and demo.
 
 Background (phase-1 toeholds; the bodies return by re-specification):
 

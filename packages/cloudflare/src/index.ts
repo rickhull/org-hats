@@ -15,11 +15,14 @@ import type { Env } from "./env";
 import {
   createCloudflareRuntime,
   createEphemeralSigner,
+  serializedVerificationKeys,
   signerFromEnv,
   verificationKeys,
   type CloudflareSigner,
 } from "./runtime";
-import type { Failed, VerifyKey } from "org-hats/access";
+import { verify, type Failed, type VerifyKey } from "org-hats/access";
+import { CONFORMANCE_PRINCIPALS, type ConformanceWorld } from "org-hats/conformance";
+import { createCloudflareConformanceWorld } from "./conformance";
 
 export { Counter } from "./counter";
 export { OrganizationAuthority } from "./organization";
@@ -54,6 +57,52 @@ const opsAuthorized = (request: Request, env: Env): boolean => {
   if (token === undefined || token.length === 0) return false;
   return request.headers.get("authorization") === `Bearer ${token}`;
 };
+
+const DEMO_OPERATION = "op-9f2e6ad4";
+const DEMO_ORG = "org-4c1f9a2e";
+const DEMO_WEST = "site-b8d620fa";
+const DEMO_HARBOR_TEAM = "team-2e8c64b9";
+const DEMO_OTHER_TEAM = "team-c7d9e2a1";
+
+let demoWorldPromise: Promise<ConformanceWorld> | undefined;
+const demoWorld = (env: Env): Promise<ConformanceWorld> => {
+  demoWorldPromise ??= createCloudflareConformanceWorld(env);
+  return demoWorldPromise;
+};
+
+const demoPage = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>org-hats demo</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 52rem; margin: 3rem auto; padding: 0 1rem; color: #17202a; }
+  h1 { font-weight: 600; } code, pre { background: #f4f6f8; } pre { padding: 1rem; overflow: auto; }
+  button { font: inherit; padding: .45rem .8rem; margin: 0 .5rem .5rem 0; }
+  .note { color: #566573; }
+</style></head>
+<body>
+<h1>org-hats demo</h1>
+<p class="note">Dev evidence only. No identity provider, no external service. The envelope is
+signed by the authority runtime and verified by <code>org-hats/access</code>.</p>
+<button onclick="bootstrap()">Bootstrap twin</button>
+<button onclick="login()">Sign in as Dana Okafor</button>
+<button onclick="check()">Check access</button>
+<pre id="out">Ready.</pre>
+<script>
+let envelope;
+const show = (value) => { document.getElementById("out").textContent = JSON.stringify(value, null, 2); };
+const api = async (path, body) => {
+  const response = await fetch(path, body === undefined ? {} : {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+  });
+  return response.json();
+};
+async function bootstrap() { show(await api("/demo/bootstrap")); }
+async function login() { const result = await api("/demo/login", {}); envelope = result.envelope; show(result); }
+async function check() { show(await api("/demo/access", { envelope })); }
+</script>
+</body></html>`;
+
 
 /** The service-binding surface. A consumer holding this binding holds the
  * same four methods the in-memory engine implements. */
@@ -98,21 +147,10 @@ export default {
 
     if (url.pathname === "/ops/verification-keys") {
       const signer = await signerFor(env);
-      const keys = (env.AUTHORITY_VERIFICATION_KEYS ?? "")
-        .split(",")
-        .map((entry) => entry.trim())
-        .filter((entry) => entry.length > 0)
-        .map((entry) => {
-          const split = entry.indexOf(":");
-          return split <= 0
-            ? undefined
-            : { keyId: entry.slice(0, split), publicKey: entry.slice(split + 1) };
-        })
-        .filter((entry): entry is { keyId: string; publicKey: string } => entry !== undefined);
-      if (!keys.some((key) => key.keyId === signer.keyId)) {
-        keys.push({ keyId: signer.keyId, publicKey: await signer.publicKey() });
-      }
-      return Response.json({ signingKeyId: signer.keyId, keys });
+      return Response.json({
+        signingKeyId: signer.keyId,
+        keySet: await serializedVerificationKeys(env, signer),
+      });
     }
 
     if (url.pathname.startsWith("/ops/")) {
@@ -158,6 +196,61 @@ export default {
           { status: 400 },
         );
       }
+    }
+
+    if (request.method === "GET" && url.pathname === "/") {
+      return new Response(demoPage, { headers: { "content-type": "text/html; charset=utf-8" } });
+    }
+
+    if (request.method === "GET" && url.pathname === "/demo/bootstrap") {
+      await demoWorld(env);
+      return Response.json({
+        ok: true,
+        operationId: DEMO_OPERATION,
+        organizationId: DEMO_ORG,
+        actorId: CONFORMANCE_PRINCIPALS.dana.actorId,
+      });
+    }
+
+    if (request.method === "POST" && url.pathname === "/demo/login") {
+      const world = await demoWorld(env);
+      const issued = await world.runtime.accessFromEvidence({
+        interfaceVersion: 1,
+        operationId: DEMO_OPERATION,
+        evidence: CONFORMANCE_PRINCIPALS.dana.evidence,
+      });
+      if ("failure" in issued) return Response.json({ ok: false, failure: issued.failure }, { status: 401 });
+      return Response.json({ ok: true, envelope: issued.envelope, refresh: issued.refresh });
+    }
+
+    if (request.method === "POST" && url.pathname === "/demo/access") {
+      const body = await request.json() as { envelope?: unknown };
+      if (body.envelope === undefined) return Response.json({ ok: false, failure: { kind: "invalid-command" } }, { status: 400 });
+      const world = await demoWorld(env);
+      const result = await verify(body.envelope as never, world.keys, {
+        now: Math.floor(Date.now() / 1000),
+        expectedOperationId: DEMO_OPERATION,
+        expectedSiteId: DEMO_WEST,
+      });
+      if ("failure" in result) return Response.json({ ok: false, failure: result.failure }, { status: 401 });
+      const access = result.access;
+      return Response.json({
+        ok: true,
+        actor: result.claims.actor,
+        operationId: access.operationId,
+        sites: access.sites,
+        selectedHat: result.claims.hat,
+        readableOrganizationIds: access.readableOrganizationIds(),
+        readableTeamIds: access.readableTeamIds(),
+        mayConfigureWest: access.mayConfigure(DEMO_WEST),
+        expiresAt: access.expiresAt(),
+        checks: [
+          { action: "review", target: { kind: "team", teamId: DEMO_HARBOR_TEAM }, allowed: access.mayAct("review", { kind: "team", teamId: DEMO_HARBOR_TEAM }) },
+          { action: "configure", target: { kind: "team", teamId: DEMO_HARBOR_TEAM }, allowed: access.mayAct("configure", { kind: "team", teamId: DEMO_HARBOR_TEAM }) },
+          { action: "review", target: { kind: "team", teamId: DEMO_OTHER_TEAM }, allowed: access.mayAct("review", { kind: "team", teamId: DEMO_OTHER_TEAM }) },
+          { action: "review", target: { kind: "operation" }, allowed: access.mayAct("review", { kind: "operation" }) },
+        ],
+      });
     }
 
     if (url.pathname !== "/increment") {

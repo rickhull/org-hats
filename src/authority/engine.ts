@@ -29,6 +29,7 @@ import {
   type SignedAccessEnvelope,
   type SiteId,
   type TeamId,
+  type VerificationKeyMaterial,
   ACCESS_ENVELOPE_FORMAT,
   ACCESS_ENVELOPE_VERSION,
   AUTHORITY_INTERFACE_VERSION,
@@ -156,14 +157,7 @@ interface OutboxMessage {
 
 // --- the engine --------------------------------------------------------------------
 
-/** What verifiers receive before issuance: the public half of the signing
- * key. The private key never leaves the engine. */
-export interface VerificationKeyMaterial {
-  readonly keyId: string;
-  readonly algorithm: string;
-  /** Standard base64 raw public bytes. */
-  readonly publicKey: string;
-}
+export type { VerificationKeyMaterial } from "../contract.ts";
 
 export interface InMemoryAuthorityHandle {
   readonly runtime: AuthorityRuntime;

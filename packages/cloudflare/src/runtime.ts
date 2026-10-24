@@ -20,10 +20,14 @@ import {
   base64Encode,
   base64UrlEncode,
   ed25519VerifyKey,
+  parseVerifyKeySet,
+  serializeVerifyKeySet,
   utf8,
   verify,
+  verifyKeysOf,
   type Failed,
   type VerifyKey,
+  type VerifyKeySet,
 } from "org-hats/access";
 import type { Env } from "./env";
 
@@ -83,26 +87,38 @@ export const signerFromEnv = async (env: Env): Promise<CloudflareSigner> => {
   };
 };
 
+/** The configured set plus the current signer, as one canonical set. */
+export const verificationKeySet = async (
+  env: Env,
+  signer: CloudflareSigner,
+): Promise<VerifyKeySet> => {
+  const configured = (env.AUTHORITY_VERIFICATION_KEYS ?? "").trim();
+  const set = configured.length === 0
+    ? { format: "org-hats.verify-keys" as const, v: 1 as const, keys: [] }
+    : parseVerifyKeySet(configured);
+  const signing = {
+    keyId: signer.keyId,
+    algorithm: "Ed25519",
+    publicKey: await signer.publicKey(),
+  };
+  return {
+    format: set.format,
+    v: set.v,
+    keys: [...set.keys.filter((key) => key.keyId !== signer.keyId), signing],
+  };
+};
+
 /** The verifier map: configured rotation keys plus the current signer. */
 export const verificationKeys = async (
   env: Env,
   signer: CloudflareSigner,
 ): Promise<ReadonlyMap<string, VerifyKey>> => {
-  const keys = new Map<string, VerifyKey>();
-  for (const entry of (env.AUTHORITY_VERIFICATION_KEYS ?? "").split(",")) {
-    const trimmed = entry.trim();
-    if (trimmed.length === 0) continue;
-    const split = trimmed.indexOf(":");
-    if (split <= 0 || split === trimmed.length - 1) {
-      throw new Error("AUTHORITY_VERIFICATION_KEYS entries must be keyId:base64");
-    }
-    const keyId = trimmed.slice(0, split);
-    keys.set(keyId, await ed25519VerifyKey(keyId, trimmed.slice(split + 1)));
-  }
-  const signing = await verificationKeyOf(signer);
-  keys.set(signing.keyId, signing);
-  return keys;
+  const set = await verificationKeySet(env, signer);
+  return verifyKeysOf(set);
 };
+
+export const serializedVerificationKeys = async (env: Env, signer: CloudflareSigner): Promise<string> =>
+  serializeVerifyKeySet((await verificationKeySet(env, signer)).keys);
 
 const now = (): number => Math.floor(Date.now() / 1000);
 

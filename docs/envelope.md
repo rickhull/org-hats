@@ -64,6 +64,11 @@ in v1; another is a format-version change, not a bundle option.
 - Key rotation follows the same order: distribute the new verification key
   everywhere, then activate it at the issuer, and retain the old key until
   its last possible envelope has expired.
+- Verification keys travel as a canonical `VerifyKeySet` from
+  `org-hats/access`: JSON with `format`, `v`, and `keys` (each key id,
+  algorithm, and raw public key). Parsing fails closed on an empty set,
+  duplicate ids, a non-Ed25519 algorithm, or malformed key material. The set,
+  not a single key, is the rotation unit.
 - Unsupported versions, wrong operation/site binding, expiry, and failed
   signatures are closed failure kinds (`wrong-interface-version`,
   `wrong-binding`, `expired`, `invalid-signature`); the deploying host owns

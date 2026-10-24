@@ -55,11 +55,12 @@ exposes `/ops/verification-keys` for the public signing key.
 - `GET  /ops/verification-keys` — public, no token
 
 Set `AUTHORITY_SIGNING_KEY` (pkcs8 base64), `AUTHORITY_SIGNING_PUBLIC_KEY`
-(raw base64), and `AUTHORITY_SIGNING_KEY_ID` for a stable signer. Add
-additional `AUTHORITY_VERIFICATION_KEYS` (`keyId:base64`, comma-separated) to
-install the next key before the issuer switches; remove the old entry after
-its last envelope expires. Without the signing-key variables the runtime
-generates an ephemeral dev key per isolate.
+(raw base64), and `AUTHORITY_SIGNING_KEY_ID` for a stable signer.
+`AUTHORITY_VERIFICATION_KEYS` carries the canonical serialized
+`VerifyKeySet` from `org-hats/access` — the new key is installed there before
+the issuer switches, and the old entry is removed after its last envelope
+expires. Without the signing-key variables the runtime generates an
+ephemeral dev key per isolate.
 
 Export is canonical JSON per coordinator, not a SQLite-file copy; restore is
 typed and atomic. The restore drill covers the operation and organization
@@ -92,5 +93,21 @@ between tests: use unique object names or explicit reset, and assert deltas
 rather than absolute values. The organization tests use unique object names;
 the counter test asserts `second === first + 1`.
 
-T6.5 adds the ops/state lifecycle. This package is `private` until the demo
-milestone decides how it is distributed.
+## T7.1 — the demo
+
+```sh
+pnpm --filter org-hats-cloudflare demo
+```
+
+Open the local URL and use the three buttons: bootstrap the twin, sign in as
+Dana with fixed dev evidence, and check access. The login issues a real signed
+envelope through the authority runtime; the access button verifies it through
+`org-hats/access` and shows neutral facts plus four allow/deny checks.
+
+The demo uses the conformance world, so it bootstraps both twins and resets
+the coordinators on first use. Dev evidence only: there is no identity
+provider, no external service, and no production secret. The page and the
+`/demo/*` routes are not a product surface.
+
+This package is `private`; it is consumed by deployment through a service
+binding, not by dependency.

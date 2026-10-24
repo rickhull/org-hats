@@ -13,6 +13,15 @@
 export type { NeutralAccess, TargetRef, VerifiedClaims } from "./types.ts";
 export { verify, ed25519VerifyKey, verifyKeyOf } from "./verify.ts";
 export type { Verified, VerifyContext, VerifyKey } from "./verify.ts";
+export {
+  VERIFY_KEY_SET_FORMAT,
+  VERIFY_KEY_SET_VERSION,
+  parseVerifyKeySet,
+  serializeVerifyKeySet,
+  verificationKeysFrom,
+  verifyKeysOf,
+} from "./keys.ts";
+export type { VerifyKeySet } from "./keys.ts";
 
 export type {
   AccessEnvelopeClaimsV1,
@@ -27,6 +36,7 @@ export type {
   SiteId,
   SignedAccessEnvelope,
   TeamId,
+  VerificationKeyMaterial,
 } from "../contract.ts";
 export {
   ACCESS_ENVELOPE_FORMAT,
