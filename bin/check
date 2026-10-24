@@ -18,6 +18,27 @@ else
 fi
 
 echo
+echo "== fence: portable authority and access compile without node or cloudflare types =="
+if [ -x node_modules/.bin/tsc ]; then
+  node_modules/.bin/tsc -p tsconfig.authority.json
+  echo "ok — authority and access compile with types: []"
+else
+  echo "(skipped — run 'pnpm install' to enable the fence)"
+fi
+
+echo
+echo "== fence: no cloudflare imports in the portable modules =="
+if grep -Rn -e "cloudflare:" -e "@cloudflare/" src/authority src/access; then
+  echo "fail — the portable modules must not import cloudflare" >&2
+  exit 1
+fi
+echo "ok — no cloudflare imports"
+
+echo
+echo "== v1 suites (node:test) =="
+node --test tests/*.test.ts
+
+echo
 echo "== release metadata: a version tag matches package.json =="
 "$(dirname "$0")/check-version"
 

@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.core.json",
+  "include": ["src/authority/**/*.ts", "src/access/**/*.ts"]
+}
