@@ -127,6 +127,16 @@ export interface AccessEnvelopeClaimsV1 {
   /** Epoch seconds. `exp` bounds the revocation window. */
   readonly iat: number;
   readonly exp: number;
+  /** Authentication method references (RFC 8176), opaque host/IdP
+   * vocabulary copied from the principal evidence at issuance and preserved
+   * through refresh. Authority never interprets the values; absent means
+   * the issuing evidence carried none. */
+  readonly amr?: readonly string[];
+  /** Epoch seconds of the authentication event the `amr` describes — the
+   * OIDC `auth_time` claim name, carried verbatim. Preserved through
+   * refresh, unlike `iat`, which describes this envelope; absent means the
+   * issuing evidence carried none. */
+  readonly auth_time?: number;
 }
 
 /** The public half of a signing key, as an operator distributes it. The

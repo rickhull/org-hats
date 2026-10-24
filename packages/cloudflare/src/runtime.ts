@@ -277,6 +277,8 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     }>(operation(input.operationId), "POST", "/issue", {
       organizationId: resolved.organizationId,
       actorId: resolved.actorId,
+      ...(input.evidence.amr === undefined ? {} : { amr: [...input.evidence.amr] }),
+      ...(input.evidence.authTime === undefined ? {} : { authTime: input.evidence.authTime }),
     });
     if (!issued.ok || issued.value === undefined) return failed(issued.failure ?? { kind: "unavailable" });
     return { envelope: await sign(issued.value.claims), refresh: issued.value.refresh };
@@ -353,6 +355,8 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
             },
           }),
       sites: claims.sites,
+      ...(claims.amr === undefined ? {} : { amr: [...claims.amr] }),
+      ...(claims.auth_time === undefined ? {} : { authTime: claims.auth_time }),
     };
   };
 

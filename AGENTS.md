@@ -11,9 +11,9 @@ to route around.
 working tree, so they proceed only with Rick's approval — ask for specific
 paths and say what each file is.  Never `git add -A` or `git add .`.
 
-Codeberg is canonical (remote `origin`); GitHub is a push mirror.  The v0.4
-line is `main` (frozen at its tags); the authority redesign work happens on
-`v1`.
+Codeberg is canonical (remote `origin`); GitHub is a push mirror.  The
+authority redesign is `main`'s line; the v0.4 surface stays frozen at its
+tags.
 
 ## The Quartermaster relay
 
@@ -63,9 +63,9 @@ not applying.  No customer names, roster material, secrets, or key material.
 - The portable fence is law: everything under `src/` compiles with
   `types: []` and imports nothing Cloudflare.  `bin/check` enforces it; when
   code and the fence disagree, fix the code.
-- This branch is a clean break with v0.4: its model, port, spine, adapter,
-  examples, and docs live on `main` at its tags, and content returns only by
-  being re-specified against `docs/authority_redesign.md` — never copied
+- The v1 line is a clean break with v0.4: the old model, port, spine,
+  adapter, examples, and docs live at their tags, and content returns only
+  by being re-specified against `docs/authority_redesign.md` — never copied
   from the old tree.
 - This is a public repository.  No customer or real-person names, no real
   rosters or manifests, anywhere — design tests are the synthetic twins

@@ -39,8 +39,12 @@
     "readableTeamIds": [],
     "configurableSiteIds": [],
     "iat": 1700000000,
-    "exp": 1700000900
+    "exp": 1700000900,
+    "amr": [
+      "pwd"
+    ],
+    "auth_time": 1699996400
   },
-  "canonical": "{\"actor\":{\"actorId\":\"actor-8d3b77c1\",\"organizationId\":\"org-4c1f9a2e\"},\"configurableSiteIds\":[],\"exp\":1700000900,\"hat\":{\"actions\":[\"review\",\"resolve\"],\"role\":\"coordinator\",\"siteIds\":[],\"teamIds\":[\"team-2e8c64b9\"]},\"iat\":1700000000,\"interfaceVersion\":1,\"memberTeamIds\":[\"team-2e8c64b9\"],\"operationId\":\"op-9f2e6ad4\",\"readableOrganizationIds\":[\"org-4c1f9a2e\"],\"readableTeamIds\":[],\"sites\":[{\"aliases\":[\"west\"],\"siteId\":\"site-b8d620fa\"}],\"v\":1}",
-  "signature": "64aVo6oOvpFJlatDJxc5YmQh5JawzGEbAsji7q_mrOZXn0vzCy1PgNZpq_c5c1Wc4WFiQf9Axt6iI_YGdPwiBg"
+  "canonical": "{\"actor\":{\"actorId\":\"actor-8d3b77c1\",\"organizationId\":\"org-4c1f9a2e\"},\"amr\":[\"pwd\"],\"auth_time\":1699996400,\"configurableSiteIds\":[],\"exp\":1700000900,\"hat\":{\"actions\":[\"review\",\"resolve\"],\"role\":\"coordinator\",\"siteIds\":[],\"teamIds\":[\"team-2e8c64b9\"]},\"iat\":1700000000,\"interfaceVersion\":1,\"memberTeamIds\":[\"team-2e8c64b9\"],\"operationId\":\"op-9f2e6ad4\",\"readableOrganizationIds\":[\"org-4c1f9a2e\"],\"readableTeamIds\":[],\"sites\":[{\"aliases\":[\"west\"],\"siteId\":\"site-b8d620fa\"}],\"v\":1}",
+  "signature": "r3ODtQUOo_5sgDqi0j5RkwT2_AB23iDZHBPnWXyOcElL5-NdIVW0D4N6XYqETDU5cKZp6z4_DQ94Y7Unr39NBg"
 }

@@ -14,6 +14,14 @@ export interface PrincipalEvidence {
     /** Presentation only; authority never uses it to identify or link an
      * actor. */
     readonly displayName?: string;
+    /** Authentication method references (RFC 8176) as the adapter verified
+     * them — opaque values in the host's or IdP's vocabulary. Authority
+     * copies them into the envelope claims and context and never interprets
+     * them; step-up policy stays with the host. */
+    readonly amr?: readonly string[];
+    /** Epoch seconds of the authentication event the `amr` describes.
+     * Distinct from envelope `iat`: refresh moves `iat` and preserves this. */
+    readonly authTime?: number;
 }
 /** Every call carries the interface version it speaks. */
 interface Versioned {
@@ -60,6 +68,11 @@ export interface AuthorityContext {
     readonly wearableHats: readonly HatSummary[];
     readonly selectedHat?: HatSummary;
     readonly sites: readonly SiteBinding[];
+    /** How the session's principal authenticated, as the issuing evidence
+     * stated: the same opaque `amr` values and authentication timestamp the
+     * envelope claims carry, absent when that evidence carried none. */
+    readonly amr?: readonly string[];
+    readonly authTime?: number;
 }
 export type CommandAuthorization = {
     readonly kind: "access-envelope";

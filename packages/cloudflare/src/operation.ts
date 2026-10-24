@@ -31,7 +31,7 @@ import {
 /** One operation authority. The object owns operation-local facts: sites,
  * teams, grants, participation, policy, refresh records, audit, claims, and
  * the outbox that carries invitations to organization authority. */
-const SCHEMA_VERSION = "1";
+const SCHEMA_VERSION = "2";
 
 type Row = Record<string, string | number | null>;
 
@@ -174,6 +174,14 @@ interface AdmitCommand {
   readonly idempotencyKey: string;
 }
 
+/** How and when the principal authenticated, as the issuing evidence
+ * stated it. Opaque to authority: stored with the refresh record, re-issued
+ * on every refresh of its chain, never interpreted. */
+interface AuthenticationFacts {
+  readonly amr?: readonly string[];
+  readonly authTime?: number;
+}
+
 export class OperationAuthority extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -254,6 +262,8 @@ export class OperationAuthority extends DurableObject<Env> {
         actor_id TEXT NOT NULL,
         revoked INTEGER NOT NULL DEFAULT 0,
         superseded INTEGER NOT NULL DEFAULT 0,
+        amr_json TEXT,
+        auth_time INTEGER,
         created_at INTEGER NOT NULL
       )`,
     );
@@ -292,6 +302,15 @@ export class OperationAuthority extends DurableObject<Env> {
       )`,
     );
     sql.exec("INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', ?)", SCHEMA_VERSION);
+    // additive migration: an object created before schema 2 lacks the
+    // authentication columns on refresh_records
+    const refreshColumns = new Set(
+      this.ctx.storage.sql.exec<{ readonly name: string }>("PRAGMA table_info(refresh_records)")
+        .toArray()
+        .map((column) => String(column.name)),
+    );
+    if (!refreshColumns.has("amr_json")) sql.exec("ALTER TABLE refresh_records ADD COLUMN amr_json TEXT");
+    if (!refreshColumns.has("auth_time")) sql.exec("ALTER TABLE refresh_records ADD COLUMN auth_time INTEGER");
   }
 
   private rows(query: string, ...bindings: (string | number | null)[]): Row[] {
@@ -837,7 +856,7 @@ export class OperationAuthority extends DurableObject<Env> {
       })),
       participations: this.rows("SELECT organization_id, status FROM participations ORDER BY organization_id"),
       invitations: this.rows("SELECT invitation_id, organization_id, status FROM invitations ORDER BY invitation_id"),
-      refreshRecords: this.rows("SELECT handle_hash, organization_id, actor_id, revoked, superseded FROM refresh_records ORDER BY handle_hash"),
+      refreshRecords: this.rows("SELECT handle_hash, organization_id, actor_id, revoked, superseded, amr_json, auth_time FROM refresh_records ORDER BY handle_hash"),
       accessRequests: this.rows("SELECT request_id, organization_id, actor_id, note FROM access_requests ORDER BY request_id"),
     };
   }
@@ -899,7 +918,7 @@ export class OperationAuthority extends DurableObject<Env> {
     };
   }
 
-  private buildClaims(organizationId: string, actorId: string): Result<{
+  private buildClaims(organizationId: string, actorId: string, auth?: AuthenticationFacts): Result<{
     readonly claims: AccessEnvelopeClaimsV1;
   }> {
     const operationId = this.operationId();
@@ -971,30 +990,35 @@ export class OperationAuthority extends DurableObject<Env> {
         configurableSiteIds,
         iat,
         exp: iat + this.envelopeLifetime(),
+        ...(auth?.amr !== undefined ? { amr: [...auth.amr] } : {}),
+        ...(auth?.authTime !== undefined ? { auth_time: auth.authTime } : {}),
       },
     });
   }
 
-  private async newRefresh(organizationId: string, actorId: string): Promise<{ handle: string; at: number }> {
+  private async newRefresh(organizationId: string, actorId: string, auth?: AuthenticationFacts): Promise<{ handle: string; at: number }> {
     const handle = `rh-${crypto.randomUUID()}`;
     const at = now();
     this.ctx.storage.sql.exec(
-      "INSERT INTO refresh_records (handle_hash, organization_id, actor_id, revoked, superseded, created_at) VALUES (?, ?, ?, 0, 0, ?)",
+      `INSERT INTO refresh_records (handle_hash, organization_id, actor_id, revoked, superseded, amr_json, auth_time, created_at)
+       VALUES (?, ?, ?, 0, 0, ?, ?, ?)`,
       await sha256Hex(handle),
       organizationId,
       actorId,
+      auth?.amr === undefined ? null : canonicalJson(auth.amr as unknown as JsonValue),
+      auth?.authTime ?? null,
       at,
     );
     return { handle, at };
   }
 
-  private async issue(organizationId: string, actorId: string): Promise<Result<{
+  private async issue(organizationId: string, actorId: string, auth?: AuthenticationFacts): Promise<Result<{
     readonly claims: AccessEnvelopeClaimsV1;
     readonly refresh: RefreshHandleOutcome;
   }>> {
-    const built = this.buildClaims(organizationId, actorId);
+    const built = this.buildClaims(organizationId, actorId, auth);
     if (!built.ok) return built;
-    const refresh = await this.newRefresh(organizationId, actorId);
+    const refresh = await this.newRefresh(organizationId, actorId, auth);
     return value({ claims: built.value.claims, refresh: { kind: "rotated", handle: refresh.handle } });
   }
 
@@ -1004,7 +1028,8 @@ export class OperationAuthority extends DurableObject<Env> {
   }>> {
     const hash = await sha256Hex(handle);
     const record = this.one(
-      "SELECT organization_id, actor_id, revoked, superseded FROM refresh_records WHERE handle_hash = ?",
+      `SELECT organization_id, actor_id, revoked, superseded, amr_json, auth_time
+       FROM refresh_records WHERE handle_hash = ?`,
       hash,
     );
     if (record === undefined) return failure("unauthenticated", "unknown refresh handle");
@@ -1012,13 +1037,21 @@ export class OperationAuthority extends DurableObject<Env> {
     if (Number(record["superseded"]) === 1) return failure("unauthenticated", "refresh handle superseded");
     const organizationId = String(record["organization_id"]);
     const actorId = String(record["actor_id"]);
-    const built = this.buildClaims(organizationId, actorId);
+    // the authentication event, not the envelope, survives the chain
+    const auth: AuthenticationFacts | undefined =
+      record["amr_json"] === null && record["auth_time"] === null
+        ? undefined
+        : {
+            ...(record["amr_json"] === null ? {} : { amr: JSON.parse(String(record["amr_json"])) as string[] }),
+            ...(record["auth_time"] === null ? {} : { authTime: Number(record["auth_time"]) }),
+          };
+    const built = this.buildClaims(organizationId, actorId, auth);
     if (!built.ok) return built;
     this.ctx.storage.sql.exec(
       "UPDATE refresh_records SET superseded = 1 WHERE handle_hash = ?",
       hash,
     );
-    const next = await this.newRefresh(organizationId, actorId);
+    const next = await this.newRefresh(organizationId, actorId, auth);
     return value({ claims: built.value.claims, refresh: { kind: "rotated", handle: next.handle } });
   }
 
@@ -1263,9 +1296,17 @@ export class OperationAuthority extends DurableObject<Env> {
 
       if (request.method === "POST" && url.pathname === "/issue") {
         const body = await readBody();
+        const auth: AuthenticationFacts | undefined =
+          body["amr"] === undefined && body["authTime"] === undefined
+            ? undefined
+            : {
+                ...(body["amr"] === undefined ? {} : { amr: asArray(body["amr"], "amr").map((entry) => asString(entry, "amr entry")) }),
+                ...(body["authTime"] === undefined ? {} : { authTime: Number(body["authTime"]) }),
+              };
         const result = await this.issue(
           asString(body["organizationId"], "organizationId"),
           asString(body["actorId"], "actorId"),
+          auth,
         );
         return json(result, result.ok ? 200 : 400);
       }

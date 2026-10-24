@@ -30,11 +30,15 @@ describe("the self-contained demo", () => {
     const access = await accessResponse.json() as {
       ok: boolean;
       actor: { organizationId: string; actorId: string };
+      amr: string[] | null;
+      authTime: number | null;
       readableOrganizationIds: string[];
       checks: { action: string; target: { kind: string }; allowed: boolean }[];
     };
     expect(access.ok).toBe(true);
     expect(access.actor.organizationId).toBe("org-4c1f9a2e");
+    expect(access.amr).toEqual(["pwd"]);
+    expect(access.authTime).not.toBeNull();
     expect(access.readableOrganizationIds).toEqual(["org-4c1f9a2e"]);
     expect(access.checks.map((check) => check.allowed)).toEqual([true, false, false, false]);
   }, 30_000);

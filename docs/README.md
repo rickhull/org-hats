@@ -41,5 +41,4 @@ by copying the v0.4 tree.
 - [`../SECURITY.md`](../SECURITY.md) — vulnerability reporting and
   coordinated disclosure.
 
-The v0.4 line lives on `main` at its tags; it is not documentation of this
-branch.
+The v0.4 line lives at its tags; it is not documentation of this line.

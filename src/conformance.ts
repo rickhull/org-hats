@@ -23,6 +23,7 @@ import {
 import type {
   AccessIssue,
   AuthorityCommand,
+  AuthorityContext,
   AuthorityRuntime,
   CommandResult,
   PrincipalEvidence,
@@ -525,6 +526,46 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
       now: rotated.envelope.claims.iat + 1,
       expectedOperationId: MERIDIAN,
     });
+  }),
+
+  runtimeCase("OH-AUTH-06", "authentication method references ride the envelope and survive refresh", async (world) => {
+    const entry = CONFORMANCE_PRINCIPALS.dana;
+    const AUTH_TIME = 1_700_000_000;
+    const withMethods = await world.runtime.accessFromEvidence({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      operationId: MERIDIAN,
+      evidence: { ...entry.evidence, amr: ["hwk", "pin"], authTime: AUTH_TIME },
+    });
+    const issueFailure = failureOf(withMethods);
+    assert(issueFailure === undefined, `issuance with methods failed: ${issueFailure?.kind ?? ""}`);
+    const issued = withMethods as AccessIssue;
+    deepEqual(issued.envelope.claims.amr, ["hwk", "pin"], "methods copied from evidence");
+    equal(issued.envelope.claims.auth_time, AUTH_TIME, "authentication time copied from evidence");
+    assert(issued.envelope.claims.auth_time !== issued.envelope.claims.iat, "authentication time is not envelope time");
+    assert(issued.refresh.kind === "rotated", "issuance rotates a refresh handle");
+    const renewedResult = await world.runtime.refresh({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      operationId: MERIDIAN,
+      handle: issued.refresh.kind === "rotated" ? issued.refresh.handle : "",
+    });
+    const refreshFailure = failureOf(renewedResult);
+    assert(refreshFailure === undefined, `refresh failed: ${refreshFailure?.kind ?? ""}`);
+    const renewed = renewedResult as AccessIssue;
+    deepEqual(renewed.envelope.claims.amr, ["hwk", "pin"], "refresh preserves the methods");
+    equal(renewed.envelope.claims.auth_time, AUTH_TIME, "refresh preserves the authentication time");
+    assert(renewed.envelope.claims.iat >= issued.envelope.claims.iat, "envelope time moves on");
+    const contextResult = await world.runtime.context({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      envelope: renewed.envelope,
+    });
+    const contextFailure = failureOf(contextResult);
+    assert(contextFailure === undefined, `context failed: ${contextFailure?.kind ?? ""}`);
+    const context = contextResult as AuthorityContext;
+    deepEqual(context.amr, ["hwk", "pin"], "context surfaces the methods");
+    equal(context.authTime, AUTH_TIME, "context surfaces the authentication time");
+    const plain = await issue(world, entry, MERIDIAN);
+    assert(!("amr" in plain.envelope.claims), "issuance without methods carries none");
+    assert(!("auth_time" in plain.envelope.claims), "issuance without an authentication time carries none");
   }),
 
   runtimeCase("OH-PART-01", "invite, accept, admit: an invited organization receives a hat", async (world) => {

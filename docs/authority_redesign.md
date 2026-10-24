@@ -8,8 +8,8 @@ This repository is the normative source for the authority seam. The consuming
 product's architecture document states consumer requirements and deployment
 illustrations; it does not define `org-hats` methods, result types, packages,
 persistence interfaces, or compatibility policy. Terminology is normative in
-[lexicon.md](lexicon.md); this document uses those terms. The `v1` branch
-implements this architecture; legacy `v0.4` content lives on `main` at its
+[lexicon.md](lexicon.md); this document uses those terms. `main`
+implements this architecture; legacy `v0.4` content lives at its
 tags.
 
 ## Purpose
@@ -269,6 +269,14 @@ local-authentication helpers; those helpers are runtime surface and do not
 change the portable seam. Browser redirects, provider callbacks, CSRF and
 state handling, and cookies belong to the host. Other hosts may supply
 different adapters without changing the authority model.
+
+Authentication facts travel without interpretation. Evidence may state how
+and when the principal authenticated — `amr` method references (RFC 8176)
+and the authentication timestamp, under the OIDC claim spellings — and
+authority carries them opaquely from `PrincipalEvidence` into the signed
+envelope claims (`amr`, `auth_time`) and `AuthorityContext`, preserving
+them through refresh while envelope `iat` moves. What the values mean and
+when they suffice is host step-up policy, never an authority rule.
 
 Authentication never creates participation or a hat implicitly. Admission and
 granting remain explicit, idempotent, and auditable authority commands.

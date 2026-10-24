@@ -16,6 +16,12 @@ import { canonicalJson, ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, AUTHORI
 import { invariantProblems, readReach, wearableGrants, } from "../model.js";
 import { actionsOf } from "../policy.js";
 import { counter, sha256Hex, systemClock, webCryptoSigner } from "./internal.js";
+const factsOf = (evidence) => evidence.amr === undefined && evidence.authTime === undefined
+    ? undefined
+    : {
+        ...(evidence.amr !== undefined ? { amr: [...evidence.amr] } : {}),
+        ...(evidence.authTime !== undefined ? { authTime: evidence.authTime } : {}),
+    };
 const V = AUTHORITY_INTERFACE_VERSION;
 const nextSigningKey = counter();
 const failed = (failure) => ({ failure });
@@ -230,7 +236,7 @@ export const createInMemoryAuthority = async (config = {}) => {
         }
     };
     // --- issuance -----------------------------------------------------------------------
-    const buildEnvelope = (op, organizationId, actorId) => {
+    const buildEnvelope = (op, organizationId, actorId, auth) => {
         const org = orgs.get(organizationId);
         const actor = org?.actors.find((a) => a.actorId === actorId);
         if (org === undefined || actor === undefined)
@@ -307,10 +313,12 @@ export const createInMemoryAuthority = async (config = {}) => {
             configurableSiteIds,
             iat,
             exp: iat + lifetime,
+            ...(auth?.amr !== undefined ? { amr: [...auth.amr] } : {}),
+            ...(auth?.authTime !== undefined ? { auth_time: auth.authTime } : {}),
         };
     };
-    const issue = async (op, organizationId, actorId) => {
-        const claims = buildEnvelope(op, organizationId, actorId);
+    const issue = async (op, organizationId, actorId, auth) => {
+        const claims = buildEnvelope(op, organizationId, actorId, auth);
         if ("kind" in claims)
             return { ok: false, failure: claims };
         const signature = await signer.sign(canonicalJson(claims));
@@ -327,6 +335,8 @@ export const createInMemoryAuthority = async (config = {}) => {
             operationId: op.operationId,
             organizationId,
             actorId,
+            ...(auth?.amr !== undefined ? { amr: [...auth.amr] } : {}),
+            ...(auth?.authTime !== undefined ? { authTime: auth.authTime } : {}),
             revoked: false,
             superseded: false,
         });
@@ -348,7 +358,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                 .find(({ k }) => k === `${input.evidence.provider}:${input.evidence.subject}`);
             if (link === undefined)
                 return failed({ kind: "unauthenticated", detail: "no principal link for this evidence" });
-            const result = await issue(op, link.v.organizationId, link.v.actorId);
+            const result = await issue(op, link.v.organizationId, link.v.actorId, factsOf(input.evidence));
             if ("failure" in result)
                 return failed(result.failure);
             return result;
@@ -370,7 +380,13 @@ export const createInMemoryAuthority = async (config = {}) => {
             if (record.superseded)
                 return failed({ kind: "unauthenticated", detail: "refresh handle superseded" });
             record.superseded = true;
-            const result = await issue(op, record.organizationId, record.actorId);
+            // the authentication event, not the envelope, survives the chain
+            const result = await issue(op, record.organizationId, record.actorId, record.amr === undefined && record.authTime === undefined
+                ? undefined
+                : {
+                    ...(record.amr !== undefined ? { amr: [...record.amr] } : {}),
+                    ...(record.authTime !== undefined ? { authTime: record.authTime } : {}),
+                });
             if ("failure" in result)
                 return failed(result.failure);
             return result;
@@ -416,6 +432,8 @@ export const createInMemoryAuthority = async (config = {}) => {
                     primary: selectedPrimary,
                 },
                 sites: [...envelope.claims.sites],
+                ...(envelope.claims.amr !== undefined ? { amr: [...envelope.claims.amr] } : {}),
+                ...(envelope.claims.auth_time !== undefined ? { authTime: envelope.claims.auth_time } : {}),
             };
         },
         async command(inputCommand) {

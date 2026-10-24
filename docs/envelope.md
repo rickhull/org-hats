@@ -38,10 +38,20 @@ claims and nobody but the issuer writes them.
 | `readableTeamIds` | exceptional team grants only — a reached team whose organization is not in `readableOrganizationIds`; never an expanded list of every readable team |
 | `configurableSiteIds` | where the holder may configure |
 | `iat`, `exp` | epoch seconds; `exp` bounds the revocation window |
+| `amr`, `auth_time` | the authentication event: opaque method references (RFC 8176) and its epoch seconds, copied from principal evidence at issuance and preserved through refresh; absent when the evidence carried none |
 
 Read reach is an issuer computation, not a verifier reconstruction: the
 verifier compares ids and evaluates the selected hat locally; it never
 rebuilds organization unions, peer reach, fallback, or worn-hat rules.
+
+`amr` and `auth_time` are the OIDC claim names (`amr` from RFC 8176,
+`auth_time` from OpenID Connect Core), carried verbatim the way `iat` and
+`exp` are. They describe the authentication event the evidence recorded,
+not the envelope: refresh re-issues both unchanged while `iat` moves, so a
+policy reading "a hardware key, used within the last fifteen minutes" is
+host code over these two claims — the values are host/IdP vocabulary that
+org-hats copies and never interprets, and absence means the issuing
+evidence carried none, which such a policy treats as failing closed.
 
 ## Encoding and signature
 
@@ -73,6 +83,10 @@ in v1; another is a format-version change, not a bundle option.
   signatures are closed failure kinds (`wrong-interface-version`,
   `wrong-binding`, `expired`, `invalid-signature`); the deploying host owns
   the product response to each.
+- Additive optional claims (v1 gained `amr` and `auth_time` this way) need
+  no format-version bump: canonical serialization covers whatever claims
+  exist, so an older verifier accepts a newer issuer's envelope and
+  ignores what it does not read.
 
 ## Fixed vectors
 

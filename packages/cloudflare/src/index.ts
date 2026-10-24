@@ -214,10 +214,15 @@ export default {
 
     if (request.method === "POST" && url.pathname === "/demo/login") {
       const world = await demoWorld(env);
+      // fixed dev evidence: Dana authenticated with a password just now
       const issued = await world.runtime.accessFromEvidence({
         interfaceVersion: 1,
         operationId: DEMO_OPERATION,
-        evidence: CONFORMANCE_PRINCIPALS.dana.evidence,
+        evidence: {
+          ...CONFORMANCE_PRINCIPALS.dana.evidence,
+          amr: ["pwd"],
+          authTime: Math.floor(Date.now() / 1000),
+        },
       });
       if ("failure" in issued) return Response.json({ ok: false, failure: issued.failure }, { status: 401 });
       return Response.json({ ok: true, envelope: issued.envelope, refresh: issued.refresh });
@@ -240,6 +245,8 @@ export default {
         operationId: access.operationId,
         sites: access.sites,
         selectedHat: result.claims.hat,
+        amr: result.claims.amr ?? null,
+        authTime: result.claims.auth_time ?? null,
         readableOrganizationIds: access.readableOrganizationIds(),
         readableTeamIds: access.readableTeamIds(),
         mayConfigureWest: access.mayConfigure(DEMO_WEST),

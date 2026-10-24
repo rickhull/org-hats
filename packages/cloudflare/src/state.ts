@@ -72,7 +72,7 @@ export const operationTables: readonly TableSpec[] = [
   { name: "participations", columns: ["organization_id", "status", "created_at", "updated_at"], orderBy: "organization_id" },
   { name: "invitations", columns: ["invitation_id", "organization_id", "status", "created_at", "updated_at"], orderBy: "invitation_id" },
   { name: "grants", columns: ["grant_id", "organization_id", "actor_id", "role", "target_kind", "team_id", "site_id", "is_primary", "revoked", "created_at", "updated_at"], orderBy: "grant_id" },
-  { name: "refresh_records", columns: ["handle_hash", "organization_id", "actor_id", "revoked", "superseded", "created_at"], orderBy: "handle_hash" },
+  { name: "refresh_records", columns: ["handle_hash", "organization_id", "actor_id", "revoked", "superseded", "amr_json", "auth_time", "created_at"], orderBy: "handle_hash" },
   { name: "access_requests", columns: ["request_id", "organization_id", "actor_id", "note", "created_at"], orderBy: "request_id" },
   { name: "audit", columns: ["seq", "at", "actor", "fact"], orderBy: "seq" },
   { name: "claims", columns: ["idempotency_key", "payload", "created_at"], orderBy: "idempotency_key" },

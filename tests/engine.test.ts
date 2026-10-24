@@ -117,6 +117,37 @@ test("refresh: rotation with explicit outcomes; a superseded handle is dead", as
   assert.match(replay.failure.detail ?? "", /superseded/);
 });
 
+test("amr and auth_time: copied from evidence, preserved through refresh, surfaced in context", async () => {
+  const { engine, signer } = await setup();
+  const authenticated: PrincipalEvidence = { ...DANA, amr: ["hwk", "otp"], authTime: 1_699_999_000 };
+  const first = await engine.runtime.accessFromEvidence(evidence(authenticated));
+  assert.ok(!("failure" in first));
+  assert.deepEqual(first.envelope.claims.amr, ["hwk", "otp"]);
+  assert.equal(first.envelope.claims.auth_time, 1_699_999_000);
+  assert.notEqual(first.envelope.claims.auth_time, first.envelope.claims.iat);
+  // evidence without authentication facts issues claims without them
+  const bare = await engine.runtime.accessFromEvidence(evidence(DANA));
+  assert.ok(!("failure" in bare));
+  assert.equal("amr" in bare.envelope.claims, false);
+  assert.equal("auth_time" in bare.envelope.claims, false);
+  if (first.refresh.kind !== "rotated") return;
+  const second = await engine.runtime.refresh({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: first.refresh.handle,
+  });
+  assert.ok(!("failure" in second));
+  assert.deepEqual(second.envelope.claims.amr, ["hwk", "otp"], "refresh preserves the methods");
+  assert.equal(second.envelope.claims.auth_time, 1_699_999_000, "refresh preserves the authentication time");
+  const context = await engine.runtime.context({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION, envelope: second.envelope,
+  });
+  assert.ok(!("failure" in context));
+  assert.deepEqual(context.amr, ["hwk", "otp"]);
+  assert.equal(context.authTime, 1_699_999_000);
+  // the methods are signed facts: tampering them breaks the signature
+  const forged = { ...second.envelope, claims: { ...second.envelope.claims, amr: ["pwd"] } };
+  assert.ok(!(await signer.verify(canonicalJson(forged.claims), forged.signature)));
+});
+
 test("the bounded window: a revoked grant kills refresh, not the live envelope", async () => {
   const { engine } = await setup();
   const danaIssue = await engine.runtime.accessFromEvidence(evidence(DANA));
