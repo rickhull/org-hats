@@ -35,7 +35,9 @@ Everything under `src/` compiles with `types: []` and imports nothing
 Cloudflare — `bin/check` enforces both fences. The Cloudflare reference
 runtime lives in `packages/cloudflare` as a separate 0.x workspace package;
 its `OrganizationAuthority` and `OperationAuthority` coordinators are real
-SQLite/workerd, and the public entrypoints land there next.
+SQLite/workerd, the `AuthorityRuntime` service binding is in place, and the
+portable conformance inventory passes against them. Ops/state lifecycle is
+next.
 
 ## Proof
 

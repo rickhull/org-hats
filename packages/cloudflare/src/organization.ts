@@ -639,6 +639,18 @@ export class OrganizationAuthority extends DurableObject<Env> {
         }));
       }
 
+      if (request.method === "GET" && url.pathname === "/admin") {
+        const actorId = asString(url.searchParams.get("actorId"), "actorId");
+        return json(value({ admin: this.isAdmin(actorId) }));
+      }
+
+      if (request.method === "POST" && url.pathname === "/reset") {
+        for (const table of ["organization", "actors", "principal_links", "org_admins", "invitations", "audit", "claims", "outbox"]) {
+          this.ctx.storage.sql.exec(`DELETE FROM ${table}`);
+        }
+        return json(value({ reset: true }));
+      }
+
       if (request.method === "GET" && url.pathname === "/status") {
         return json(value(this.status()));
       }

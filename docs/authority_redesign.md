@@ -233,6 +233,15 @@ The Cloudflare package is the reference operational implementation. It owns:
   deployment documentation; and
 - integration tests using the real Cloudflare runtime rather than mocks.
 
+The runtime uses only the standard Durable Object surface — SQLite storage,
+alarms, namespace and service bindings, and Web Crypto. It does not depend on
+proprietary bindings (R2, KV, D1, AI, Vectorize, Hyperdrive, Browser
+Rendering, or the Cache API), so a self-hosted workerd-compatible target
+remains a deployment choice rather than a redesign. The `AuthorityRuntime`
+service binding is also the local-development seam: a local Worker can point
+at a deployed authority through a service binding, which a handed-out
+namespace cannot express.
+
 It does not own organizational semantics. A rule that affects whether an actor
 may act belongs in the portable modules and must be tested there first.
 

@@ -1,12 +1,23 @@
 import { DurableObject } from "cloudflare:workers";
 import {
+  ACCESS_ENVELOPE_VERSION,
+  AUTHORITY_INTERFACE_VERSION,
   actionsOf,
   canonicalJson,
   validatePolicyBundle,
+  type AccessEnvelopeClaimsV1,
   type FailureKind,
   type JsonValue,
   type PolicyBundle,
+  type RefreshHandleOutcome,
+  type SiteBinding,
 } from "org-hats/authority";
+import {
+  readReach,
+  wearableGrants,
+  type Grant,
+  type Snapshot,
+} from "org-hats";
 import type { Env } from "./env";
 
 /** One operation authority. The object owns operation-local facts: sites,
@@ -33,6 +44,11 @@ const value = <T>(result: T): { readonly ok: true; readonly value: T } => ({ ok:
 
 const payloadOf = (input: Record<string, unknown>): string =>
   canonicalJson(input as unknown as JsonValue);
+
+const sha256Hex = async (value: string): Promise<string> => {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
 
 const asRecord = (input: unknown): Record<string, unknown> => {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
@@ -87,6 +103,7 @@ interface BootstrapInput {
   readonly policy: PolicyBundle;
   readonly adminRoles?: readonly string[];
   readonly configureActions?: readonly string[];
+  readonly envelopeLifetimeSeconds?: number;
   readonly sites: readonly SiteInput[];
   readonly teams: readonly TeamInput[];
   readonly grants: readonly GrantInput[];
@@ -166,6 +183,7 @@ export class OperationAuthority extends DurableObject<Env> {
         policy_json TEXT NOT NULL,
         admin_roles_json TEXT NOT NULL,
         configure_actions_json TEXT NOT NULL,
+        envelope_lifetime_seconds INTEGER NOT NULL DEFAULT 900,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )`,
@@ -348,14 +366,15 @@ export class OperationAuthority extends DurableObject<Env> {
       const existing = this.one("SELECT 1 AS present FROM operation WHERE operation_id = ?", input.operationId);
       this.ctx.storage.sql.exec(
         `INSERT INTO operation
-          (operation_id, display_name, bounded, policy_json, admin_roles_json, configure_actions_json, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          (operation_id, display_name, bounded, policy_json, admin_roles_json, configure_actions_json, envelope_lifetime_seconds, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(operation_id) DO UPDATE SET
            display_name = excluded.display_name,
            bounded = excluded.bounded,
            policy_json = excluded.policy_json,
            admin_roles_json = excluded.admin_roles_json,
            configure_actions_json = excluded.configure_actions_json,
+           envelope_lifetime_seconds = excluded.envelope_lifetime_seconds,
            updated_at = excluded.updated_at`,
         input.operationId,
         input.displayName ?? null,
@@ -363,6 +382,7 @@ export class OperationAuthority extends DurableObject<Env> {
         canonicalJson(input.policy as unknown as JsonValue),
         canonicalJson((input.adminRoles ?? []) as unknown as JsonValue),
         canonicalJson((input.configureActions ?? ["configure"]) as unknown as JsonValue),
+        input.envelopeLifetimeSeconds ?? 900,
         at,
         at,
       );
@@ -437,7 +457,7 @@ export class OperationAuthority extends DurableObject<Env> {
     const invitationId = input.invitationId ?? `inv-${crypto.randomUUID()}`;
     const payload = payloadOf({
       kind: "participation-invite",
-      invitationId,
+      invitationId: input.invitationId ?? null,
       organizationId: input.organizationId,
       byActorId: input.byActorId,
     });
@@ -576,7 +596,7 @@ export class OperationAuthority extends DurableObject<Env> {
     const grantId = input.grantId ?? `g-${crypto.randomUUID()}`;
     const payload = payloadOf({
       kind: "grant-hat",
-      grantId,
+      grantId: input.grantId ?? null,
       organizationId: input.organizationId,
       actorId: input.actorId,
       role: input.role,
@@ -683,7 +703,7 @@ export class OperationAuthority extends DurableObject<Env> {
     const requestId = input.requestId ?? `ar-${crypto.randomUUID()}`;
     const payload = payloadOf({
       kind: "request-access",
-      requestId,
+      requestId: input.requestId ?? null,
       organizationId: input.organizationId,
       actorId: input.actorId,
       note: input.note ?? null,
@@ -814,6 +834,205 @@ export class OperationAuthority extends DurableObject<Env> {
     };
   }
 
+  private configureActions(): readonly string[] {
+    const row = this.one("SELECT configure_actions_json FROM operation LIMIT 1");
+    return row === undefined ? ["configure"] : (JSON.parse(String(row["configure_actions_json"])) as string[]);
+  }
+
+  private envelopeLifetime(): number {
+    const row = this.one("SELECT envelope_lifetime_seconds FROM operation LIMIT 1");
+    return row === undefined ? 900 : Number(row["envelope_lifetime_seconds"]);
+  }
+
+  private modelSnapshot(organizationId: string, actorId: string): Snapshot | undefined {
+    const operationId = this.operationId();
+    if (operationId === undefined) return undefined;
+    const sites = this.rows("SELECT site_id, display_name, aliases_json FROM sites").map((row) => ({
+      siteId: String(row["site_id"]),
+      operationId,
+      ...(row["display_name"] === null ? {} : { displayName: String(row["display_name"]) }),
+      aliases: JSON.parse(String(row["aliases_json"])) as string[],
+    }));
+    const teams = this.rows("SELECT team_id, site_id, organization_id, display_name FROM teams").map((row) => ({
+      teamId: String(row["team_id"]),
+      siteId: String(row["site_id"]),
+      organizationId: String(row["organization_id"]),
+      ...(row["display_name"] === null ? {} : { displayName: String(row["display_name"]) }),
+    }));
+    const grants: Grant[] = this.rows("SELECT * FROM grants").map((row) => ({
+      grantId: String(row["grant_id"]),
+      operationId,
+      organizationId: String(row["organization_id"]),
+      actorId: String(row["actor_id"]),
+      role: String(row["role"]),
+      target: row["target_kind"] === "team"
+        ? { kind: "team", teamId: String(row["team_id"]) }
+        : { kind: "site", siteId: String(row["site_id"]) },
+      ...(Number(row["is_primary"]) === 1 ? { primary: true } : {}),
+      ...(Number(row["revoked"]) === 1 ? { revoked: true } : {}),
+    }));
+    const participations = this.rows("SELECT organization_id, status FROM participations").map((row) => ({
+      organizationId: String(row["organization_id"]),
+      operationId,
+      status: String(row["status"]) as "invited" | "accepted" | "active" | "revoked",
+    }));
+    const organizationIds = [...new Set([
+      ...teams.map((team) => team.organizationId),
+      ...participations.map((participation) => participation.organizationId),
+    ])];
+    return {
+      organizations: organizationIds.map((id) => ({ organizationId: id })),
+      actors: [{ organizationId, actorId }],
+      operations: [{ operationId }],
+      sites,
+      teams,
+      grants,
+      participations,
+    };
+  }
+
+  private buildClaims(organizationId: string, actorId: string): Result<{
+    readonly claims: AccessEnvelopeClaimsV1;
+  }> {
+    const operationId = this.operationId();
+    const policy = this.policy();
+    if (operationId === undefined || policy === undefined) return failure("unavailable", "operation is not bootstrapped");
+    const snapshot = this.modelSnapshot(organizationId, actorId);
+    if (snapshot === undefined) return failure("unavailable", "operation is not bootstrapped");
+    const wearable = wearableGrants(snapshot, organizationId, actorId, operationId);
+    if (wearable.length === 0) return failure("not-admitted");
+    const rank = (grant: Grant): string =>
+      `${grant.primary === true ? 0 : 1}|${grant.role}|${grant.target.kind === "team" ? grant.target.teamId : grant.target.siteId}|${grant.grantId}`;
+    const hat = [...wearable].sort((left, right) => rank(left) < rank(right) ? -1 : rank(left) > rank(right) ? 1 : 0)[0];
+    if (hat === undefined) return failure("not-admitted");
+    const actions = actionsOf(policy, hat.role) ?? [];
+    const teams = snapshot.teams;
+    const hatTeamIds = new Set<string>();
+    const hatSiteIds = new Set<string>();
+    if (hat.target.kind === "site") {
+      hatSiteIds.add(hat.target.siteId);
+      for (const team of teams) if (team.siteId === hat.target.siteId) hatTeamIds.add(team.teamId);
+    } else {
+      hatTeamIds.add(hat.target.teamId);
+    }
+    const siteIds = new Set<string>();
+    const memberTeams = new Set<string>();
+    for (const grant of wearable) {
+      if (grant.target.kind === "site") {
+        siteIds.add(grant.target.siteId);
+        for (const team of teams) if (team.siteId === grant.target.siteId) memberTeams.add(team.teamId);
+      } else {
+        const teamId = grant.target.teamId;
+        memberTeams.add(teamId);
+        const team = teams.find((candidate) => candidate.teamId === teamId);
+        if (team !== undefined) siteIds.add(team.siteId);
+      }
+    }
+    const sites: SiteBinding[] = snapshot.sites
+      .filter((site) => siteIds.has(site.siteId))
+      .map((site) => ({ siteId: site.siteId, aliases: [...site.aliases] }));
+    const reach = readReach(snapshot, policy, organizationId, actorId, operationId);
+    const configureActions = this.configureActions();
+    const configurableSiteIds = [...new Set(
+      wearable.flatMap((grant) => {
+        const carried = actionsOf(policy, grant.role) ?? [];
+        if (!carried.some((action) => configureActions.includes(action))) return [];
+        if (grant.target.kind === "site") return [grant.target.siteId];
+        const teamId = grant.target.teamId;
+        const team = teams.find((candidate) => candidate.teamId === teamId);
+        return team === undefined ? [] : [team.siteId];
+      }),
+    )];
+    const iat = now();
+    return value({
+      claims: {
+        v: ACCESS_ENVELOPE_VERSION,
+        interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+        operationId,
+        actor: { organizationId, actorId },
+        hat: {
+          role: hat.role,
+          actions: [...actions],
+          teamIds: [...hatTeamIds],
+          siteIds: [...hatSiteIds],
+        },
+        memberTeamIds: [...memberTeams],
+        sites,
+        readableOrganizationIds: reach.readableOrganizationIds,
+        readableTeamIds: reach.readableTeamIds,
+        configurableSiteIds,
+        iat,
+        exp: iat + this.envelopeLifetime(),
+      },
+    });
+  }
+
+  private async newRefresh(organizationId: string, actorId: string): Promise<{ handle: string; at: number }> {
+    const handle = `rh-${crypto.randomUUID()}`;
+    const at = now();
+    this.ctx.storage.sql.exec(
+      "INSERT INTO refresh_records (handle_hash, organization_id, actor_id, revoked, superseded, created_at) VALUES (?, ?, ?, 0, 0, ?)",
+      await sha256Hex(handle),
+      organizationId,
+      actorId,
+      at,
+    );
+    return { handle, at };
+  }
+
+  private async issue(organizationId: string, actorId: string): Promise<Result<{
+    readonly claims: AccessEnvelopeClaimsV1;
+    readonly refresh: RefreshHandleOutcome;
+  }>> {
+    const built = this.buildClaims(organizationId, actorId);
+    if (!built.ok) return built;
+    const refresh = await this.newRefresh(organizationId, actorId);
+    return value({ claims: built.value.claims, refresh: { kind: "rotated", handle: refresh.handle } });
+  }
+
+  private async refresh(handle: string): Promise<Result<{
+    readonly claims: AccessEnvelopeClaimsV1;
+    readonly refresh: RefreshHandleOutcome;
+  }>> {
+    const hash = await sha256Hex(handle);
+    const record = this.one(
+      "SELECT organization_id, actor_id, revoked, superseded FROM refresh_records WHERE handle_hash = ?",
+      hash,
+    );
+    if (record === undefined) return failure("unauthenticated", "unknown refresh handle");
+    if (Number(record["revoked"]) === 1) return failure("unauthenticated", "refresh handle revoked");
+    if (Number(record["superseded"]) === 1) return failure("unauthenticated", "refresh handle superseded");
+    const organizationId = String(record["organization_id"]);
+    const actorId = String(record["actor_id"]);
+    const built = this.buildClaims(organizationId, actorId);
+    if (!built.ok) return built;
+    this.ctx.storage.sql.exec(
+      "UPDATE refresh_records SET superseded = 1 WHERE handle_hash = ?",
+      hash,
+    );
+    const next = await this.newRefresh(organizationId, actorId);
+    return value({ claims: built.value.claims, refresh: { kind: "rotated", handle: next.handle } });
+  }
+
+  private reset(): Result<{ reset: boolean }> {
+    for (const table of [
+      "operation",
+      "sites",
+      "teams",
+      "participations",
+      "invitations",
+      "grants",
+      "refresh_records",
+      "access_requests",
+      "audit",
+      "claims",
+      "outbox",
+    ]) {
+      this.ctx.storage.sql.exec(`DELETE FROM ${table}`);
+    }
+    return value({ reset: true });
+  }
+
   async alarm(): Promise<void> {
     await this.drain();
   }
@@ -834,6 +1053,7 @@ export class OperationAuthority extends DurableObject<Env> {
           policy,
           ...(body["adminRoles"] === undefined ? {} : { adminRoles: asArray(body["adminRoles"], "adminRoles").map((entry) => asString(entry, "adminRoles entry")) }),
           ...(body["configureActions"] === undefined ? {} : { configureActions: asArray(body["configureActions"], "configureActions").map((entry) => asString(entry, "configureActions entry")) }),
+          ...(body["envelopeLifetimeSeconds"] === undefined ? {} : { envelopeLifetimeSeconds: Number(body["envelopeLifetimeSeconds"]) }),
           sites: asArray(body["sites"], "sites").map((entry) => {
             const site = asRecord(entry);
             return {
@@ -971,6 +1191,33 @@ export class OperationAuthority extends DurableObject<Env> {
           asString(body["organizationId"], "organizationId"),
           asString(body["actorId"], "actorId"),
         ));
+      }
+
+      if (request.method === "POST" && url.pathname === "/issue") {
+        const body = await readBody();
+        const result = await this.issue(
+          asString(body["organizationId"], "organizationId"),
+          asString(body["actorId"], "actorId"),
+        );
+        return json(result, result.ok ? 200 : 400);
+      }
+
+      if (request.method === "POST" && url.pathname === "/refresh") {
+        const body = await readBody();
+        const result = await this.refresh(asString(body["handle"], "handle"));
+        return json(result, result.ok ? 200 : 400);
+      }
+
+      if (request.method === "POST" && url.pathname === "/reset") {
+        return json(this.reset());
+      }
+
+      if (request.method === "GET" && url.pathname === "/config") {
+        return json(value({
+          adminRoles: this.adminRoles(),
+          configureActions: this.configureActions(),
+          envelopeLifetimeSeconds: this.envelopeLifetime(),
+        }));
       }
 
       if (request.method === "POST" && url.pathname === "/drain") {

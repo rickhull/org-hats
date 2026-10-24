@@ -35,8 +35,30 @@ coordinators, alarm retry, grants/select/revoke with idempotency,
 refresh-record revocation, cross-coordinator actor-disable, and
 operation-side participation revoke.
 
-The full conformance inventory, the public `AuthorityRuntime` binding, and
-the ops entrypoints are T6.4.
+## T6.4 — runtime and conformance
+
+`src/runtime.ts` implements `AuthorityRuntime` over the two coordinators;
+`AuthorityRuntimeEntrypoint` is the RPC service shape. `src/conformance.ts`
+boots and resets the coordinators from `CONFORMANCE_WORLD`, and the full
+25-case portable inventory now runs against them in workerd. The Worker
+exposes `/ops/verification-keys` for the public signing key.
+
+The signer is ephemeral per isolate; stable key configuration, rotation, ops
+authentication, export/restore, and complete context presentation are T6.5.
+
+## Portability constraint
+
+The runtime uses only the standard Durable Object surface: SQLite storage,
+alarms, namespace and service bindings, and Web Crypto. It does not use
+Cloudflare-proprietary bindings (R2, KV, D1, AI, Vectorize, Hyperdrive,
+Browser Rendering, or the Cache API). That keeps a self-hosted
+workerd-compatible target a deployment choice rather than a redesign.
+
+The `AuthorityRuntime` service binding is also the local-development seam: a
+local Worker can point at a deployed authority through a service binding,
+which a handed-out namespace cannot express. Export/restore is canonical JSON
+per coordinator, not a SQLite-file copy, so the drill is about state
+semantics rather than storage format.
 
 ```sh
 pnpm --filter org-hats-cloudflare typecheck
@@ -51,5 +73,5 @@ between tests: use unique object names or explicit reset, and assert deltas
 rather than absolute values. The organization tests use unique object names;
 the counter test asserts `second === first + 1`.
 
-T6.4 adds the runtime/ops entrypoints. This package is `private` until the
-demo milestone decides how it is distributed.
+T6.5 adds the ops/state lifecycle. This package is `private` until the demo
+milestone decides how it is distributed.

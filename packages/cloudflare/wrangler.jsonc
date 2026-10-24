@@ -2,7 +2,8 @@
 //
 // T6.1 proves the real local runtime and a SQLite-backed Durable Object;
 // T6.2 adds the organization coordinator and T6.3 the operation coordinator.
-// The public authority entrypoints arrive in T6.4.
+// T6.4 adds the AuthorityRuntime service entrypoint and conformance; T6.5
+// adds ops and state lifecycle.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "org-hats-cloudflare-test",
