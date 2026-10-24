@@ -30,7 +30,8 @@
   "scripts": {
     "check": "bin/check",
     "typecheck": "tsc -p tsconfig.authority.json && tsc -p tsconfig.json --noEmit",
-    "build": "tsc -p tsconfig.json && node bin/fix-dts.mjs"
+    "build": "tsc -p tsconfig.json && node bin/fix-dts.mjs",
+    "check:cloudflare": "pnpm --filter org-hats-cloudflare typecheck && pnpm --filter org-hats-cloudflare test"
   },
   "dependencies": {},
   "devDependencies": {

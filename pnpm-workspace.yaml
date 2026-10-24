@@ -1,0 +1,10 @@
+packages:
+  - packages/*
+
+# Workerd and esbuild run postinstall integrity/install scripts. They are
+# used only by the optional Cloudflare package; the portable root never runs
+# them. Sharp is a wrangler transitive and is not needed.
+allowBuilds:
+  esbuild: true
+  workerd: true
+  sharp: false

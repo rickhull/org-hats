@@ -437,7 +437,9 @@ The initial distribution target is:
 
 - `org-hats`: the generic root export plus portable `authority`, `access`, and
   `conformance` subpaths; and
-- `org-hats-cloudflare`: optional Cloudflare implementation and tooling.
+- `org-hats-cloudflare`: optional Cloudflare implementation and tooling. It
+  lives at `packages/cloudflare` in the same workspace, is private while it
+  is a reference runtime, and keeps its own 0.x cadence.
 
 This keeps generic installation free of Cloudflare dependencies while avoiding
 an unnecessary family of tiny packages. If independent release cadence or

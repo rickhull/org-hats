@@ -33,7 +33,8 @@ What ships here:
 
 Everything under `src/` compiles with `types: []` and imports nothing
 Cloudflare — `bin/check` enforces both fences. The Cloudflare reference
-runtime arrives as a separate package later in the plan.
+runtime is scaffolded in `packages/cloudflare` as a separate 0.x workspace
+package, with real-workerd tests; its authority entrypoints land there.
 
 ## Proof
 
