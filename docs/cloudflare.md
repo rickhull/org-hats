@@ -20,10 +20,11 @@ storage:
   outbox, and the sealed identity-provider configuration (stored
   opaquely; parsed only by the provider-callback exchange).
 - **`OperationAuthority`** (`src/operation.ts`) — operation-local
-  authority: sites, teams, grants, participation, the policy version,
-  refresh records, admission requests, audit, claims, the outbox
-  carrying invitations and revocations to organization authority, and the
-  `org_actors` projection of each participating organization's roster.
+  authority: the operation hostname slug, sites (including their canonical
+  paths and alias labels), teams, grants, participation, the policy version,
+  refresh records, admission requests, audit, claims, the outbox carrying
+  invitations and revocations to organization authority, and the `org_actors`
+  projection of each participating organization's roster.
 
 Every mutation commits with its audit event, idempotency claim, and outbox
 rows inside one `transactionSync`. Work spanning the two coordinators is a
@@ -42,6 +43,16 @@ participations and grants can issue on the next request. `GET
 /ops/schema-status` reports `orgActors`, `disabledOrgActors`, and
 `rosterSyncedAt` so a stale image is visible rather than inferred, and
 `POST /reconcile-rosters` on the operation forces a pull.
+
+## Routing facts (operation schema 4)
+
+The operation row carries a `slug`; each site row carries a canonical `path`.
+Bootstrap requires both, the export includes them, and `/snapshot` and
+`/ops/schema-status` expose them. `POST /ops/operation/routing-facts` replaces
+the full set for a backfill or an ops-only rename. Operation authority
+validates one DNS label per slug, one path segment per site, local path and
+alias uniqueness, and alias/slug collisions; deployment-wide slug uniqueness
+is the registry's check.
 
 **`AuthorityRuntimeEntrypoint`** (`src/index.ts`) is the Worker consumers
 bind to. Over a `services` binding it exposes the four portable
@@ -110,8 +121,11 @@ public key distribution:
 
 - `POST /ops/organization/bootstrap`, `POST /ops/operation/bootstrap` —
   typed, idempotent bootstrap
+- `POST /ops/operation/routing-facts` — `{ operationId, slug, sites }`,
+  replacing the operation's complete routing facts (backfill or rename)
 - `GET /ops/schema-status?coordinator=organization|operation&id=…` —
-  includes the operation's roster-projection counts and freshness
+  includes the operation's roster-projection counts and freshness, plus
+  `operationSlug` and `sitesWithPath`
 - `GET /ops/export?coordinator=…&id=…` — canonical JSON
 - `POST /ops/restore` — `{ coordinator, id, snapshot }`, typed and atomic
 - `GET /ops/verification-keys` — **public**, no token:
@@ -134,6 +148,12 @@ authority. Restore clears it and rebuilds by pulling before returning, and
 Restore is typed and atomic; a failed restore leaves the previous state
 intact. Refresh handles issued before a wipe survive the export → wipe →
 restore round trip: recovery does not strand a session.
+
+The operation schema is 4. Older operation exports (schema 2 or 3) restore
+into it: columns the older snapshot did not carry read as null, and
+`POST /ops/operation/routing-facts` backfills the complete routing set. The
+schema-2 → accepted-schema drill is a restore plus a typed backfill, not a
+second bootstrap.
 
 ## Conformance, tests, and workerd notes
 

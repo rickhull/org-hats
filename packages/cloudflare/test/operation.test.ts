@@ -38,6 +38,7 @@ const bootstrapOrganization = async (current: World) =>
 const bootstrapOperation = async (current: World, participating = false) =>
   call(current.op, "POST", "/bootstrap", {
     operationId: current.opId,
+    slug: "test-op",
     ...(participating ? { participations: [{ organizationId: current.orgId, status: "active" }] } : {}),
     displayName: "Test Operation",
     policy: {
@@ -54,7 +55,7 @@ const bootstrapOperation = async (current: World, participating = false) =>
     },
     adminRoles: ["admin"],
     configureActions: ["configure"],
-    sites: [{ siteId: SITE, aliases: ["site"] }],
+    sites: [{ siteId: SITE, path: "site", aliases: ["site"] }],
     teams: [{ teamId: TEAM, siteId: SITE, organizationId: current.orgId }],
     grants: [
       {
@@ -67,6 +68,26 @@ const bootstrapOperation = async (current: World, participating = false) =>
       },
     ],
   });
+
+const routingPolicy = {
+  format: 1,
+  id: "policy-routing",
+  version: "1",
+  actions: ["observe"],
+  roles: [{ title: "field", actions: ["observe"] }],
+  readPolicy: { organizations: "granted-teams" },
+};
+
+const routingBootstrap = (operationId: string, overrides: Record<string, unknown> = {}) => ({
+  operationId,
+  slug: "routing-op",
+  policy: routingPolicy,
+  sites: [{ siteId: SITE, path: "site", aliases: [] }],
+  teams: [],
+  grants: [],
+  participations: [],
+  ...overrides,
+});
 
 const invite = async (current: World, key = "invite-1") =>
   call<{ applied: boolean; invitationId?: string }>(current.op, "POST", "/invite", {
@@ -86,6 +107,70 @@ const drain = async (stub: DurableObjectStub) =>
   call<{ delivered: number; pending: number }>(stub, "POST", "/drain");
 
 describe("OperationAuthority", () => {
+  it("stores and exports routing facts, and replaces them as a full set", async () => {
+    const current = world("routing-facts");
+    await bootstrapOrganization(current);
+    const bootstrapped = await call(current.op, "POST", "/bootstrap", routingBootstrap(current.opId));
+    expect(bootstrapped.body.ok).toBe(true);
+
+    const snapshot = await call<{ operationSlug?: string; sites: { path?: string }[] }>(
+      current.op,
+      "GET",
+      "/snapshot",
+    );
+    expect(snapshot.body.value?.operationSlug).toBe("routing-op");
+    expect(snapshot.body.value?.sites[0]?.path).toBe("site");
+
+    const exported = await call<{
+      schemaVersion: string;
+      tables: { operation: Record<string, unknown>[]; sites: Record<string, unknown>[] };
+    }>(current.op, "GET", "/export");
+    expect(exported.body.value?.schemaVersion).toBe("4");
+    expect(exported.body.value?.tables.operation[0]?.["slug"]).toBe("routing-op");
+    expect(exported.body.value?.tables.sites[0]?.["path"]).toBe("site");
+
+    const updated = await call(current.op, "POST", "/routing-facts", {
+      slug: "renamed-op",
+      sites: [{ siteId: SITE, path: "renamed" }],
+    });
+    expect(updated.body.ok).toBe(true);
+    const after = await call<{ operationSlug?: string; sites: { path?: string }[] }>(
+      current.op,
+      "GET",
+      "/snapshot",
+    );
+    expect(after.body.value?.operationSlug).toBe("renamed-op");
+    expect(after.body.value?.sites[0]?.path).toBe("renamed");
+
+    const partial = await call(current.op, "POST", "/routing-facts", {
+      slug: "renamed-op",
+      sites: [],
+    });
+    expect(partial.body.ok).toBe(false);
+    expect(partial.body.failure?.kind).toBe("invalid-command");
+  });
+
+  it("refuses invalid routing facts before committing", async () => {
+    const current = world("routing-invalid");
+    const cases = [
+      { name: "www slug", overrides: { slug: "www" }, detail: /slug/ },
+      { name: "invalid path", overrides: { sites: [{ siteId: SITE, path: "two/parts", aliases: [] }] }, detail: /path/ },
+      {
+        name: "duplicate path",
+        overrides: { sites: [{ siteId: SITE, path: "same", aliases: [] }, { siteId: "site-two", path: "same", aliases: [] }] },
+        detail: /used more than once/,
+      },
+      { name: "reserved alias", overrides: { sites: [{ siteId: SITE, path: "site", aliases: ["www"] }] }, detail: /alias/ },
+      { name: "alias collides with slug", overrides: { sites: [{ siteId: SITE, path: "site", aliases: ["routing-op"] }] }, detail: /collides/ },
+    ];
+    for (const entry of cases) {
+      const result = await call(current.op, "POST", "/bootstrap", routingBootstrap(current.opId, entry.overrides));
+      expect(result.body.ok, entry.name).toBe(false);
+      expect(result.body.failure?.kind, entry.name).toBe("invalid-command");
+      expect(result.body.failure?.detail ?? "", entry.name).toMatch(entry.detail);
+    }
+  });
+
   it("refuses an acceptance delivered after the participation was revoked", async () => {
     // The outbox retries, so an acceptance can arrive against a state that
     // has moved on. `UPDATE participations SET status = 'active'` had no
@@ -391,6 +476,7 @@ describe("OperationAuthority", () => {
     // state recovery, not the workflow
     await call(current.op, "POST", "/bootstrap", {
       operationId: current.opId,
+      slug: "test-op",
       displayName: "Test Operation",
       policy: {
         format: 1,
@@ -400,7 +486,7 @@ describe("OperationAuthority", () => {
         roles: [{ title: "field", actions: ["observe"] }],
         readPolicy: { organizations: "granted-teams" },
       },
-      sites: [{ siteId: SITE, aliases: [] }],
+      sites: [{ siteId: SITE, path: "site", aliases: [] }],
       teams: [{ teamId: TEAM, siteId: SITE, organizationId: current.orgId }],
       grants: [
         {

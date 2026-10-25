@@ -58,7 +58,7 @@ export const PROFESSIONAL_OPERATION = twin({
     name: "professional",
     policy: professionalPolicy,
     snapshot: {
-        operations: [{ operationId: OP, displayName: "Meridian Field Services" }],
+        operations: [{ operationId: OP, displayName: "Meridian Field Services", slug: "meridian" }],
         organizations: [
             { organizationId: "org-2b7c41de", displayName: "Northline Electrical" },
             { organizationId: HARBOR_LOGISTICS, displayName: "Harbor Logistics" },
@@ -72,8 +72,8 @@ export const PROFESSIONAL_OPERATION = twin({
             { organizationId: "org-a53e90f7", actorId: "actor-77f2b0e5", displayName: "Len Chu" },
         ],
         sites: [
-            { siteId: EAST, operationId: OP, displayName: "East Hall", aliases: ["east"] },
-            { siteId: WEST, operationId: OP, displayName: "West Yard", aliases: ["west"] },
+            { siteId: EAST, operationId: OP, displayName: "East Hall", path: "east", aliases: ["east"] },
+            { siteId: WEST, operationId: OP, displayName: "West Yard", path: "west", aliases: ["west"] },
         ],
         teams: [
             { teamId: "team-c7d9e2a1", siteId: EAST, organizationId: "org-2b7c41de", displayName: "Hall build crew" },
@@ -157,7 +157,7 @@ export const FESTIVAL = twin({
     name: "festival",
     policy: festivalPolicy,
     snapshot: {
-        operations: [{ operationId: FOP, displayName: "Riverbend Fest", bounded: true }],
+        operations: [{ operationId: FOP, displayName: "Riverbend Fest", slug: "festival", bounded: true }],
         organizations: [
             { organizationId: "org-d94b1c6e", displayName: "Ciders Guild" },
             { organizationId: "org-08f7a2b5", displayName: "Park Stewards" },
@@ -170,8 +170,8 @@ export const FESTIVAL = twin({
             { organizationId: HARBOR_LOGISTICS, actorId: DANA_OKAFOR, displayName: "Dana Okafor" },
         ],
         sites: [
-            { siteId: ROW, operationId: FOP, displayName: "Tasting Row", aliases: ["tasting", "row"] },
-            { siteId: GATE, operationId: FOP, displayName: "Park Gate", aliases: ["gate"] },
+            { siteId: ROW, operationId: FOP, displayName: "Tasting Row", path: "row", aliases: ["tasting", "row"] },
+            { siteId: GATE, operationId: FOP, displayName: "Park Gate", path: "gate", aliases: ["gate"] },
         ],
         teams: [
             { teamId: "team-3f8b52d6", siteId: GATE, organizationId: "org-08f7a2b5", displayName: "Gate crew" },
@@ -242,7 +242,7 @@ export const AIRLIFT = twin({
     name: "airlift",
     policy: airliftPolicy,
     snapshot: {
-        operations: [{ operationId: AOP, displayName: "Berlin Airlift", bounded: true }],
+        operations: [{ operationId: AOP, displayName: "Berlin Airlift", slug: "berlin-airlift", bounded: true }],
         organizations: [
             { organizationId: "org-6f1a93c4", displayName: "Vittles Airlift Wing" },
             { organizationId: "org-2d7eb58a", displayName: "Plane Fare Air Group" },
@@ -264,11 +264,11 @@ export const AIRLIFT = twin({
             { organizationId: "org-58e3a2d1", actorId: "actor-a93c8e50", displayName: "Clara Weiss" },
         ],
         sites: [
-            { siteId: RHEIN_MAIN, operationId: AOP, displayName: "Rhein-Main Airfield", aliases: ["rhein-main"] },
-            { siteId: FASSBERG, operationId: AOP, displayName: "Fassberg Station", aliases: ["fassberg"] },
-            { siteId: TEMPELHOF, operationId: AOP, displayName: "Tempelhof Airfield", aliases: ["tempelhof"] },
-            { siteId: GATOW, operationId: AOP, displayName: "Gatow Airfield", aliases: ["gatow"] },
-            { siteId: TEGEL, operationId: AOP, displayName: "Tegel Strip", aliases: ["tegel"] },
+            { siteId: RHEIN_MAIN, operationId: AOP, displayName: "Rhein-Main Airfield", path: "rhein-main", aliases: ["rhein-main"] },
+            { siteId: FASSBERG, operationId: AOP, displayName: "Fassberg Station", path: "fassberg", aliases: ["fassberg"] },
+            { siteId: TEMPELHOF, operationId: AOP, displayName: "Tempelhof Airfield", path: "tempelhof", aliases: ["tempelhof"] },
+            { siteId: GATOW, operationId: AOP, displayName: "Gatow Airfield", path: "gatow", aliases: ["gatow"] },
+            { siteId: TEGEL, operationId: AOP, displayName: "Tegel Strip", path: "tegel", aliases: ["tegel"] },
         ],
         teams: [
             { teamId: "team-a41f8c73", siteId: RHEIN_MAIN, organizationId: "org-6f1a93c4", displayName: "Loading rack one" },

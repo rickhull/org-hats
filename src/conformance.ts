@@ -119,7 +119,7 @@ export const CONFORMANCE_INVITEE: TwinFixture = {
   name: "professional",
   policy: PROFESSIONAL_OPERATION.policy,
   snapshot: {
-    operations: [{ operationId: HOME_OP, displayName: "Conformance Home" }],
+    operations: [{ operationId: HOME_OP, displayName: "Conformance Home", slug: "conformance-home" }],
     organizations: [{ organizationId: INVITEE_ORG, displayName: "Cedar Works" }],
     actors: [{ organizationId: INVITEE_ORG, actorId: INVITEE_ACTOR, displayName: "Nia Fields" }],
     sites: [],

@@ -18,6 +18,11 @@ export interface Actor {
 export interface Operation {
     readonly operationId: OperationId;
     readonly displayName?: string;
+    /** The one DNS label naming this operation's hostname. The registry
+     * projects it; operation authority is the only writer. Optional only for
+     * snapshots that predate routing facts; a snapshot with site paths must
+     * carry it. */
+    readonly slug?: string;
     /** `true` marks a time-boxed undertaking whose access closes on a
      * schedule rather than by revocation alone. */
     readonly bounded?: boolean;
@@ -29,6 +34,12 @@ export interface Site {
     readonly siteId: SiteId;
     readonly operationId: OperationId;
     readonly displayName?: string;
+    /** The canonical one-segment path beneath the operation's hostname. The
+     * registry projects it; operation authority is the only writer. Optional
+     * only for snapshots that predate routing facts. */
+    readonly path?: string;
+    /** Hostname labels that resolve to this site, alongside the operation's
+     * slug. `www` is reserved for the apex. */
     readonly aliases: readonly string[];
 }
 export interface Team {
@@ -174,5 +185,9 @@ export interface ReadReach {
  * organization actively participating). A future team-audience axis composes
  * here without changing what this axis means. */
 export declare const readReach: (snapshot: Snapshot, bundle: PolicyBundle, organizationId: OrganizationId, actorId: ActorId, operationId: OperationId) => ReadReach;
+export declare const isHostnameLabel: (value: string) => boolean;
+/** A site path is one segment; it is a path, not a hostname, so `www` is not
+ * reserved there. */
+export declare const isSitePath: (value: string) => boolean;
 /** One sentence per violation. An empty list is the only healthy snapshot. */
 export declare const invariantProblems: (snapshot: Snapshot, bundle: PolicyBundle) => readonly string[];

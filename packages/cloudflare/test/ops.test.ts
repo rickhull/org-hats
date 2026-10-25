@@ -29,6 +29,7 @@ const orgBootstrap = (organizationId: string) =>
 
 const opBootstrap = (operationId: string, organizationId: string) => ({
   operationId,
+  slug: "ops-op",
   displayName: "Ops Operation",
   policy: {
     format: 1,
@@ -42,7 +43,7 @@ const opBootstrap = (operationId: string, organizationId: string) => ({
     readPolicy: { organizations: "granted-teams" },
   },
   configureActions: ["configure"],
-  sites: [{ siteId: "site-ops", aliases: ["ops"] }],
+  sites: [{ siteId: "site-ops", path: "ops", aliases: ["ops"] }],
   teams: [{ teamId: "team-ops", siteId: "site-ops", organizationId }],
   grants: [
     {
@@ -117,6 +118,48 @@ describe("typed ops routes", () => {
     expect(restoredOrg.status).toBe(200);
     const restoredOrgExport = await (await ops(`/ops/export?coordinator=organization&id=${RESTORED_ORG}`)).json();
     expect(restoredOrgExport).toEqual(orgExport);
+  });
+
+  it("restores a schema-3 export and backfills routing facts", async () => {
+    const operationExport = await ops(`/ops/export?coordinator=operation&id=${OP}`);
+    const snapshot = await operationExport.json() as {
+      coordinator: string;
+      schemaVersion: string;
+      tables: Record<string, Record<string, unknown>[]>;
+    };
+    const older = {
+      ...snapshot,
+      schemaVersion: "3",
+      tables: {
+        ...snapshot.tables,
+        operation: snapshot.tables["operation"]?.map(({ slug: _slug, ...row }) => row) ?? [],
+        sites: snapshot.tables["sites"]?.map(({ path: _path, ...row }) => row) ?? [],
+      },
+    };
+    const restoredId = `${RESTORED_OP}-routing`;
+    const restored = await jsonPost("/ops/restore", { coordinator: "operation", id: restoredId, snapshot: older });
+    expect(restored.status).toBe(200);
+    expect((await restored.json() as { ok: boolean }).ok).toBe(true);
+
+    const status = await (await ops(`/ops/schema-status?coordinator=operation&id=${restoredId}`)).json() as {
+      value?: Record<string, unknown>;
+    };
+    expect(status.value?.["operationSlug"]).toBeNull();
+    expect(status.value?.["sitesWithPath"]).toBe(0);
+
+    const facts = await jsonPost("/ops/operation/routing-facts", {
+      operationId: restoredId,
+      slug: "ops-restored",
+      sites: [{ siteId: "site-ops", path: "ops-restored" }],
+    });
+    expect(facts.status).toBe(200);
+    expect((await facts.json() as { ok: boolean }).ok).toBe(true);
+
+    const backfilled = await (await ops(`/ops/export?coordinator=operation&id=${restoredId}`)).json() as {
+      tables: Record<string, Record<string, unknown>[]>;
+    };
+    expect(backfilled.tables["operation"]?.[0]?.["slug"]).toBe("ops-restored");
+    expect(backfilled.tables["sites"]?.[0]?.["path"]).toBe("ops-restored");
   });
 
   it("exposes the verification keys without the ops token", async () => {

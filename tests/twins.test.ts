@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { invariantProblems } from "../src/model.ts";
+import { invariantProblems, isHostnameLabel, isSitePath } from "../src/model.ts";
 import {
   AIRLIFT,
   DANA_OKAFOR,
@@ -15,6 +15,20 @@ import {
   PROFESSIONAL_OPERATION,
   TWINS,
 } from "../src/authority/twins.ts";
+
+test("the twins carry one valid, unique routing namespace", () => {
+  for (const { snapshot } of TWINS) {
+    for (const operation of snapshot.operations) {
+      assert.ok(operation.slug !== undefined && isHostnameLabel(operation.slug), `${operation.operationId} slug`);
+      const paths = new Set<string>();
+      for (const site of snapshot.sites.filter((candidate) => candidate.operationId === operation.operationId)) {
+        assert.ok(site.path !== undefined && isSitePath(site.path), `${site.siteId} path`);
+        assert.ok(!paths.has(site.path), `${site.siteId} path is unique`);
+        paths.add(site.path);
+      }
+    }
+  }
+});
 
 test("the professional operation is multi-organization and multi-site", () => {
   const s = PROFESSIONAL_OPERATION.snapshot;

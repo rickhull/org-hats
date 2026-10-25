@@ -132,3 +132,21 @@ and removing an actor from one operation starts affecting another.
 No provider credential, authorization code, or secret crosses the portable
 `AuthorityRuntime`; the exchange that turns a provider callback into
 evidence is runtime surface, supplied per deployment.
+
+### A12 — Routing facts are authority-owned
+
+The operation slug and each site's canonical path are operation-authority
+facts. The registry is their projection; a tracked manifest or a derived
+copy is not a second writer. Operation authority validates one DNS label for
+the slug, one path segment per site, local path and alias uniqueness, and
+alias/slug collisions. Deployment-wide slug uniqueness and the applied
+routing projection stay registry checks because authority has no global
+directory.
+
+*Held by:* the operation schema's `slug` and `path` columns and canonical
+export; `POST /ops/operation/routing-facts` as a full-set replace; the
+registry bootstrap's projection validation; the routing cases in
+`tests/model.test.ts`, `tests/twins.test.ts`, and the Cloudflare coordinator
+suite.
+*If it breaks:* a hand-maintained routing manifest becomes authority, and a
+rename can leave the registry serving an address authority no longer names.

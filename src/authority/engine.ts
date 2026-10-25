@@ -158,9 +158,10 @@ const factsOf = (evidence: PrincipalEvidence): AuthenticationFacts | undefined =
 interface OpState {
   readonly operationId: OperationId;
   readonly displayName?: string;
+  readonly slug?: string;
   readonly bounded?: boolean;
   policy: PolicyBundle;
-  sites: { siteId: SiteId; operationId: OperationId; displayName?: string; aliases: readonly string[] }[];
+  sites: { siteId: SiteId; operationId: OperationId; displayName?: string; path?: string; aliases: readonly string[] }[];
   teams: { teamId: TeamId; siteId: SiteId; organizationId: OrganizationId; displayName?: string }[];
   grants: Grant[];
   participations: Participation[];
@@ -259,6 +260,7 @@ export const createInMemoryAuthority = async (
     ops.set(op.operationId, {
       operationId: op.operationId,
       ...(op.displayName !== undefined ? { displayName: op.displayName } : {}),
+      ...(op.slug !== undefined ? { slug: op.slug } : {}),
       ...(op.bounded !== undefined ? { bounded: op.bounded } : {}),
       policy: fixture.policy,
       sites: fixture.snapshot.sites.map((s) => ({ ...s })),
@@ -327,6 +329,7 @@ export const createInMemoryAuthority = async (
       operations: [...ops.values()].map((o) => ({
         operationId: o.operationId,
         ...(o.displayName !== undefined ? { displayName: o.displayName } : {}),
+        ...(o.slug !== undefined ? { slug: o.slug } : {}),
         ...(o.bounded !== undefined ? { bounded: o.bounded } : {}),
       })),
       sites: op.sites,

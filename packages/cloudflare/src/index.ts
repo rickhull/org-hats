@@ -170,6 +170,11 @@ export default {
           if (typeof body.operationId !== "string") throw new Error("operationId is required");
           return relay(env.OPERATION.get(env.OPERATION.idFromName(body.operationId)), "/bootstrap", body);
         }
+        if (request.method === "POST" && url.pathname === "/ops/operation/routing-facts") {
+          const body = await request.json() as { operationId?: string };
+          if (typeof body.operationId !== "string") throw new Error("operationId is required");
+          return relay(env.OPERATION.get(env.OPERATION.idFromName(body.operationId)), "/routing-facts", body);
+        }
         if (request.method === "GET" && url.pathname === "/ops/schema-status") {
           const stub = coordinator(env, url.searchParams.get("coordinator"), url.searchParams.get("id") ?? "");
           if (stub === undefined) throw new Error("coordinator must be organization or operation, with an id");

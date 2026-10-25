@@ -66,6 +66,7 @@ export const createInMemoryAuthority = async (config = {}) => {
         ops.set(op.operationId, {
             operationId: op.operationId,
             ...(op.displayName !== undefined ? { displayName: op.displayName } : {}),
+            ...(op.slug !== undefined ? { slug: op.slug } : {}),
             ...(op.bounded !== undefined ? { bounded: op.bounded } : {}),
             policy: fixture.policy,
             sites: fixture.snapshot.sites.map((s) => ({ ...s })),
@@ -130,6 +131,7 @@ export const createInMemoryAuthority = async (config = {}) => {
             operations: [...ops.values()].map((o) => ({
                 operationId: o.operationId,
                 ...(o.displayName !== undefined ? { displayName: o.displayName } : {}),
+                ...(o.slug !== undefined ? { slug: o.slug } : {}),
                 ...(o.bounded !== undefined ? { bounded: o.bounded } : {}),
             })),
             sites: op.sites,

@@ -45,6 +45,11 @@ export interface Actor {
 export interface Operation {
   readonly operationId: OperationId;
   readonly displayName?: string;
+  /** The one DNS label naming this operation's hostname. The registry
+   * projects it; operation authority is the only writer. Optional only for
+   * snapshots that predate routing facts; a snapshot with site paths must
+   * carry it. */
+  readonly slug?: string;
   /** `true` marks a time-boxed undertaking whose access closes on a
    * schedule rather than by revocation alone. */
   readonly bounded?: boolean;
@@ -57,6 +62,12 @@ export interface Site {
   readonly siteId: SiteId;
   readonly operationId: OperationId;
   readonly displayName?: string;
+  /** The canonical one-segment path beneath the operation's hostname. The
+   * registry projects it; operation authority is the only writer. Optional
+   * only for snapshots that predate routing facts. */
+  readonly path?: string;
+  /** Hostname labels that resolve to this site, alongside the operation's
+   * slug. `www` is reserved for the apex. */
   readonly aliases: readonly string[];
 }
 
@@ -382,6 +393,19 @@ export const readReach = (
   return { readableOrganizationIds, readableTeamIds };
 };
 
+// --- routing facts -------------------------------------------------------------------
+
+/** One DNS label, lower-case, no empty hyphen groups; `www` is the apex
+ * reservation, so it is never an operation slug or alias label. */
+const ROUTING_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+export const isHostnameLabel = (value: string): boolean =>
+  value !== "www" && ROUTING_LABEL.test(value);
+
+/** A site path is one segment; it is a path, not a hostname, so `www` is not
+ * reserved there. */
+export const isSitePath = (value: string): boolean => ROUTING_LABEL.test(value);
+
 // --- invariants ---------------------------------------------------------------------
 
 /** One sentence per violation. An empty list is the only healthy snapshot. */
@@ -456,6 +480,60 @@ export const invariantProblems = (snapshot: Snapshot, bundle: PolicyBundle): rea
   }
   for (const [key, count] of primaries) {
     if (count > 1) problems.push(`${key} has ${count} primary hats; one per actor per operation`);
+  }
+
+  // Routing facts are operation-authority facts. A snapshot may predate them
+  // (no slug, no paths), but it may not carry half of the pair: a slug with a
+  // pathless site, or a path with no slug, is a routing projection with no
+  // source. Labels are checked here because the registry copies them into a
+  // hostname namespace without reinterpreting them.
+  const slugs = new Map<string, OperationId>();
+  for (const operation of snapshot.operations) {
+    const opSites = snapshot.sites.filter((site) => site.operationId === operation.operationId);
+    const hasPath = opSites.some((site) => site.path !== undefined);
+    if (operation.slug === undefined) {
+      if (hasPath) problems.push(`operation ${operation.operationId} has site paths but no slug`);
+    } else {
+      if (!isHostnameLabel(operation.slug)) {
+        problems.push(`operation ${operation.operationId} has an invalid slug "${operation.slug}"`);
+      }
+      const existing = slugs.get(operation.slug);
+      if (existing !== undefined && existing !== operation.operationId) {
+        problems.push(`operations ${existing} and ${operation.operationId} share the slug "${operation.slug}"`);
+      }
+      slugs.set(operation.slug, operation.operationId);
+      if (opSites.some((site) => site.path === undefined)) {
+        problems.push(`operation ${operation.operationId} has a slug but a site without a path`);
+      }
+    }
+
+    const paths = new Map<string, SiteId>();
+    const aliases = new Map<string, SiteId>();
+    for (const site of opSites) {
+      if (site.path !== undefined) {
+        if (!isSitePath(site.path)) {
+          problems.push(`site ${site.siteId} has an invalid path "${site.path}"`);
+        }
+        const existingPath = paths.get(site.path);
+        if (existingPath !== undefined) {
+          problems.push(`sites ${existingPath} and ${site.siteId} share the path "${site.path}"`);
+        }
+        paths.set(site.path, site.siteId);
+      }
+      for (const alias of site.aliases) {
+        if (!isHostnameLabel(alias)) {
+          problems.push(`site ${site.siteId} has an invalid alias "${alias}"`);
+        }
+        if (operation.slug !== undefined && alias === operation.slug) {
+          problems.push(`site ${site.siteId} alias "${alias}" collides with the operation slug`);
+        }
+        const existingAlias = aliases.get(alias);
+        if (existingAlias !== undefined && existingAlias !== site.siteId) {
+          problems.push(`sites ${existingAlias} and ${site.siteId} share the alias "${alias}"`);
+        }
+        aliases.set(alias, site.siteId);
+      }
+    }
   }
   return problems;
 };

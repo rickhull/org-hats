@@ -73,17 +73,25 @@ export const createCloudflareConformanceWorld = async (env: Env): Promise<Confor
     const snapshot = fixture.snapshot;
     const operationRecord = snapshot.operations[0];
     if (operationRecord === undefined) continue;
+    const slug = operationRecord.slug;
+    if (slug === undefined) throw new Error(`conformance fixture ${operationRecord.operationId} has no operation slug`);
     await post(operation(operationRecord.operationId), "/bootstrap", {
       operationId: operationRecord.operationId,
+      slug,
       ...(operationRecord.displayName === undefined ? {} : { displayName: operationRecord.displayName }),
       ...(operationRecord.bounded === true ? { bounded: true } : {}),
       policy: fixture.policy,
       configureActions: ["configure"],
-      sites: snapshot.sites.map((site) => ({
-        siteId: site.siteId,
-        ...(site.displayName === undefined ? {} : { displayName: site.displayName }),
-        aliases: [...site.aliases],
-      })),
+      sites: snapshot.sites.map((site) => {
+        const path = site.path;
+        if (path === undefined) throw new Error(`conformance fixture site ${site.siteId} has no path`);
+        return {
+          siteId: site.siteId,
+          path,
+          ...(site.displayName === undefined ? {} : { displayName: site.displayName }),
+          aliases: [...site.aliases],
+        };
+      }),
       teams: snapshot.teams.map((team) => ({
         teamId: team.teamId,
         siteId: team.siteId,

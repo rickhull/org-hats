@@ -37,6 +37,7 @@ const world = (suffix: string): World => {
 const bootstrapOperation = async (current: World) =>
   call(current.op, "POST", "/bootstrap", {
     operationId: current.opId,
+    slug: "roster-op",
     policy: {
       format: 1,
       id: "policy-roster",
@@ -47,7 +48,7 @@ const bootstrapOperation = async (current: World) =>
     },
     adminRoles: ["admin"],
     configureActions: ["configure"],
-    sites: [{ siteId: SITE, aliases: ["site"] }],
+    sites: [{ siteId: SITE, path: "site", aliases: ["site"] }],
     teams: [{ teamId: TEAM, siteId: SITE, organizationId: current.orgId }],
     grants: [
       { grantId: "g-roster", organizationId: current.orgId, actorId: MEMBER, role: "field", target: { kind: "team", teamId: TEAM }, primary: true },

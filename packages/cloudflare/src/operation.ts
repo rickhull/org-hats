@@ -26,6 +26,8 @@ import {
   type Unbranded,
 } from "org-hats/authority";
 import {
+  isHostnameLabel,
+  isSitePath,
   readReach,
   transitionParticipation,
   wearableGrants,
@@ -56,7 +58,7 @@ import {
 /** One operation authority. The object owns operation-local facts: sites,
  * teams, grants, participation, policy, refresh records, audit, claims, and
  * the outbox that carries invitations to organization authority. */
-const SCHEMA_VERSION = "3";
+const SCHEMA_VERSION = "4";
 
 /** How stale the org-actor projection may get before reconciliation pulls it
  * again. The push channel carries a change immediately; this interval bounds
@@ -138,6 +140,8 @@ const targetColumns = (target: Unbranded<GrantTarget>): readonly [string, string
 interface SiteInput {
   readonly siteId: string;
   readonly displayName?: string;
+  /** The canonical one-segment path beneath the operation hostname. */
+  readonly path: string;
   readonly aliases: readonly string[];
 }
 
@@ -166,6 +170,8 @@ interface ParticipationInput {
 interface BootstrapInput {
   readonly operationId: string;
   readonly displayName?: string;
+  /** The one DNS label naming the operation hostname. */
+  readonly slug: string;
   readonly bounded?: boolean;
   readonly policy: PolicyBundle;
   readonly adminRoles?: readonly string[];
@@ -246,6 +252,13 @@ interface AdmitCommand {
   readonly idempotencyKey: string;
 }
 
+/** A full replace of the operation's routing facts. Every site must be named;
+ * a partial set would leave a routing projection with no source. */
+interface RoutingFactsInput {
+  readonly slug: string;
+  readonly sites: readonly { readonly siteId: string; readonly path: string }[];
+}
+
 /** How and when the principal authenticated, as the issuing evidence
  * stated it. Opaque to authority: stored with the refresh record, re-issued
  * on every refresh of its chain, never interpreted. */
@@ -267,6 +280,7 @@ export class OperationAuthority extends DurableObject<Env> {
       `CREATE TABLE IF NOT EXISTS operation (
         operation_id TEXT PRIMARY KEY,
         display_name TEXT,
+        slug TEXT,
         bounded INTEGER NOT NULL DEFAULT 0,
         policy_json TEXT NOT NULL,
         admin_roles_json TEXT NOT NULL,
@@ -280,6 +294,7 @@ export class OperationAuthority extends DurableObject<Env> {
       `CREATE TABLE IF NOT EXISTS sites (
         site_id TEXT PRIMARY KEY,
         display_name TEXT,
+        path TEXT,
         aliases_json TEXT NOT NULL,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
@@ -397,6 +412,19 @@ export class OperationAuthority extends DurableObject<Env> {
     );
     if (!refreshColumns.has("amr_json")) sql.exec("ALTER TABLE refresh_records ADD COLUMN amr_json TEXT");
     if (!refreshColumns.has("auth_time")) sql.exec("ALTER TABLE refresh_records ADD COLUMN auth_time INTEGER");
+    // schema 4: operation routing facts (slug and site paths)
+    const operationColumns = new Set(
+      this.ctx.storage.sql.exec<{ readonly name: string }>("PRAGMA table_info(operation)")
+        .toArray()
+        .map((column) => String(column.name)),
+    );
+    if (!operationColumns.has("slug")) sql.exec("ALTER TABLE operation ADD COLUMN slug TEXT");
+    const siteColumns = new Set(
+      this.ctx.storage.sql.exec<{ readonly name: string }>("PRAGMA table_info(sites)")
+        .toArray()
+        .map((column) => String(column.name)),
+    );
+    if (!siteColumns.has("path")) sql.exec("ALTER TABLE sites ADD COLUMN path TEXT");
     // Every migration above is additive and runs unconditionally, so after
     // this constructor the object *is* at the current schema: the recorded
     // version must say so. `INSERT OR IGNORE` alone would leave an object
@@ -614,15 +642,45 @@ export class OperationAuthority extends DurableObject<Env> {
   private bootstrap(input: BootstrapInput): Result<{ operationId: string }> {
     const problems = validatePolicyBundle(input.policy);
     if (problems.length > 0) return failure("invalid-command", problems.join("; "));
+    // Routing facts are operation-authority facts. Validate the whole set
+    // before opening the transaction: a bootstrap that writes half a
+    // hostname namespace is a projection with no source.
+    if (!isHostnameLabel(input.slug)) {
+      return failure("invalid-command", `operation slug "${input.slug}" must be one DNS label and not www`);
+    }
+    const paths = new Set<string>();
+    const aliases = new Set<string>();
+    for (const site of input.sites) {
+      if (!isSitePath(site.path)) {
+        return failure("invalid-command", `site ${site.siteId} path "${site.path}" must be one segment`);
+      }
+      if (paths.has(site.path)) {
+        return failure("invalid-command", `site path "${site.path}" is used more than once`);
+      }
+      paths.add(site.path);
+      for (const alias of site.aliases) {
+        if (!isHostnameLabel(alias)) {
+          return failure("invalid-command", `site ${site.siteId} alias "${alias}" must be one DNS label and not www`);
+        }
+        if (alias === input.slug) {
+          return failure("invalid-command", `site ${site.siteId} alias "${alias}" collides with the operation slug`);
+        }
+        if (aliases.has(alias)) {
+          return failure("invalid-command", `alias "${alias}" is used more than once`);
+        }
+        aliases.add(alias);
+      }
+    }
     const at = now();
     return this.ctx.storage.transactionSync(() => {
       const existing = this.one("SELECT 1 AS present FROM operation WHERE operation_id = ?", input.operationId);
       this.ctx.storage.sql.exec(
         `INSERT INTO operation
-          (operation_id, display_name, bounded, policy_json, admin_roles_json, configure_actions_json, envelope_lifetime_seconds, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (operation_id, display_name, slug, bounded, policy_json, admin_roles_json, configure_actions_json, envelope_lifetime_seconds, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(operation_id) DO UPDATE SET
            display_name = excluded.display_name,
+           slug = excluded.slug,
            bounded = excluded.bounded,
            policy_json = excluded.policy_json,
            admin_roles_json = excluded.admin_roles_json,
@@ -631,6 +689,7 @@ export class OperationAuthority extends DurableObject<Env> {
            updated_at = excluded.updated_at`,
         input.operationId,
         input.displayName ?? null,
+        input.slug,
         input.bounded === true ? 1 : 0,
         canonicalJson(input.policy as unknown as JsonValue),
         canonicalJson((input.adminRoles ?? []) as unknown as JsonValue),
@@ -641,14 +700,16 @@ export class OperationAuthority extends DurableObject<Env> {
       );
       for (const site of input.sites) {
         this.ctx.storage.sql.exec(
-          `INSERT INTO sites (site_id, display_name, aliases_json, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?)
+          `INSERT INTO sites (site_id, display_name, path, aliases_json, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)
            ON CONFLICT(site_id) DO UPDATE SET
              display_name = excluded.display_name,
+             path = excluded.path,
              aliases_json = excluded.aliases_json,
              updated_at = excluded.updated_at`,
           site.siteId,
           site.displayName ?? null,
+          site.path,
           canonicalJson(site.aliases as unknown as JsonValue),
           at,
           at,
@@ -1085,6 +1146,8 @@ export class OperationAuthority extends DurableObject<Env> {
     return {
       schemaVersion: String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0"),
       operationId: this.operationId() ?? null,
+      operationSlug: this.one("SELECT slug FROM operation LIMIT 1")?.["slug"] ?? null,
+      sitesWithPath: Number(this.one("SELECT COUNT(*) AS n FROM sites WHERE path IS NOT NULL")?.["n"] ?? 0),
       policyId: this.policy()?.id ?? null,
       policyVersion: this.policy()?.version ?? null,
       sites: count("sites"),
@@ -1107,10 +1170,12 @@ export class OperationAuthority extends DurableObject<Env> {
   private snapshot(): Record<string, unknown> {
     return {
       operationId: this.operationId() ?? null,
+      operationSlug: this.one("SELECT slug FROM operation LIMIT 1")?.["slug"] ?? null,
       policy: this.policy() ?? null,
-      sites: this.rows("SELECT site_id, display_name, aliases_json FROM sites ORDER BY site_id").map((row) => ({
+      sites: this.rows("SELECT site_id, display_name, path, aliases_json FROM sites ORDER BY site_id").map((row) => ({
         siteId: String(row["site_id"]),
         displayName: row["display_name"],
+        path: row["path"],
         aliases: JSON.parse(String(row["aliases_json"])) as unknown,
       })),
       teams: this.rows("SELECT team_id, site_id, organization_id, display_name FROM teams ORDER BY team_id"),
@@ -1153,10 +1218,13 @@ export class OperationAuthority extends DurableObject<Env> {
   private modelSnapshot(): Snapshot | undefined {
     const operationId = this.operationId();
     if (operationId === undefined) return undefined;
-    const sites = this.rows("SELECT site_id, display_name, aliases_json FROM sites").map((row) => ({
+    const operation = this.one("SELECT operation_id, slug FROM operation LIMIT 1");
+    const slug = operation?.["slug"];
+    const sites = this.rows("SELECT site_id, display_name, path, aliases_json FROM sites").map((row) => ({
       siteId: rowSiteId(row),
       operationId,
       ...(row["display_name"] === null ? {} : { displayName: rowText(row, "display_name") }),
+      ...(row["path"] === null ? {} : { path: rowText(row, "path") }),
       aliases: JSON.parse(rowText(row, "aliases_json")) as string[],
     }));
     const teams = this.rows("SELECT team_id, site_id, organization_id, display_name FROM teams").map((row) => ({
@@ -1195,7 +1263,7 @@ export class OperationAuthority extends DurableObject<Env> {
     return {
       organizations: organizationIds.map((id) => ({ organizationId: id })),
       actors,
-      operations: [{ operationId }],
+      operations: [{ operationId, ...(slug === null || slug === undefined ? {} : { slug: String(slug) }) }],
       sites,
       teams,
       grants,
@@ -1434,8 +1502,14 @@ export class OperationAuthority extends DurableObject<Env> {
     if (typeof input !== "object" || input === null) return failure("invalid-command", "snapshot must be an object");
     const snapshot = input as Partial<ExportSnapshot>;
     if (snapshot.coordinator !== "operation") return failure("invalid-command", "snapshot is not operation state");
-    const version = String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0");
-    if (snapshot.schemaVersion !== version) return failure("invalid-command", "snapshot schema version does not match");
+    // Older exports are intentionally restorable: `restoreTables` writes the
+    // current columns and fills columns the older snapshot did not carry with
+    // null, so the schema-2 → accepted-schema drill is a restore, not a
+    // second bootstrap. An unknown or future version is still refused.
+    const supported = new Set(["2", "3", "4"]);
+    if (!supported.has(String(snapshot.schemaVersion))) {
+      return failure("invalid-command", "snapshot schema version is not supported");
+    }
     if (typeof snapshot.tables !== "object" || snapshot.tables === null) return failure("invalid-command", "snapshot has no tables");
     this.ctx.storage.transactionSync(() => {
       restoreTables(
@@ -1451,6 +1525,57 @@ export class OperationAuthority extends DurableObject<Env> {
       );
     });
     return value({ restored: true });
+  }
+
+  /** Replace the operation's routing facts. A rename is an ops act: the
+   * operation keeps no rename history, so a self-service rename waits until
+   * there is one; the registry's temporary redirect covers the change. */
+  private setRoutingFacts(input: RoutingFactsInput): Result<{ operationId: string }> {
+    const operation = this.one("SELECT operation_id, slug FROM operation LIMIT 1");
+    if (operation === undefined) return failure("unavailable", "operation is not bootstrapped");
+    if (!isHostnameLabel(input.slug)) {
+      return failure("invalid-command", `operation slug "${input.slug}" must be one DNS label and not www`);
+    }
+    const siteRows = this.rows("SELECT site_id, aliases_json FROM sites");
+    const known = new Set(siteRows.map((row) => String(row["site_id"])));
+    const provided = new Set<string>();
+    const paths = new Set<string>();
+    for (const site of input.sites) {
+      if (!known.has(site.siteId)) return failure("invalid-command", `unknown site ${site.siteId}`);
+      if (provided.has(site.siteId)) return failure("invalid-command", `site ${site.siteId} is named twice`);
+      provided.add(site.siteId);
+      if (!isSitePath(site.path)) {
+        return failure("invalid-command", `site ${site.siteId} path "${site.path}" must be one segment`);
+      }
+      if (paths.has(site.path)) return failure("invalid-command", `site path "${site.path}" is used more than once`);
+      paths.add(site.path);
+    }
+    if (provided.size !== known.size) {
+      return failure("invalid-command", "routing facts must name every site");
+    }
+    const aliases = new Set<string>();
+    for (const row of siteRows) {
+      for (const alias of JSON.parse(rowText(row, "aliases_json")) as string[]) {
+        if (!isHostnameLabel(alias)) {
+          return failure("invalid-command", `site ${String(row["site_id"])} alias "${alias}" is not one DNS label or is www`);
+        }
+        if (alias === input.slug) {
+          return failure("invalid-command", `alias "${alias}" collides with the operation slug`);
+        }
+        if (aliases.has(alias)) return failure("invalid-command", `alias "${alias}" is used more than once`);
+        aliases.add(alias);
+      }
+    }
+    const at = now();
+    const id = rowOperationId(operation);
+    this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec("UPDATE operation SET slug = ?, updated_at = ? WHERE operation_id = ?", input.slug, at, id);
+      for (const site of input.sites) {
+        this.ctx.storage.sql.exec("UPDATE sites SET path = ?, updated_at = ? WHERE site_id = ?", site.path, at, site.siteId);
+      }
+      this.audit("routing-facts", `routing facts set for ${id}`, at);
+    });
+    return value({ operationId: id });
   }
 
   async alarm(): Promise<void> {
@@ -1470,6 +1595,7 @@ export class OperationAuthority extends DurableObject<Env> {
         const policy = asRecord(body["policy"]) as unknown as PolicyBundle;
         const input: BootstrapInput = {
           operationId: asString(body["operationId"], "operationId"),
+          slug: asString(body["slug"], "slug"),
           ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
           ...(body["bounded"] === true ? { bounded: true } : {}),
           policy,
@@ -1480,6 +1606,7 @@ export class OperationAuthority extends DurableObject<Env> {
             const site = asRecord(entry);
             return {
               siteId: asString(site["siteId"], "siteId"),
+              path: asString(site["path"], "path"),
               ...(site["displayName"] === undefined ? {} : { displayName: asString(site["displayName"], "displayName") }),
               aliases: asArray(site["aliases"] ?? [], "aliases").map((alias) => asString(alias, "alias")),
             };
@@ -1523,6 +1650,17 @@ export class OperationAuthority extends DurableObject<Env> {
         // pulled here.
         if (bootstrapped.ok) await this.reconcileRosters(true);
         return json(bootstrapped);
+      }
+
+      if (request.method === "POST" && url.pathname === "/routing-facts") {
+        const body = await readBody();
+        return json(this.setRoutingFacts({
+          slug: asString(body["slug"], "slug"),
+          sites: asArray(body["sites"], "sites").map((entry) => {
+            const site = asRecord(entry);
+            return { siteId: asString(site["siteId"], "siteId"), path: asString(site["path"], "path") };
+          }),
+        }));
       }
 
       if (request.method === "POST" && url.pathname === "/invite") {

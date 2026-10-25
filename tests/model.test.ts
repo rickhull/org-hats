@@ -29,6 +29,55 @@ test("the twins pass invariantProblems unchanged", () => {
   assert.deepEqual(invariantProblems(FESTIVAL.snapshot, FESTIVAL.policy), []);
 });
 
+test("routing facts are complete, unique, and valid labels", () => {
+  const base = PROFESSIONAL_OPERATION.snapshot;
+  const operation = base.operations[0]!;
+  const problems = (snapshot: Snapshot): string => invariantProblems(snapshot, PROFESSIONAL_OPERATION.policy).join("; ");
+
+  assert.match(
+    problems({ ...base, operations: [{ ...operation, slug: "www" }] }),
+    /invalid slug/,
+  );
+  assert.match(
+    problems({ ...base, sites: base.sites.map((site, index) => index === 0 ? { ...site, path: "two/segments" } : site) }),
+    /invalid path/,
+  );
+  assert.match(
+    problems({ ...base, sites: base.sites.map((site) => ({ ...site, path: "same" })) }),
+    /share the path/,
+  );
+  assert.match(
+    problems({ ...base, operations: [{ ...operation, slug: undefined }] }),
+    /has site paths but no slug/,
+  );
+  assert.match(
+    problems({ ...base, sites: base.sites.map((site, index) => index === 0 ? { ...site, path: undefined } : site) }),
+    /has a slug but a site without a path/,
+  );
+  assert.match(
+    problems({ ...base, sites: base.sites.map((site, index) => index === 0 ? { ...site, aliases: ["www"] } : site) }),
+    /invalid alias/,
+  );
+  assert.match(
+    problems({ ...base, sites: base.sites.map((site, index) => index === 0 ? { ...site, aliases: [operation.slug!] } : site) }),
+    /collides with the operation slug/,
+  );
+  assert.match(
+    problems({ ...base, sites: base.sites.map((site) => ({ ...site, aliases: ["shared"] })) }),
+    /share the alias/,
+  );
+
+  // A snapshot that predates routing facts is still healthy; half a pair is not.
+  assert.equal(
+    problems({
+      ...base,
+      operations: [{ ...operation, slug: undefined }],
+      sites: base.sites.map((site) => ({ ...site, path: undefined })),
+    }),
+    "",
+  );
+});
+
 test("allow: the worn hat carries the action and reaches the target", () => {
   const d = meridian("resolve", { kind: "team", teamId: "team-2e8c64b9" });
   assert.ok(d.allowed);

@@ -76,10 +76,15 @@ declarations so that cannot regress silently.
   only. The organization remains the sole writer; the operation pushes on
   change and reconciles every fifteen minutes. No write path reads the
   organization coordinator synchronously.
-- The operation schema version moves 2 → 3, so take a fresh export before
-  upgrading; an export taken at schema 2 does not restore into a schema-3
-  object. The projection is derived and is deliberately absent from export;
-  restore clears it and rebuilds by pulling.
+- The operation schema moved 2 → 3 for the roster projection and 3 → 4 for
+  routing facts. Older exports restore into the current schema with the new
+  columns null; a restored operation is backfilled with
+  `POST /ops/operation/routing-facts`. The projection is derived and is
+  deliberately absent from export; restore clears it and rebuilds by pulling.
+- `cloudflare-v0.3.0` adds operation routing facts: bootstrap requires
+  `slug` and `sites[].path`, the export and `/snapshot` carry them, and the
+  typed routing-facts route replaces the full set. The operation schema is 4.
+  This is runtime-only; the portable pin and interface version do not move.
 - New operator verbs: `POST /reconcile-rosters` on an operation;
   `GET /ops/schema-status` reports `orgActors`, `disabledOrgActors`,
   `rosterSyncedAt`, and `rosterReconcileSeconds`; `GET /snapshot` reports
@@ -97,4 +102,5 @@ declarations so that cannot regress silently.
 - Leave envelope verification alone: format 1 still verifies, including
   envelopes issued before the upgrade.
 - On Cloudflare, export before upgrading, then let restore rebuild the
-  roster projection.
+  roster projection. If the export predates schema 4, backfill the operation
+  slug and site paths with `POST /ops/operation/routing-facts`.

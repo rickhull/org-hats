@@ -71,8 +71,8 @@ export const organizationTables: readonly TableSpec[] = [
  * pulling, which fails closed in the meantime — an actor missing from the
  * projection is `not-admitted`, never wrongly admitted. */
 export const operationTables: readonly TableSpec[] = [
-  { name: "operation", columns: ["operation_id", "display_name", "bounded", "policy_json", "admin_roles_json", "configure_actions_json", "envelope_lifetime_seconds", "created_at", "updated_at"], orderBy: "operation_id" },
-  { name: "sites", columns: ["site_id", "display_name", "aliases_json", "created_at", "updated_at"], orderBy: "site_id" },
+  { name: "operation", columns: ["operation_id", "display_name", "slug", "bounded", "policy_json", "admin_roles_json", "configure_actions_json", "envelope_lifetime_seconds", "created_at", "updated_at"], orderBy: "operation_id" },
+  { name: "sites", columns: ["site_id", "display_name", "path", "aliases_json", "created_at", "updated_at"], orderBy: "site_id" },
   { name: "teams", columns: ["team_id", "site_id", "organization_id", "display_name", "created_at", "updated_at"], orderBy: "team_id" },
   { name: "participations", columns: ["organization_id", "status", "created_at", "updated_at"], orderBy: "organization_id" },
   { name: "invitations", columns: ["invitation_id", "organization_id", "status", "created_at", "updated_at"], orderBy: "invitation_id" },

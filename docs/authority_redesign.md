@@ -308,11 +308,21 @@ do not create a platform-global person.
 One operation-authority instance owns operation-local authority:
 
 - participating organization identifiers and participation status;
-- sites and their permanent identifiers;
+- the operation's hostname slug;
+- sites, their permanent identifiers, canonical paths, and alias labels;
 - teams, roles, policy version, hats, and grants;
 - operation-local admission and access requests;
 - refresh/session authority and access-projection issuance; and
 - operation-administration audit events.
+
+The operation slug and site paths are authority facts, not registry-manifest
+input: the registry is their projection. Operation authority validates one
+DNS label for the slug, one path segment per site, unique paths within the
+operation, and alias labels that collide with neither the slug nor another
+site. Deployment-wide slug uniqueness and the applied routing projection stay
+registry checks because operation authority has no global directory. A
+rename is an operator act; the operation keeps no rename history yet, so a
+self-service rename waits for one.
 
 Removing an actor from one operation does not remove the actor from their
 organization or another operation.
