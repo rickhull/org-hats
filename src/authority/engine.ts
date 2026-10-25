@@ -15,9 +15,11 @@
 
 import {
   canonicalJson,
+  epochSeconds,
   type AccessEnvelopeClaimsV1,
   type ActorId,
   type AuthorityInterfaceVersion,
+  type EpochSeconds,
   type Failure,
   type IdempotencyKey,
   type JsonValue,
@@ -107,7 +109,7 @@ export interface InMemoryAuthorityConfig {
 // --- coordinator state ------------------------------------------------------------
 
 interface AuditEvent {
-  readonly at: number;
+  readonly at: EpochSeconds;
   readonly by: string;
   readonly fact: string;
 }

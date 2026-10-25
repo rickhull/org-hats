@@ -15,14 +15,17 @@ import test from "node:test";
 import type {
   AccessEnvelopeClaimsV1,
   AuthorityInterfaceVersion,
+  EpochSeconds,
   Failure,
   FailureKind,
   GrantTarget,
   IssuerInterfaceVersion,
   SignedAccessEnvelope,
   TargetRef,
+  Unbranded,
 } from "../src/contract.ts";
 import type { NeutralAccess } from "../src/access/types.ts";
+import type { VerifyContext } from "../src/access/verify.ts";
 import { wearableGrants, type ActiveGrant, type Grant } from "../src/model.ts";
 import type {
   AccessFromEvidenceInput,
@@ -100,7 +103,7 @@ type _CommandsSpeakCurrent = Expect<
 // --- the command result keeps its `ok` discriminant --------------------------------
 //
 // Session and command results stay asymmetric by design
-// (plans/type_leverage.md): sessions narrow by property presence
+// (docs/types.md): sessions narrow by property presence
 // (`isFailed`), commands by `ok`.
 
 type _CommandFailureIsOkDiscriminated = Expect<
@@ -121,6 +124,16 @@ type _RevokedGrantIsNotActive = Expect<
 type _WearableGrantsYieldActive = Expect<
   Equal<ReturnType<typeof wearableGrants>[number], ActiveGrant>
 >;
+
+// --- the numeric time brand stays internal ------------------------------------------
+//
+// `EpochSeconds` brands instants on the clock seam; `Unbranded` maps it
+// back to `number`, so public inputs like `VerifyContext.now` stay plain
+// and a host never imports an epoch constructor.
+
+type _UnbrandedEpochIsPlain = Expect<Equal<Unbranded<EpochSeconds>, number>>;
+type _VerifyNowStaysPlain = Expect<Equal<NonNullable<VerifyContext["now"]>, number>>;
+type _ClaimsIatStaysPlain = Expect<Equal<AccessEnvelopeClaimsV1["iat"], number>>;
 
 test("public-surface type assertions are compile-time only", () => {
   // The assertions are the type aliases above; they fail `tsc -p

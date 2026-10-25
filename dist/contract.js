@@ -16,6 +16,11 @@ export const actorId = (raw) => raw;
 export const operationId = (raw) => raw;
 export const siteId = (raw) => raw;
 export const teamId = (raw) => raw;
+/** The boundary conversion for the numeric brand, same rule as the ids:
+ * one named, deliberate conversion — wherever a wall-clock or
+ * caller-supplied number becomes an instant. Hosts never call this;
+ * public inputs take plain numbers and the runtime converts. */
+export const epochSeconds = (raw) => raw;
 // --- versions -----------------------------------------------------------------
 /** The authority interface version. Every runtime call carries it, and a
  * mismatch is the `wrong-interface-version` failure, never a silent

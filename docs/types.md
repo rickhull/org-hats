@@ -1,8 +1,7 @@
 # The type layer — compile-time claims at runtime boundaries
 
 *How org-hats uses TypeScript: what the compiler proves, what it does not,
-and where validation takes over. The forward work is in
-[`plans/type_leverage.md`](../plans/type_leverage.md).*
+and where validation takes over.*
 
 TypeScript is a structural, erased checker. It can prove shape,
 exhaustiveness, and assignability at compile time. It cannot prove that a
@@ -56,6 +55,13 @@ Fixture data enters the same way. `Unbranded<Snapshot>` describes
 hand-written fixture shape; `fixtureSnapshot` converts once at the test
 boundary, and `invariantProblems` checks coherence. The cast does not make
 the data valid; the validator does.
+
+`EpochSeconds` is the numeric sibling of the id brands, and the one that
+stays entirely internal: the clock seam, audit instants, and the
+verifier's `now` carry it, while claims fields and public inputs (`VerifyContext.now`)
+are plain numbers through `Unbranded<EpochSeconds>` — a host never imports
+an epoch constructor. Durations (lifetimes, steps) are not instants and
+stay plain numbers.
 
 ## Unions that make invalid states unrepresentable
 
@@ -127,7 +133,10 @@ widening the provenance field must never widen the call surface with it.
 The compiler is used as a boundary enforcer, not only as a build step:
 
 - `tsconfig.authority.json` compiles `src/` with `types: []`; `bin/check`
-  also rejects any Cloudflare import under `src/`.
+  also rejects any Cloudflare import under `src/`. `erasableSyntaxOnly`
+  keeps every source erasable, so Node's type stripping runs the `.ts`
+  suites and the pilot directly; the root and the Cloudflare package are
+  aligned on TypeScript 5.9.
 - `tsconfig.json` builds the published declarations; `tsconfig.consumer.json`
   compiles the consumer surface against `dist/`.
 - `tsconfig.tests.json` typechecks `src`, `tests`, and `examples` in
@@ -186,8 +195,9 @@ These are current facts, not future promises:
    with `AssertPlainId` and the consumer fence.
 4. **Do not over-brand.** `GrantId`, `KeyId`, `RefreshHandle`, and
    `IdempotencyKey` are candidates only when a concrete mix-up appears.
-   `EpochSeconds` is the strongest remaining numeric brand because
-   seconds-versus-milliseconds is a real failure mode.
+   `EpochSeconds` exists — internal to the clock seam, audit instants, and
+   verification — and is the ceiling: the next brand needs a failure mode
+   at least as concrete as seconds-versus-milliseconds.
 5. **Use `satisfies` and `never` for exhaustiveness.** A
    `Record<FailureKind, ...>` and an `assertNever` default make a closed
    union stay closed.

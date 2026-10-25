@@ -1,8 +1,12 @@
-/** Epoch seconds. The engine never reads a clock except through this. */
+import { type EpochSeconds } from "../contract.js";
+/** Epoch seconds, branded from here on. The engine never reads a clock
+ * except through this. */
 export type Clock = {
-    now(): number;
+    now(): EpochSeconds;
 };
-/** A fixed clock for deterministic tests; step it by mutation. */
+/** A fixed clock for deterministic tests; step it by mutation. The start is
+ * caller data and stays a plain number — branding happens inside, because
+ * the clock is the boundary where a number becomes the engine's time. */
 export declare const fixedClock: (start: number) => Clock & {
     advance(seconds: number): void;
 };

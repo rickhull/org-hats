@@ -26,6 +26,7 @@ export type { VerifyKeySet } from "./keys.ts";
 export type {
   AccessEnvelopeClaimsV1,
   ActorId,
+  EpochSeconds,
   Failed,
   Failure,
   FailureKind,

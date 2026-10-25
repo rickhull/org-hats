@@ -69,6 +69,7 @@ export { createInMemoryAuthority } from "./engine.ts";export type {
 export type {
   AccessEnvelopeClaimsV1,
   ActorId,
+  EpochSeconds,
   Failed,
   Failure,
   GrantTarget,
@@ -91,6 +92,7 @@ export {
   ACCESS_ENVELOPE_VERSION,
   actorId,
   canonicalJson,
+  epochSeconds,
   isFailed,
   operationId,
   organizationId,

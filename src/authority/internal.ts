@@ -12,24 +12,35 @@
 // ../contract.ts — the encoding contract's single home. Nothing here is
 // exported from a public subpath.
 
-import { base64Decode, base64Encode, base64UrlDecode, base64UrlEncode, utf8 } from "../contract.ts";
+import {
+  base64Decode,
+  base64Encode,
+  base64UrlDecode,
+  base64UrlEncode,
+  epochSeconds,
+  utf8,
+  type EpochSeconds,
+} from "../contract.ts";
 
-/** Epoch seconds. The engine never reads a clock except through this. */
-export type Clock = { now(): number };
+/** Epoch seconds, branded from here on. The engine never reads a clock
+ * except through this. */
+export type Clock = { now(): EpochSeconds };
 
-/** A fixed clock for deterministic tests; step it by mutation. */
+/** A fixed clock for deterministic tests; step it by mutation. The start is
+ * caller data and stays a plain number — branding happens inside, because
+ * the clock is the boundary where a number becomes the engine's time. */
 export const fixedClock = (start: number): Clock & { advance(seconds: number): void } => {
-  let now = start;
+  let now = epochSeconds(start);
   return {
     now: () => now,
     advance: (seconds) => {
-      now += seconds;
+      now = epochSeconds(now + seconds);
     },
   };
 };
 
 /** The wall clock: the in-memory runtime's real-time default. */
-export const systemClock = (): Clock => ({ now: () => Math.floor(Date.now() / 1000) });
+export const systemClock = (): Clock => ({ now: () => epochSeconds(Math.floor(Date.now() / 1000)) });
 
 /** Opaque key material; the engine never inspects it. */
 interface KeyLike {

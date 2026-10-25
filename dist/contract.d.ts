@@ -41,7 +41,7 @@ export type TeamId = Branded<"TeamId">;
  * `invariantProblems` checks; the brand's job is the function boundaries,
  * where an argument-order slip would otherwise compile.
  */
-export type Unbranded<T> = T extends Branded<string> ? string : T extends readonly (infer E)[] ? readonly Unbranded<E>[] : T extends object ? {
+export type Unbranded<T> = T extends Branded<string> ? string : T extends EpochSeconds ? number : T extends readonly (infer E)[] ? readonly Unbranded<E>[] : T extends object ? {
     readonly [K in keyof T]: Unbranded<T[K]>;
 } : T;
 /** The only way to make a branded id: a named, deliberate conversion at the
@@ -51,6 +51,21 @@ export declare const actorId: (raw: string) => ActorId;
 export declare const operationId: (raw: string) => OperationId;
 export declare const siteId: (raw: string) => SiteId;
 export declare const teamId: (raw: string) => TeamId;
+/** Seconds since the Unix epoch — never milliseconds. The one remaining
+ * numeric mix-up with a real failure mode, so it carries the one remaining
+ * numeric brand: code that expects an instant refuses a millisecond count
+ * at compile time. Claims and public call inputs stay plain numbers
+ * (`Unbranded<EpochSeconds>`); the brand lives on the internal clock seam
+ * and the instants the engine and verifier reason about. Durations
+ * (lifetimes, steps) are not instants and stay plain. */
+export type EpochSeconds = number & {
+    readonly [brand]: "EpochSeconds";
+};
+/** The boundary conversion for the numeric brand, same rule as the ids:
+ * one named, deliberate conversion — wherever a wall-clock or
+ * caller-supplied number becomes an instant. Hosts never call this;
+ * public inputs take plain numbers and the runtime converts. */
+export declare const epochSeconds: (raw: number) => EpochSeconds;
 /** What a grant reaches: one team, or a site and every team at it.
  *
  * Declared here beside `TargetRef` because it is target vocabulary both the

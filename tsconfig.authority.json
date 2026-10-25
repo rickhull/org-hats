@@ -6,6 +6,7 @@
     "moduleResolution": "NodeNext",
     "types": [],
     "strict": true,
+    "erasableSyntaxOnly": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noEmit": true,

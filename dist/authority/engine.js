@@ -12,7 +12,7 @@
 // Determinism: the clock and signer are injected; a fixed clock plus a
 // fresh signer gives reproducible behavior (ids, failure kinds, receipts)
 // without pinning signature bytes.
-import { canonicalJson, ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, AUTHORITY_INTERFACE_VERSION, actorId, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";
+import { canonicalJson, epochSeconds, ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, AUTHORITY_INTERFACE_VERSION, actorId, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";
 import { applyParticipationEvent, readReach, wearableGrants, } from "../model.js";
 import { actionsOf } from "../policy.js";
 import { counter, sha256Hex, systemClock, webCryptoSigner } from "./internal.js";

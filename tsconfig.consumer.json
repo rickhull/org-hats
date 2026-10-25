@@ -6,6 +6,7 @@
     "moduleResolution": "NodeNext",
     "types": [],
     "strict": true,
+    "erasableSyntaxOnly": true,
     "noEmit": true,
     "incremental": true,
     "tsBuildInfoFile": "node_modules/.org-hats-consumer.tsbuildinfo",

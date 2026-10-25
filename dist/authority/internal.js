@@ -11,19 +11,21 @@
 // accidental `document` still fails to compile. Byte codecs live in
 // ../contract.ts — the encoding contract's single home. Nothing here is
 // exported from a public subpath.
-import { base64Decode, base64Encode, base64UrlDecode, base64UrlEncode, utf8 } from "../contract.js";
-/** A fixed clock for deterministic tests; step it by mutation. */
+import { base64Decode, base64Encode, base64UrlDecode, base64UrlEncode, epochSeconds, utf8, } from "../contract.js";
+/** A fixed clock for deterministic tests; step it by mutation. The start is
+ * caller data and stays a plain number — branding happens inside, because
+ * the clock is the boundary where a number becomes the engine's time. */
 export const fixedClock = (start) => {
-    let now = start;
+    let now = epochSeconds(start);
     return {
         now: () => now,
         advance: (seconds) => {
-            now += seconds;
+            now = epochSeconds(now + seconds);
         },
     };
 };
 /** The wall clock: the in-memory runtime's real-time default. */
-export const systemClock = () => ({ now: () => Math.floor(Date.now() / 1000) });
+export const systemClock = () => ({ now: () => epochSeconds(Math.floor(Date.now() / 1000)) });
 const subtle = globalThis.crypto?.subtle;
 const signerFromKeys = (subtle, keyId, pair) => ({
     keyId,

@@ -1,4 +1,4 @@
-import { type AccessEnvelopeClaimsV1, type Failed, type OperationId, type Unbranded, type SiteId, type SignedAccessEnvelope } from "../contract.js";
+import { type AccessEnvelopeClaimsV1, type EpochSeconds, type Failed, type OperationId, type Unbranded, type SiteId, type SignedAccessEnvelope } from "../contract.js";
 import type { NeutralAccess } from "./types.js";
 /** A verification-only key, keyed by id. Rotation is two live keys in the
  * map; retirement is removing the old one after its last envelope expires. */
@@ -7,8 +7,10 @@ export interface VerifyKey {
     verify(payload: string, signature: string): Promise<boolean>;
 }
 export interface VerifyContext {
-    /** Epoch seconds; defaults to the wall clock. Deterministic tests inject. */
-    now?: number;
+    /** Epoch seconds; defaults to the wall clock. Deterministic tests inject.
+     * Plain number: `Unbranded<EpochSeconds>` — a host passes seconds and
+     * never an epoch constructor. */
+    now?: Unbranded<EpochSeconds>;
     /** The operation the caller is serving; a mismatch is `wrong-binding`.
      * Plain string: a host passes the id it holds in its own configuration. */
     expectedOperationId?: Unbranded<OperationId>;

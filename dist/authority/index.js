@@ -20,4 +20,4 @@ export { AUTHORITY_INTERFACE_VERSION } from "./types.js";
 export { actionsOf, validatePolicyBundle } from "../policy.js";
 export { AIRLIFT, DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION, TWINS, } from "./twins.js";
 export { createInMemoryAuthority } from "./engine.js";
-export { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, actorId, canonicalJson, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";
+export { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, actorId, canonicalJson, epochSeconds, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";

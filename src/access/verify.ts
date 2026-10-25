@@ -17,8 +17,10 @@ import {
   base64Decode,
   base64UrlDecode,
   canonicalJson,
+  epochSeconds,
   utf8,
   type AccessEnvelopeClaimsV1,
+  type EpochSeconds,
   type Failed,
   type Failure,
   type JsonValue,
@@ -49,8 +51,10 @@ type _ExpectedSiteIdIsPlain = Assert<
 >;
 
 export interface VerifyContext {
-  /** Epoch seconds; defaults to the wall clock. Deterministic tests inject. */
-  now?: number;
+  /** Epoch seconds; defaults to the wall clock. Deterministic tests inject.
+   * Plain number: `Unbranded<EpochSeconds>` — a host passes seconds and
+   * never an epoch constructor. */
+  now?: Unbranded<EpochSeconds>;
   /** The operation the caller is serving; a mismatch is `wrong-binding`.
    * Plain string: a host passes the id it holds in its own configuration. */
   expectedOperationId?: Unbranded<OperationId>;
@@ -155,7 +159,7 @@ export const verify = async (
   if (!(await key.verify(payload, envelope.signature))) {
     return failed({ kind: "invalid-signature" });
   }
-  const now = context.now ?? Math.floor(Date.now() / 1000);
+  const now = epochSeconds(context.now ?? Math.floor(Date.now() / 1000));
   if (now >= envelope.claims.exp) {
     return failed({ kind: "expired" });
   }
