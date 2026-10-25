@@ -1,6 +1,7 @@
 import { SELF } from "cloudflare:test";
 import { ed25519VerifyKey, parseVerifyKeySet } from "org-hats/access";
 import { describe, expect, it } from "vitest";
+import { organizationBootstrap } from "./helpers";
 
 const OPS = { authorization: "Bearer test-ops-token" };
 const ORG = "org-ops";
@@ -21,20 +22,10 @@ const jsonPost = async (path: string, body: unknown): Promise<Response> =>
     body: JSON.stringify(body),
   });
 
-const orgBootstrap = (organizationId: string) => ({
-  organizationId,
-  displayName: "Ops Works",
-  actors: [
-    { actorId: "actor-admin", displayName: "Nia Fields" },
-    { actorId: "actor-member", displayName: "Sam Whitfield" },
-  ],
-  principalLinks: [
-    { provider: "idp", subject: "admin", actorId: "actor-admin" },
-    { provider: "idp", subject: "member", actorId: "actor-member" },
-  ],
-  orgAdmins: ["actor-admin"],
-  sealedIdpConfig: "sealed:ops-test",
-});
+// the ops surface seeds the same Cedar Works actors, links, admins, and
+// sealed-config shape, under its own display name and sealed marker
+const orgBootstrap = (organizationId: string) =>
+  organizationBootstrap(organizationId, { displayName: "Ops Works", sealedIdpConfig: "sealed:ops-test" });
 
 const opBootstrap = (operationId: string, organizationId: string) => ({
   operationId,

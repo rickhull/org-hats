@@ -1,16 +1,11 @@
 import { env, runDurableObjectAlarm } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { call, organizationBootstrap } from "./helpers";
 
 const ADMIN = "actor-admin";
 const MEMBER = "actor-member";
 const SITE = "site-test";
 const TEAM = "team-test";
-
-interface Envelope<T> {
-  readonly ok: boolean;
-  readonly value?: T;
-  readonly failure?: { readonly kind: string; readonly detail?: string };
-}
 
 interface World {
   readonly orgId: string;
@@ -33,36 +28,8 @@ const world = (suffix: string): World => {
   };
 };
 
-const call = async <T>(
-  stub: DurableObjectStub,
-  method: "GET" | "POST",
-  path: string,
-  body?: unknown,
-): Promise<{ status: number; body: Envelope<T> }> => {
-  const response = await stub.fetch(`https://authority.internal${path}`, {
-    method,
-    ...(body === undefined
-      ? {}
-      : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
-  });
-  return { status: response.status, body: (await response.json()) as Envelope<T> };
-};
-
 const bootstrapOrganization = async (current: World) =>
-  call(current.org, "POST", "/bootstrap", {
-    organizationId: current.orgId,
-    displayName: "Cedar Works",
-    actors: [
-      { actorId: ADMIN, displayName: "Nia Fields" },
-      { actorId: MEMBER, displayName: "Sam Whitfield" },
-    ],
-    principalLinks: [
-      { provider: "idp", subject: "admin", actorId: ADMIN },
-      { provider: "idp", subject: "member", actorId: MEMBER },
-    ],
-    orgAdmins: [ADMIN],
-    sealedIdpConfig: "sealed:test-only",
-  });
+  call(current.org, "POST", "/bootstrap", organizationBootstrap(current.orgId));
 
 const bootstrapOperation = async (current: World) =>
   call(current.op, "POST", "/bootstrap", {

@@ -107,6 +107,14 @@ coordinator; the authorization cases assert denials for non-administrators.
 without a release, and the grant/revoke workflow's own gate becomes
 unmovable.
 
+*Held by:* `PrincipalEvidence` carries identity and authentication facts
+only — nothing a provider issued; the exchange lives in
+`packages/cloudflare/src/exchange.ts`, not under `src/`; the identity
+boundary in `docs/authority_redesign.md`.
+*If it breaks:* provider secrets enter the portable modules and the fence
+of P1 loses its meaning for identity, or every host grows a second OIDC
+implementation — the drift the boundary exists to prevent.
+
 ### A10 — Evidence is never a roster
 
 A principal link resolves one `(organizationId, actorId)`; no provider
@@ -118,3 +126,9 @@ conflicting re-link is refused at both bootstrap layers (`scenarios.test.ts`
 pins it); the twins keep actors organization-scoped.
 *If it breaks:* a platform-global person record appears by the back door,
 and removing an actor from one operation starts affecting another.
+
+### A11 — The portable seam is evidence-only
+
+No provider credential, authorization code, or secret crosses the portable
+`AuthorityRuntime`; the exchange that turns a provider callback into
+evidence is runtime surface, supplied per deployment.

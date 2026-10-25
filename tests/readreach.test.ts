@@ -9,6 +9,7 @@ import { invariantProblems, readReach, type Snapshot } from "../src/model.ts";
 import type { PolicyBundle } from "../src/policy.ts";
 import { validatePolicyBundle } from "../src/policy.ts";
 import { DANA_OKAFOR, FESTIVAL, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION } from "../src/authority/twins.ts";
+import { mulberry32, pick } from "./helpers.ts";
 
 test("granted-teams: Dana reads Harbor, the org of her reached team", () => {
   const r = readReach(PROFESSIONAL_OPERATION.snapshot, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, DANA_OKAFOR, "op-9f2e6ad4");
@@ -30,15 +31,9 @@ test("all-participating: festival-wide read, no exceptional teams", () => {
 
 // --- generated snapshots --------------------------------------------------------
 //
-// A tiny deterministic generator (mulberry32): small worlds, every one valid
-// by construction, run through readReach and the invariants.
-
-const mulberry32 = (seed: number) => () => {
-  seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
-  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-};
+// A tiny deterministic generator (mulberry32, from tests/helpers.ts):
+// small worlds, every one valid by construction, run through readReach and
+// the invariants.
 
 const bundle: PolicyBundle = {
   format: 1,
@@ -56,7 +51,6 @@ assert.deepEqual(validatePolicyBundle(bundle), []);
 test("generated snapshots: invariants clean, read reach structurally sound", () => {
   for (let seed = 1; seed <= 50; seed++) {
     const rng = mulberry32(seed);
-    const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rng() * xs.length)] as T;
 
     const orgs = [1, 2, 3].map((i) => ({ organizationId: `org-${i}` }));
     const actors = orgs.flatMap((o) =>
@@ -76,8 +70,8 @@ test("generated snapshots: invariants clean, read reach structurally sound", () 
       organizationId: a.organizationId, actorId: a.actorId,
       role: rng() > 0.5 ? "field" : "lead",
       target: rng() > 0.5
-        ? { kind: "team" as const, teamId: pick(teams).teamId }
-        : { kind: "site" as const, siteId: pick(sites).siteId },
+        ? { kind: "team" as const, teamId: pick(rng, teams).teamId }
+        : { kind: "site" as const, siteId: pick(rng, sites).siteId },
       primary: i === 0,
     }));
     const snapshot: Snapshot = {
