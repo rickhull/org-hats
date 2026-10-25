@@ -206,11 +206,24 @@ export const evidenceFromProviderCode = async (
     .filter((id) => id.length > 0);
   for (const organizationId of organizationIds) {
     const stub = env.ORGANIZATION.get(env.ORGANIZATION.idFromName(organizationId));
-    const response = await stub.fetch("https://authority.internal/idp-config");
-    const result = (await response.json()) as {
+    let result: {
       readonly ok: boolean;
       readonly value?: { readonly present: boolean; readonly config?: string };
     };
+    try {
+      const response = await stub.fetch("https://authority.internal/idp-config");
+      result = (await response.json()) as typeof result;
+    } catch (error) {
+      // A directory member that cannot answer could be the one holding the
+      // sealed configuration; do not claim no match.
+      return {
+        ok: false,
+        failure: {
+          kind: "unavailable",
+          detail: error instanceof Error ? error.message : "the organization directory is unavailable",
+        },
+      };
+    }
     if (!result.ok || result.value?.present !== true) continue;
     let config: SealedProviderConfig | undefined;
     try {
@@ -240,13 +253,25 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     path: string,
     body?: unknown,
   ): Promise<Envelope<T>> => {
-    const response = await stub.fetch(`https://authority.internal${path}`, {
-      method,
-      ...(body === undefined
-        ? {}
-        : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
-    });
-    return (await response.json()) as Envelope<T>;
+    try {
+      const response = await stub.fetch(`https://authority.internal${path}`, {
+        method,
+        ...(body === undefined
+          ? {}
+          : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+      });
+      return (await response.json()) as Envelope<T>;
+    } catch (error) {
+      // A coordinator that cannot answer is `unavailable`, not an exception
+      // through the service binding. The portable seam returns failures.
+      return {
+        ok: false,
+        failure: {
+          kind: "unavailable",
+          detail: error instanceof Error ? error.message : "the coordinator is unavailable",
+        },
+      };
+    }
   };
 
   const drain = async (operationId?: string, organizationId?: string): Promise<void> => {
@@ -264,6 +289,12 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
       ...(preferredOrganizationId === undefined ? [] : [preferredOrganizationId]),
       ...organizationIds,
     ])];
+    // The directory is not a registry: each organization holds its own
+    // links, so the only global view is to ask every candidate. One
+    // identity linked to two actors is a configuration fault, not a race
+    // to win — return it as `unavailable` rather than silently resolving
+    // whichever organization happened to be first.
+    const matches: { actorId: string; organizationId: string; disabled: boolean }[] = [];
     for (const organizationId of candidates) {
       const result = await call<{ actorId: string; disabled: boolean }>(
         organization(organizationId),
@@ -271,11 +302,22 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         `/resolve?provider=${encodeURIComponent(evidence.provider)}&subject=${encodeURIComponent(evidence.subject)}`,
       );
       if (result.ok && result.value !== undefined) {
-        return { actorId: result.value.actorId, organizationId, disabled: result.value.disabled };
+        matches.push({ actorId: result.value.actorId, organizationId, disabled: result.value.disabled });
+        continue;
       }
       if (result.failure?.kind !== "unauthenticated") return failed(result.failure ?? { kind: "unavailable" });
     }
-    return failed({ kind: "unauthenticated", detail: "no principal link for this evidence" });
+    if (matches.length > 1) {
+      return failed({
+        kind: "unavailable",
+        detail: "the principal link is ambiguous across organizations",
+      });
+    }
+    const match = matches[0];
+    if (match === undefined) {
+      return failed({ kind: "unauthenticated", detail: "no principal link for this evidence" });
+    }
+    return match;
   };
 
   const adminOfOrganization = async (organizationId: string, actorId: string): Promise<boolean> => {
@@ -325,6 +367,10 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     const preferred = command.kind === "disable-actor" ? command.organizationId : undefined;
     const resolved = await resolve(command.authorization.evidence, preferred);
     if (isFailed(resolved)) return resolved;
+    // The live organization read is the disable gate; the projection is not
+    // the revocation promise. This matches the in-memory engine, which
+    // refuses a disabled actor's fresh evidence before any handler runs.
+    if (resolved.disabled) return failed({ kind: "not-admitted", detail: "actor disabled" });
     return {
       organizationId: resolved.organizationId,
       actorId: resolved.actorId,
@@ -435,10 +481,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     if (input.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) {
       return { ok: false, failure: { kind: "wrong-interface-version" } };
     }
-    const authorized = await authorize(input);
-    if (isFailed(authorized)) return { ok: false, failure: authorized.failure };
     const operationId = "operationId" in input ? input.operationId : undefined;
-    await drain(operationId, authorized.organizationId);
     const key = input.idempotencyKey;
     const route = async (stub: DurableObjectStub, path: string, body: Record<string, unknown>): Promise<CommandResult> => {
       const result = await call<{ applied: boolean }>(stub, "POST", path, { ...body, idempotencyKey: key });
@@ -446,6 +489,28 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
       return { ok: true, receipt: { idempotencyKey: key, applied: result.value.applied } };
     };
     const deny = (failure: Failure): CommandResult => ({ ok: false, failure });
+
+    // request-access asks as the evidence in the request; the shell
+    // authorization is not the request. The in-memory engine reads the same
+    // field and takes this path before resolving an administrator, so an
+    // unrelated (or stale) authorization cannot make the request as
+    // somebody else. No administrator is involved.
+    if (input.kind === "request-access") {
+      const resolved = await resolve(input.evidence);
+      if (isFailed(resolved)) return deny(resolved.failure);
+      await drain(input.operationId, resolved.organizationId);
+      const result = await route(operation(input.operationId), "/request-access", {
+        organizationId: resolved.organizationId,
+        actorId: resolved.actorId,
+        ...(input.note === undefined ? {} : { note: input.note }),
+      });
+      await drain(input.operationId, resolved.organizationId);
+      return result;
+    }
+
+    const authorized = await authorize(input);
+    if (isFailed(authorized)) return deny(authorized.failure);
+    await drain(operationId, authorized.organizationId);
 
     let result: CommandResult;
     switch (input.kind) {
@@ -477,13 +542,6 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
             actorId: authorized.actorId,
           });
         }
-        break;
-      case "request-access":
-        result = await route(operation(input.operationId), "/request-access", {
-          organizationId: authorized.organizationId,
-          actorId: authorized.actorId,
-          ...(input.note === undefined ? {} : { note: input.note }),
-        });
         break;
       case "admit":
         if (!authorized.adminOfOperation) return deny({ kind: "denied", detail: "the caller does not administer this operation" });

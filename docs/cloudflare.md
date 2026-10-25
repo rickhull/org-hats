@@ -30,7 +30,10 @@ Every mutation commits with its audit event, idempotency claim, and outbox
 rows inside one `transactionSync`. Work spanning the two coordinators is a
 durable outbox message with a visible partial state and an alarm-driven
 retry — never a distributed transaction. A duplicate or mismatched
-principal link is refused at bootstrap: one identity is never two actors.
+principal link is refused at bootstrap, and the runtime's evidence
+resolution asks the whole directory and fails closed when one
+`(provider, subject)` resolves in more than one organization: one identity
+is never two actors.
 
 No write path reads the other coordinator synchronously
 (docs/authority_redesign.md § State ownership), with one deliberate
@@ -82,6 +85,16 @@ for malformed input. Issuance stays `accessFromEvidence` — evidence in,
 one verb per crossing. Discovery is cached a day and JWKS an hour per
 isolate; a failing signature triggers exactly one JWKS refetch per
 exchange, which is the key-rotation window.
+
+Evidence and command authorization read the organization live where the
+decision needs it. A disabled actor's fresh evidence is refused
+`not-admitted` before a handler runs, even while the operation's projection
+still says enabled; one `(provider, subject)` resolving in more than one
+directory organization is `unavailable`, not a first-match; and a
+coordinator that cannot answer is a closed `unavailable`, never an
+exception through the service binding. `request-access` is the exception to
+the administrator path: it takes the evidence the command carries, and
+needs no administrator.
 
 ## Signing and verification keys
 
@@ -183,8 +196,9 @@ Two platform notes, both load-bearing:
 - The vitest plugin has no `isolatedStorage`. Tests use unique object
   names or explicit resets and assert deltas rather than absolute values.
 - workerd's ECDSA `sign` emits the raw `r||s` JWS form where the
-  WebCrypto spec says DER; the exchange's verifier accepts either shape,
-  so tokens from spec-conformant runtimes and from workerd both pass.
+  WebCrypto spec expects DER; the exchange converts raw to DER (including
+  the leading zero a high-bit integer needs) and tries both, so the
+  verifier does not depend on which shape the runtime expects.
 
 ## The demo
 

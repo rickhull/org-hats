@@ -1,0 +1,29 @@
+#!/usr/bin/env sh
+# Replace a package manifest's top-level version, preserving the file's
+# formatting. The release script used to replace every occurrence of the old
+# version string, which also rewrote a description or a dependency that
+# happened to name it.
+#
+#   bin/set-version package.json 2.1.0
+set -eu
+[ "$#" -eq 2 ] || { printf 'usage: bin/set-version <manifest> <version>\n' >&2; exit 2; }
+manifest=$1
+next=$2
+[ -f "$manifest" ] || { printf 'set-version: no manifest: %s\n' "$manifest" >&2; exit 1; }
+
+node -e '
+const fs = require("node:fs");
+const path = process.argv[1];
+const next = process.argv[2];
+if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(next)) {
+  console.error(`set-version: not a release version: ${next}`);
+  process.exit(1);
+}
+const text = fs.readFileSync(path, "utf8");
+const pattern = /("version"\s*:\s*")[^"]*(")/;
+if (!pattern.test(text)) {
+  console.error("set-version: the manifest has no version field");
+  process.exit(1);
+}
+fs.writeFileSync(path, text.replace(pattern, `$1${next}$2`));
+' "$manifest" "$next"

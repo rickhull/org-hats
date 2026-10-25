@@ -5,12 +5,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const script = fileURLToPath(new URL("../bin/check-version", import.meta.url));
+const setVersion = fileURLToPath(new URL("../bin/set-version", import.meta.url));
 
 // The guard reads GITHUB_REF and runs git in a temp repository. Neither an
 // ambient CI tag nor a developer's global git config may influence it.
@@ -78,6 +79,46 @@ test("both release-tag families are validated against their own manifest", () =>
     assert.equal(atHead.status, 0, atHead.stderr);
     assert.match(atHead.stdout ?? "", /v1\.2\.3 matches/);
     assert.match(atHead.stdout ?? "", /cloudflare-v0\.1\.0 matches/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("set-version changes only the manifest's top-level version", () => {
+  const root = mkdtempSync(join(tmpdir(), "org-hats-set-version-"));
+  try {
+    const manifest = join(root, "package.json");
+    const before = `{
+  "name": "fixture",
+  "version": "1.2.3",
+  "description": "pinned at 1.2.3 for a reason",
+  "dependencies": { "dep": "1.2.3" }
+}
+`;
+    writeFileSync(manifest, before);
+    const result = spawnSync(setVersion, [manifest, "1.2.4"], { encoding: "utf8", env: testEnv });
+    assert.equal(result.status, 0, result.stderr);
+    const after = readFileSync(manifest, "utf8");
+    assert.equal(
+      after,
+      before.replace(`"version": "1.2.3"`, `"version": "1.2.4"`),
+      "only the top-level version may move",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("set-version refuses a manifest without a version and leaves it untouched", () => {
+  const root = mkdtempSync(join(tmpdir(), "org-hats-set-version-"));
+  try {
+    const manifest = join(root, "package.json");
+    const before = `{ "name": "fixture" }\n`;
+    writeFileSync(manifest, before);
+    const result = spawnSync(setVersion, [manifest, "1.2.4"], { encoding: "utf8", env: testEnv });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr ?? "", /version/);
+    assert.equal(readFileSync(manifest, "utf8"), before);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

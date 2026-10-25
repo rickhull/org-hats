@@ -124,10 +124,10 @@ if $verify; then
 	fi
 fi
 
-# The manifest is the single pinned version. Replace only that value so the
-# rest of the file's formatting is untouched.
-node -e 'const fs=require("fs"),p=process.argv[1],o=process.argv[2],n=process.argv[3];
-	fs.writeFileSync(p, fs.readFileSync(p,"utf8").split(o).join(n));' "$manifest" "$current" "$next"
+# The manifest is the single pinned version. The helper changes only that
+# field, so the rest of the file's formatting is untouched and a description
+# or dependency naming the old version stays as written.
+"$(dirname "$0")/set-version" "$manifest" "$next"
 
 # When the gates ran, bin/check-dist already built and verified dist/
 # before the bump; the bump touches only the manifest. Without the gates,

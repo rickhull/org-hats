@@ -65,12 +65,17 @@ plausible deletion or inversion leaves the suite green.
 - [ ] `packages/cloudflare/test/operation.test.ts:210` — `/intake` status is
   never asserted (only the body), so a regression flipping 503-for-retry
   against 200-recorded-no-op passes. Assert both.
-- [ ] `packages/cloudflare/test/exchange.test.ts:99` — no expired or wrong
+- [x] `packages/cloudflare/test/exchange.test.ts:99` — no expired or wrong
   `aud`/`iss` token is exercised; deleting those checks passes. Add expiry,
   audience, issuer, and a rejected `alg` case.
-- [ ] `packages/cloudflare/test/exchange.test.ts:50` — only ES256 is tested;
+  Landed 2026-10-25 with the R5 exchange review: expired, wrong issuer,
+  single wrong audience, and `alg: none` cases.
+- [x] `packages/cloudflare/test/exchange.test.ts:50` — only ES256 is tested;
   the RS256 branch and the DER-signature fallback are dead under test. Add an
   RS256 token and a fixed DER vector.
+  Landed 2026-10-25: the RS256 test exposed a missing SHA-256 algorithm
+  parameter (RS256 could not verify at all); the fixed high-bit DER vector
+  pins the conversion.
 - [ ] `packages/cloudflare/test/conformance.test.ts:13` — asserts
   `results.length > 0`, not the full inventory id set; a runtime-side skip
   passes. Assert the ids equal `CONFORMANCE_CASES`.

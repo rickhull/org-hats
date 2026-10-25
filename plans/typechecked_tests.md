@@ -89,7 +89,7 @@ runs it; `pnpm check` and `pnpm verify` are green; no suppressions were added.
 ## Out of scope
 
 - Runtime behavior changes or new public API. If a type error exposes a real
-  behavior bug, move it to `code_review.md` and decide it there.
+  behavior bug, move it to `plans/test_suite_review.md` and decide it there.
 - The `packages/cloudflare` tests: its `tsconfig.json` already includes
   `src`, `test`, and `vitest.config.ts`.
 - The R4 engine split and the R5 package slices.

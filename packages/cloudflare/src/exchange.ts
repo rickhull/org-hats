@@ -61,21 +61,55 @@ const jwksCache = new Map<string, { value: readonly Jwk[]; expiresAt: number }>(
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
+/** A discovery document that is reachable but not trustworthy: the provider
+ * answered, and the answer is wrong. Distinct from a network failure so the
+ * exchange can report `unauthenticated` rather than `unavailable`. */
+class MetadataError extends Error {}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
 const fetchJson = async (url: string): Promise<unknown> => {
   const response = await fetch(url, { headers: { accept: "application/json" } });
   if (!response.ok) throw new Error(`fetch ${url} failed with ${response.status}`);
-  return response.json();
+  try {
+    return await response.json();
+  } catch {
+    throw new MetadataError("the provider returned invalid JSON");
+  }
+};
+
+/** RFC 8414 §2.1: the server metadata endpoints are https URLs. */
+const httpsEndpoint = (value: unknown, field: string): string => {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new MetadataError(`the discovery document lacks ${field}`);
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new MetadataError(`the discovery document's ${field} is not a URL`);
+  }
+  if (url.protocol !== "https:") {
+    throw new MetadataError(`the discovery document's ${field} must use https`);
+  }
+  return value;
 };
 
 const discoveryOf = async (issuer: string): Promise<Discovery> => {
   const cached = discoveryCache.get(issuer);
   if (cached !== undefined && cached.expiresAt > nowSeconds()) return cached.value;
   const url = `${issuer.replace(/\/+$/, "")}/.well-known/openid-configuration`;
-  const document = (await fetchJson(url)) as { token_endpoint?: unknown; jwks_uri?: unknown };
-  if (typeof document.token_endpoint !== "string" || typeof document.jwks_uri !== "string") {
-    throw new Error("the discovery document lacks its endpoints");
+  const document = await fetchJson(url);
+  if (!isRecord(document)) throw new MetadataError("the discovery document is not an object");
+  // RFC 8414 §3.3: `issuer` is required and must identify this issuer.
+  if (document["issuer"] !== issuer) {
+    throw new MetadataError("the discovery document names a different issuer");
   }
-  const value: Discovery = { tokenEndpoint: document.token_endpoint, jwksUri: document.jwks_uri };
+  const value: Discovery = {
+    tokenEndpoint: httpsEndpoint(document["token_endpoint"], "token_endpoint"),
+    jwksUri: httpsEndpoint(document["jwks_uri"], "jwks_uri"),
+  };
   discoveryCache.set(issuer, { value, expiresAt: nowSeconds() + DISCOVERY_TTL_SECONDS });
   return value;
 };
@@ -98,6 +132,13 @@ interface TokenClaims {
   readonly aud: string | readonly string[];
   readonly nonce?: string;
   readonly exp: number;
+  /** OIDC ID tokens carry `iat`; RFC 7519 calls it informational, but the
+   * issuer must state when the token was issued. */
+  readonly iat: number;
+  /** RFC 7519 §4.1.5: if present, the token is not valid before this time. */
+  readonly nbf?: number;
+  /** OIDC Core §3.1.3.7: required when `aud` has more than one value. */
+  readonly azp?: string;
   readonly name?: string;
   readonly amr?: readonly string[];
   readonly auth_time?: number;
@@ -111,21 +152,23 @@ const decodeSegment = <T>(segment: string): T => {
   }
 };
 
+/** One DER INTEGER: a big-endian value with a leading zero when its high
+ * bit would otherwise make it negative. */
+const derInteger = (value: Uint8Array): Uint8Array => {
+  const pad = ((value[0] ?? 0) & 0x80) !== 0;
+  return Uint8Array.from([0x02, value.length + (pad ? 1 : 0), ...(pad ? [0] : []), ...value]);
+};
+
 /** JWS signs ES256 as raw `r || s` (64 bytes) per RFC 7518; WebCrypto
  * verifies DER per the WebCrypto spec — and workerd verifies raw, like it
- * signs. Both forms are tried, so the verifier works on either shape. */
-const derSignatureOf = (raw: Uint8Array): Uint8Array => {
+ * signs. Both forms are tried, so the verifier works on either shape. The
+ * DER form is a real conversion, not a fixed-width wrapper: an integer whose
+ * high bit is set gets the leading zero DER requires. */
+export const derSignatureOf = (raw: Uint8Array): Uint8Array => {
   if (raw.length !== 64) throw new Error("the ID token signature does not verify");
-  const der = new Uint8Array(70);
-  der[0] = 0x30;
-  der[1] = 68;
-  der[2] = 0x02;
-  der[3] = 32;
-  der.set(raw.subarray(0, 32), 4);
-  der[36] = 0x02;
-  der[37] = 32;
-  der.set(raw.subarray(32, 64), 38);
-  return der;
+  const r = derInteger(raw.subarray(0, 32));
+  const s = derInteger(raw.subarray(32, 64));
+  return Uint8Array.from([0x30, r.length + s.length, ...r, ...s]);
 };
 
 interface VerifyOptions {
@@ -138,32 +181,42 @@ interface VerifyOptions {
 const verifyIdToken = async (token: string, options: VerifyOptions): Promise<TokenClaims> => {
   const parts = token.split(".");
   if (parts.length !== 3) throw new Error("the ID token is not a JWS compact serialization");
-  const header = decodeSegment<{ alg?: string; kid?: string }>(parts[0] ?? "");
+  const header = decodeSegment<{ alg?: unknown; kid?: unknown; crit?: unknown }>(parts[0] ?? "");
   const claims = decodeSegment<TokenClaims>(parts[1] ?? "");
   const signature = base64UrlDecode(parts[2] ?? "");
 
-  if (header.alg !== "ES256" && header.alg !== "RS256") {
-    throw new Error(`the ID token algorithm ${header.alg ?? "(none)"} is not accepted`);
+  if (typeof header.alg !== "string" || (header.alg !== "ES256" && header.alg !== "RS256")) {
+    throw new Error(`the ID token algorithm ${String(header.alg ?? "(none)")} is not accepted`);
   }
-  const wantedKty = header.alg === "ES256" ? "EC" : "RSA";
+  // RFC 7515 §4.1.11: a `crit` extension the verifier does not understand
+  // must be rejected; this verifier understands none.
+  if (header.crit !== undefined) throw new Error("the ID token carries an unsupported critical header");
+  if (header.kid !== undefined && typeof header.kid !== "string") {
+    throw new Error("the ID token header has an invalid kid");
+  }
+  const kid = header.kid;
+  const isEs256 = header.alg === "ES256";
+  const wantedKty = isEs256 ? "EC" : "RSA";
   const candidates = options.keys.filter(
-    (key) => key.kty === wantedKty && (header.kid === undefined || key.kid === header.kid),
+    (key) => key.kty === wantedKty && (kid === undefined || key.kid === kid),
   );
-  const verifyAlgorithm = header.alg === "ES256"
+  // RS256 is RSASSA-PKCS1-v1_5 with SHA-256 (RFC 7518 §3.3); the hash is
+  // part of both the import and the verify algorithm.
+  const verifyAlgorithm = isEs256
     ? { name: "ECDSA", hash: { name: "SHA-256" } }
-    : { name: "RSASSA-PKCS1-v1_5" };
+    : { name: "RSASSA-PKCS1-v1_5", hash: { name: "SHA-256" } };
   const signed = utf8(`${parts[0]}.${parts[1]}`);
   let verified = false;
   for (const key of candidates) {
     try {
-      // EC JWK import needs the curve, not the hash; the hash belongs to
-      // the verify call. A JWK naming another curve is tried, not trusted.
-      const importAlgorithm = header.alg === "ES256"
-        ? { name: "ECDSA", namedCurve: key.crv === "P-256" ? "P-256" : "P-384" }
-        : { name: "RSASSA-PKCS1-v1_5" };
-      if (header.alg === "ES256" && key.crv !== "P-256" && key.crv !== "P-384") continue;
+      // ES256 is P-256 (RFC 7518 §3.4). A key on another curve is tried,
+      // not trusted — and here it is not even tried.
+      if (isEs256 && key.crv !== "P-256") continue;
+      const importAlgorithm = isEs256
+        ? { name: "ECDSA", namedCurve: "P-256" }
+        : { name: "RSASSA-PKCS1-v1_5", hash: { name: "SHA-256" } };
       const cryptoKey = await crypto.subtle.importKey("jwk", key, importAlgorithm, false, ["verify"]);
-      const forms = header.alg === "ES256" ? [signature, derSignatureOf(signature)] : [signature];
+      const forms = isEs256 ? [signature, derSignatureOf(signature)] : [signature];
       for (const signatureBytes of forms) {
         if (await crypto.subtle.verify(verifyAlgorithm, cryptoKey, signatureBytes, signed)) {
           verified = true;
@@ -178,11 +231,47 @@ const verifyIdToken = async (token: string, options: VerifyOptions): Promise<Tok
   if (!verified) throw new Error("the ID token signature does not verify");
 
   if (claims.iss !== options.issuer) throw new Error("the ID token issuer does not match");
-  const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  const audiences = typeof claims.aud === "string"
+    ? [claims.aud]
+    : Array.isArray(claims.aud) && claims.aud.every((value) => typeof value === "string")
+      ? claims.aud
+      : [];
   if (!audiences.includes(options.clientId)) throw new Error("the ID token audience does not match");
+  if (claims.azp !== undefined && typeof claims.azp !== "string") {
+    throw new Error("the ID token authorized party is not a string");
+  }
+  if (audiences.length > 1 && claims.azp !== options.clientId) {
+    throw new Error("the ID token authorized party does not match");
+  }
   if (claims.nonce !== options.expectedNonce) throw new Error("the ID token nonce does not match");
-  if (typeof claims.exp !== "number" || nowSeconds() >= claims.exp) throw new Error("the ID token is expired");
+  if (typeof claims.exp !== "number" || !Number.isFinite(claims.exp) || nowSeconds() >= claims.exp) {
+    throw new Error("the ID token is expired");
+  }
+  if (typeof claims.iat !== "number" || !Number.isFinite(claims.iat)) {
+    throw new Error("the ID token has no issued-at time");
+  }
+  if (
+    claims.nbf !== undefined &&
+    (typeof claims.nbf !== "number" || !Number.isFinite(claims.nbf) || nowSeconds() < claims.nbf)
+  ) {
+    throw new Error("the ID token is not yet valid");
+  }
   if (typeof claims.sub !== "string" || claims.sub.length === 0) throw new Error("the ID token has no subject");
+  if (
+    claims.amr !== undefined &&
+    (!Array.isArray(claims.amr) || !claims.amr.every((value) => typeof value === "string" && value.length > 0))
+  ) {
+    throw new Error("the ID token amr is not a list of method references");
+  }
+  if (
+    claims.auth_time !== undefined &&
+    (typeof claims.auth_time !== "number" || !Number.isFinite(claims.auth_time))
+  ) {
+    throw new Error("the ID token auth_time is not a timestamp");
+  }
+  if (claims.name !== undefined && typeof claims.name !== "string") {
+    throw new Error("the ID token name is not a string");
+  }
   return claims;
 };
 
@@ -241,6 +330,11 @@ export const exchangeCodeForEvidence = async (
       return failed({ kind: "invalid-command", detail: `${field} must be a non-empty string` });
     }
   }
+  // RFC 7636 §4.1: 43-128 unreserved characters. The tenant creates the
+  // verifier; the runtime refuses a malformed one before a round trip.
+  if (!/^[A-Za-z0-9\-._~]{43,128}$/.test(input.codeVerifier)) {
+    return failed({ kind: "invalid-command", detail: "codeVerifier must be 43-128 unreserved characters" });
+  }
   if (input.issuer !== config.issuer || input.clientId !== config.clientId) {
     return failed({ kind: "unauthenticated", detail: "the sealed provider configuration does not match the request" });
   }
@@ -249,8 +343,11 @@ export const exchangeCodeForEvidence = async (
   try {
     discovery = await discoveryOf(input.issuer);
   } catch (error) {
+    // A reachable provider with a wrong discovery document is a trust
+    // failure (`unauthenticated`); a provider that could not be reached is
+    // `unavailable`.
     return failed({
-      kind: "unavailable",
+      kind: error instanceof MetadataError ? "unauthenticated" : "unavailable",
       detail: error instanceof Error ? error.message : "the provider could not be reached",
     });
   }
@@ -293,11 +390,12 @@ export const exchangeCodeForEvidence = async (
     return { ok: true, evidence: evidenceOf(claims, input.issuer) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "the ID token did not verify";
-    if (message !== "the ID token signature does not verify" && !message.includes("not well-formed")) {
+    if (message !== "the ID token signature does not verify") {
       return failed({ kind: "unauthenticated", detail: message });
     }
     // the signature failing against cached keys is the rotation window:
-    // one refetch, one retry, then the failure stands
+    // one refetch, one retry, then the failure stands. A malformed token is
+    // not a rotation signal, so only a signature failure gets the retry.
     try {
       jwksCache.delete(input.issuer);
       const fresh = await jwksOf(input.issuer, discovery.jwksUri);
@@ -308,8 +406,11 @@ export const exchangeCodeForEvidence = async (
         keys: fresh,
       });
       return { ok: true, evidence: evidenceOf(claims, input.issuer) };
-    } catch {
-      return failed({ kind: "unauthenticated", detail: message });
+    } catch (retryError) {
+      return failed({
+        kind: "unauthenticated",
+        detail: retryError instanceof Error ? retryError.message : message,
+      });
     }
   }
 };

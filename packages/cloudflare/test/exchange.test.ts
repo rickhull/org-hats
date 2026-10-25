@@ -11,6 +11,7 @@ import { AUTHORITY_INTERFACE_VERSION } from "org-hats/authority";
 import { base64UrlEncode, utf8 } from "org-hats/access";
 import type { Env } from "../src/env";
 import {
+  derSignatureOf,
   exchangeCodeForEvidence,
   resetExchangeCaches,
   type EvidenceFromProviderCodeInput,
@@ -21,21 +22,26 @@ const ISSUER = "https://idp.example";
 const CLIENT_ID = "qm-tenant";
 const REDIRECT_URI = "https://tenant.example/auth/callback";
 const CONFIG = { issuer: ISSUER, clientId: CLIENT_ID, clientSecret: "sealed-secret" };
+/** RFC 7636: 43-128 unreserved characters. */
+const CODE_VERIFIER = `verifier-${"a".repeat(34)}`;
 
 const b64url = (bytes: Uint8Array): string => base64UrlEncode(bytes);
 const jsonSegment = (value: unknown): string => b64url(utf8(JSON.stringify(value)));
 
 /** ECDSA P-256 keys and a JWS compact ID token with a raw r||s signature. */
-const providerKeys = async (kid = "key-1") => {
-  const pair = (await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, [
+const providerKeys = async (kid = "key-1", curve: "P-256" | "P-384" = "P-256") => {
+  const pair = (await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: curve }, true, [
     "sign",
     "verify",
   ])) as CryptoKeyPair;
   const jwk = (await crypto.subtle.exportKey("jwk", pair.publicKey)) as JsonWebKey;
   const withKid = { ...jwk, kid, alg: "ES256", use: "sig" };
 
-  const sign = async (claims: Record<string, unknown>): Promise<string> => {
-    const header = jsonSegment({ alg: "ES256", kid });
+  const sign = async (
+    claims: Record<string, unknown>,
+    headerExtra: Record<string, unknown> = {},
+  ): Promise<string> => {
+    const header = jsonSegment({ alg: "ES256", kid, ...headerExtra });
     const payload = jsonSegment(claims);
     // workerd's ECDSA sign already emits the raw r||s JWS form
     const raw = new Uint8Array(
@@ -44,6 +50,31 @@ const providerKeys = async (kid = "key-1") => {
     return `${header}.${payload}.${b64url(raw)}`;
   };
 
+  return { jwk: withKid, sign };
+};
+
+/** An RS256 signer, the other algorithm the exchange accepts. */
+const providerRsaKeys = async (kid = "rsa-1") => {
+  const pair = (await crypto.subtle.generateKey(
+    {
+      name: "RSASSA-PKCS1-v1_5",
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: "SHA-256",
+    },
+    true,
+    ["sign", "verify"],
+  )) as CryptoKeyPair;
+  const jwk = (await crypto.subtle.exportKey("jwk", pair.publicKey)) as JsonWebKey;
+  const withKid = { ...jwk, kid, alg: "RS256", use: "sig" };
+  const sign = async (claims: Record<string, unknown>): Promise<string> => {
+    const header = jsonSegment({ alg: "RS256", kid });
+    const payload = jsonSegment(claims);
+    const signature = new Uint8Array(
+      await crypto.subtle.sign("RSASSA-PKCS1-v1_5", pair.privateKey, utf8(`${header}.${payload}`)),
+    );
+    return `${header}.${payload}.${b64url(signature)}`;
+  };
   return { jwk: withKid, sign };
 };
 
@@ -96,7 +127,7 @@ const input = (overrides: Partial<EvidenceFromProviderCodeInput> = {}): Evidence
   clientId: CLIENT_ID,
   redirectUri: REDIRECT_URI,
   code: "auth-code-1",
-  codeVerifier: "verifier-1",
+  codeVerifier: CODE_VERIFIER,
   expectedNonce: "nonce-1",
   ...overrides,
 });
@@ -105,6 +136,7 @@ const claims = (amr: string[], authTime: number, nonce = "nonce-1") => ({
   iss: ISSUER,
   aud: CLIENT_ID,
   nonce,
+  iat: nowSeconds() - 60,
   exp: nowSeconds() + 600,
   sub: "subject-7",
   name: "Dana Okafor",
@@ -118,14 +150,19 @@ const claims = (amr: string[], authTime: number, nonce = "nonce-1") => ({
 const AUTHORIZATION_URL = `${ISSUER}/authorize`;
 const TOKEN_URL = `${ISSUER}/token`;
 const DISCOVERY = {
+  issuer: ISSUER,
   authorization_endpoint: AUTHORIZATION_URL,
   token_endpoint: TOKEN_URL,
   jwks_uri: `${ISSUER}/jwks`,
 };
 
-const serveIdp = (jwksBodies: unknown[], idToken: string): Served =>
+const serveIdp = (
+  jwksBodies: unknown[],
+  idToken: string,
+  discovery: Record<string, unknown> = DISCOVERY,
+): Served =>
   serve([
-    { method: "GET", url: `${ISSUER}/.well-known/openid-configuration`, bodies: [DISCOVERY] },
+    { method: "GET", url: `${ISSUER}/.well-known/openid-configuration`, bodies: [discovery] },
     { method: "GET", url: `${ISSUER}/jwks`, bodies: jwksBodies },
     { method: "POST", url: TOKEN_URL, bodies: [{ id_token: idToken }] },
   ]);
@@ -166,7 +203,7 @@ describe("the provider-callback exchange", () => {
     // the token POST carried exactly the explicit input set plus the secret
     const body = new URLSearchParams(post?.body ?? "");
     expect(body.get("code")).toBe("auth-code-1");
-    expect(body.get("code_verifier")).toBe("verifier-1");
+    expect(body.get("code_verifier")).toBe(CODE_VERIFIER);
     expect(body.get("client_secret")).toBe("sealed-secret");
     expect(body.get("redirect_uri")).toBe(REDIRECT_URI);
   });
@@ -264,5 +301,196 @@ describe("the provider-callback exchange", () => {
     if (!result.ok) return;
     expect(result.evidence.subject).toBe("subject-7");
     expect(result.evidence.authTime).toBe(authTime);
+  });
+
+  it("requires the OIDC issued-at claim", async () => {
+    const { jwk, sign } = await providerKeys();
+    const { iat: _iat, ...withoutIssuedAt } = claims(["pwd"], nowSeconds());
+    served = serveIdp([{ keys: [jwk] }], await sign(withoutIssuedAt));
+
+    const result = await exchangeCodeForEvidence(input(), CONFIG);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.kind).toBe("unauthenticated");
+    expect(result.failure.detail).toMatch(/issued-at/);
+  });
+
+  it("refuses a token before its not-before time", async () => {
+    const { jwk, sign } = await providerKeys();
+    served = serveIdp(
+      [{ keys: [jwk] }],
+      await sign({ ...claims(["pwd"], nowSeconds()), nbf: nowSeconds() + 600 }),
+    );
+
+    const result = await exchangeCodeForEvidence(input(), CONFIG);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.kind).toBe("unauthenticated");
+    expect(result.failure.detail).toMatch(/not yet valid/);
+  });
+
+  it("refuses malformed optional claims instead of copying them", async () => {
+    for (const [label, override, detail] of [
+      ["amr", { amr: "pwd" }, /amr/],
+      ["auth_time", { auth_time: "soon" }, /auth_time/],
+      ["name", { name: 7 }, /name/],
+    ] as const) {
+      const { jwk, sign } = await providerKeys();
+      served = serveIdp([{ keys: [jwk] }], await sign({ ...claims(["pwd"], nowSeconds()), ...override }));
+
+      const result = await exchangeCodeForEvidence(input(), CONFIG);
+      expect(result.ok, label).toBe(false);
+      if (result.ok) continue;
+      expect(result.failure.kind).toBe("unauthenticated");
+      expect(result.failure.detail).toMatch(detail);
+    }
+  });
+
+  it("requires azp when the audience has more than one value", async () => {
+    const { jwk, sign } = await providerKeys();
+    const multi = { ...claims(["pwd"], nowSeconds()), aud: [CLIENT_ID, "another-client"] };
+    served = serveIdp([{ keys: [jwk] }], await sign(multi));
+    const missing = await exchangeCodeForEvidence(input(), CONFIG);
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) {
+      expect(missing.failure.kind).toBe("unauthenticated");
+      expect(missing.failure.detail).toMatch(/authorized party/);
+    }
+
+    served?.restore();
+    served = serveIdp([{ keys: [jwk] }], await sign({ ...multi, azp: CLIENT_ID }));
+    const present = await exchangeCodeForEvidence(input(), CONFIG);
+    expect(present.ok).toBe(true);
+  });
+
+  it("refuses a critical header it does not understand", async () => {
+    const { jwk, sign } = await providerKeys();
+    served = serveIdp(
+      [{ keys: [jwk] }],
+      await sign(claims(["pwd"], nowSeconds()), { crit: ["custom"], custom: true }),
+    );
+
+    const result = await exchangeCodeForEvidence(input(), CONFIG);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.kind).toBe("unauthenticated");
+    expect(result.failure.detail).toMatch(/critical/);
+  });
+
+  it("refuses ES256 with a key on the wrong curve", async () => {
+    const { jwk, sign } = await providerKeys("key-p384", "P-384");
+    served = serveIdp([{ keys: [jwk] }], await sign(claims(["pwd"], nowSeconds())));
+
+    const result = await exchangeCodeForEvidence(input(), CONFIG);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.kind).toBe("unauthenticated");
+    expect(result.failure.detail).toMatch(/signature/);
+  });
+
+  it("requires the discovery document to name the issuer and use https endpoints", async () => {
+    served = serve([
+      {
+        method: "GET",
+        url: `${ISSUER}/.well-known/openid-configuration`,
+        bodies: [{ ...DISCOVERY, issuer: "https://other.example" }],
+      },
+    ]);
+    const wrongIssuer = await exchangeCodeForEvidence(input(), CONFIG);
+    expect(wrongIssuer.ok).toBe(false);
+    if (!wrongIssuer.ok) {
+      expect(wrongIssuer.failure.kind).toBe("unauthenticated");
+      expect(wrongIssuer.failure.detail).toMatch(/issuer/);
+    }
+
+    served?.restore();
+    served = serve([
+      {
+        method: "GET",
+        url: `${ISSUER}/.well-known/openid-configuration`,
+        bodies: [{ ...DISCOVERY, token_endpoint: "http://idp.example/token" }],
+      },
+    ]);
+    const insecure = await exchangeCodeForEvidence(input(), CONFIG);
+    expect(insecure.ok).toBe(false);
+    if (!insecure.ok) {
+      expect(insecure.failure.kind).toBe("unauthenticated");
+      expect(insecure.failure.detail).toMatch(/https/);
+    }
+  });
+
+  it("validates the PKCE verifier before touching the provider", async () => {
+    served = serve([]);
+    const result = await exchangeCodeForEvidence(input({ codeVerifier: "short" }), CONFIG);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.kind).toBe("invalid-command");
+    expect(result.failure.detail).toMatch(/codeVerifier/);
+    expect(served.requests).toHaveLength(0);
+  });
+
+
+  it("verifies an RS256 token as well as ES256", async () => {
+    const { jwk, sign } = await providerRsaKeys();
+    served = serveIdp([{ keys: [jwk] }], await sign(claims(["pwd"], nowSeconds())));
+
+    const result = await exchangeCodeForEvidence(input(), CONFIG);
+    expect(result.ok).toBe(true);
+  });
+
+  it("refuses expired, wrong-issuer, wrong-audience, and none-alg tokens", async () => {
+    const cases = [
+      {
+        label: "expired",
+        claims: { ...claims(["pwd"], nowSeconds()), exp: nowSeconds() - 1 },
+        header: {},
+        detail: /expired/,
+      },
+      {
+        label: "wrong issuer",
+        claims: { ...claims(["pwd"], nowSeconds()), iss: "https://other.example" },
+        header: {},
+        detail: /issuer/,
+      },
+      {
+        label: "wrong audience",
+        claims: { ...claims(["pwd"], nowSeconds()), aud: "another-client" },
+        header: {},
+        detail: /audience/,
+      },
+      {
+        label: "none algorithm",
+        claims: claims(["pwd"], nowSeconds()),
+        header: { alg: "none" },
+        detail: /algorithm/,
+      },
+    ] as const;
+    for (const entry of cases) {
+      const { jwk, sign } = await providerKeys();
+      served = serveIdp([{ keys: [jwk] }], await sign(entry.claims, entry.header));
+      const result = await exchangeCodeForEvidence(input(), CONFIG);
+      expect(result.ok, entry.label).toBe(false);
+      if (result.ok) continue;
+      expect(result.failure.kind).toBe("unauthenticated");
+      expect(result.failure.detail).toMatch(entry.detail);
+    }
+  });
+
+  it("encodes an ECDSA signature as valid DER integers", () => {
+    const high = new Uint8Array(64).fill(0x01);
+    high[0] = 0x80;
+    high[32] = 0x80;
+    const bothHigh = derSignatureOf(high);
+    expect(bothHigh).toHaveLength(72);
+    expect(Array.from(bothHigh.slice(0, 5))).toEqual([0x30, 0x46, 0x02, 0x21, 0x00]);
+    expect(Array.from(bothHigh.slice(37, 40))).toEqual([0x02, 0x21, 0x00]);
+
+    const plain = new Uint8Array(64).fill(0x01);
+    const neitherHigh = derSignatureOf(plain);
+    expect(neitherHigh).toHaveLength(70);
+    expect(Array.from(neitherHigh.slice(0, 4))).toEqual([0x30, 0x44, 0x02, 0x20]);
+    expect(Array.from(neitherHigh.slice(36, 38))).toEqual([0x02, 0x20]);
+
+    expect(() => derSignatureOf(new Uint8Array(63))).toThrow(/signature/);
   });
 });

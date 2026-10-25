@@ -6,9 +6,9 @@ untypechecked root test suite, now `plans/typechecked_tests.md`. This file is
 retained as the review record; remove it with the next plans cleanup.
 
 The original pass was by the main agent (not a reader report), 2026-10-25,
-alongside `plans/code_review.md`'s findings ledger (kept separate and
-untouched — this file holds its own action items rather than folding into
-that one). Where that plan catalogs *what* is wrong, this one asks *why the
+alongside the code-review ledger (now retired; its landed findings are in
+the commit history and `docs/`). This file holds its own action items rather
+than folding into that one. Where that plan catalogs *what* is wrong, this one asks *why the
 design let it happen* and *what would make the class of bug unreachable*
 rather than merely patched. It was grounded directly in `src/model.ts`,
 `src/authority/engine.ts`, `src/authority/types.ts`, `src/access/verify.ts`,
@@ -65,12 +65,12 @@ grant-insert function's signature requires the token as a precondition).
 In-memory has no such excuse — `orgs` is reachable from the same closure
 `grant-hat`'s handler runs in — so that half is a plain, fixable-now gap.
 
-This is also the mechanical argument for `code_review.md`'s R4
-engine-coordinator split, not just a readability one: an 890-line closure
+This is also the mechanical argument for the R4 engine-coordinator split,
+not just a readability one: an 890-line closure
 is exactly the kind of place a hand-rolled duplicate drifts from the pure
 function sitting two imports away that was supposed to be canonical.
 
-### Action: P0 — shared transition kernel (precondition for `code_review.md` R1)
+### Action: P0 — shared transition kernel (precondition for R1)
 
 - [x] Route every participation-status mutation through *read current
   state → call `transitionParticipation` → write only on `ok: true`*.
