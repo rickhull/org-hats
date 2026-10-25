@@ -56,7 +56,11 @@ not applying.  No customer names, roster material, secrets, or key material.
   runs the compiler fence, the cloudflare-import guard, and the `node --test`
   suites; a single suite is `node --test tests/<file>.test.ts`.  The full
   local gate is `pnpm verify` — `bin/check-dist` (build and dist freshness),
-  `pnpm check`, and `pnpm check:cloudflare`.
+  `pnpm check`, and `pnpm check:cloudflare`.  The rings are in
+  `tests/README.md`.
+- Do not run `pnpm check` concurrently with `bin/check-dist` or `pnpm verify`
+  in the same checkout: the build cleans `dist/`, and the consumer fence
+  would read a missing tree.
 - When every changed path is documentation (`*.md`), do not run application
   typechecks or tests; inspect the changed text and report that no automated
   check applies.

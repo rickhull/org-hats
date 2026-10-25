@@ -460,6 +460,25 @@ test("request-access and admit: asking is not being admitted", async () => {
   ));
   assert.equal(orphan.ok, false);
   assert.equal(orphan.failure.kind, "unauthenticated");
+
+  // a linked principal can ask; the request is recorded, not admission
+  const request = await engine.runtime.command(cmd(
+    { kind: "request-access", operationId: OP, evidence: INVITEE_ADMIN },
+    { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
+    "req-invitee",
+  ));
+  assert.ok(request.ok, request.ok ? "" : request.failure.kind);
+  const beforeAdmit = await engine.runtime.accessFromEvidence(evidence(INVITEE_ADMIN));
+  assert.ok("failure" in beforeAdmit);
+  assert.equal(beforeAdmit.failure.kind, "not-admitted", "asking did not admit");
+
+  // admission is a separate, administrator act
+  const admitted = await engine.runtime.command(cmd(
+    { kind: "admit", operationId: OP, organizationId: "org-invitee", actorId: "actor-inv-admin" },
+    { kind: "access-envelope", envelope: len.envelope },
+    "admit-invitee",
+  ));
+  assert.ok(admitted.ok, admitted.ok ? "" : admitted.failure.kind);
 });
 
 test("select-hat: an actor selects their own hat; a stranger cannot", async () => {

@@ -15,6 +15,8 @@ planned is released, adopted, and documented in `docs/`.
   feeds into `code_review.md`'s R1-R4.
 - `v2_release.md` — the 2.0.0 release gate: migration note, demo smoke,
   tag, and the consumer relay. The source break is landed.
+- `test_suite_review.md` — the test-suite fanout: fragility and dependency
+  findings, the rings, and the remaining coverage gaps in priority order.
 
 Completed work is not kept here. What exists is in `docs/`; how it got here
 is in the commit history.

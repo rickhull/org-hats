@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 
 import {
   ACCESS_ENVELOPE_FORMAT,
+  AUTHORITY_INTERFACE_VERSION,
   canonicalJson,
   type AccessEnvelopeClaimsV1,
   type SignedAccessEnvelope,
@@ -129,8 +130,10 @@ test("the issuing interface version is provenance, not a gate on reading", async
   // is a *valid* envelope whose issuing interface version differs.
   const signer = await webCryptoSigner("key-provenance");
   const signerKey = await ed25519VerifyKey("key-provenance", await signer.publicKey());
-  // 1 is the interface the vectors were issued under; 2 is current.
-  const claims = { ...vectors.claims, interfaceVersion: 1 as never };
+  // Deliberately not the current interface, and derived from it so the test
+  // cannot become a no-op if the constant ever moves back.
+  const differentInterface = (AUTHORITY_INTERFACE_VERSION + 1) as never;
+  const claims = { ...vectors.claims, interfaceVersion: differentInterface };
   const envelope: SignedAccessEnvelope = {
     format: ACCESS_ENVELOPE_FORMAT,
     v: 1,
@@ -142,7 +145,7 @@ test("the issuing interface version is provenance, not a gate on reading", async
     now: vectors.claims.iat + 1,
   });
   assert.ok(!("failure" in verified), "a different issuing interface version still reads");
-  assert.equal(verified.claims.interfaceVersion, 1 as never, "and is reported unchanged");
+  assert.equal(verified.claims.interfaceVersion, differentInterface, "and is reported unchanged");
 });
 
 test("wrong-binding: another operation, or a site the envelope is not admitted to", async () => {

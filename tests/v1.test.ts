@@ -7,7 +7,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 test("the authority and access modules load inside the portable fence", async () => {
-  await import("../src/authority/index.ts");
-  await import("../src/access/index.ts");
-  assert.ok(true, "both modules resolve");
+  const authority = await import("../src/authority/index.ts");
+  const access = await import("../src/access/index.ts");
+  assert.equal(typeof authority.createInMemoryAuthority, "function");
+  assert.equal(typeof access.verify, "function");
 });

@@ -36,8 +36,9 @@ echo "ok — dist declarations use .js specifiers"
 echo
 echo "== fence: the published surface takes plain string ids =="
 if [ -x node_modules/.bin/tsc ]; then
-  node_modules/.bin/tsc --noEmit --strict --target es2022 --module nodenext \
-    --moduleResolution nodenext tests/consumer-surface.ts
+  # Incremental: the first run after a dist/ change is cold, a repeat is warm.
+  # tsconfig.consumer.json keeps the build info inside node_modules.
+  node_modules/.bin/tsc -p tsconfig.consumer.json
   echo "ok — a consumer builds commands and reads claims without an id constructor"
 else
   echo "(skipped — run 'pnpm install' to enable the fence)"

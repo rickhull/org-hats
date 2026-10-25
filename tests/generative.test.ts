@@ -26,6 +26,7 @@ import {
 } from "../src/model.ts";
 import type { PolicyBundle } from "../src/policy.ts";
 import { validatePolicyBundle } from "../src/policy.ts";
+import { fixedClock } from "../src/authority/internal.ts";
 import {
   CONFORMANCE_PRINCIPALS,
   CONFORMANCE_WORLD,
@@ -263,7 +264,11 @@ type CommandBody = AuthorityCommand extends infer Command
   : never;
 
 const setup = async (transportFailures = 0) =>
-  createInMemoryAuthority({ ...CONFORMANCE_WORLD, transportFailures });
+  createInMemoryAuthority({
+    ...CONFORMANCE_WORLD,
+    transportFailures,
+    clock: fixedClock(1_700_000_000),
+  });
 
 const issue = async (
   engine: Awaited<ReturnType<typeof setup>>,

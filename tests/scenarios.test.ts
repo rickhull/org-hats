@@ -131,7 +131,7 @@ test("the embedded specialist reads the organization that owns the team, not the
   const after = await issue(engine.runtime, MARCO, MERIDIAN);
   // read reach follows the target: the Harbor-owned team makes Harbor
   // readable to a North actor
-  assert.deepEqual(after.envelope.claims.readableOrganizationIds.sort(), [HARBOR_LOGISTICS, NORTH_ORG].sort());
+  assert.deepEqual([...after.envelope.claims.readableOrganizationIds].sort(), [HARBOR_LOGISTICS, NORTH_ORG].sort());
   const verified = await verify(after.envelope, keys, {
     now: after.envelope.claims.iat + 1,
     expectedOperationId: MERIDIAN,

@@ -129,8 +129,13 @@ fi
 node -e 'const fs=require("fs"),p=process.argv[1],o=process.argv[2],n=process.argv[3];
 	fs.writeFileSync(p, fs.readFileSync(p,"utf8").split(o).join(n));' "$manifest" "$current" "$next"
 
-printf '\n== build ==\n'
-pnpm build
+# When the gates ran, bin/check-dist already built and verified dist/
+# before the bump; the bump touches only the manifest. Without the gates,
+# build now.
+if ! $verify; then
+	printf '\n== build ==\n'
+	pnpm build
+fi
 
 # A root release commits the rebuilt dist/. A Cloudflare release must not
 # change it: that would be a root source change smuggled into this tag.

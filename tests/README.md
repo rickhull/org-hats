@@ -6,6 +6,26 @@ adds the compiler fence, the Cloudflare-import guard, the pilot, and the
 release-metadata guard. `pnpm verify` is the full local gate: `bin/check-dist`
 (build and freshness), `pnpm check`, then the Cloudflare workerd suites.
 
+## Rings
+
+- **Ring 0 — targeted.** `node --test tests/<file>.test.ts` for one portable
+  suite; `pnpm --filter org-hats-cloudflare exec vitest run test/<file>.test.ts`
+  for one workerd suite. Use while iterating; this is where a change's own
+  evidence should come from.
+- **Ring 1 — portable.** `pnpm check` (fences, portable suites, pilot, tag
+  audit).
+- **Ring 2 — workspace.** `pnpm check-dist && pnpm check:cloudflare` when
+  `src/`, `dist/`, `package.json`, or `packages/cloudflare/` changes.
+  `check-dist` cleans and rebuilds `dist/`; run it before the workerd suites
+  and never concurrently with `pnpm check` in the same checkout.
+- **Ring 3 — full.** `pnpm verify` (ring 2 plus ring 1) and
+  `bin/release --push` for a release. CI on the GitHub release mirror is the
+  release-time backstop, not the live gate.
+
+`pnpm test:tools` runs the release-guard suites alone
+(`release-tools.test.ts`, `gate-cache.test.ts`); they need only Node and git
+and are part of ring 1.
+
 - `contract.test.ts` — canonical JSON, byte codecs, version constants.
 - `model.test.ts` — decisions, worn-hat selection, participation transitions.
 - `policy.test.ts` — policy-bundle validation, including read-policy axes.
@@ -13,7 +33,9 @@ release-metadata guard. `pnpm verify` is the full local gate: `bin/check-dist`
 - `twins.test.ts` — the structural properties of the synthetic twins.
 - `engine.test.ts` — issuance, refresh, participation, idempotency, disable.
 - `access.test.ts` — the verifier and the golden envelope vectors.
+- `keyset.test.ts` — verification-key set parsing, serialization, rotation.
 - `vertical.test.ts` — evidence → issuance → key distribution → verification.
+- `scenarios.test.ts` — the twin scenarios end-to-end.
 - `conformance.test.ts` — runs the public inventory from `src/conformance.ts`.
 - `generative.test.ts` — 100 seeded states, duplicate commands, partial
   failure and outbox replay.
@@ -21,7 +43,7 @@ release-metadata guard. `pnpm verify` is the full local gate: `bin/check-dist`
 - `release-tools.test.ts` — the release-tag guard against throwaway
   repositories, both tag families.
 - `gate-cache.test.ts` — the local per-commit gate marker, and its
-  invalidation by dirt or a new commit.
+  invalidation by dirt, a new commit, or a changed toolchain.
 
 The inventory ships as `org-hats/conformance`; `tests/conformance.test.ts` is
 only its in-memory runner. A case that cannot be expressed through the public

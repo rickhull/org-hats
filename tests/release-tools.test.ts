@@ -12,6 +12,16 @@ import { fileURLToPath } from "node:url";
 
 const script = fileURLToPath(new URL("../bin/check-version", import.meta.url));
 
+// The guard reads GITHUB_REF and runs git in a temp repository. Neither an
+// ambient CI tag nor a developer's global git config may influence it.
+const testEnv = {
+  ...process.env,
+  GITHUB_REF: "",
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_SYSTEM: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1",
+};
+
 const git = (cwd: string, ...args: string[]): string =>
   execFileSync(
     "git",
@@ -22,7 +32,7 @@ const git = (cwd: string, ...args: string[]): string =>
       "-c", "tag.gpgsign=false",
       ...args,
     ],
-    { cwd, encoding: "utf8" },
+    { cwd, encoding: "utf8", env: testEnv },
   );
 
 const repo = (): string => {
@@ -42,7 +52,7 @@ const repo = (): string => {
 const run = (root: string, ...args: string[]) =>
   spawnSync(script, args, {
     cwd: root,
-    env: { ...process.env, CHECK_VERSION_ROOT: root },
+    env: { ...testEnv, CHECK_VERSION_ROOT: root },
     encoding: "utf8",
   });
 
@@ -68,6 +78,33 @@ test("both release-tag families are validated against their own manifest", () =>
     assert.equal(atHead.status, 0, atHead.stderr);
     assert.match(atHead.stdout ?? "", /v1\.2\.3 matches/);
     assert.match(atHead.stdout ?? "", /cloudflare-v0\.1\.0 matches/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an untagged checkout is not an error", () => {
+  const root = repo();
+  try {
+    const untagged = run(root);
+    assert.equal(untagged.status, 0, untagged.stderr);
+    assert.match(untagged.stdout ?? "", /no version tag at this checkout/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the CI tag ref is audited from the checkout", () => {
+  const root = repo();
+  try {
+    git(root, "tag", "-a", "v1.2.3", "-m", "v1.2.3");
+    const ci = spawnSync(script, [], {
+      cwd: root,
+      env: { ...testEnv, CHECK_VERSION_ROOT: root, GITHUB_REF: "refs/tags/v1.2.3" },
+      encoding: "utf8",
+    });
+    assert.equal(ci.status, 0, ci.stderr);
+    assert.match(ci.stdout ?? "", /v1\.2\.3 matches package\.json 1\.2\.3/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
