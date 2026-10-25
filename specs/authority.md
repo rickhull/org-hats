@@ -10,7 +10,8 @@ Evidence resolves an actor or fails. Actors, participation, and hats change
 only through explicit, idempotent, audited commands.
 
 *Held by:* the runtime surface — no write path begins at evidence;
-`OH-PART-02` and `OH-CMD-02` pin asking-is-not-admission.
+`OH-CMD-02` pins asking-is-not-admission, and `OH-PART-02` pins terminal
+revocation.
 *If it breaks:* admission becomes a property of the identity provider, and
 the consumer's no-self-registration posture loses its structural guarantee
 — it reverts from "no write path exists" to "every write path remembers
@@ -34,7 +35,7 @@ Callers receive four methods — issue from evidence, refresh, context,
 command — and never a grant query, a row, or a repository.
 
 *Held by:* `AuthorityRuntime` is the only public surface; the conformance
-inventory runs through it exclusively.
+inventory runs through the public surface exclusively.
 *If it breaks:* the seam shallows into a repository, and ordering, policy
 application, audit, and projection coordination move back to every host —
 the v0.4 posture the redesign closed.
@@ -107,14 +108,6 @@ coordinator; the authorization cases assert denials for non-administrators.
 without a release, and the grant/revoke workflow's own gate becomes
 unmovable.
 
-*Held by:* `PrincipalEvidence` carries identity and authentication facts
-only — nothing a provider issued; the exchange lives in
-`packages/cloudflare/src/exchange.ts`, not under `src/`; the identity
-boundary in `docs/authority_redesign.md`.
-*If it breaks:* provider secrets enter the portable modules and the fence
-of P1 loses its meaning for identity, or every host grows a second OIDC
-implementation — the drift the boundary exists to prevent.
-
 ### A10 — Evidence is never a roster
 
 A principal link resolves one `(organizationId, actorId)`; no provider
@@ -132,6 +125,14 @@ and removing an actor from one operation starts affecting another.
 No provider credential, authorization code, or secret crosses the portable
 `AuthorityRuntime`; the exchange that turns a provider callback into
 evidence is runtime surface, supplied per deployment.
+
+*Held by:* `PrincipalEvidence` carries identity and authentication facts
+only — nothing a provider issued; the exchange lives in
+`packages/cloudflare/src/exchange.ts`, not under `src/`; the identity
+boundary in `docs/authority_redesign.md`.
+*If it breaks:* provider secrets enter the portable modules and the fence
+of P1 loses its meaning for identity, or every host grows a second OIDC
+implementation — the drift the boundary exists to prevent.
 
 ### A12 — Routing facts are authority-owned
 

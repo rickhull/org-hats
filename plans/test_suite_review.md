@@ -11,6 +11,9 @@ tool and was not a fit for a review (and the worktree was dirty); the
 `code-review` skill is diff-based and had no fixed point. The fanout used
 `test-reviewer` for the suites and `reviewer` for the gates.
 
+The root tests/examples typecheck gap is separate from coverage:
+`plans/typechecked_tests.md` makes the suites compile at all.
+
 ## Landed in this pass
 
 - **Ambient-state leaks in the tool tests.** `release-tools` inherited

@@ -1,29 +1,33 @@
 # Architecture and type-soundness review — slice 1 (`src/`)
 
-**Status:** independent pass by the main agent (not a reader report),
-2026-10-25, alongside `plans/code_review.md`'s findings ledger (kept
-separate and untouched — this file holds its own action items rather
-than folding into that one). Where that plan catalogs *what* is wrong,
-this one asks *why the design let it happen* and *what would make the
-class of bug unreachable* rather than merely patched. Grounded directly
-in `src/model.ts`, `src/authority/engine.ts`, `src/authority/types.ts`,
-`src/access/verify.ts`, `src/policy.ts`, `src/contract.ts`, and
-cross-checked against `packages/cloudflare/src/operation.ts` and
+**Status (2026-10-25): realized.** P0-P3 landed; root `v2.0.0` and Cloudflare
+`cloudflare-v0.3.1` are released. The remaining unlanded gap is the
+untypechecked root test suite, now `plans/typechecked_tests.md`. This file is
+retained as the review record; remove it with the next plans cleanup.
+
+The original pass was by the main agent (not a reader report), 2026-10-25,
+alongside `plans/code_review.md`'s findings ledger (kept separate and
+untouched — this file holds its own action items rather than folding into
+that one). Where that plan catalogs *what* is wrong, this one asks *why the
+design let it happen* and *what would make the class of bug unreachable*
+rather than merely patched. It was grounded directly in `src/model.ts`,
+`src/authority/engine.ts`, `src/authority/types.ts`, `src/access/verify.ts`,
+`src/policy.ts`, `src/contract.ts`, and cross-checked against
+`packages/cloudflare/src/operation.ts` and
 `packages/cloudflare/src/exchange.ts`.
 
 ## The one redesign that would have prevented most of R1
 
-`model.ts` defines two pure functions whose entire job is to prevent the
-ledger's correctness findings, and neither is called from either runtime's
-write path:
+At review time, `model.ts` defined two pure functions whose entire job was
+to prevent the ledger's correctness findings, and neither was called from
+either runtime's write path:
 
-- `transitionParticipation` (`model.ts:128`) already refuses `activate`
+- `transitionParticipation` (`model.ts:128`) already refused `activate`
   unless `current.status === "accepted"` — exactly the guard that would
-  have caught "acceptance delivered after revoke." `grep -rn
-  "transitionParticipation" src packages` returns one hit: the
-  definition. `engine.ts`'s import list (`engine.ts:37-44`) pulls
-  `invariantProblems`, `readReach`, `wearableGrants` from `model.ts` but
-  not this function.
+  have caught "acceptance delivered after revoke." A grep at review time
+  returned one hit: the definition. `engine.ts`'s import list
+  (`engine.ts:37-44`) pulled `invariantProblems`, `readReach`, and
+  `wearableGrants` from `model.ts`, but not this function.
 - `invariantProblems` (`model.ts:337`) is a complete, exported snapshot
   validator, used only by tests. Nothing on the `grant-hat` write path
   calls it or a narrower form of it, in either runtime.
@@ -247,8 +251,9 @@ signature-valid `v: 2` payload inside a `v: 1` envelope was read as v1.
 - [x] Update the access vectors and `OH-ACCESS-04`: the version pair fails
   closed, and a differently-issued envelope is provenance, not a version
   failure.
-- [ ] The release itself is `plans/v2_release.md`: migration note, demo
-  smoke, `v2.0.0` tag, and the post-tag relay. The source break is landed.
+- [x] The release itself is `plans/v2_release.md`: migration note, demo
+  smoke, `v2.0.0` tag, and the post-tag relay. Root `v2.0.0` and Cloudflare
+  `v0.3.1` are cut; Quartermaster acceptance remains in that plan.
 
 ## Found while landing: `tests/` is not typechecked
 
@@ -281,3 +286,8 @@ coordinators — worth sequencing P0 first in those two files so the
 transition-kernel routing lands on unbranded types, then id-branding's
 compiler-driven sweep catches the new call sites too, rather than
 branding twice.
+
+## Remaining
+
+The typechecked-test gap described above is `plans/typechecked_tests.md`. All
+other actions in this review are landed.

@@ -1,22 +1,22 @@
 # Code review and crystallization — whole-tree, one slice at a time
 
-**Status:** slice 1 (`src/`) reviewed 2026-10-25 by three parallel
+**Status (2026-10-25):** slice 1 (`src/`) was reviewed by three parallel
 report-only readers (flash model, read-only), findings judged and
-cross-verified against the Cloudflare code by the main agent. Findings
-below ride the **2.0.0** release: `GrantTarget` landed as a breaking
-command change (`claude_review.md` P3), and the behavior tightenings and
-additive API here land alongside it, so no patch-release discipline is
-needed. Pending slices: `packages/cloudflare`
-(including the RFC-grounded exchange review), `tests/`, `bin/` and
-configs.
+cross-verified against the Cloudflare code by the main agent. The review's
+findings rode the **2.0.0** release: `GrantTarget` landed as the breaking
+command change (`claude_review.md` P3), alongside the behavior tightenings
+and additive API. This ledger is reconciled against the released 2.0 line:
+the R1/R2/R3 items checked below are fixed; the remaining R1/R2/R3 findings
+plus R4 and R5 are live. The typechecked-test pass is its own plan,
+`typechecked_tests.md`. Pending slices: `packages/cloudflare` (including
+the RFC-grounded exchange review), `tests/`, `bin/`, and configs.
 
-Two correctness findings below are confirmed present in **both**
-runtimes by reading the Cloudflare coordinator against the same
-invariant; they are not `src/`-only bugs and they anchor slice 2.
+The two cross-runtime findings below were fixed in 2.0.0; the rest of the
+ledger is reconciled as marked.
 
 ## R1 — Correctness fixes (both runtimes, verified)
 
-- [ ] **Acceptance-after-revoke flips `revoked → active`.** An outbox
+- [x] **Acceptance-after-revoke flips `revoked → active`.** An outbox
   acceptance delivered after `participation-revoke` is applied unguarded
   — reachable under retry/fault injection. True in the in-memory engine
   (outbox delivery) and in `packages/cloudflare`'s `operation.ts` intake
@@ -24,16 +24,24 @@ invariant; they are not `src/`-only bugs and they anchor slice 2.
   check). Fix: activate only from a non-revoked state, prefer routing
   the transition through `model.transitionParticipation` itself (which
   already refuses this). Add a fault-injection conformance case.
-- [ ] **`grant-hat` validates role/team/site but not the actor.** Neither
+  Landed: both runtimes route through the shared transition;
+  `tests/engine.test.ts` and `packages/cloudflare/test/operation.test.ts`
+  pin the late acceptance.
+- [x] **`grant-hat` validates role/team/site but not the actor.** Neither
   the in-memory engine nor the Cloudflare `/grant` handler checks that
   the actor exists or participates in the organization — a dangling
   grant commits where `invariantProblems` would flag it live. Fix:
   validate the actor/participation pair in both runtimes; add tests.
-- [ ] **`claims.v` never checked inside the envelope.** `verify.ts`
+  Landed: in-memory validates the actor and active participation;
+  Cloudflare checks the `org_actors` projection in the same transaction.
+  `OH-CMD-03` and the coordinator tests pin it.
+- [x] **`claims.v` never checked inside the envelope.** `verify.ts`
   checks `interfaceVersion` but not the inner claims version — a
   signature-valid `v:2` claims payload inside a `v:1` envelope is
   accepted. Fix: one comparison, mirroring the `interfaceVersion` check.
   Add a vector/test.
+  Landed: `verify` compares the claims' `v` with the envelope's;
+  `OH-ACCESS-04` and the access vectors pin it.
 - [ ] `snapshotOf` returns live internal arrays — copy before returning.
 - [ ] `deliverPending` runs before the version-gate check — a
   wrong-version call still mutates state via drain. Move the drain after
@@ -53,16 +61,25 @@ invariant; they are not `src/`-only bugs and they anchor slice 2.
 
 ## R2 — Invariant-truth and doc fixes (mechanical, behavior-preserving)
 
-- [ ] `specs/authority.md` A3: "inventory runs through it exclusively"
+- [x] `specs/authority.md` A3: "inventory runs through it exclusively"
   overstates coverage — OH-MODEL cases call `decide`/`readReach`
-  directly. Reword to "the public surface, exclusively."
-- [ ] A1 cites `OH-PART-02` for a property that belongs to `OH-CMD-02`.
+  directly. Reword to "the public surface, exclusively." Fixed
+  2026-10-25.
+- [x] A1 cites `OH-PART-02` for a property that belongs to `OH-CMD-02`.
+  Fixed: A1 names `OH-CMD-02` for asking and `OH-PART-02` for terminal
+  revocation.
 - [ ] `contract.ts` header mislabels the root as `v0.4`.
-- [ ] `verify.ts` header states the fail-closed check order backwards.
-- [ ] `specs/access.md` (§ Access) claims an issuer check that the code
-  doesn't perform.
+- [x] `verify.ts` header states the fail-closed check order backwards.
+  Fixed: the header states format/version, signature, expiry, and binding
+  in that order.
+- [x] ~~`specs/access.md` (§ Access) claims an issuer check that the code
+  doesn't perform.~~ Stale entry: there is no `specs/access.md`; the access
+  invariants live in `specs/authority.md` A5/A11 and `specs/envelope.md`.
+  Verified 2026-10-25.
 - [ ] `acceptAgain`'s message names the wrong terminal state (says
   "accepted," means "revoked").
+- [x] `specs/authority.md` A9/A11: A11's held-by block was orphaned under
+  A9; moved under A11. Fixed 2026-10-25.
 - [ ] `access/index.ts`'s header charter ignores its second job
   (issuer-side codec home) — document the dual role.
 - [ ] E8 shared-kind note; `keys.ts` unknown-fields note; error-message
@@ -86,10 +103,12 @@ invariant; they are not `src/`-only bugs and they anchor slice 2.
   authTime), `actor()` (organizationId/actorId). The amr addition left
   hosts without narrow accessors, contradicting § Access's "callers
   never see raw claims." Add the accessors; align docs and code.
-- [ ] `["admin"]` default role fallback (A9, found independently by two
+- [x] `["admin"]` default role fallback (A9, found independently by two
   readers) — a hardcoded admin title where the invariant says titles are
   configuration. Decision: require an explicit/declared default rather
   than falling back silently. Behavior change, sanctioned for 2.0.0.
+  Landed in `claude_review.md` P1: an undeclared admin role set is empty,
+  not a hardcoded title.
 - [ ] Non-admin-denial case added to the portable conformance inventory
   (authorize grant-hat by a non-admin → denied) — additive, both
   runtimes already exercise the shape.
@@ -120,7 +139,8 @@ coordinators' commands. This is the headline item.
   fixes from R1), runtime, the exchange (RFC 8414/7515/7519/7636
   grounded — already landed per Quartermaster's relay note, review it
   against the RFCs), entrypoint, ops, wrangler configs.
-- [ ] `tests/`: portable suite organization review.
+- [ ] `tests/`: portable suite organization review. The typechecked-test
+  pass is its own plan, `typechecked_tests.md`.
 - [ ] `bin/`: `check`, `release`, `check-version`, `fix-dts`.
 
 ## Release
