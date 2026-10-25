@@ -16,6 +16,9 @@ pre-bootstrapped operation without resetting it.*
   wearable grant for the test actor. This is not the product operation.
 - The distributed `VerifyKeySet` for the deployment, in `org-hats/access`
   form.
+- A way to disable the dedicated test actor at the organization without
+  delivering the roster image or `actor-disabled` message to the operation,
+  for the stale-projection case.
 - No reset/bootstrap call. The smoke consumes the seeded operation; `refresh`
   rotates its handle, so a rerun uses a fresh fixture or operation.
 
@@ -37,6 +40,11 @@ Through the service binding, with `interfaceVersion: 2`:
    not an ambiguous success.
 6. Verification with the wrong operation fails `wrong-binding`; verification
    with `now >= exp` fails `expired`.
+7. With the organization's actor disabled and the operation projection still
+   saying enabled (the disable message was not delivered or reconciled),
+   refresh fails `not-admitted`; it does not issue a replacement. The live
+   organization read is the gate; the projection is not the revocation
+   promise. An organization that cannot answer fails `unavailable`.
 
 No reset or bootstrap is called, and this subset does not exercise the
 remaining `OH-*` cases. Do not report it as the full inventory.
@@ -60,6 +68,10 @@ verifier built from the distributed key set:
 6. Verify the replacement envelope with another operation's id and assert
    `wrong-binding`. Verify it with `now` at or after `exp` and assert
    `expired`.
+7. Disable the dedicated actor at the organization while leaving the
+   operation's projection stale — do not deliver the roster or
+   `actor-disabled` message and do not reconcile. Refresh the current handle.
+   Assert `not-admitted`; do not accept a replacement envelope.
 
 The full `OH-*` claim is run separately:
 
