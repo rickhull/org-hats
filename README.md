@@ -8,8 +8,8 @@ The v0.4 organization model — predicates, persistence port, request spine,
 and the Node SQLite adapter — is not here; it lives at its tags (`v0.4.4`
 last), and content returns only by being re-specified, never copied. The
 released line is the latest `v1.x` tag;
-`1.0.0` is historical. The Cloudflare runtime and demo are in place; what
-remains is consumer adoption ([`plans/v1.md`](plans/v1.md)).
+`1.0.0` is historical. The Cloudflare runtime and demo are in place;
+Quartermaster's deployment of the reference runtime is under way.
 
 What ships here:
 
@@ -69,8 +69,8 @@ Normative documents:
   this repository uses, and the ones it rejects.
 - [`docs/migration-v1.md`](docs/migration-v1.md) — the 0.4 → v1 deltas.
 - [`SECURITY.md`](SECURITY.md) — reporting and coordinated disclosure.
-- [`plans/v1.md`](plans/v1.md) — the forward plan: consumer adoption of
-  `v1.2.0` and the decisions still open.
+- [`plans/README.md`](plans/README.md) — the plans index; a plan names
+  work in flight and is removed when realized.
 
 Background (phase-1 toeholds; the bodies return by re-specification):
 

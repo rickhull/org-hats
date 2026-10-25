@@ -3,10 +3,9 @@
 Strictly forward-looking. A plan names work to do, a decision to make, or a
 gate to clear. It describes intent, not current behavior. When a plan is
 realized it is removed or rewritten; the result belongs in `docs/` and in
-commit messages.
+commit messages. The v1 delivery plan (`v1.md`) is retired: the line it
+planned is released, adopted, and documented in `docs/`.
 
-- `v1.md` — consumer adoption of `v1.2.0` (the Quartermaster pin and
-  stand-in reconciliation) and the decisions still open.
 - `gh_mirror.md` — restore the GitHub push mirror: catch-up push, PAT
   rotation, and the sync-on-commit verification.
 

@@ -1,8 +1,9 @@
 # Authority subsystem redesign
 
 **Status:** Normative architecture for the v1 authority subsystem. It states
-the shape and the settled interfaces; [plans/v1.md](../plans/v1.md)
-records consumer adoption and the decisions still open.
+the shape and the settled interfaces; the v1 delivery plan is realized and
+retired, and the decisions still open are recorded at the end of this
+document.
 
 This repository is the normative source for the authority seam. The consuming
 product's architecture document states consumer requirements and deployment
@@ -353,8 +354,9 @@ its product verbs map onto neutral access facts rather than extending them.
 
 The accepted contract is authority interface `1` and access envelope `1`,
 recorded in Quartermaster's `specs/login.md`. The portable v1 line and the
-Cloudflare reference runtime implement it; consumer adoption is recorded in
-[plans/v1.md](../plans/v1.md). Quartermaster's `apps/authority-dev` and
+Cloudflare reference runtime implement it; the consumer's deployment and
+stand-in retirement are tracked in their own plans. Quartermaster's
+`apps/authority-dev` and
 `packages/access` are temporary stand-ins and are deleted together when the
 consumer adopts the runtime binding, so it never grows a second envelope
 implementation. The review items that preceded the alpha are settled in the
@@ -594,14 +596,19 @@ the authority command and result types (`src/authority/types.ts`), the
 subpath names (`./authority`, `./access`, the evolved root), the
 access-projection encoding and signing (docs/envelope.md, with committed
 vectors), the typed shape of principal evidence, and the policy vocabulary
-the design twins exercise. What remains open:
+the design twins exercise. The exchange material is settled too: landed as
+Cloudflare runtime surface (`evidenceFromProviderCode`), evidence-only,
+with the positions recorded in the consumer's login spec. What remains
+open:
 
 - the production access lifetime and which privileged commands require live
   authority or fresh authentication — the engine defaults to 900 seconds,
   configurable; the consumer's security review owns the number; and
-- the exchange-material shape handled by runtime identity adapters when
-  provider secrets are sealed inside the authority runtime (Cloudflare
-  expansion surface).
+- a read-only hat: `validatePolicyBundle` rejects a role with zero
+  actions, so an auditor (read reach, no act capability) has no natural
+  carrier in v1. It arrives with the team-audience axis — the consumer's
+  read-audience requirement — not by weakening bundle validation ahead of
+  the consumer that needs it.
 
 Those decisions should be made against concrete product flows. They should not
 weaken the central shape: a portable, deep authority module with Cloudflare as

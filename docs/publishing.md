@@ -44,7 +44,7 @@ A consumer pins one of:
 | Codeberg (canonical, immediate) | `git+https://codeberg.org/rickhull/org-hats.git#vX.Y.Z` |
 | GitHub (mirror, lagging) | `github:rickhull/org-hats#vX.Y.Z` |
 
-Replace `vX.Y.Z` with the release tag. `v0.4.4` remains the last frozen v0.4 pin; v1 releases start at `v1.0.0`, and the current target is in [`plans/v1.md`](../plans/v1.md). Prefer the Codeberg pin: the mirror's interval then never affects the consumer. The `github:` shorthand resolves only GitHub; a consumer whose CI is already GitHub-native may pin the mirror.
+Replace `vX.Y.Z` with the release tag. `v0.4.4` remains the last frozen v0.4 pin; v1 releases start at `v1.0.0`, and the latest tag is the pin target — no plan tracks it. The Cloudflare package releases on its own cadence as `cloudflare-vX.Y.Z`, which the root version guard deliberately ignores. Prefer the Codeberg pin: the mirror's interval then never affects the consumer. The `github:` shorthand resolves only GitHub; a consumer whose CI is already GitHub-native may pin the mirror.
 
 ## Release ritual
 
