@@ -74,6 +74,35 @@ test("expiry: the envelope dies at exp, verified one second before", async () =>
   assert.equal(dead.failure.kind, "expired");
 });
 
+test("verification fails closed in a fixed order when faults combine", async () => {
+  // versions before the signature: a wrong version with a forged signature
+  // is a version failure, not a signature failure
+  const wrongVersionForged = {
+    ...envelopeOf(vectors.claims, vectors.signature.slice(0, -4) + "AAAA"),
+    v: 2 as never,
+  };
+  assert.equal(
+    (await verify(wrongVersionForged, keys, { now: vectors.claims.iat + 1 })).failure.kind,
+    "wrong-interface-version",
+  );
+  // the key before the clock: an expired envelope under an unknown key id is
+  // an invalid signature, not an expiry
+  const expiredUnknownKey = envelopeOf(vectors.claims, vectors.signature, "key-never-configured");
+  assert.equal(
+    (await verify(expiredUnknownKey, keys, { now: vectors.claims.exp + 100 })).failure.kind,
+    "invalid-signature",
+  );
+  // the clock before the bindings: an expired envelope at the wrong site is
+  // expired, not wrongly bound
+  assert.equal(
+    (await verify(envelopeOf(vectors.claims), keys, {
+      now: vectors.claims.exp + 100,
+      expectedSiteId: "site-not-admitted",
+    })).failure.kind,
+    "expired",
+  );
+});
+
 test("wrong versions fail closed, never reinterpreted", async () => {
   const badFormat = { ...envelopeOf(vectors.claims), format: "something.else" };
   assert.equal((await verify(badFormat, keys, { now: vectors.claims.iat + 1 })).failure.kind, "wrong-interface-version");

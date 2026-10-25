@@ -91,18 +91,12 @@ test("generated snapshots: invariants clean, read reach structurally sound", () 
       const r = readReach(snapshot, bundle, actor.organizationId, actor.actorId, "op-1");
       // unique orgs, no duplicates
       assert.equal(new Set(r.readableOrganizationIds).size, r.readableOrganizationIds.length);
-      // exceptional teams are exactly the reached teams outside the org set
+      // exceptional teams are exactly the reached teams outside the org set;
+      // the strong bidirectional form is pinned by tests/generative.test.ts
       for (const teamId of r.readableTeamIds) {
         const team = teams.find((t) => t.teamId === teamId);
         assert.ok(team, `seed ${seed}: exceptional team exists`);
         assert.ok(!r.readableOrganizationIds.includes(team.organizationId));
-      }
-      // granted-teams: every readable org owns a reached team
-      for (const orgId of r.readableOrganizationIds) {
-        const owns = [...r.readableTeamIds, ...teams
-          .filter((t) => r.readableOrganizationIds.includes(t.organizationId))
-          .map((t) => t.teamId)];
-        assert.ok(owns.length > 0 || teams.some((t) => t.organizationId === orgId));
       }
     }
   }

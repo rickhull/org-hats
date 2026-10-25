@@ -1,8 +1,8 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { base64Decode, base64UrlDecode, base64Encode, serializeVerifyKeySet } from "org-hats/access";
+import { base64Decode, base64UrlDecode, base64Encode, parseVerifyKeySet, serializeVerifyKeySet } from "org-hats/access";
 import type { Env } from "../src/env";
-import { signerFor, signerFromEnv, verificationKeys } from "../src/runtime";
+import { serializedVerificationKeys, signerFor, signerFromEnv, verificationKeys } from "../src/runtime";
 
 const pair = async () => {
   const keys = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]) as CryptoKeyPair;
@@ -44,6 +44,25 @@ describe("configured signing keys", () => {
     } as Env);
     const nextSignature = await next.sign(payload);
     expect(await keys.get("key-b")?.verify(payload, nextSignature)).toBe(true);
+  });
+
+  it("the serialized set carries the configured keys and the signer, exactly", async () => {
+    const a = await pair();
+    const b = await pair();
+    const materials = [
+      { keyId: "key-a", algorithm: "Ed25519", publicKey: a.publicKey },
+      { keyId: "key-b", algorithm: "Ed25519", publicKey: b.publicKey },
+    ];
+    const configured = {
+      ...env,
+      AUTHORITY_SIGNING_KEY: b.privateKey,
+      AUTHORITY_SIGNING_PUBLIC_KEY: b.publicKey,
+      AUTHORITY_SIGNING_KEY_ID: "key-b",
+      AUTHORITY_VERIFICATION_KEYS: serializeVerifyKeySet(materials),
+    } as Env;
+    const signer = await signerFromEnv(configured);
+    const parsed = parseVerifyKeySet(await serializedVerificationKeys(configured, signer));
+    expect(parsed.keys).toEqual(materials);
   });
 
   it("rejects a partial signing configuration instead of falling back", async () => {

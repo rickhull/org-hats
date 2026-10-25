@@ -1,5 +1,5 @@
 import { SELF } from "cloudflare:test";
-import { parseVerifyKeySet } from "org-hats/access";
+import { ed25519VerifyKey, parseVerifyKeySet } from "org-hats/access";
 import { describe, expect, it } from "vitest";
 
 const OPS = { authorization: "Bearer test-ops-token" };
@@ -132,8 +132,12 @@ describe("typed ops routes", () => {
     const response = await SELF.fetch("https://authority.internal/ops/verification-keys");
     expect(response.status).toBe(200);
     const body = await response.json() as { signingKeyId: string; keySet: string };
-    expect(body.signingKeyId.length).toBeGreaterThan(0);
     const set = parseVerifyKeySet(body.keySet);
-    expect(set.keys.some((key) => key.keyId === body.signingKeyId)).toBe(true);
+    // nothing is configured here, so the set is exactly the current signer —
+    // not "at least contains" it
+    expect(set.keys).toHaveLength(1);
+    expect(set.keys[0]?.keyId).toBe(body.signingKeyId);
+    expect(set.keys[0]?.algorithm).toBe("Ed25519");
+    await expect(ed25519VerifyKey(body.signingKeyId, set.keys[0]!.publicKey)).resolves.toBeTruthy();
   });
 });

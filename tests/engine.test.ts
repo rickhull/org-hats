@@ -42,13 +42,14 @@ const invitee: TwinFixture = {
   },
 };
 
-const setup = async (transportFailures = 0) => {
+const setup = async (transportFailures = 0, envelopeLifetimeSeconds?: number) => {
   const clock = fixedClock(1_700_000_000);
   const signer = await webCryptoSigner("key-test");
   const engine = await createInMemoryAuthority({
     clock,
     signer,
     transportFailures,
+    ...(envelopeLifetimeSeconds !== undefined ? { envelopeLifetimeSeconds } : {}),
     fixtures: [PROFESSIONAL_OPERATION, FESTIVAL, invitee],
     principalLinks: [
       { provider: LEN.provider, subject: LEN.subject, organizationId: "org-a53e90f7", actorId: "actor-77f2b0e5" },
@@ -115,6 +116,13 @@ test("refresh: rotation with explicit outcomes; a superseded handle is dead", as
   });
   assert.equal(replay.failure.kind, "unauthenticated");
   assert.match(replay.failure.detail ?? "", /superseded/);
+});
+
+test("the envelope lifetime is configuration, not a constant", async () => {
+  const { engine } = await setup(0, 60);
+  const issue = await engine.runtime.accessFromEvidence(evidence(DANA));
+  assert.ok(!("failure" in issue));
+  assert.equal(issue.envelope.claims.exp - issue.envelope.claims.iat, 60);
 });
 
 test("amr and auth_time: copied from evidence, preserved through refresh, surfaced in context", async () => {

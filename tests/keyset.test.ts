@@ -37,6 +37,15 @@ const material = {
   publicKey: vectors.publicKeyBase64,
 };
 
+test("parseVerifyKeySet fails closed on a duplicate key id, not only serialize", () => {
+  const duplicated = JSON.stringify({
+    format: VERIFY_KEY_SET_FORMAT,
+    v: VERIFY_KEY_SET_VERSION,
+    keys: [material, { ...material, publicKey: "AA" + material.publicKey.slice(2) }],
+  });
+  assert.throws(() => parseVerifyKeySet(duplicated), /duplicate keyId/);
+});
+
 test("a key set round-trips and verifies the committed vector", async () => {
   const serialized = serializeVerifyKeySet([material]);
   const parsed = parseVerifyKeySet(serialized);

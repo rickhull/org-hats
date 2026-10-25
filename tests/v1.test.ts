@@ -1,7 +1,7 @@
-// The fence smoke test: the portable modules compile and load.
-//
-// This file proves the node:test harness runs inside bin/check and that the
-// portable modules stay loadable without node-only or Cloudflare types.
+// A resolution smoke test: the node:test harness runs inside bin/check and
+// the portable modules stay loadable under it. This is not the fence —
+// the fence is bin/check's `types: []` compile; this file proves the
+// modules resolve at runtime in the portable harness.
 
 import test from "node:test";
 import assert from "node:assert/strict";

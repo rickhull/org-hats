@@ -12,7 +12,26 @@ import {
   base64UrlDecode,
   base64UrlEncode,
   canonicalJson,
+  type FailureKind,
 } from "../src/contract.ts";
+
+test("the failure taxonomy is closed at nine kinds", () => {
+  // Record<FailureKind, true> makes this a compile-time exhaustiveness pin:
+  // a tenth kind fails typecheck here — the interface-version change A4
+  // demands — before any runtime assertion matters.
+  const taxonomy: Record<FailureKind, true> = {
+    unavailable: true,
+    unauthenticated: true,
+    "not-admitted": true,
+    expired: true,
+    "wrong-interface-version": true,
+    "wrong-binding": true,
+    "invalid-signature": true,
+    "invalid-command": true,
+    denied: true,
+  };
+  assert.equal(Object.keys(taxonomy).length, 9);
+});
 
 test("canonicalJson is independent of key order, recursively", () => {
   const a = canonicalJson({ b: 1, a: { d: [3, { z: null, c: true }], e: "x" } });

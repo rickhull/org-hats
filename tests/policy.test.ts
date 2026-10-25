@@ -13,16 +13,14 @@ test("both twin bundles validate cleanly", () => {
   assert.deepEqual(validatePolicyBundle(FESTIVAL.policy), []);
 });
 
+// The twins' read policies differ on purpose: this suite and the inventory
+// exercise both axes of the organization read policy through them.
 test("the twins exercise both read policies", () => {
   assert.equal(PROFESSIONAL_OPERATION.policy.readPolicy.organizations, "granted-teams");
   assert.equal(FESTIVAL.policy.readPolicy.organizations, "all-participating");
 });
 
 const base: PolicyBundle = PROFESSIONAL_OPERATION.policy;
-
-test("read policy is an axis structure, not a scalar", () => {
-  assert.deepEqual(base.readPolicy, { organizations: "granted-teams" });
-});
 
 test("an unknown read policy axis fails closed", () => {
   const bundle = {
