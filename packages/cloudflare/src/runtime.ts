@@ -182,6 +182,49 @@ export interface CloudflareRuntimeOptions {
 }
 
 /** The portable `AuthorityRuntime` over the two coordinators. */
+import {
+  exchangeCodeForEvidence,
+  parseSealedProviderConfig,
+  type EvidenceFromProviderCodeInput,
+  type EvidenceFromProviderCodeResult,
+  type SealedProviderConfig,
+} from "./exchange";
+
+/** The provider-callback exchange as the Worker serves it: resolve the
+ * sealed provider configuration from the organization directory — there is
+ * no global registry — then exchange the code for verified evidence. The
+ * portable seam is untouched; this is runtime surface. */
+export const evidenceFromProviderCode = async (
+  env: Env,
+  input: EvidenceFromProviderCodeInput,
+): Promise<EvidenceFromProviderCodeResult | { readonly ok: false; readonly failure: Failure }> => {
+  const organizationIds = (env.AUTHORITY_ORGANIZATION_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+  for (const organizationId of organizationIds) {
+    const stub = env.ORGANIZATION.get(env.ORGANIZATION.idFromName(organizationId));
+    const response = await stub.fetch("https://authority.internal/idp-config");
+    const result = (await response.json()) as {
+      readonly ok: boolean;
+      readonly value?: { readonly present: boolean; readonly config?: string };
+    };
+    if (!result.ok || result.value?.present !== true) continue;
+    let config: SealedProviderConfig | undefined;
+    try {
+      config = parseSealedProviderConfig(result.value.config ?? "");
+    } catch {
+      continue; // a configuration this runtime cannot read is not a match
+    }
+    if (config.issuer !== input.issuer || config.clientId !== input.clientId) continue;
+    return exchangeCodeForEvidence(input, config);
+  }
+  return {
+    ok: false,
+    failure: { kind: "unauthenticated", detail: "no sealed provider configuration for this issuer" },
+  };
+};
+
 export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): AuthorityRuntime => {
   const { env, signer, keys, organizationIds } = options;
   const organization = (organizationId: string): DurableObjectStub =>

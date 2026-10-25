@@ -20,6 +20,10 @@ public `org-hats` docs are normative for the seam.
   packaging.
 - [`envelope.md`](envelope.md) — the signed access-envelope format: claims,
   canonical encoding, signature transport, version and key compatibility.
+- [`cloudflare.md`](cloudflare.md) — the Cloudflare reference runtime as
+  built: its coordinators, the Worker surface and the provider-callback
+  exchange, signing and key rotation, configuration, ops routes, and the
+  state lifecycle.
 - [`lexicon.md`](lexicon.md) — the normative vocabulary; it wins over loose
   usage elsewhere.
 - [`migration-v1.md`](migration-v1.md) — the 0.4 → v1 crossing, including

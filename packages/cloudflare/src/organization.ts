@@ -710,6 +710,21 @@ export class OrganizationAuthority extends DurableObject<Env> {
           : json(value(actor));
       }
 
+      if (request.method === "GET" && url.pathname === "/idp-config") {
+        // the sealed provider configuration, for the runtime's exchange —
+        // internal surface only (the coordinator is reachable solely through
+        // the Worker), and parsed by the runtime, never here
+        const row = this.one(
+          "SELECT sealed_idp_config FROM organization LIMIT 1",
+        );
+        return json(value({
+          present: row !== undefined && row["sealed_idp_config"] !== null,
+          ...(row !== undefined && row["sealed_idp_config"] !== null
+            ? { config: String(row["sealed_idp_config"]) }
+            : {}),
+        }));
+      }
+
       if (request.method === "GET" && url.pathname === "/organization") {
         const organizationId = this.organizationId();
         const organization = organizationId === undefined

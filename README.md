@@ -34,12 +34,12 @@ What ships here:
 
 Everything under `src/` compiles with `types: []` and imports nothing
 Cloudflare — `bin/check` enforces both fences. The Cloudflare reference
-runtime lives in `packages/cloudflare` as a separate 0.x workspace package;
-its `OrganizationAuthority` and `OperationAuthority` coordinators are real
-SQLite/workerd, the `AuthorityRuntime` service binding is in place, the
-portable conformance inventory passes against them, the ops/state lifecycle
-(keys, export/restore, restore drill, context) is complete, and the
-self-contained demo runs with `pnpm --filter org-hats-cloudflare demo`.
+runtime lives in `packages/cloudflare` as a separate 0.x workspace package:
+the two SQLite-backed coordinators, the `AuthorityRuntimeEntrypoint`
+service binding (including the provider-callback exchange), ops routes,
+key rotation, and export/restore — the reference document is
+[`docs/cloudflare.md`](docs/cloudflare.md), and the self-contained demo
+runs with `pnpm --filter org-hats-cloudflare demo`.
 
 ## Proof
 
@@ -60,6 +60,9 @@ Normative documents:
   architecture; § Authority and § Access point at the shipped spec types.
 - [`docs/envelope.md`](docs/envelope.md) — the v1 access-envelope format
   contract.
+- [`docs/cloudflare.md`](docs/cloudflare.md) — the Cloudflare reference
+  runtime as built: coordinators, Worker surface, keys, ops, state
+  lifecycle.
 - [`specs/README.md`](specs/README.md) — the named invariants: what must
   hold, what enforces it, and what follows when it stops holding.
 - [`docs/lexicon.md`](docs/lexicon.md) — the normative vocabulary: the words

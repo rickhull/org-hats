@@ -14,11 +14,13 @@ import {
 import type { Env } from "./env";
 import {
   createCloudflareRuntime,
+  evidenceFromProviderCode,
   serializedVerificationKeys,
   signerFor,
   verificationKeys,
   type CloudflareSigner,
 } from "./runtime";
+import type { EvidenceFromProviderCodeInput, EvidenceFromProviderCodeResult } from "./exchange";
 import { verify, type Failed, type VerifyKey } from "org-hats/access";
 import { CONFORMANCE_PRINCIPALS, type ConformanceWorld } from "org-hats/conformance";
 import { createCloudflareConformanceWorld } from "./conformance";
@@ -97,10 +99,17 @@ async function check() { show(await api("/demo/access", { envelope })); }
 
 
 /** The service-binding surface. A consumer holding this binding holds the
- * same four methods the in-memory engine implements. */
+ * same four methods the in-memory engine implements, plus the runtime-only
+ * provider-callback exchange. */
 export class AuthorityRuntimeEntrypoint extends WorkerEntrypoint<Env> implements AuthorityRuntime {
   accessFromEvidence(input: AccessFromEvidenceInput): Promise<AccessIssue | Failed> {
     return runtime(this.env).then((value) => value.accessFromEvidence(input));
+  }
+  /** The provider-callback exchange: typed, verified evidence for the code
+   * the caller's callback holds, or a closed failure. Issuance stays
+   * `accessFromEvidence`. */
+  evidenceFromProviderCode(input: EvidenceFromProviderCodeInput): Promise<EvidenceFromProviderCodeResult> {
+    return evidenceFromProviderCode(this.env, input);
   }
   refresh(input: RefreshInput): Promise<AccessIssue | Failed> {
     return runtime(this.env).then((value) => value.refresh(input));
