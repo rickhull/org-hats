@@ -22,6 +22,13 @@ Keep these true:
 - **A rewrite needs both hosts.** If history is ever rewritten, force-push Codeberg and let the mirror resync; GitHub follows the mirror.
 - **Codeberg is the truth.** GitHub holds no authority, only a copy.
 
+**Current status (2026-10-25): the mirror is down and being repaired.**
+GitHub is frozen at the repository's root commit with only `v0.1.0`
+tagged; the standing mirror has effectively never run, most likely on an
+expired PAT. Canonical hosting and Codeberg-first consumer pins are
+unaffected. The repair is [`plans/gh_mirror.md`](../plans/gh_mirror.md);
+until it lands, Codeberg is the only live host and mirror CI is dark.
+
 ## CI
 
 CI runs on the **mirror**: GitHub Actions, [`.github/workflows/check.yml`](../.github/workflows/check.yml). On every push it installs, builds, **fails if the committed `dist/` is stale**, and runs `bin/check`; a tag push additionally fails if the tag does not match `package.json` — `bin/check-version`, run by `bin/check` and as its own early step. Because it lives on the mirror, a stalled sync stops CI as well as reach — check the mirror after any credential change.
