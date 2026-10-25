@@ -33,11 +33,15 @@ retry — never a distributed transaction. A duplicate or mismatched
 principal link is refused at bootstrap: one identity is never two actors.
 
 No write path reads the other coordinator synchronously
-(docs/authority_redesign.md § State ownership). What the operation needs
-from an organization in order to decide — which actors exist and which are
-disabled — arrives as a stamped roster image: pushed when the organization
-changes, pulled by the operation every fifteen minutes to repair a lost
-push, applied as a monotonic full replace per organization. Operation
+(docs/authority_redesign.md § State ownership), with one deliberate
+exception: **refresh's liveness gate** re-resolves the actor's existence and
+disabled flag at the organization before reissuing, read-only and fail-closed
+if the organization cannot answer. The projection still serves local command
+validation; the gate exists so a lost disable message cannot extend a
+session. What the operation needs in order to decide — which actors exist and
+which are disabled — arrives as a stamped roster image: pushed when the
+organization changes, pulled by the operation every fifteen minutes to
+repair a lost push, applied as a monotonic full replace per organization. Operation
 bootstrap pulls once, so an operation whose fixture declares active
 participations and grants can issue on the next request. `GET
 /ops/schema-status` reports `orgActors`, `disabledOrgActors`, and

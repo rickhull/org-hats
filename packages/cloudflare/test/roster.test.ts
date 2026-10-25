@@ -248,17 +248,17 @@ describe("the org-actor projection", () => {
     });
     expect(rotated.body.ok).toBe(true);
 
-    // The disable happens, but its `actor-disabled` message never arrives —
-    // nothing drains, so the refresh records are not revoked. Before the
-    // projection, refresh rested entirely on that message: `buildClaims`
-    // fabricated an enabled actor and would keep re-issuing. The roster
-    // image is pulled independently, so the operation denies on its own.
+    // The disable happens, but neither the `actor-disabled` message nor the
+    // roster image arrives: nothing drains and nothing reconciles. The
+    // projection therefore still says enabled. Refresh re-resolves the actor
+    // at the organization, so it refuses on the live fact rather than on the
+    // stale image.
     await call(current.org, "POST", "/disable", {
       actorId: MEMBER,
       byActorId: ADMIN,
       idempotencyKey: "disable-lost",
     });
-    await call(current.op, "POST", "/reconcile-rosters");
+    expect((await projected(current)).find((row) => row.actor_id === MEMBER)?.disabled).toBe(0);
 
     const refreshed = await call<{ refresh: { handle: string } }>(current.op, "POST", "/refresh", {
       handle: rotated.body.value?.refresh.handle ?? "",

@@ -86,6 +86,11 @@ declarations so that cannot regress silently.
   typed routing-facts route backfills the full set. It is not a rename route:
   no old-name history is carried yet. The operation schema is 4. This is
   runtime-only; the portable pin and interface version do not move.
+- `cloudflare-v0.3.1` adds refresh freshness: before reissuing, refresh
+  re-resolves the actor's existence and disabled flag at the organization;
+  missing or disabled fails `not-admitted`, and an unavailable organization
+  fails `unavailable`. The operation schema stays 4; interface 2 and envelope
+  1 do not move.
 - New operator verbs: `POST /reconcile-rosters` on an operation;
   `GET /ops/schema-status` reports `orgActors`, `disabledOrgActors`,
   `rosterSyncedAt`, and `rosterReconcileSeconds`; `GET /snapshot` reports

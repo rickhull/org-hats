@@ -151,3 +151,17 @@ suite. Rename history is not carried yet, so a rename stays ops-only and the
 route is not a rename act.
 *If it breaks:* a hand-maintained routing manifest becomes authority, and a
 rename can leave the registry serving an address authority no longer names.
+
+### A13 — Refresh re-resolves the actor at the organization
+
+A refresh handle is not by itself authority to reissue. Before issuing a
+replacement, the runtime resolves the actor's existence and disabled flag at
+the organization; missing or disabled fails closed, and an organization that
+cannot answer fails closed. The roster projection is not the revocation
+promise.
+
+*Held by:* the Cloudflare operation refresh's organization read; the
+in-memory engine's live organization lookup; the lost-disable refresh case in
+`packages/cloudflare/test/roster.test.ts`.
+*If it breaks:* a lost roster push becomes indefinite refresh authority, and a
+disabled actor keeps a session past the envelope lease.

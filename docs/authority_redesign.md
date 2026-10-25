@@ -346,6 +346,14 @@ every write. The standing rule instead: **no synchronous cross-coordinator
 read on a write path** — a fact a decision needs is projected into the
 coordinator that must decide.
 
+The one deliberate exception is **refresh's liveness gate**: before reissuing
+from a refresh handle, the operation resolves the actor's existence and
+disabled flag at the organization, read-only, and fails closed if the
+organization cannot answer. It decides no grant or participation mutation;
+it exists because a lost roster push and a lost actor-disabled message must
+not turn a refresh handle into indefinite authority. The local projection
+still serves command validation.
+
 Two channels keep it true, doing different work:
 
 - the organization **pushes** an image when its roster changes, so a disable
@@ -358,7 +366,8 @@ budget, never the revocation window. Images are stamped and applied
 monotonically, because the outbox may deliver a delayed message after a
 newer one and an older image must not resurrect a disabled actor. Revocation
 of issued access stays what it was: the actor-disabled message revokes
-refresh records, and an envelope's lifetime bounds the rest.
+refresh records, refresh itself re-resolves the actor at the organization,
+and an envelope's lifetime bounds the rest.
 
 The projection is derived, so it is not state to back up: a coordinator
 export carries the operation's own facts and leaves the projection out, and a

@@ -1387,6 +1387,37 @@ export class OperationAuthority extends DurableObject<Env> {
     return value({ claims: built.value.claims, refresh: { kind: "rotated", handle: refresh.handle } });
   }
 
+  /** The refresh liveness gate. This is the one deliberate synchronous
+   * cross-coordinator read on a write path: it is read-only, narrow, and
+   * fails closed. The projection remains the source for local command
+   * validation; this gate exists because a lost roster push must not turn
+   * a refresh handle into indefinite authority. */
+  private async organizationActor(
+    organizationId: OrganizationId,
+    actorId: ActorId,
+  ): Promise<{ readonly actorId: string; readonly disabled: boolean } | "unknown" | "unavailable"> {
+    let response: Response;
+    try {
+      response = await this.env.ORGANIZATION
+        .get(this.env.ORGANIZATION.idFromName(organizationId))
+        .fetch(`https://authority.internal/actor?actorId=${encodeURIComponent(actorId)}`);
+    } catch {
+      return "unavailable";
+    }
+    if (response.status === 404) return "unknown";
+    if (!response.ok) return "unavailable";
+    try {
+      const body = await response.json() as {
+        readonly ok?: boolean;
+        readonly value?: { readonly actorId: string; readonly disabled: boolean };
+      };
+      if (body.ok !== true || body.value === undefined) return "unavailable";
+      return body.value;
+    } catch {
+      return "unavailable";
+    }
+  }
+
   private async refresh(handle: string): Promise<Result<{
     readonly claims: AccessEnvelopeClaimsV1;
     readonly refresh: RefreshHandleOutcome;
@@ -1410,6 +1441,13 @@ export class OperationAuthority extends DurableObject<Env> {
             ...(record["amr_json"] === null ? {} : { amr: JSON.parse(String(record["amr_json"])) as string[] }),
             ...(record["auth_time"] === null ? {} : { authTime: Number(record["auth_time"]) }),
           };
+    // Refresh is the exception to local-only decisions: resolve the actor at
+    // the organization before reissuing. A lost roster push and a lost
+    // actor-disabled message must not keep a disabled actor's session alive.
+    const live = await this.organizationActor(organization, actor);
+    if (live === "unknown") return failure("not-admitted", "actor is not known at the organization");
+    if (live === "unavailable") return failure("unavailable", "the organization could not confirm the actor");
+    if (live.disabled) return failure("not-admitted", "actor disabled");
     const built = this.buildClaims(organization, actor, auth);
     if (!built.ok) return built;
     this.ctx.storage.sql.exec(
