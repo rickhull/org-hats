@@ -3,8 +3,8 @@
 # `codeberg-small` is 2 CPU / 4 GB / 5 min. The root-only install keeps the
 # Cloudflare workspace (workerd, vitest, wrangler) off this runner; workerd
 # stays on the local/release rings. A local root-only run is well inside the
-# cap: install ~5s (warm store), build ~4s, check ~5s. The first hosted run is
-# the cold evidence.
+# cap: install ~5s (warm store), build ~4s, check ~5s. The first hosted run
+# was green in ~1m25s, well inside the 5-minute cap.
 name: check
 
 on:

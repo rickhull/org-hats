@@ -67,14 +67,50 @@ pre-push hook skips it explicitly so a catch-up can validate every other tag;
 
 ## CI
 
-CI runs on GitHub when a release is pushed to the mirror: GitHub Actions,
-[`.github/workflows/check.yml`](../.github/workflows/check.yml). It is a
-release-time backstop, not the live gate — the live gate is the local
-pre-push hook and `pnpm verify`. On a mirror push it installs, runs **`bin/check-dist`** (build
-and fail if the committed `dist/` is stale), then runs `bin/check`. A tag
-push additionally fails if the tag does not match the manifest for its
-family — `bin/check-version`, run by `bin/check` and as its own early step.
-The workerd suites run in a separate job, after the same build.
+Codeberg is the per-push CI. Hosted Forgejo Actions runs
+[`.forgejo/workflows/check.yml`](../.forgejo/workflows/check.yml) on every
+push and on `workflow_dispatch`, on `codeberg-small`:
+
+- checkout with tags (`fetch-depth: 0`), pnpm 11.21.0, Node 24;
+- `pnpm install --frozen-lockfile --filter org-hats` — root only, so workerd
+  and vitest stay off the light runner;
+- `bin/check-dist` and `bin/check`.
+
+The first run was green: 96 portable tests in about 1m25s, well inside the
+5-minute cap. Workerd is not on this runner; it stays in the local and
+release rings.
+
+GitHub Actions remains the **release-mirror backstop**: it runs only when
+`bin/release --push` updates GitHub. It installs the workspace, runs
+`bin/check-dist` and `bin/check`, and runs the workerd suites in a separate
+job; a tag push also runs `bin/check-version`.
+
+The live gate for a working checkout is still the local pre-push hook and
+`pnpm verify`; CI is the remote evidence.
+
+### Codeberg CI setup
+
+Actions must be enabled in the repository (Settings → Units → Overview →
+Enable Actions). The CLI path is:
+
+```sh
+# once per clone; use an application token, not the OAuth browser flow
+fj auth add-token          # token from codeberg.org/user/settings/applications
+fj auth list
+fj repo units rickhull/org-hats actions --enable true
+```
+
+Grant the token `repository` read/write (and `user` read if you want
+`fj whoami`). `fj auth login` waits for an OAuth callback on
+`127.0.0.1:26218`; it hangs in a headless or remote session. The token and
+host are stored durably in `~/.local/share/forgejo-cli/keys.json` (mode 600),
+so `-H` is only needed to override the repository's host.
+
+The run history is at <https://codeberg.org/rickhull/org-hats/actions> and
+through `GET /api/v1/repos/rickhull/org-hats/actions/runs`.
+`fj actions tasks -r rickhull/org-hats` shows the task list and status — the
+first run was `success` in 1m25s. A manual dispatch is
+`fj actions dispatch -r rickhull/org-hats check.yml main`.
 
 ## The release
 
@@ -126,7 +162,7 @@ From a clean `main`:
 - **A release tag must match its manifest.** `bin/check-version` validates both families: `vX.Y.Z` against `package.json`, `cloudflare-vX.Y.Z` against `packages/cloudflare/package.json` (it also audits any tag: `bin/check-version v0.4.3`, `bin/check-version cloudflare-v0.2.0`). `bin/check` runs it, so CI enforces it on every mirror push; `bin/release` keeps the two equal by construction and re-checks the tag it just made. The committed `.githooks/pre-push` runs the root gate before a push leaves the machine — install it once with `git config core.hooksPath .githooks`. CI remains the backstop.
 - **`dist/` must be fresh.** `bin/check` runs the fence but does not emit; `pnpm build` does. `bin/check-dist` builds and fails if `git status --porcelain -- dist` is non-empty; the pre-push hook and **CI** both run it, so the local gate and the remote gate answer the same question in the same order.
 - **A gated commit is recorded locally.** A passing pre-push gate writes a marker under `.git/org-hats-gates/` keyed by the commit and a fingerprint of the runtime, compiler, and installed tree. A second push of the same clean commit (origin, then the mirror) reuses it; a dirty tree, a new commit, or a changed toolchain does not. The marker is local and never a release authority — `bin/release` and CI run their own gates.
-- **CI rides the release mirror.** GitHub Actions runs when a release is pushed, so it is a release-time backstop, not the live gate. The pre-push hook and `pnpm verify` are what every push is gated by.
+- **Codeberg CI is the per-push gate; GitHub CI is release-time.** `.forgejo/workflows/check.yml` runs on every Codeberg push; GitHub Actions runs only when the release mirror is updated. Workerd stays in the local and release rings.
 - **Know which host the consumer pins.** Codeberg is canonical and immediate; GitHub trails until the next release push. Prefer Codeberg.
 
 ## Metadata

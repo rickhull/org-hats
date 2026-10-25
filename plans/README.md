@@ -17,8 +17,6 @@ planned is released, adopted, and documented in `docs/`.
   tag, and the consumer relay. The source break is landed.
 - `test_suite_review.md` — the test-suite fanout: fragility and dependency
   findings, the rings, and the remaining coverage gaps in priority order.
-- `codeberg_ci.md` — Codeberg's hosted CI options, why we are not using them,
-  and the recommended hosted Forgejo Actions gate.
 
 Completed work is not kept here. What exists is in `docs/`; how it got here
 is in the commit history.
