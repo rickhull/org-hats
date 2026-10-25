@@ -5,11 +5,24 @@ and the in-memory engine, with the actual fixture ids and the decisions they
 produce. The README is the map; this is the walk. All fixtures are synthetic
 design data.*
 
+One rule runs through every case:
+
+```text
+may act = the worn role carries the action × the grant reaches the target
+```
+
+The rest of the model — organizations, participation, admission, envelopes,
+refresh, projections — exists to apply that rule across a network boundary
+and to keep applying it as the facts change. This is the organizational half
+of authorization; product objects, role hierarchy, and deployment stay with
+the host.
+
 The in-memory engine implements the same `AuthorityRuntime` as the Cloudflare
-reference runtime. The first snippet shows the imports; later snippets omit
-them, and some error handling is elided. `examples/pilot.ts` is the complete
-runnable setup, and the `OH-*` inventory is the exhaustive one. The point
-here is to connect the concepts to concrete facts.
+reference runtime, so the cases you see here run against the same seam that
+deploys. `examples/pilot.ts` is the complete runnable Case 1 setup, and the
+`OH-*` inventory is the exhaustive conformance set. The snippets below elide
+imports, repeated setup, and some error narrowing; the ids and outcomes are
+the ones the fixtures and tests produce.
 
 **Cases:** [one operation](#case-1-one-operation-one-hat) ·
 [same actor, another operation](#case-2-the-same-actor-another-operation) ·
@@ -29,29 +42,30 @@ normative: each term names a distinction the code may not blur.
 
 ## The world we will use
 
-The tutorial uses three twins:
+The three twins are chosen for the shapes they add: an ordinary team grant,
+the same actor in a second hat under a different policy, and a coalition that
+puts a crossed team grant beside a site grant.
 
-- **Professional Operation** (`op-9f2e6ad4`), a persistent, multi-site
-  operation. Harbor Logistics (`org-4c1f9a2e`) participates. Dana
-  (`actor-8d3b77c1`) holds grant `g-mer-3`: `coordinator` over the Yard crew
-  team (`team-2e8c64b9`) at West Yard (`site-b8d620fa`). Sam
-  (`actor-3a91c4d8`) is another Harbor Logistics actor; the setup below makes
-  him an organization administrator for the disable case. The policy is
-  `policy-meridian`; its read policy is `granted-teams`.
-- **Riverbend Fest** (`op-61a8e3f2`), a bounded, multi-venue operation. The
-  same Harbor Logistics actor Dana holds grant `g-fest-4`: `admin` over the
-  Park Gate site (`site-a9e05c41`). The policy is `policy-riverbend`; its read
-  policy is `all-participating`.
-- **Berlin Airlift** (`op-4b8d2e67`), a bounded, multi-airfield public-history
-  twin. Charles (`actor-4f7c2a19`) is a Vittles Airlift Wing duty officer over
-  the Tempelhof site (`site-c5d2a8f7`); Duncan (`actor-91f3c7e8`) is a Plane
-  Fare Air Group duty officer over the Ground Handling shift one team
-  (`team-5a2b8e37`) — a crossed grant.
+- **Professional Operation** (`op-9f2e6ad4`) — persistent, multi-site.
+  Dana (`actor-8d3b77c1`, Harbor Logistics `org-4c1f9a2e`) holds
+  `coordinator` over Yard crew (`team-2e8c64b9`) at West Yard
+  (`site-b8d620fa`), grant `g-mer-3`. Read policy `granted-teams`
+  (`policy-meridian`).
+- **Riverbend Fest** (`op-61a8e3f2`) — bounded, multi-venue. Dana again,
+  `admin` over Park Gate (`site-a9e05c41`), grant `g-fest-4`. Read policy
+  `all-participating` (`policy-riverbend`).
+- **Berlin Airlift** (`op-4b8d2e67`) — bounded, multi-airfield coalition.
+  Charles (`actor-4f7c2a19`, Vittles `org-6f1a93c4`) is a duty officer over
+  Tempelhof (`site-c5d2a8f7`); Duncan (`actor-91f3c7e8`, Plane Fare
+  `org-2d7eb58a`) is a duty officer over Ground shift one
+  (`team-5a2b8e37`) — the crossed grant. Read policy `all-participating`
+  (`policy-vittles`).
 
-The same actor does not carry a global role. Dana has one identity, one
-organization, and two operation-local hats. Charles's site grant and
-Duncan's team grant show the two shapes of reach, including the crossed
-secondment.
+Sam (`actor-3a91c4d8`) is a second Harbor Logistics actor; the setup makes him
+an organization administrator, which the disable case needs. A **grant** is an
+actor, a role, and one target. A **hat** is that grant worn for one act, and
+what the target covers is the grant's **reach**. No actor carries a global
+role: Dana has one identity, one organization, and two operation-local hats.
 
 ### Counterpoint
 
@@ -81,6 +95,7 @@ import {
   PROFESSIONAL_OPERATION,
   actorId,
   createInMemoryAuthority,
+  isFailed,
   organizationId,
   type SignedAccessEnvelope,
 } from "org-hats/authority";
@@ -119,9 +134,11 @@ const engine = await createInMemoryAuthority({
 
 The fixtures provide the structure. The principal links are the only
 identity mapping: evidence resolves to one organization actor, and no
-provider claim creates a second one.
+provider claim creates a second one. Every runtime call also carries the
+interface version it speaks, so a runtime can refuse a request it does not
+understand.
 
-Distribute the verification key before issuing:
+The verifier needs the public key, never the authority:
 
 ```ts
 const material = await engine.verificationKey();
@@ -138,7 +155,7 @@ const issueFor = async (subject: string, operationId: string) => {
     operationId,
     evidence: { provider: "tutorial-idp", subject },
   });
-  if ("failure" in result) {
+  if (isFailed(result)) {
     throw new Error(`${result.failure.kind}: ${result.failure.detail ?? ""}`);
   }
   return result;
@@ -150,11 +167,12 @@ const accessFor = async (
   siteId: string,
 ) => {
   const result = await verify(envelope, keys, {
+    // A deterministic instant inside the envelope's window.
     now: envelope.claims.iat + 1,
     expectedOperationId: operationId,
     expectedSiteId: siteId,
   });
-  if ("failure" in result) {
+  if (isFailed(result)) {
     throw new Error(`${result.failure.kind}: ${result.failure.detail ?? ""}`);
   }
   return result.access;
@@ -173,11 +191,14 @@ The four links are the whole identity boundary: evidence resolves to exactly
 one organization actor, and no provider claim mints a second one. The engine
 is there because the tutorial needs changes, sessions, and an outbox, not a
 table read, and it implements the same `AuthorityRuntime` as the Cloudflare
-package, so one story covers both. The key is distributed before issuance
-because verification is offline; a verifier that called the authority to
-check a signature would not be portable. The `orgAdmins` mapping is there
-because the disable case needs an administrator who is not a coordinator.
-Every piece here is used by a later case; scenery would not earn a line.
+package, so one story covers both. The alternative — handing the host a grant
+table — leaves ordering, sessions, and revocation to every host, and hosts
+reimplement them, not always correctly. The key is handed to the verifier,
+not fetched from the authority at check time, because verification is offline;
+a verifier that called the authority to check a signature would not be
+portable. The `orgAdmins` mapping is there because the disable case needs an
+administrator who is not a coordinator. Every piece here is used by a later
+case; scenery would not earn a line.
 
 ## Case 1: one operation, one hat
 
@@ -188,8 +209,13 @@ const danaPro = await issueFor("dana", "op-9f2e6ad4");
 const pro = await accessFor(danaPro.envelope, "op-9f2e6ad4", "site-b8d620fa");
 ```
 
-The envelope carries the projection. Product code does not read this; the
-verifier does. It is shown here to connect the model to the output:
+Issuance is one call; verification is another. `accessFor` names the
+operation and site the caller meant, because an authentic envelope for a
+different place is not a permission slip.
+
+The envelope carries a signed projection of the decision: the hat, its reach,
+and the read board. Product code does not read it; the verifier does. It is
+shown here to connect the model to the output:
 
 ```jsonc
 {
@@ -206,6 +232,9 @@ verifier does. It is shown here to connect the model to the output:
   "configurableSiteIds": []
 }
 ```
+
+Fields that describe the artifact rather than the decision — format and
+version, key id and signature, `iat` and `exp` — are omitted.
 
 The `hat` names the grant's own target. A team grant has a team id and no
 site id in `hat`, but the site it sits at appears in `sites`; the site grant
@@ -225,6 +254,17 @@ What the verifier returns:
 | `readableOrganizationIds()` | `["org-4c1f9a2e"]` — the reached team's organization |
 | `readableTeamIds()` | `[]` — the team's organization is already readable |
 
+The calls are ordinary predicates on the value the verifier returned:
+
+```ts
+if (!pro.mayAct("review", { kind: "team", teamId: "team-2e8c64b9" })) {
+  throw new Error("the worn hat should reach the team");
+}
+if (pro.mayAct("observe", { kind: "team", teamId: "team-2e8c64b9" })) {
+  throw new Error("a coordinator does not carry observe");
+}
+```
+
 `readableTeamIds` is not the expanded team list; it carries only exceptional
 team grants whose organization is outside the readable organization set. The
 shipped twins produce an empty list.
@@ -240,7 +280,8 @@ const context = await engine.runtime.context({
   interfaceVersion: AUTHORITY_INTERFACE_VERSION,
   envelope: danaPro.envelope,
 });
-// context.selectedHat.role === "coordinator"
+if (isFailed(context)) throw new Error(context.failure.kind);
+// context.selectedHat?.role === "coordinator"
 // context.wearableHats.length === 1
 // context.participation === "active"
 ```
@@ -250,19 +291,19 @@ hats belong. It is a presentation read, not an authority decision.
 
 ### Counterpoint
 
-Four calls — an issue, a verify, a context read, and an artifact you are told
-not to read — to answer one yes-or-no question. And a coordinator who may
-resolve a review but not observe her own team. Why so many parts?
+An issued artifact, a verification call, and a separate presentation read —
+to answer one yes-or-no question. And a coordinator who may resolve a review
+but may not observe her own team. Why so many parts?
 
 ### Rationale
 
-The calls answer four different questions: issuance is an authority act,
-verification is "may this holder act", `context` supplies presentation, and
-the envelope is what travels. Splitting them is what lets a service decide
-from a signed artifact without the authority database, and lets a display
-name change without touching the decision. `observe` is absent because a role
-enumerates the actions it carries; that closed answer is the point. Adding a
-capability is a policy edit at the authority, never an assumption in a host.
+The calls answer three different questions: issuance is an authority act;
+verification is "may this holder act"; `context` supplies presentation.
+Merging them would put the authority database on every request path — a
+service could not decide while the authority is unreachable, and a
+display-name change would become a decision change. `observe` is absent
+because a role enumerates the actions it carries; adding one is a policy edit,
+never a host assumption.
 
 ## Case 2: the same actor, another operation
 
@@ -291,8 +332,9 @@ The envelope's hat changes with the operation:
 ```
 
 The site grant reaches both Park Gate teams — Gate crew and Safety — even
-though neither belongs to Harbor Logistics. The same actor pair is unchanged;
-the operation-local grant and the policy are different.
+though neither belongs to Harbor Logistics. The actor pair, organization and
+actor id, is unchanged; the operation-local grant and the policy are
+different.
 
 | Check | Result |
 | --- | --- |
@@ -305,9 +347,17 @@ the operation-local grant and the policy are different.
 | `readableOrganizationIds()` | all three actively participating organizations |
 | `readableTeamIds()` | `[]` — every team's organization is readable under `all-participating` |
 
+One check, in code:
+
+```ts
+if (!fest.mayAct("flag", { kind: "site", siteId: "site-a9e05c41" })) {
+  throw new Error("a site grant reaches its site");
+}
+```
+
 The read policy changed: Professional's `granted-teams` gave Dana one
-readable organization; the Festival's `all-participating` gives her the
-whole operation's read board. The verifier compares the ids; it does not recompute
+readable organization; the Festival's `all-participating` gives her the whole
+operation's read board. The verifier compares the ids; it does not recompute
 either policy.
 
 ### Counterpoint
@@ -334,8 +384,16 @@ officer over a Ground Handling team):
 ```ts
 const charles = await issueFor("charles", "op-4b8d2e67");
 const duncan = await issueFor("duncan", "op-4b8d2e67");
-const ca = await accessFor(charles.envelope, "op-4b8d2e67", "site-c5d2a8f7");
-const du = await accessFor(duncan.envelope, "op-4b8d2e67", "site-c5d2a8f7");
+const charlesAccess = await accessFor(
+  charles.envelope,
+  "op-4b8d2e67",
+  "site-c5d2a8f7",
+);
+const duncanAccess = await accessFor(
+  duncan.envelope,
+  "op-4b8d2e67",
+  "site-c5d2a8f7",
+);
 ```
 
 | Check | Charles (site Tempelhof) | Duncan (team Ground shift one) |
@@ -347,37 +405,48 @@ const du = await accessFor(duncan.envelope, "op-4b8d2e67", "site-c5d2a8f7");
 | `mayConfigure(Tempelhof)` | `true` | `true` — the team sits at Tempelhof and the role carries `configure` |
 | `readableOrganizationIds()` | all four active organizations | all four active organizations |
 
-Charles's site grant reaches every team at Tempelhof, including Ground
-Handling teams from another organization: that is why a Vittles officer can
-dispatch a Ground Handling shift. Duncan's team grant is a crossed grant — a
-Plane Fare officer seconded onto a Ground Handling shift. It reaches only
-that team, not the site, though configuration reach follows the team's site.
+Two checks, in code:
 
-`mayAct` reach and configuration reach are separate. A team grant reaches
-only its team for `mayAct`; if its role carries `configure`, configuration
-reach follows the team's site. That is why Duncan can configure Tempelhof
-without being able to dispatch over the whole site.
+```ts
+const groundShift = { kind: "team", teamId: "team-5a2b8e37" } as const;
+if (!charlesAccess.mayAct("dispatch", groundShift)) {
+  throw new Error("the site grant should reach the ground shift");
+}
+if (duncanAccess.mayAct("dispatch", { kind: "site", siteId: "site-c5d2a8f7" })) {
+  throw new Error("a team grant should not reach its site");
+}
+```
 
-The three Berlin airfields are separate sites because admission and reach are
-per airfield. The coalition read board is `all-participating`; the verifier
-receives the four organization ids and does not reconstruct the coalition.
+The table's asymmetry is the lesson. Charles's site grant reaches every team
+at Tempelhof, including Ground Handling teams from another organization, which
+is why a Vittles officer can dispatch a Ground Handling shift. Duncan's team
+grant is a crossed grant — a Plane Fare officer seconded onto a Ground
+Handling shift — and reaches only that team, not the site. But the
+duty-officer role carries `configure`, and configuration reach follows the
+team's site, so Duncan can configure Tempelhof without dispatch reach over the
+whole airfield.
+
+The three Berlin airfields are separate sites for the same reason: admission
+and reach are per site, and collapsing them into one site with aliases would
+let a Tempelhof grant reach Gatow. The coalition read board is
+`all-participating`; the verifier receives the four organization ids and does
+not reconstruct the coalition.
 
 ### Counterpoint
 
-Charles may dispatch another organization's team; Duncan may configure a site
-where he may dispatch only one of its teams; and two grants at one site reach
-different targets. Are these special cases?
+One table, three answers that look inconsistent: a team grant that configures
+its site, a site grant that reaches another organization's teams, and a role
+that means different things depending on its target. Why is this not one
+rule?
 
 ### Rationale
 
-Two reaches, applied separately. `mayAct` follows the grant's target: a site
-grant reaches every team at that site, a team grant reaches only its team.
-Configuration follows the site a grant sits at — the site itself, or the
-site its team is anchored to — when the role carries `configure`, because
-setup is site-shaped: a seconded officer can configure the place their shift
-works without dispatch reach over the other teams there. The airfields are
-separate sites for the same reason: admission and reach are per site, and one
-site with three aliases would let a Tempelhof grant reach Gatow.
+It is one rule with two reaches. Acting is target-shaped: a site grant covers
+every team at its site, a team grant covers only its team. Setup is
+place-shaped: a grant that carries `configure` reaches the site it sits at —
+the site itself, or the site its team is anchored to. Collapsing the two would
+either widen a secondment into authority over the airfield or leave a team
+unable to configure the place it works.
 
 ## Case 4: commands, denial, and idempotency
 
@@ -399,20 +468,31 @@ const refused = await engine.runtime.command({
 ```
 
 ```jsonc
-{ "ok": false, "failure": { "kind": "denied", "detail": "the caller does not administer this operation" } }
+{
+  "ok": false,
+  "failure": {
+    "kind": "denied",
+    "detail": "the caller does not administer this operation"
+  }
+}
 ```
 
-The coordinator's hat does not carry `configure`, and Dana is not an
-operation admin. The command is a normal value, not an exception; it commits
+The coordinator's hat does not carry `configure`, so Dana does not administer
+the operation. The command is a normal value, not an exception; it commits
 nothing, and its idempotency key is not claimed.
 
-A valid command can select Dana's own primary hat:
+A valid command can select Dana's own primary hat. The act is deliberately
+uninteresting — she selects the grant she already wears — so the retry
+behavior is the only thing to watch:
 
 ```ts
 const command = {
   interfaceVersion: AUTHORITY_INTERFACE_VERSION,
   idempotencyKey: "tutorial-select-hat",
-  authorization: { kind: "access-envelope" as const, envelope: danaPro.envelope },
+  authorization: {
+    kind: "access-envelope" as const,
+    envelope: danaPro.envelope,
+  },
   kind: "select-hat" as const,
   operationId: "op-9f2e6ad4",
   grantId: "g-mer-3",
@@ -440,11 +520,14 @@ is claimed only on success and commits with the mutation, so a retry returns
 the original receipt rather than acting twice, while a denial leaves the key
 free for a corrected attempt. The failure is a value because "denied" is an
 ordinary authority answer, not an exception, and a receipt is what makes
-at-least-once delivery safe.
+at-least-once delivery safe. One `command` method with a typed `kind` also
+keeps the runtime's surface closed: a new act extends the union, and every
+implementation handles the same set. A host could build the same protocol
+over its own dedupe table; the command surface is where it is written once.
 
 ## Case 5: refresh rotation
 
-A session outlives one envelope. Refresh the Festival issue:
+A session outlives one envelope. Refresh Dana's Festival handle:
 
 ```ts
 if (danaFest.refresh.kind !== "rotated") throw new Error("expected a handle");
@@ -453,7 +536,7 @@ const refreshed = await engine.runtime.refresh({
   operationId: "op-61a8e3f2",
   handle: danaFest.refresh.handle,
 });
-if ("failure" in refreshed) throw new Error(refreshed.failure.kind);
+if (isFailed(refreshed)) throw new Error(refreshed.failure.kind);
 const afterRefresh = await accessFor(
   refreshed.envelope,
   "op-61a8e3f2",
@@ -462,9 +545,9 @@ const afterRefresh = await accessFor(
 ```
 
 `refreshed.refresh.kind` is `rotated`; `afterRefresh` answers from the
-replacement envelope, with the same keys and binding. The old envelope
-remains valid until its `exp` — refresh rotates the handle, not the
-already-issued envelope — but the old handle is dead:
+replacement envelope under the same binding. The old envelope remains valid
+until its `exp` — refresh rotates the handle, not the already-issued
+envelope — but the old handle is dead:
 
 ```ts
 const replay = await engine.runtime.refresh({
@@ -486,12 +569,14 @@ old envelope keeps verifying until it expires. Which of these is the session?
 
 ### Rationale
 
-All three, with different jobs. The handle is the live session, so one use
-bounds replay. The envelope is an offline-verifiable artifact already in
-someone's hands; the authority cannot take it back, so `exp` is what limits
-it, and calling it revoked would promise something the verifier cannot keep.
-The outcome is explicit — kept, rotated, revoked — so the host never has to
-infer which happened.
+Two lifetimes, not one. The handle is the live session, so a single use bounds
+replay. The envelope is an offline-verifiable artifact already in someone's
+hands; the authority cannot take it back, so `exp` limits it, and calling it
+revoked would promise something the verifier cannot keep. Re-running
+`accessFromEvidence` would ask the IdP again and could lose the authentication
+facts the session already carries; the handle is what the host holds between
+those events. The outcome is explicit — kept, rotated, revoked — so the host
+never infers which lifetime changed.
 
 ## Case 6: disable, a lost message, and the liveness gate
 
@@ -529,8 +614,8 @@ const staleSam = await staleEngine.runtime.accessFromEvidence({
   operationId: "op-9f2e6ad4",
   evidence: { provider: "tutorial-idp", subject: "sam" },
 });
-if ("failure" in staleDana) throw new Error(staleDana.failure.kind);
-if ("failure" in staleSam) throw new Error(staleSam.failure.kind);
+if (isFailed(staleDana)) throw new Error(staleDana.failure.kind);
+if (isFailed(staleSam)) throw new Error(staleSam.failure.kind);
 ```
 
 Sam administers the organization, so he can disable Dana:
@@ -580,7 +665,10 @@ with the stale world's key set:
 
 ```ts
 const staleMaterial = await staleEngine.verificationKey();
-const staleKey = await ed25519VerifyKey(staleMaterial.keyId, staleMaterial.publicKey);
+const staleKey = await ed25519VerifyKey(
+  staleMaterial.keyId,
+  staleMaterial.publicKey,
+);
 const staleKeys = new Map([[staleKey.keyId, staleKey]]);
 const expired = await verify(staleDana.envelope, staleKeys, {
   now: staleDana.envelope.claims.exp,
@@ -608,10 +696,12 @@ The organization owns the actor fact; the operation owns its local copy, and
 a copy can be stale. "One writer for each fact" means a lost message must not
 become indefinite authority, so refresh reads the owner — read-only and
 fail-closed, the named exception to no cross-coordinator reads on the write
-path — while the projection still validates local commands. An
-already-issued envelope cannot be recalled, so its `exp` is the blast radius;
-the gate makes sure no session outlives it. The stale projection is not a
-wart to paper over. It is why the gate exists.
+path — while the projection still validates local commands. The alternative
+is a cross-coordinator transaction on every disable, which makes the
+organization's commit depend on the operation being reachable. An
+already-issued envelope cannot be recalled either way, so its `exp` is the
+blast radius; the gate makes sure no session outlives it. The stale projection
+is not a wart to paper over. It is why the gate exists.
 
 ## The same rules in Cloudflare
 
@@ -633,9 +723,8 @@ does not grow a second set of authority rules. It provides:
 
 The standing rule is no synchronous cross-coordinator read on a write path.
 Refresh's liveness gate is the deliberate exception: read-only, fail-closed,
-and it decides no grant or participation mutation. The operation's projection
-still serves local command validation; the gate keeps a lost disable message
-from becoming indefinite authority.
+and it mutates no grant or participation. The operation's projection still
+serves local command validation.
 
 The full `OH-*` inventory runs against the real coordinators in workerd. A
 deployed runtime reached through a service binding has a separate, narrower
@@ -650,14 +739,14 @@ declared separately from the main inventory. Is this one system or two?
 
 ### Rationale
 
-One contract, two implementations: the in-memory engine and the Cloudflare
-package both implement `AuthorityRuntime`, so the deployed runtime cannot
-grow its own rules without failing the portable tests. The coordinators split
-state where the single writer is: the organization owns actors and their
-lifecycle, the operation owns sites, teams, grants, participation, policy,
-and refresh. The smoke subset is named separately because a deployed binding
-proves that subset, not the full `OH-*` inventory; conflating the two claims
-is how a test claim becomes fiction.
+One contract, two implementations, and two owners of state. The deployed
+runtime cannot grow its own rules without failing the portable tests, and the
+in-memory engine is not a mock but the second implementation that keeps the
+contract honest. The coordinators split state where the single writer is: the
+organization owns actors and their lifecycle, the operation owns sites,
+teams, grants, participation, policy, and refresh. The smoke subset is named
+separately because a deployed binding proves that subset, not the full `OH-*`
+inventory; conflating the two claims is how a test claim becomes fiction.
 
 ## Where to run it
 
@@ -667,6 +756,12 @@ is how a test claim becomes fiction.
   scenario suites.
 - `pnpm check:cloudflare` — the Cloudflare typecheck and workerd suites,
   including the full inventory and the lost-disable roster case.
+- `pnpm verify` — the full local gate: dist freshness, the portable checks,
+  and the Cloudflare suite.
+
+The cases cover decisions and sessions. The `OH-*` inventory covers the
+lifecycle they assume — participation, admission, access requests, grant and
+revoke — and the Cloudflare suite adds the deployment checks.
 
 ### Counterpoint
 
@@ -675,9 +770,14 @@ some errors are narrowed by hand. Why is the tutorial not executable?
 
 ### Rationale
 
-Because the executable authority is the pilot and the suite, and a document
-that duplicated them would drift from them. A tutorial that imported them
-would show internals instead of the seam. The snippets keep the fixture ids
-and the outcomes, so what you read can be checked against what runs; only the
-repeated setup and the error handling are left out. When the text and a test
-disagree, the test is right, and the text is a bug.
+The executable authority is the pilot and the suite; a document that
+duplicated them would drift from them. A tutorial that imported them would
+show internals instead of the seam. The snippets keep the fixture ids and the
+outcomes, so what you read can be checked against what runs; only the repeated
+setup and the error handling are left out. When the text and a test disagree,
+the test is right, and the text is a bug.
+
+The whole walk, in one sentence: one equation, an artifact that carries the
+facts a verifier needs, two reaches, a command protocol that survives a retry,
+two lifetimes for a session, and a gate that reads the owner when a copy may
+be stale.
