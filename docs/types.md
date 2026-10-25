@@ -180,9 +180,6 @@ These are current facts, not future promises:
   fail closed with `invalid-command` while an inline `satisfies never`
   witness keeps them exhaustive — a structurally wrong command over the
   wire gets the closed taxonomy, never a thrown exception.
-- The root package does not re-export the id aliases, and `NeutralAccess`
-  lacks some accessors hosts need for the projection; those are tracked in
-  `plans/code_review.md` R3.
 
 ## Rules of thumb
 

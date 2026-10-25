@@ -5,12 +5,12 @@ report-only readers (flash model, read-only), findings judged and
 cross-verified against the Cloudflare code by the main agent. The review's
 findings rode the **2.0.0** release: `GrantTarget` landed as the breaking
 command change (`claude_review.md` P3), alongside the behavior tightenings
-and additive API. R1 and R2 are now fully reconciled — every correctness
-and mechanical item landed or was closed as stale/kept-deliberately on
-2026-10-25, tests-first through the public seams. Remaining: R3 (two
-additive API items plus one inventory case), R4, R5. Pending slices:
-`packages/cloudflare` (including the RFC-grounded exchange review),
-`tests/`, `bin/`, and configs.
+and additive API. R1, R2, and R3 are now fully reconciled — every
+correctness and mechanical item landed or was closed as stale/kept-
+deliberately on 2026-10-25, tests-first through the public seams. Remaining:
+R4's engine-coordinator split (its shared primitives and mechanical pass
+landed), and R5. Pending slices: `packages/cloudflare` (including the
+RFC-grounded exchange review), `tests/`, `bin/`, and configs.
 
 The two cross-runtime findings below were fixed in 2.0.0; the rest of the
 ledger is reconciled as marked.
@@ -142,23 +142,35 @@ ledger is reconciled as marked.
 
 ## R3 — API additions (additive, 2.0.0)
 
-- [ ] Root doesn't re-export the id aliases `model.ts` defines
-  (`OrganizationId` etc.) — root consumers can't name them. Re-export
-  from the package root.
-- [ ] `NeutralAccess` lacks accessors the docs promise hosts read —
+- [x] Root doesn't re-export the id aliases — root consumers can't name
+  them. Re-export from the package root.
+  Landed 2026-10-25: the five aliases plus `Unbranded` re-export from
+  `src/index.ts`. The aliases are the model's branded ids — the root is
+  the core, not the host seam; hosts annotate their own strings with
+  `Unbranded<OrganizationId>`, pinned by the consumer fence.
+- [x] `NeutralAccess` lacks accessors the docs promise hosts read —
   `memberTeamIds()`, `authenticatedWith()`/`authenticatedAt()` (amr /
   authTime), `actor()` (organizationId/actorId). The amr addition left
   hosts without narrow accessors, contradicting § Access's "callers
   never see raw claims." Add the accessors; align docs and code.
+  Landed 2026-10-25: all four accessors on `NeutralAccess`; absent `amr`
+  flattens to an empty list, absent `auth_time` stays `undefined` (no
+  honest zero); § Access's vocabulary sentence names them. Vector tests
+  and the consumer fence pin the shapes; `tests/types.test.ts` pins the
+  plain-string returns.
 - [x] `["admin"]` default role fallback (A9, found independently by two
   readers) — a hardcoded admin title where the invariant says titles are
   configuration. Decision: require an explicit/declared default rather
   than falling back silently. Behavior change, sanctioned for 2.0.0.
   Landed in `claude_review.md` P1: an undeclared admin role set is empty,
   not a hardcoded title.
-- [ ] Non-admin-denial case added to the portable conformance inventory
+- [x] Non-admin-denial case added to the portable conformance inventory
   (authorize grant-hat by a non-admin → denied) — additive, both
   runtimes already exercise the shape.
+  Landed 2026-10-25 as `OH-CMD-04`: a wearable coordinator hat with no
+  configure action is refused the grant act, and an administrator's
+  identical grant still applies. Passes against the in-memory and the
+  Cloudflare worlds.
 
 ## R4 — Structural refactors (crystallization, 2.0.0)
 
@@ -168,17 +180,37 @@ coordinators' commands. This is the headline item.
 
 - [ ] Split `engine.ts` into coordinator modules with a gated-handler
   shape shared between them.
-- [ ] Lift envelope-claims assembly — duplicated nearly line-for-line
+- [x] Lift envelope-claims assembly — duplicated nearly line-for-line
   between `engine.ts` and Cloudflare's `operation.ts` — into one shared
   pure module under `src/`.
-- [ ] Grant ranking is written three times (model, engine, Cloudflare
+  Landed 2026-10-25: `src/authority/claims.ts` owns
+  `assembleAccessClaims`; each runtime keeps only its own preconditions
+  (actor existence and disablement in memory, bootstrap state in
+  Cloudflare) and both delegate the claim shape. `tests/claims.test.ts`
+  pins the hat, membership, routing sites, read reach, configuration
+  reach, lifetime, and absent-versus-present authentication facts; the
+  Cloudflare suite passes unchanged.
+- [x] Grant ranking is written three times (model, engine, Cloudflare
   `buildClaims`) — the model should own one ranked-selection primitive;
   both engines call it.
-- [ ] `resolveLink` helper duplicated three times; `failed`/`fail`/`ok`
+  Landed 2026-10-25: `firstByRank` is exported from `model.ts`; worn-hat
+  selection, the decision rule, and the shared claims assembler read it.
+  The engine's `defaultHat` and Cloudflare's local rank are gone.
+- [x] `resolveLink` helper duplicated three times; `failed`/`fail`/`ok`
   naming pass; select-hat double-negative simplification; refresh's
   `factsOf` reuse; `SignerLike`/`ClockLike` alias cleanup;
   `VerificationKeyMaterial` placement; `access/index.ts` verify/keys
   key-material split (optional).
+  Reconciled 2026-10-25: no `resolveLink` exists — stale. The three
+  result helpers are kept and now read as what they are: `failed` wraps a
+  `Failure` for the session surface, `fail` builds one for a command, `ok`
+  builds a receipt. Select-hat's dead id guards and double negative are
+  simplified. Refresh reuses `authenticationFactsOf` for the record →
+  claims copy. `SignerLike`/`ClockLike` are type aliases, not empty
+  interfaces. `VerificationKeyMaterial` stays the contract's type
+  re-exported by the authority subpath — that is its placement. The
+  optional `access/index.ts` split is declined: the codec home is
+  documented and small.
 
 ## R5 — Pending slices
 

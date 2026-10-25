@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 
 import {
   decide,
+  firstByRank,
   invariantProblems,
   isActiveGrant,
   selectWornHat,
@@ -216,6 +217,28 @@ test("the revocation filter is the ActiveGrant refinement, checked once", () => 
   assert.equal(survivors.length, 1);
   // while `Snapshot.grants` keeps the revoked record for audit
   assert.ok(revoked.grants.some((g) => g.grantId === "g-mer-3" && g.revoked === true));
+});
+
+test("the ranked selection is one primitive: primary, then role, target, grant id", () => {
+  const grant = (id: string, role: string, primary?: boolean): ActiveGrant => ({
+    grantId: id,
+    operationId: OP,
+    organizationId: NEW_ORG,
+    actorId: DANA_OKAFOR,
+    role,
+    target: { kind: "team", teamId: teamId("team-rank") },
+    ...(primary === true ? { primary: true } : {}),
+  });
+  // primary wins regardless of input order or role spelling
+  assert.equal(firstByRank([grant("g-a", "field"), grant("g-z", "coordinator", true)])?.grantId, "g-z");
+  // without a primary: role, then target id (equal here), then grant id
+  assert.equal(firstByRank([grant("g-b", "reviewer"), grant("g-a", "field")])?.grantId, "g-a");
+  assert.equal(firstByRank([grant("g-b", "field"), grant("g-a", "field")])?.grantId, "g-a");
+  // the caller's array is never reordered in place
+  const input = [grant("g-b", "field"), grant("g-a", "field")];
+  firstByRank(input);
+  assert.deepEqual(input.map((g) => g.grantId), ["g-b", "g-a"]);
+  assert.equal(firstByRank([]), undefined);
 });
 
 test("a primary that does not reach the target stands aside for the fallback", () => {

@@ -5,6 +5,8 @@ export { actionsOf, validatePolicyBundle } from "../policy.js";
 export type { TwinFixture } from "./twins.js";
 export { AIRLIFT, DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION, TWINS, } from "./twins.js";
 export { createInMemoryAuthority } from "./engine.js";
+export { assembleAccessClaims } from "./claims.js";
+export type { AccessClaimsInput, AuthenticationFacts } from "./claims.js";
 export type { ClockLike, InMemoryAuthorityConfig, InMemoryAuthorityHandle, SignerLike, VerificationKeyMaterial, } from "./engine.js";
 export type { AccessEnvelopeClaimsV1, ActorId, EpochSeconds, Failed, Failure, GrantTarget, FailureKind, IdempotencyKey, IssuerInterfaceVersion, JsonValue, OperationId, OrganizationId, RefreshHandle, RefreshHandleOutcome, SiteBinding, SiteId, SignedAccessEnvelope, TeamId, Unbranded, } from "../contract.js";
 export { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, actorId, canonicalJson, epochSeconds, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";

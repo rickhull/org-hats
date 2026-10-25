@@ -3,10 +3,8 @@ import { type Snapshot } from "../model.js";
 import type { TwinFixture } from "./twins.js";
 import type { AuthorityRuntime } from "./types.js";
 import { type Clock, type Signer } from "./internal.js";
-export interface SignerLike extends Signer {
-}
-export interface ClockLike extends Clock {
-}
+export type SignerLike = Signer;
+export type ClockLike = Clock;
 /** Administration is deployment policy, never a hardcoded role title: the
  * host states which role titles administer an operation and which actors
  * administer an organization. An operation with no declared `adminRoles` has

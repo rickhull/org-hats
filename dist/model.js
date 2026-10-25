@@ -113,10 +113,11 @@ export const wearableGrants = (snapshot, organizationId, actorId, operationId) =
         .filter(isActiveGrant);
 };
 /** The one ranked selection: the primary first, then the deterministic
- * order by (role, target id, grant id). Both `selectWornHat` and `decide`
- * read it, so the rule is written once. Only active grants enter — the
+ * order by (role, target id, grant id). Every caller that must choose a
+ * default hat reads it — worn-hat selection, the decision rule, and envelope
+ * issuance — so the rule is written once. Only active grants enter; the
  * revocation filter happened upstream in `wearableGrants`. */
-const firstByRank = (grants) => {
+export const firstByRank = (grants) => {
     const rank = (g) => `${g.primary === true ? 0 : 1}|${g.role}|${g.target.kind === "team" ? g.target.teamId : g.target.siteId}|${g.grantId}`;
     return [...grants].sort((a, b) => (rank(a) < rank(b) ? -1 : rank(a) > rank(b) ? 1 : 0))[0];
 };

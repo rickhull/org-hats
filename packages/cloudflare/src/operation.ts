@@ -1,10 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
 import {
-  ACCESS_ENVELOPE_VERSION,
-  AUTHORITY_INTERFACE_VERSION,
   actionsOf,
   actorId,
+  assembleAccessClaims,
   canonicalJson,
+  epochSeconds,
   operationId,
   organizationId,
   siteId,
@@ -12,6 +12,7 @@ import {
   validatePolicyBundle,
   type AccessEnvelopeClaimsV1,
   type ActorId,
+  type AuthenticationFacts,
   type FailureKind,
   type Failure,
   type GrantTarget,
@@ -21,7 +22,6 @@ import {
   type OrganizationId,
   type PolicyBundle,
   type RefreshHandleOutcome,
-  type SiteBinding,
   type SiteId,
   type TeamId,
   type Unbranded,
@@ -29,9 +29,7 @@ import {
 import {
   isHostnameLabel,
   isSitePath,
-  readReach,
   transitionParticipation,
-  wearableGrants,
   type Grant,
   type Participation,
   type ParticipationEvent,
@@ -258,13 +256,8 @@ interface RoutingFactsInput {
   readonly sites: readonly { readonly siteId: string; readonly path: string }[];
 }
 
-/** How and when the principal authenticated, as the issuing evidence
- * stated it. Opaque to authority: stored with the refresh record, re-issued
- * on every refresh of its chain, never interpreted. */
-interface AuthenticationFacts {
-  readonly amr?: readonly string[];
-  readonly authTime?: number;
-}
+/** How and when the principal authenticated arrives with the evidence and
+ * lives on the refresh record; the claims assembler owns the shape. */
 
 export class OperationAuthority extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -1284,80 +1277,21 @@ export class OperationAuthority extends DurableObject<Env> {
     if (operationId === undefined || policy === undefined) return failure("unavailable", "operation is not bootstrapped");
     const snapshot = this.modelSnapshot();
     if (snapshot === undefined) return failure("unavailable", "operation is not bootstrapped");
-    const wearable = wearableGrants(snapshot, organizationId, actorId, operationId);
-    if (wearable.length === 0) return failure("not-admitted");
-    const rank = (grant: Grant): string =>
-      `${grant.primary === true ? 0 : 1}|${grant.role}|${grant.target.kind === "team" ? grant.target.teamId : grant.target.siteId}|${grant.grantId}`;
-    const hat = [...wearable].sort((left, right) => rank(left) < rank(right) ? -1 : rank(left) > rank(right) ? 1 : 0)[0];
-    if (hat === undefined) return failure("not-admitted");
-    const role = actionsOf(policy, hat.role);
-    // the grants and the active bundle disagreeing is an administrator's
-    // inconsistency, not an empty action list for this actor
-    if (!role.found) {
-      return failure("unavailable", `the policy bundle no longer carries the role "${hat.role}"`);
-    }
-    const actions = role.actions;
-    const teams = snapshot.teams;
-    const hatTeamIds = new Set<string>();
-    const hatSiteIds = new Set<string>();
-    if (hat.target.kind === "site") {
-      hatSiteIds.add(hat.target.siteId);
-      for (const team of teams) if (team.siteId === hat.target.siteId) hatTeamIds.add(team.teamId);
-    } else {
-      hatTeamIds.add(hat.target.teamId);
-    }
-    const siteIds = new Set<string>();
-    const memberTeams = new Set<string>();
-    for (const grant of wearable) {
-      if (grant.target.kind === "site") {
-        siteIds.add(grant.target.siteId);
-        for (const team of teams) if (team.siteId === grant.target.siteId) memberTeams.add(team.teamId);
-      } else {
-        const teamId = grant.target.teamId;
-        memberTeams.add(teamId);
-        const team = teams.find((candidate) => candidate.teamId === teamId);
-        if (team !== undefined) siteIds.add(team.siteId);
-      }
-    }
-    const sites: SiteBinding[] = snapshot.sites
-      .filter((site) => siteIds.has(site.siteId))
-      .map((site) => ({ siteId: site.siteId, aliases: [...site.aliases] }));
-    const reach = readReach(snapshot, policy, organizationId, actorId, operationId);
-    const configureActions = this.configureActions();
-    const configurableSiteIds = [...new Set(
-      wearable.flatMap((grant) => {
-        const carried = actionsOf(policy, grant.role);
-        if (!carried.found || !carried.actions.some((action) => configureActions.includes(action))) return [];
-        if (grant.target.kind === "site") return [grant.target.siteId];
-        const teamId = grant.target.teamId;
-        const team = teams.find((candidate) => candidate.teamId === teamId);
-        return team === undefined ? [] : [team.siteId];
-      }),
-    )];
-    const iat = now();
-    return value({
-      claims: {
-        v: ACCESS_ENVELOPE_VERSION,
-        interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-        operationId,
-        actor: { organizationId, actorId },
-        hat: {
-          role: hat.role,
-          actions: [...actions],
-          teamIds: [...hatTeamIds],
-          siteIds: [...hatSiteIds],
-        },
-        memberTeamIds: [...memberTeams],
-        sites,
-        readableOrganizationIds: reach.readableOrganizationIds,
-        readableTeamIds: reach.readableTeamIds,
-        configurableSiteIds,
-        iat,
-        exp: iat + this.envelopeLifetime(),
-        ...(auth?.amr !== undefined ? { amr: [...auth.amr] } : {}),
-        ...(auth?.authTime !== undefined ? { auth_time: auth.authTime } : {}),
-      },
+    // The claim shape is the portable assembler's: the coordinator supplies
+    // only what it owns — the bootstrapped snapshot, the active bundle, and
+    // the deployment's configure vocabulary.
+    const claims = assembleAccessClaims({
+      snapshot,
+      policy,
+      operationId,
+      organizationId,
+      actorId,
+      configureActions: this.configureActions(),
+      envelopeLifetimeSeconds: this.envelopeLifetime(),
+      issuedAt: epochSeconds(now()),
+      ...(auth !== undefined ? { auth } : {}),
     });
+    return "kind" in claims ? failure(claims.kind, claims.detail) : value({ claims });
   }
 
   private async newRefresh(organizationId: string, actorId: string, auth?: AuthenticationFacts): Promise<{ handle: string; at: number }> {

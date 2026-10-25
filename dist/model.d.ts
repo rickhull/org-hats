@@ -153,6 +153,12 @@ export interface WornHat {
     readonly actions: readonly string[];
     readonly target: GrantTarget;
 }
+/** The one ranked selection: the primary first, then the deterministic
+ * order by (role, target id, grant id). Every caller that must choose a
+ * default hat reads it — worn-hat selection, the decision rule, and envelope
+ * issuance — so the rule is written once. Only active grants enter; the
+ * revocation filter happened upstream in `wearableGrants`. */
+export declare const firstByRank: (grants: readonly ActiveGrant[]) => ActiveGrant | undefined;
 /** Worn-hat selection, operation-local: the primary when it is wearable at
  * the target, otherwise the deterministic first by (role, target id, grant
  * id). A revoked or disabled primary never blocks the fallback. */

@@ -14,6 +14,14 @@
 
 import { AUTHORITY_INTERFACE_VERSION } from "../dist/authority/index.js";
 import type {
+  OrganizationId as RootOrganizationId,
+  ActorId as RootActorId,
+  OperationId as RootOperationId,
+  SiteId as RootSiteId,
+  TeamId as RootTeamId,
+  Unbranded as RootUnbranded,
+} from "../dist/index.js";
+import type {
   AccessEnvelopeClaimsV1,
   AuthorityCommand,
   AuthorityContext,
@@ -72,7 +80,24 @@ export const readAccess = (access: NeutralAccess): boolean =>
   access.mayConfigure(siteId) &&
   access.readableOrganizationIds().every((id: string) => id.length > 0) &&
   access.readableTeamIds().every((id: string) => id.length > 0) &&
+  access.memberTeamIds().every((id: string) => id.length > 0) &&
+  access.authenticatedWith().every((method: string) => method.length > 0) &&
+  typeof access.authenticatedAt() !== "object" &&
+  access.actor().organizationId === organizationId &&
+  access.actor().actorId === actorId &&
   access.operationId === operationId;
+
+// A root consumer can name the id aliases without importing a subpath.
+// The root is the core model, and the model's ids are the branded ones;
+// a host holding its own plain strings annotates with the `Unbranded`
+// composition — never a constructor.
+const namedOrg: RootUnbranded<RootOrganizationId> = organizationId;
+const namedActor: RootUnbranded<RootActorId> = actorId;
+const namedOperation: RootUnbranded<RootOperationId> = operationId;
+const namedSite: RootUnbranded<RootSiteId> = siteId;
+const namedTeam: RootUnbranded<RootTeamId> = teamId;
+const fixtureShape: RootUnbranded<RootOrganizationId> = organizationId;
+export const namedIds = [namedOrg, namedActor, namedOperation, namedSite, namedTeam, fixtureShape];
 
 export const readContext = (context: AuthorityContext): string[] => [
   context.operationId,

@@ -199,7 +199,9 @@ interface is specified and shipped: `NeutralAccess` in
 the `org-hats/access` subpath. The vocabulary is fixed and domain-neutral:
 operation and site binding, the selected hat's actions over a neutral
 target, the organization and exceptional team ids readable under the active
-policy, and configuration reach. The module never names a product entity;
+policy, configuration reach, the actor's membership teams, how and when the
+principal authenticated, and the session's stable actor identity. The
+module never names a product entity;
 product verbs — a host's `mayReadReport`, for example — are host code in a
 thin module that maps product facts onto these neutral targets. The
 important properties are:

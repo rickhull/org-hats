@@ -11,6 +11,7 @@
 
 import type {
   AccessEnvelopeClaimsV1,
+  ActorId,
   OperationId,
   OrganizationId,
   SiteBinding,
@@ -43,6 +44,19 @@ export interface NeutralAccess {
   readableTeamIds(): readonly Unbranded<TeamId>[];
   /** Site-configuration reach. */
   mayConfigure(siteId: Unbranded<SiteId>): boolean;
+  /** The teams the actor belongs to by membership, not by grant — what a
+   * site-local view lists without a grant query. */
+  memberTeamIds(): readonly Unbranded<TeamId>[];
+  /** How the session's principal authenticated (RFC 8176 `amr`), as the
+   * issuing evidence stated and the issuer preserved; empty when that
+   * evidence carried none. */
+  authenticatedWith(): readonly string[];
+  /** When the principal authenticated — the OIDC `auth_time`, epoch
+   * seconds. Undefined has no zero: absent means the issuing evidence
+   * carried no event time. */
+  authenticatedAt(): number | undefined;
+  /** Who holds the session: the stable pair, plain strings. */
+  actor(): { readonly organizationId: Unbranded<OrganizationId>; readonly actorId: Unbranded<ActorId> };
   /** Epoch seconds; authorization changes take effect at expiry. */
   expiresAt(): number;
 }

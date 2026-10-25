@@ -1,4 +1,4 @@
-import type { AccessEnvelopeClaimsV1, OperationId, OrganizationId, SiteBinding, SiteId, TargetRef, TeamId, Unbranded } from "../contract.js";
+import type { AccessEnvelopeClaimsV1, ActorId, OperationId, OrganizationId, SiteBinding, SiteId, TargetRef, TeamId, Unbranded } from "../contract.js";
 export type { TargetRef } from "../contract.js";
 /** What a verified envelope yields: binding facts plus predicates. Callers
  * never see raw claims and never rebuild reach, fallback, or worn-hat rules. */
@@ -15,6 +15,22 @@ export interface NeutralAccess {
     readableTeamIds(): readonly Unbranded<TeamId>[];
     /** Site-configuration reach. */
     mayConfigure(siteId: Unbranded<SiteId>): boolean;
+    /** The teams the actor belongs to by membership, not by grant — what a
+     * site-local view lists without a grant query. */
+    memberTeamIds(): readonly Unbranded<TeamId>[];
+    /** How the session's principal authenticated (RFC 8176 `amr`), as the
+     * issuing evidence stated and the issuer preserved; empty when that
+     * evidence carried none. */
+    authenticatedWith(): readonly string[];
+    /** When the principal authenticated — the OIDC `auth_time`, epoch
+     * seconds. Undefined has no zero: absent means the issuing evidence
+     * carried no event time. */
+    authenticatedAt(): number | undefined;
+    /** Who holds the session: the stable pair, plain strings. */
+    actor(): {
+        readonly organizationId: Unbranded<OrganizationId>;
+        readonly actorId: Unbranded<ActorId>;
+    };
     /** Epoch seconds; authorization changes take effect at expiry. */
     expiresAt(): number;
 }

@@ -213,4 +213,32 @@ test("neutral access: a host maps product facts onto neutral targets", async () 
   assert.deepEqual(access.readableTeamIds(), []);
   assert.equal(access.mayConfigure("site-b8d620fa"), false);
   assert.equal(access.expiresAt(), vectors.claims.exp);
+  // membership, authentication facts, and the holder — all without reading
+  // raw claims
+  assert.deepEqual(access.memberTeamIds(), ["team-2e8c64b9"]);
+  assert.deepEqual(access.authenticatedWith(), ["pwd"]);
+  assert.equal(access.authenticatedAt(), 1_699_996_400);
+  assert.equal(access.actor().organizationId, "org-4c1f9a2e");
+  assert.equal(access.actor().actorId, "actor-8d3b77c1");
+});
+
+test("neutral access: absent authentication facts flatten honestly", async () => {
+  // `amr` absent means the issuing evidence carried none — an empty list.
+  // `auth_time` absent has no honest zero; it stays undefined.
+  const { amr: _amr, auth_time: _authTime, ...bare } = vectors.claims;
+  const signer = await webCryptoSigner("key-bare-amr");
+  const signerKey = await ed25519VerifyKey(signer.keyId, await signer.publicKey());
+  const envelope: SignedAccessEnvelope = {
+    format: ACCESS_ENVELOPE_FORMAT,
+    v: 1,
+    keyId: signer.keyId,
+    claims: bare,
+    signature: await signer.sign(canonicalJson(asJson(bare))),
+  };
+  const { access } = successOf(await verify(envelope, new Map([[signerKey.keyId, signerKey]]), {
+    now: vectors.claims.iat + 1,
+  }));
+  assert.deepEqual(access.authenticatedWith(), []);
+  assert.equal(access.authenticatedAt(), undefined);
+  assert.deepEqual(access.memberTeamIds(), ["team-2e8c64b9"]);
 });

@@ -13,15 +13,14 @@
 // fresh signer gives reproducible behavior (ids, failure kinds, receipts)
 // without pinning signature bytes.
 import { canonicalJson, epochSeconds, ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, AUTHORITY_INTERFACE_VERSION, actorId, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";
-import { applyParticipationEvent, readReach, wearableGrants, } from "../model.js";
+import { applyParticipationEvent, wearableGrants, } from "../model.js";
 import { actionsOf } from "../policy.js";
+import { assembleAccessClaims, authenticationFactsOf } from "./claims.js";
 import { counter, sha256Hex, systemClock, webCryptoSigner } from "./internal.js";
-const factsOf = (evidence) => evidence.amr === undefined && evidence.authTime === undefined
-    ? undefined
-    : {
-        ...(evidence.amr !== undefined ? { amr: [...evidence.amr] } : {}),
-        ...(evidence.authTime !== undefined ? { authTime: evidence.authTime } : {}),
-    };
+/** How and when the principal authenticated, as the evidence stated it.
+ * Opaque to authority: carried into claims, context, and refresh records,
+ * never interpreted. */
+const factsOf = (evidence) => authenticationFactsOf(evidence);
 const V = AUTHORITY_INTERFACE_VERSION;
 const nextSigningKey = counter();
 const failed = (failure) => ({ failure });
@@ -37,17 +36,6 @@ const ok = (idempotencyKey, applied) => ({
     ok: true,
     receipt: { idempotencyKey, applied },
 });
-const defaultHat = (grants, bundle) => {
-    const rank = (g) => `${g.primary === true ? 0 : 1}|${g.role}|${g.target.kind === "team" ? g.target.teamId : g.target.siteId}|${g.grantId}`;
-    const sorted = [...grants].sort((a, b) => (rank(a) < rank(b) ? -1 : rank(a) > rank(b) ? 1 : 0));
-    const chosen = sorted[0];
-    if (chosen === undefined)
-        return { ok: false, reason: "no-grant" };
-    const role = actionsOf(bundle, chosen.role);
-    if (!role.found)
-        return { ok: false, reason: "unknown-role", role: chosen.role };
-    return { ok: true, grant: chosen, actions: role.actions };
-};
 export const createInMemoryAuthority = async (config = {}) => {
     const clock = config.clock ?? systemClock();
     const signer = config.signer ?? (await webCryptoSigner(`key-${nextSigningKey()}`));
@@ -321,84 +309,17 @@ export const createInMemoryAuthority = async (config = {}) => {
         const snapshot = snapshotOf(op.operationId);
         if (snapshot === undefined)
             return { kind: "wrong-binding" };
-        const wearable = wearableGrants(snapshot, organizationId, actorId, op.operationId);
-        if (wearable.length === 0)
-            return { kind: "not-admitted" };
-        const hat = defaultHat(wearable, op.policy);
-        if (!hat.ok) {
-            // an inconsistency between the grants and the active bundle is not a
-            // statement about this actor: fail closed, and say which role
-            return hat.reason === "unknown-role"
-                ? { kind: "unavailable", detail: `the policy bundle no longer carries the role "${hat.role}"` }
-                : { kind: "not-admitted" };
-        }
-        const hatTeamIds = new Set();
-        const hatSiteIds = new Set();
-        if (hat.grant.target.kind === "site") {
-            hatSiteIds.add(hat.grant.target.siteId);
-            for (const team of op.teams)
-                if (team.siteId === hat.grant.target.siteId)
-                    hatTeamIds.add(team.teamId);
-        }
-        else {
-            hatTeamIds.add(hat.grant.target.teamId);
-        }
-        const siteIds = new Set();
-        const memberTeams = new Set();
-        for (const grant of wearable) {
-            if (grant.target.kind === "site") {
-                siteIds.add(grant.target.siteId);
-                for (const team of op.teams)
-                    if (team.siteId === grant.target.siteId)
-                        memberTeams.add(team.teamId);
-            }
-            else {
-                const teamId = grant.target.teamId;
-                memberTeams.add(teamId);
-                const siteId = op.teams.find((t) => t.teamId === teamId)?.siteId;
-                if (siteId !== undefined)
-                    siteIds.add(siteId);
-            }
-        }
-        const sites = op.sites
-            .filter((s) => siteIds.has(s.siteId))
-            .map((s) => ({ siteId: s.siteId, aliases: [...s.aliases] }));
-        const reach = readReach(snapshot, op.policy, organizationId, actorId, op.operationId);
-        const carriesConfigure = (g) => {
-            const role = actionsOf(op.policy, g.role);
-            return role.found && role.actions.some((a) => configureActions.includes(a));
-        };
-        const siteIdOfGrant = (g) => {
-            if (g.target.kind === "site")
-                return g.target.siteId;
-            const teamId = g.target.teamId;
-            return op.teams.find((t) => t.teamId === teamId)?.siteId;
-        };
-        const configurableSiteIds = op.sites
-            .filter((site) => wearable.some((g) => carriesConfigure(g) && siteIdOfGrant(g) === site.siteId))
-            .map((s) => s.siteId);
-        const iat = clock.now();
-        return {
-            v: ACCESS_ENVELOPE_VERSION,
-            interfaceVersion: V,
+        return assembleAccessClaims({
+            snapshot,
+            policy: op.policy,
             operationId: op.operationId,
-            actor: { organizationId, actorId },
-            hat: {
-                role: hat.grant.role,
-                actions: [...hat.actions],
-                teamIds: [...hatTeamIds],
-                siteIds: [...hatSiteIds],
-            },
-            memberTeamIds: [...memberTeams],
-            sites,
-            readableOrganizationIds: reach.readableOrganizationIds,
-            readableTeamIds: reach.readableTeamIds,
-            configurableSiteIds,
-            iat,
-            exp: iat + lifetime,
-            ...(auth?.amr !== undefined ? { amr: [...auth.amr] } : {}),
-            ...(auth?.authTime !== undefined ? { auth_time: auth.authTime } : {}),
-        };
+            organizationId,
+            actorId,
+            configureActions,
+            envelopeLifetimeSeconds: lifetime,
+            issuedAt: clock.now(),
+            ...(auth !== undefined ? { auth } : {}),
+        });
     };
     const issue = async (op, organizationId, actorId, auth) => {
         const claims = buildEnvelope(op, organizationId, actorId, auth);
@@ -472,12 +393,7 @@ export const createInMemoryAuthority = async (config = {}) => {
             // risk two live handles.
             record.superseded = true;
             // the authentication event, not the envelope, survives the chain
-            const result = await issue(op, record.organizationId, record.actorId, record.amr === undefined && record.authTime === undefined
-                ? undefined
-                : {
-                    ...(record.amr !== undefined ? { amr: [...record.amr] } : {}),
-                    ...(record.authTime !== undefined ? { authTime: record.authTime } : {}),
-                });
+            const result = await issue(op, record.organizationId, record.actorId, authenticationFactsOf(record));
             if (isFailed(result))
                 return failed(result.failure);
             return result;
@@ -788,9 +704,10 @@ export const createInMemoryAuthority = async (config = {}) => {
                     const op = ops.get(operationId(inputCommand.operationId));
                     if (op === undefined)
                         return fail("wrong-binding", "unknown operation");
-                    if (!principalOrFailure.adminOfOperation && !(principalOrFailure.organizationId !== undefined &&
-                        principalOrFailure.actorId !== undefined &&
-                        op.grants.some((g) => g.grantId === inputCommand.grantId && g.organizationId === principalOrFailure.organizationId && g.actorId === principalOrFailure.actorId))) {
+                    const selectsOwn = op.grants.some((g) => g.grantId === inputCommand.grantId &&
+                        g.organizationId === principalOrFailure.organizationId &&
+                        g.actorId === principalOrFailure.actorId);
+                    if (!principalOrFailure.adminOfOperation && !selectsOwn) {
                         return fail("denied", "an actor selects their own hat or an administrator does");
                     }
                     const replay = checkClaim(op.claims, inputCommand);

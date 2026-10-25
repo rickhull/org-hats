@@ -125,6 +125,15 @@ type _WearableGrantsYieldActive = Expect<
   Equal<ReturnType<typeof wearableGrants>[number], ActiveGrant>
 >;
 
+// --- the access accessors stay plain -------------------------------------------------
+
+type _AccessActorIdsArePlain = Expect<
+  Equal<ReturnType<NeutralAccess["actor"]>["organizationId"], string>
+>;
+type _MemberTeamsArePlain = Expect<
+  Equal<ReturnType<NeutralAccess["memberTeamIds"]>[number], string>
+>;
+
 // --- the numeric time brand stays internal ------------------------------------------
 //
 // `EpochSeconds` brands instants on the clock seam; `Unbranded` maps it

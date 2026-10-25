@@ -1,0 +1,156 @@
+// The claims an envelope carries, assembled once — the issuer's only copy of
+// the shape.
+//
+// The in-memory engine and the Cloudflare operation coordinator each own
+// their preconditions (does the actor exist, is it disabled, is the
+// operation bootstrapped) but neither owns the claim shape: the hat, its
+// action list, membership, routing sites, read reach, configuration reach,
+// the lifetime, and the preserved authentication facts are computed here from
+// a model snapshot and the active bundle. Two copies drifted once; one
+// function cannot.
+//
+// Pure: the caller supplies the issued-at instant, the lifetime, and the
+// configure-action vocabulary. No clock, signer, or storage.
+
+import {
+  ACCESS_ENVELOPE_VERSION,
+  AUTHORITY_INTERFACE_VERSION,
+  type AccessEnvelopeClaimsV1,
+  type ActorId,
+  type EpochSeconds,
+  type Failure,
+  type OperationId,
+  type OrganizationId,
+  type SiteBinding,
+  type SiteId,
+  type TeamId,
+} from "../contract.ts";
+import {
+  firstByRank,
+  readReach,
+  wearableGrants,
+  type Snapshot,
+} from "../model.ts";
+import { actionsOf, type PolicyBundle } from "../policy.ts";
+
+/** How and when the principal authenticated, as the evidence stated it.
+ * Opaque to authority: carried into claims, context, and refresh records,
+ * never interpreted. */
+export interface AuthenticationFacts {
+  readonly amr?: readonly string[];
+  readonly authTime?: number;
+}
+
+/** Copy the facts a source carried, dropping absent ones rather than
+ * inventing a value. The evidence-to-claims and refresh-record-to-claims
+ * paths share this so an absent `amr` never becomes `[]` and an absent
+ * `auth_time` never becomes zero. */
+export const authenticationFactsOf = (
+  source: AuthenticationFacts | undefined,
+): AuthenticationFacts | undefined =>
+  source === undefined || (source.amr === undefined && source.authTime === undefined)
+    ? undefined
+    : {
+        ...(source.amr !== undefined ? { amr: [...source.amr] } : {}),
+        ...(source.authTime !== undefined ? { authTime: source.authTime } : {}),
+      };
+
+export interface AccessClaimsInput {
+  readonly snapshot: Snapshot;
+  readonly policy: PolicyBundle;
+  readonly operationId: OperationId;
+  readonly organizationId: OrganizationId;
+  readonly actorId: ActorId;
+  /** Actions that confer site-configuration reach, as deployment configured
+   * them. */
+  readonly configureActions: readonly string[];
+  readonly envelopeLifetimeSeconds: number;
+  /** Epoch seconds this envelope is issued at; `exp` derives from it. */
+  readonly issuedAt: EpochSeconds;
+  readonly auth?: AuthenticationFacts;
+}
+
+/** The complete claims payload, or the reason no honest hat exists: the
+ * actor wears no grant (`not-admitted`) or the grant names a role the bundle
+ * does not carry (`unavailable` — an administrator's inconsistency, never an
+ * empty action list describing the actor). */
+export const assembleAccessClaims = (input: AccessClaimsInput): AccessEnvelopeClaimsV1 | Failure => {
+  const { snapshot, policy, operationId, organizationId, actorId, configureActions, issuedAt } = input;
+  const wearable = wearableGrants(snapshot, organizationId, actorId, operationId);
+  if (wearable.length === 0) return { kind: "not-admitted" };
+  const hatGrant = firstByRank(wearable);
+  if (hatGrant === undefined) return { kind: "not-admitted" };
+  const role = actionsOf(policy, hatGrant.role);
+  if (!role.found) {
+    return { kind: "unavailable", detail: `the policy bundle no longer carries the role "${hatGrant.role}"` };
+  }
+
+  const hatTeamIds = new Set<TeamId>();
+  const hatSiteIds = new Set<SiteId>();
+  if (hatGrant.target.kind === "site") {
+    hatSiteIds.add(hatGrant.target.siteId);
+    for (const team of snapshot.teams) {
+      if (team.siteId === hatGrant.target.siteId) hatTeamIds.add(team.teamId);
+    }
+  } else {
+    hatTeamIds.add(hatGrant.target.teamId);
+  }
+
+  const siteIds = new Set<SiteId>();
+  const memberTeams = new Set<TeamId>();
+  for (const grant of wearable) {
+    if (grant.target.kind === "site") {
+      siteIds.add(grant.target.siteId);
+      for (const team of snapshot.teams) {
+        if (team.siteId === grant.target.siteId) memberTeams.add(team.teamId);
+      }
+    } else {
+      const teamId = grant.target.teamId;
+      memberTeams.add(teamId);
+      const siteId = snapshot.teams.find((team) => team.teamId === teamId)?.siteId;
+      if (siteId !== undefined) siteIds.add(siteId);
+    }
+  }
+
+  const sites: readonly SiteBinding[] = snapshot.sites
+    .filter((site) => siteIds.has(site.siteId))
+    .map((site) => ({ siteId: site.siteId, aliases: [...site.aliases] }));
+
+  const reach = readReach(snapshot, policy, organizationId, actorId, operationId);
+
+  const configurableSiteIds = snapshot.sites
+    .filter((site) =>
+      wearable.some((grant) => {
+        const carried = actionsOf(policy, grant.role);
+        if (!carried.found || !carried.actions.some((action) => configureActions.includes(action))) {
+          return false;
+        }
+        if (grant.target.kind === "site") return grant.target.siteId === site.siteId;
+        const teamId = grant.target.teamId;
+        return snapshot.teams.find((team) => team.teamId === teamId)?.siteId === site.siteId;
+      }),
+    )
+    .map((site) => site.siteId);
+
+  return {
+    v: ACCESS_ENVELOPE_VERSION,
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    operationId,
+    actor: { organizationId, actorId },
+    hat: {
+      role: hatGrant.role,
+      actions: [...role.actions],
+      teamIds: [...hatTeamIds],
+      siteIds: [...hatSiteIds],
+    },
+    memberTeamIds: [...memberTeams],
+    sites,
+    readableOrganizationIds: reach.readableOrganizationIds,
+    readableTeamIds: reach.readableTeamIds,
+    configurableSiteIds,
+    iat: issuedAt,
+    exp: issuedAt + input.envelopeLifetimeSeconds,
+    ...(input.auth?.amr !== undefined ? { amr: [...input.auth.amr] } : {}),
+    ...(input.auth?.authTime !== undefined ? { auth_time: input.auth.authTime } : {}),
+  };
+};

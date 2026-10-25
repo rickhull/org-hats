@@ -38,6 +38,8 @@ runtime.
 - `readreach.test.ts` — read reach under both policies and generated states.
 - `twins.test.ts` — the structural properties of the synthetic twins.
 - `engine.test.ts` — issuance, refresh, participation, idempotency, disable.
+- `claims.test.ts` — the shared claims assembler: hat, reach, configuration,
+  lifetime, and authentication facts, including the absent cases.
 - `access.test.ts` — the verifier and the golden envelope vectors.
 - `types.test.ts` — compile-only surface assertions: plain ids, closed
   unions, version literals, claims provenance. Nothing runs; the aliases

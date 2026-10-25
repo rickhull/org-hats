@@ -58,7 +58,9 @@ export {
   TWINS,
 } from "./twins.ts";
 
-export { createInMemoryAuthority } from "./engine.ts";export type {
+export { createInMemoryAuthority } from "./engine.ts";
+export { assembleAccessClaims } from "./claims.ts";
+export type { AccessClaimsInput, AuthenticationFacts } from "./claims.ts";export type {
   ClockLike,
   InMemoryAuthorityConfig,
   InMemoryAuthorityHandle,

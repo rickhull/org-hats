@@ -691,6 +691,28 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
     assert(valid.ok && valid.receipt.applied, `a well-founded grant applies: ${valid.ok ? "" : valid.failure.kind}`);
   }),
 
+  runtimeCase("OH-CMD-04", "a wearable hat is not an administrator's hat", async (world) => {
+    // A valid envelope whose role carries no configure action — and no
+    // admin role is declared — must be refused the grant act. Administration
+    // is deployment policy, never something a worn hat implies.
+    const dana = await issue(world, CONFORMANCE_PRINCIPALS.dana, MERIDIAN);
+    const grant = {
+      kind: "grant-hat",
+      operationId: MERIDIAN,
+      organizationId: NORTH_ORG,
+      actorId: MARCO,
+      role: "reviewer",
+      target: { kind: "team" as const, teamId: NORTH_TEAM },
+    } as const;
+    const denied = await command(world, grant, envelopeAuth(dana.envelope), "conf-grant-nonadmin");
+    expectFailure(denied, "denied", "a non-administrator cannot grant hats");
+    // and the refusal settles nothing: an administrator's identical grant
+    // still applies under its own key
+    const admin = await issue(world, CONFORMANCE_PRINCIPALS.len, MERIDIAN);
+    const applied = await command(world, grant, envelopeAuth(admin.envelope), "conf-grant-nonadmin-2");
+    assert(applied.ok && applied.receipt.applied, "the administrator's grant applies");
+  }),
+
   runtimeCase("OH-CMD-02", "request-access asks; it does not admit", async (world) => {
     const invitee = CONFORMANCE_PRINCIPALS.inviteeAdmin;
     const request = await command(

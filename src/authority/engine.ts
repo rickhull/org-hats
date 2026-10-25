@@ -27,7 +27,6 @@ import {
   type OrganizationId,
   type RefreshHandle,
   type RefreshHandleOutcome,
-  type SiteBinding,
   type SignedAccessEnvelope,
   type SiteId,
   type TeamId,
@@ -44,15 +43,14 @@ import {
 } from "../contract.ts";
 import {
   applyParticipationEvent,
-  readReach,
   wearableGrants,
-  type ActiveGrant,
   type Grant,
   type Participation,
   type Snapshot,
 } from "../model.ts";
 import type { PolicyBundle } from "../policy.ts";
 import { actionsOf } from "../policy.ts";
+import { assembleAccessClaims, authenticationFactsOf, type AuthenticationFacts } from "./claims.ts";
 import type { TwinFixture } from "./twins.ts";
 import type {
   AccessFromEvidenceInput,
@@ -71,8 +69,8 @@ import { counter, sha256Hex, systemClock, webCryptoSigner, type Clock, type Sign
 
 // --- configuration ---------------------------------------------------------------
 
-export interface SignerLike extends Signer {}
-export interface ClockLike extends Clock {}
+export type SignerLike = Signer;
+export type ClockLike = Clock;
 
 /** Administration is deployment policy, never a hardcoded role title: the
  * host states which role titles administer an operation and which actors
@@ -145,18 +143,8 @@ interface RefreshRecord {
 /** How and when the principal authenticated, as the evidence stated it.
  * Opaque to authority: carried into claims, context, and refresh records,
  * never interpreted. */
-interface AuthenticationFacts {
-  readonly amr?: readonly string[];
-  readonly authTime?: number;
-}
-
 const factsOf = (evidence: PrincipalEvidence): AuthenticationFacts | undefined =>
-  evidence.amr === undefined && evidence.authTime === undefined
-    ? undefined
-    : {
-        ...(evidence.amr !== undefined ? { amr: [...evidence.amr] } : {}),
-        ...(evidence.authTime !== undefined ? { authTime: evidence.authTime } : {}),
-      };
+  authenticationFactsOf(evidence);
 
 interface OpState {
   readonly operationId: OperationId;
@@ -223,27 +211,6 @@ const ok = (idempotencyKey: string, applied: boolean): CommandResult => ({
   ok: true,
   receipt: { idempotencyKey, applied },
 });
-
-/** The hat an envelope carries, or why there is none. "No grant" and "the
- * grant names a role the bundle does not carry" are different failures: the
- * first describes the actor, the second is an administrator's
- * inconsistency, and `?? []` used to report the second as the first with an
- * empty action list. */
-type DefaultHat =
-  | { readonly ok: true; readonly grant: ActiveGrant; readonly actions: readonly string[] }
-  | { readonly ok: false; readonly reason: "no-grant" }
-  | { readonly ok: false; readonly reason: "unknown-role"; readonly role: string };
-
-const defaultHat = (grants: readonly ActiveGrant[], bundle: PolicyBundle): DefaultHat => {
-  const rank = (g: ActiveGrant): string =>
-    `${g.primary === true ? 0 : 1}|${g.role}|${g.target.kind === "team" ? g.target.teamId : g.target.siteId}|${g.grantId}`;
-  const sorted = [...grants].sort((a, b) => (rank(a) < rank(b) ? -1 : rank(a) > rank(b) ? 1 : 0));
-  const chosen = sorted[0];
-  if (chosen === undefined) return { ok: false, reason: "no-grant" };
-  const role = actionsOf(bundle, chosen.role);
-  if (!role.found) return { ok: false, reason: "unknown-role", role: chosen.role };
-  return { ok: true, grant: chosen, actions: role.actions };
-};
 
 export const createInMemoryAuthority = async (
   config: InMemoryAuthorityConfig = {},
@@ -551,75 +518,17 @@ export const createInMemoryAuthority = async (
     if (actor.disabled) return { kind: "not-admitted", detail: "actor disabled" };
     const snapshot = snapshotOf(op.operationId);
     if (snapshot === undefined) return { kind: "wrong-binding" };
-    const wearable = wearableGrants(snapshot, organizationId, actorId, op.operationId);
-    if (wearable.length === 0) return { kind: "not-admitted" };
-    const hat = defaultHat(wearable, op.policy);
-    if (!hat.ok) {
-      // an inconsistency between the grants and the active bundle is not a
-      // statement about this actor: fail closed, and say which role
-      return hat.reason === "unknown-role"
-        ? { kind: "unavailable", detail: `the policy bundle no longer carries the role "${hat.role}"` }
-        : { kind: "not-admitted" };
-    }
-    const hatTeamIds = new Set<TeamId>();
-    const hatSiteIds = new Set<SiteId>();
-    if (hat.grant.target.kind === "site") {
-      hatSiteIds.add(hat.grant.target.siteId);
-      for (const team of op.teams) if (team.siteId === hat.grant.target.siteId) hatTeamIds.add(team.teamId);
-    } else {
-      hatTeamIds.add(hat.grant.target.teamId);
-    }
-    const siteIds = new Set<SiteId>();
-    const memberTeams = new Set<TeamId>();
-    for (const grant of wearable) {
-      if (grant.target.kind === "site") {
-        siteIds.add(grant.target.siteId);
-        for (const team of op.teams) if (team.siteId === grant.target.siteId) memberTeams.add(team.teamId);
-      } else {
-        const teamId = grant.target.teamId;
-        memberTeams.add(teamId);
-        const siteId = op.teams.find((t) => t.teamId === teamId)?.siteId;
-        if (siteId !== undefined) siteIds.add(siteId);
-      }
-    }
-    const sites: SiteBinding[] = op.sites
-      .filter((s) => siteIds.has(s.siteId))
-      .map((s) => ({ siteId: s.siteId, aliases: [...s.aliases] }));
-    const reach = readReach(snapshot, op.policy, organizationId, actorId, op.operationId);
-    const carriesConfigure = (g: Grant): boolean => {
-      const role = actionsOf(op.policy, g.role);
-      return role.found && role.actions.some((a) => configureActions.includes(a));
-    };
-    const siteIdOfGrant = (g: Grant): SiteId | undefined => {
-      if (g.target.kind === "site") return g.target.siteId;
-      const teamId = g.target.teamId;
-      return op.teams.find((t) => t.teamId === teamId)?.siteId;
-    };
-    const configurableSiteIds = op.sites
-      .filter((site) => wearable.some((g) => carriesConfigure(g) && siteIdOfGrant(g) === site.siteId))
-      .map((s) => s.siteId);
-    const iat = clock.now();
-    return {
-      v: ACCESS_ENVELOPE_VERSION,
-      interfaceVersion: V,
+    return assembleAccessClaims({
+      snapshot,
+      policy: op.policy,
       operationId: op.operationId,
-      actor: { organizationId, actorId },
-      hat: {
-        role: hat.grant.role,
-        actions: [...hat.actions],
-        teamIds: [...hatTeamIds],
-        siteIds: [...hatSiteIds],
-      },
-      memberTeamIds: [...memberTeams],
-      sites,
-      readableOrganizationIds: reach.readableOrganizationIds,
-      readableTeamIds: reach.readableTeamIds,
-      configurableSiteIds,
-      iat,
-      exp: iat + lifetime,
-      ...(auth?.amr !== undefined ? { amr: [...auth.amr] } : {}),
-      ...(auth?.authTime !== undefined ? { auth_time: auth.authTime } : {}),
-    };
+      organizationId,
+      actorId,
+      configureActions,
+      envelopeLifetimeSeconds: lifetime,
+      issuedAt: clock.now(),
+      ...(auth !== undefined ? { auth } : {}),
+    });
   };
 
   const issue = async (
@@ -692,17 +601,7 @@ export const createInMemoryAuthority = async (
       // risk two live handles.
       record.superseded = true;
       // the authentication event, not the envelope, survives the chain
-      const result = await issue(
-        op,
-        record.organizationId,
-        record.actorId,
-        record.amr === undefined && record.authTime === undefined
-          ? undefined
-          : {
-              ...(record.amr !== undefined ? { amr: [...record.amr] } : {}),
-              ...(record.authTime !== undefined ? { authTime: record.authTime } : {}),
-            },
-      );
+      const result = await issue(op, record.organizationId, record.actorId, authenticationFactsOf(record));
       if (isFailed(result)) return failed(result.failure);
       return result;
     },
@@ -984,11 +883,13 @@ export const createInMemoryAuthority = async (
         case "select-hat": {
           const op = ops.get(operationId(inputCommand.operationId));
           if (op === undefined) return fail("wrong-binding", "unknown operation");
-          if (!principalOrFailure.adminOfOperation && !(
-            principalOrFailure.organizationId !== undefined &&
-            principalOrFailure.actorId !== undefined &&
-            op.grants.some((g) => g.grantId === inputCommand.grantId && g.organizationId === principalOrFailure.organizationId && g.actorId === principalOrFailure.actorId)
-          )) {
+          const selectsOwn = op.grants.some(
+            (g) =>
+              g.grantId === inputCommand.grantId &&
+              g.organizationId === principalOrFailure.organizationId &&
+              g.actorId === principalOrFailure.actorId,
+          );
+          if (!principalOrFailure.adminOfOperation && !selectsOwn) {
             return fail("denied", "an actor selects their own hat or an administrator does");
           }
           const replay = checkClaim(op.claims, inputCommand);
