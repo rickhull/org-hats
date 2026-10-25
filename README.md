@@ -18,8 +18,6 @@ The model is portable. The reference runtime is Cloudflare. The same four
 portable use cases are exposed by an in-memory engine for tests and examples,
 and by the Cloudflare reference runtime for deployment.
 
-The shape, in one picture:
-
 ```text
 organization ── participation ── operation
      │                              ├── sites
@@ -28,14 +26,10 @@ organization ── participation ── operation
      └──────── grants ──► worn hat ─┘
 ```
 
-An operation-local grant is an actor, a role, and one target; the hat is
-the grant worn now.
+An operation-local grant is an actor, a role, and one target; the hat is the
+grant worn now.
 
-**In this README:** [Run the tour](#run-the-tour) ·
-[A walkthrough](#a-walkthrough) · [The pieces](#the-pieces) ·
-[Versions](#versions-and-compatibility) · [Where to go next](#where-to-go-next)
-
-## Run the tour
+## Run it
 
 With Node 24+ and pnpm:
 
@@ -44,11 +38,10 @@ pnpm install
 node examples/pilot.ts
 ```
 
-The pilot is a complete, small story: one organization, one operation, one
+The pilot is a complete small story: one organization, one operation, one
 actor, one hat, one signed envelope, one local decision, and one expiry. It
 uses the synthetic Professional Operation and Harbor Logistics; there are no
-real people or customer records in this repository. The snippets below show
-the shape; `examples/pilot.ts` is the runnable version.
+real people or customer records in this repository.
 
 For the full gate:
 
@@ -56,44 +49,33 @@ For the full gate:
 pnpm verify
 ```
 
-That runs the portable model and authority suites, the compiler fences, the
-pilot, and the Cloudflare workerd suite. `pnpm test` runs only the portable
-suites; `pnpm check:cloudflare` runs only the reference runtime's typecheck
-and tests. The Cloudflare suite runs locally in workerd; it needs no
-Cloudflare account.
+That runs the portable suites, the compiler fences, the pilot, and the
+Cloudflare workerd suite. `pnpm test` runs only the portable suites;
+`pnpm check:cloudflare` runs only the reference runtime's typecheck and tests.
+The Cloudflare suite runs locally; it needs no Cloudflare account.
 
-## A walkthrough
+## The idea in five steps
 
 ### 1. An organization takes part in an operation
 
 An **organization** is the durable body an actor belongs to. An **operation**
 is a bounded or persistent undertaking with its own sites, teams, policy
-version, and grants. The relationship is many-to-many: an organization can
-take part in several operations, and an operation can host several
-organizations.
+version, and grants. The relationship is many-to-many.
 
 An operation has **sites** — places where work happens — and **teams** — an
-organization's group anchored to exactly one site. That anchoring is
-structural: a team belongs to exactly one site.
+organization's group anchored to exactly one site. The organization–operation
+relationship is **participation** (`invited → accepted → active`, revocable by
+either side), and no hat is wearable until participation is `active`.
 
-The organization–operation relationship is **participation**:
-`invited → accepted → active`, with either side able to revoke terminally.
-The operation's record is canonical for whether the organization may receive
-authority there; the organization owns its acceptance. No hat is wearable
-until participation is `active`.
-
-Participation gets an organization through the door. **Admission** is the
-operation's acceptance of one actor to act there. It is neither
-authentication nor participation: an active organization can still have an
-actor who is not admitted. An access request is an authority command, never
-an issuance input.
+**Admission** is the operation's acceptance of one actor to act there. It is
+neither authentication nor participation: an active organization can still
+have an actor who is not admitted.
 
 ### 2. Evidence becomes an actor
 
 An **actor** is a durable identity scoped to one organization:
 `(organizationId, actorId)`. The same real person in two organizations is two
-actors; equal email addresses never merge them. The organization is the unit
-of identity, not a platform-wide user directory.
+actors; equal email addresses never merge them.
 
 A **principal** is the external subject an identity provider vouches for.
 **Evidence** is a typed assertion — provider, subject, optionally a display
@@ -107,162 +89,92 @@ The **policy bundle** is versioned data: an action vocabulary, roles that
 carry actions, and a read policy. A **role** is a title in that data; an
 **action** is an opaque verb such as `review`.
 
-A **grant** assigns a role to an actor over exactly one **target**:
-
-- a **team**, or
-- a **site** and every team at that site.
-
-A grant is held. The **hat** is the grant the actor wears when acting: one
-role, its actions, and its target. An actor may hold several grants but wears
-exactly one hat at a time. Authority chooses it from the wearable grants —
-the primary first, then a deterministic fallback — and the `select-hat`
-command changes which grant is primary. The host does not invent a hat from
-product state.
+A **grant** assigns a role to an actor over exactly one **target**: a **team**,
+or a **site** and every team at that site. A grant is held. The **hat** is the
+grant the actor wears when acting: one role, its actions, and its target. An
+actor may hold several grants but wears exactly one hat at a time. Authority
+chooses it from the wearable grants — primary first, then a deterministic
+fallback — and `select-hat` changes which grant is primary.
 
 A grant is **wearable** when it is not revoked, the actor is enabled, and the
-organization's participation is active. **Reach** is a separate question: a
-team grant reaches its team; a site grant reaches its site and every team at
-that site. Nothing reaches the whole operation. There is no hierarchy, prefix
-coverage, or inheritance. Those are the two independent clauses in the rule
-above.
+organization's participation is active. **Reach** is separate: a team grant
+reaches its team; a site grant reaches its site and every team at that site.
+Nothing reaches the whole operation, and there is no hierarchy, prefix
+coverage, or inheritance.
 
 **Read reach** is the issuer's computation under the bundle: `granted-teams`
 follows the teams the actor's wearable grants reach; `all-participating`
-follows every active organization. The verifier compares the resulting ids;
-it never rebuilds the rule.
+follows every active organization. The verifier compares ids; it never
+rebuilds the rule.
 
-### 4. Issue a signed projection
+### 4. Issue and verify
 
 When the actor has a wearable hat, the host asks the authority runtime for
-access:
+access. The result is `{ envelope, refresh }` or a closed failure. The
+**access envelope** is a signed projection of the actor pair, the operation,
+the worn hat's role/actions/reach, the sites the grants touch, readable
+organization and exceptional team ids, configurable sites, and `iat`/`exp`.
+It is not a JWT; it is `org-hats.access` format 1, signed with Ed25519 over
+canonical JSON. The **refresh handle** comes with an explicit outcome — kept,
+rotated, or revoked.
 
-```ts
-const issued = await runtime.accessFromEvidence({
-  interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-  operationId,
-  evidence, // verified principal evidence
-});
-```
+The host hands the envelope to `org-hats/access` with the verification keys
+and its expectations. On success it gets **neutral access** —
+`mayAct(action, target)`, `readableOrganizationIds()`, `readableTeamIds()`,
+`mayConfigure(siteId)`, and `expiresAt()` — not raw claims. The verifier gates
+on the envelope's format and version pair, checks the signature, expiry, and
+the caller's expected operation and site binding, then evaluates the worn hat
+locally. It does not rebuild reach, participation, or fallback.
 
-The result is `{ envelope, refresh }` or a closed failure. The **access
-envelope** is a compact, signed projection of the facts a host needs: the
-actor pair, the operation, the worn hat's role/actions/reach, the sites the
-wearable grants reach, readable organization and exceptional team ids,
-configurable sites, and `iat`/`exp`. It is not a JWT; it is `org-hats.access`
-format 1, signed with Ed25519 over canonical JSON. The **refresh handle**
-comes with an explicit outcome — `kept`, `rotated`, or `revoked` — so the host
-never infers session state.
+A wrong operation or site fails `wrong-binding`; a correct envelope at or
+after `exp` fails `expired`; an unsupported format fails
+`wrong-interface-version`; a bad signature fails `invalid-signature`. All
+failures are values from one closed taxonomy; the deploying host owns the
+product response.
 
-The envelope is opaque to product code. Nobody but the issuer writes claims;
-nobody but the verifier reads them.
-
-### 5. Verify locally
-
-The host hands the envelope to `org-hats/access` with the distributed
-verification keys and its own expectations:
-
-```ts
-const verified = await verify(envelope, keys, {
-  now: Math.floor(Date.now() / 1000),
-  expectedOperationId: operationId,
-  expectedSiteId: siteId,
-});
-if ("failure" in verified) throw new Error(verified.failure.kind);
-const access = verified.access;
-```
-
-On success, `access` is **neutral access**, not raw claims:
-
-- `mayAct("review", { kind: "team", teamId })`
-- `readableOrganizationIds()` and `readableTeamIds()`
-- `mayConfigure(siteId)`
-- `expiresAt()`
-
-The verifier gates on the envelope's own format and version pair, checks the
-signature, expiry, and the caller's expected operation and site binding, then
-evaluates the worn hat locally. It does not rebuild reach, participation, or
-fallback. The claims' `interfaceVersion` is provenance — the interface that
-issued them — not a readability gate, so a command-surface change does not
-strand live sessions.
-
-A right proof for the wrong operation or site fails `wrong-binding`; a
-correct envelope at or after `exp` fails `expired`; an unsupported format
-fails `wrong-interface-version`; a bad signature fails `invalid-signature`.
-All failures are values from one closed taxonomy. The deploying host owns the
-product response to each.
-
-### 6. Change authority through commands
+### 5. Change and refresh
 
 Reads are local; changes go through the runtime. A **command** is a typed,
 idempotent business act: `request-access`, `admit`, `grant-hat`,
-`revoke-grant`, `select-hat`, `disable-actor`, and the participation
-commands. It carries an authorization (an access envelope or fresh
-evidence), an interface version, and an idempotency key. The runtime
-validates the whole command before committing; the claim commits with the
-mutation, so a retry returns the original result (`applied: false`) and a
-denied command cannot poison its key.
-
-A refusal is a normal result — `ok: false` with a kind such as `denied` — not
-an exception. Commands and sessions share the same closed failure taxonomy.
-
-### 7. Refresh is a liveness check
+`revoke-grant`, `select-hat`, `disable-actor`, and the participation commands.
+It carries an authorization (an access envelope or fresh evidence), an
+interface version, and an idempotency key. The runtime validates the whole
+command before committing; the claim commits with the mutation, so a retry
+returns the original result and a denied command cannot poison its key.
 
 A session outlives one envelope. `refresh(handle)` issues a replacement and
 states what happened to the handle. Revoking a grant revokes affected refresh
 records; a disabled actor cannot refresh because the runtime re-resolves the
 actor at the organization. That read is read-only and fail-closed: a missing
 or disabled actor is `not-admitted`; an organization that cannot answer is
-`unavailable`. A lost disable message must not turn a refresh handle into
-indefinite authority. The envelope's bounded lifetime covers the rest of the
-revocation window.
+`unavailable`. A lost disable message must not become indefinite authority;
+the envelope's bounded lifetime covers the rest.
+
+> **Going deeper:** [`docs/tutorial.md`](docs/tutorial.md) follows one actor
+> through two operations, then through commands, refresh rotation, a lost
+> disable message, and the crossed grant in the Berlin Airlift twin.
 
 ## The pieces
 
-### `org-hats` — the portable model
-
-The root export is the smallest reusable statement of the organization model:
-organizations, operations, actors, sites, teams, grants, participation,
-wearability, worn-hat selection, `decide`, `readReach`, and
-`invariantProblems`, plus the policy-bundle vocabulary. It is data and pure
-functions — no I/O, no storage, no clock, no Cloudflare.
-
-### `org-hats/authority` — use cases, not a repository
-
-This is the normative `AuthorityRuntime`: `accessFromEvidence`, `refresh`,
-`context`, and `command`. It owns evidence resolution, participation and
-admission workflows, grants, hat selection, issuance, idempotency, audit, and
-the explicit partial states of cross-owner work. The in-memory engine ships
-beside it and implements the same interface; the synthetic twins are its
-public fixtures. Callers ask for complete use cases, not a grant repository.
-
-### `org-hats/access` — verification only
-
-`verify(envelope, keys, expectations)` turns a signed envelope into neutral
-access. Verification keys travel as the canonical `VerifyKeySet`; fixed
-vectors pin the envelope format byte-exactly. The module never names a
-product entity and does not know how a session is transported.
-
-### `org-hats/conformance` — the executable inventory
-
-The `OH-*` cases specify portable behaviour through the public interface
-only. `CONFORMANCE_WORLD` carries the synthetic fixtures, principal links,
-and org-admin bootstrap; another runtime runs the same inventory by supplying
-its own world factory. This is the executable specification, not an adapter
-SPI.
-
-### `org-hats-cloudflare` — the reference runtime
-
-The Cloudflare package is a separate `0.x` workspace package. It provides:
-
-- the `OrganizationAuthority` and `OperationAuthority` Durable Objects, with
-  SQLite state, transactions, alarms, and a durable outbox;
-- the `AuthorityRuntimeEntrypoint` service binding, including the
-  provider-callback exchange for OIDC-style login;
-- signing-key rotation, authenticated `/ops/*` routes, bootstrap,
-  schema-status, export, and restore;
-- operation routing facts — the hostname slug and each site's canonical path
-  — as authority state, with aliases as routing decoration; and
-- a self-contained `pnpm --filter org-hats-cloudflare demo`.
+- **`org-hats`** — the portable model: organizations, operations, actors,
+  sites, teams, grants, participation, wearability, worn-hat selection,
+  `decide`, `readReach`, `invariantProblems`, and the policy-bundle
+  vocabulary. Data and pure functions; no I/O, storage, clock, or Cloudflare.
+- **`org-hats/authority`** — the normative `AuthorityRuntime`
+  (`accessFromEvidence`, `refresh`, `context`, `command`), plus the in-memory
+  engine and the synthetic twins. Callers ask for complete use cases, not a
+  grant repository.
+- **`org-hats/access`** — verification only: `verify` turns a signed envelope
+  into neutral access; `VerifyKeySet` is the rotation unit; fixed vectors pin
+  the format.
+- **`org-hats/conformance`** — the executable `OH-*` inventory, run through
+  the public interface only. `CONFORMANCE_WORLD` supplies the synthetic
+  fixtures, links, and org-admin bootstrap; another runtime supplies its own
+  world factory.
+- **`org-hats-cloudflare`** — the reference runtime as a separate `0.x`
+  package: the two SQLite-backed coordinators, the service binding and
+  provider-callback exchange, signing-key rotation, authenticated ops routes,
+  bootstrap, schema status, export, restore, routing facts, and a demo.
 
 The portable fence is load-bearing: everything under `src/` compiles with
 `types: []` and imports nothing Cloudflare; `bin/check` enforces both. The
@@ -270,9 +182,9 @@ Cloudflare package depends on the portable modules, never the reverse.
 
 The full `OH-*` inventory runs against the real coordinators in workerd. A
 deployed runtime reached through a service binding has a separate, narrower
-claim: the documented smoke subset in
+claim: the smoke subset in
 [`docs/binding-conformance.md`](docs/binding-conformance.md). It is not the
-full inventory, and the document says exactly what it does not claim.
+full inventory.
 
 ## Versions and compatibility
 
@@ -285,43 +197,37 @@ full inventory, and the document says exactly what it does not claim.
   reviewed tag or commit. Codeberg is canonical; GitHub is a release mirror.
 
 The interface version and the envelope version move for different reasons. A
-command-surface break moves the interface version. A change to what the
-claims mean moves the envelope format. An envelope records the issuing
-interface as provenance, but verification reads the envelope's own version
-pair — so the line can be at interface 2 while still reading format-1
-envelopes. The 2.0 break changed `grant-hat` to one `GrantTarget` (team or
-site) and moved the interface to 2; see
-[`docs/migration-v2.md`](docs/migration-v2.md).
+command-surface break moves the interface version; a change to what the claims
+mean moves the envelope format. An envelope records the issuing interface as
+provenance, but verification reads the envelope's own version pair — so the
+line can be at interface 2 while still reading format-1 envelopes. The 2.0
+break changed `grant-hat` to one `GrantTarget` (team or site) and moved the
+interface to 2; see [`docs/migration-v2.md`](docs/migration-v2.md).
 
 This is the 2.x line. The v0.4 surface — predicates, persistence port,
 request spine, and the Node SQLite adapter — lives at its tags and is not
-copied forward; v2 content returns by being re-specified against the
-architecture. The earlier 1.x package line is historical. See
+copied forward; the earlier 1.x package line is historical. See
 [`docs/authority_redesign.md`](docs/authority_redesign.md) for the design and
 [`docs/publishing.md`](docs/publishing.md) for the release ritual.
 
-## Where to go next
+## Read next
 
-- [`docs/README.md`](docs/README.md) — the docs index and the
-  normative/background split.
-- [`docs/lexicon.md`](docs/lexicon.md) — the normative words; start here when
-  a term is unfamiliar.
+- [`docs/tutorial.md`](docs/tutorial.md) — the longer, concrete walkthrough.
+- [`docs/README.md`](docs/README.md) — the docs index.
+- [`docs/lexicon.md`](docs/lexicon.md) — the normative words.
 - [`docs/authority_redesign.md`](docs/authority_redesign.md) — architecture,
-  modules, state ownership, and the identity boundary.
-- [`docs/envelope.md`](docs/envelope.md) — the envelope format, encoding,
-  signature, and version/key compatibility.
-- [`docs/cloudflare.md`](docs/cloudflare.md) — the reference runtime as
-  built: coordinators, Worker surface, keys, ops, and state lifecycle.
+  state ownership, and the identity boundary.
+- [`docs/envelope.md`](docs/envelope.md) — the envelope format and version
+  rules.
+- [`docs/cloudflare.md`](docs/cloudflare.md) — the reference runtime as built.
 - [`docs/binding-conformance.md`](docs/binding-conformance.md) — the deployed
-  service-binding smoke claim and its limits.
-- [`specs/README.md`](specs/README.md) — the named invariants: what must hold,
-  what enforces it, and what follows when it stops holding.
+  smoke claim and its limits.
+- [`specs/README.md`](specs/README.md) — the named invariants.
 - [`docs/migration-v2.md`](docs/migration-v2.md) — the 1.2 → 2.0 deltas.
-- [`docs/publishing.md`](docs/publishing.md) — canonical host, mirror, CI,
-  and the release ritual.
+- [`docs/publishing.md`](docs/publishing.md) — canonical host, mirror, and
+  release ritual.
 - [`SECURITY.md`](SECURITY.md) — reporting and coordinated disclosure.
-- [`plans/README.md`](plans/README.md) — work in flight; a plan is removed
-  when it is realized.
+- [`plans/README.md`](plans/README.md) — work in flight.
 
 Background reading: [`docs/organization_model.md`](docs/organization_model.md),
 [`docs/rbac.md`](docs/rbac.md), and

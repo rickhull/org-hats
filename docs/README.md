@@ -36,6 +36,13 @@ public `org-hats` docs are normative for the seam.
 - [`publishing.md`](publishing.md) — canonical host, mirror, CI, and the
   release ritual.
 
+## Tutorial
+
+- [`tutorial.md`](tutorial.md) — a longer, concrete walkthrough through the
+  synthetic twins: one actor in two operations, the decisions each hat
+  produces, commands and denial, refresh rotation, a lost disable message,
+  and the Airlift's crossed grant.
+
 ## Background
 
 Phase-1 toeholds. Each carries only the opening that still holds in v1; the
