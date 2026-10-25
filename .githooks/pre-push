@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-# Pre-push gate: validate every version tag being pushed, run bin/check, and
-# refuse to publish a stale dist/.
+# Pre-push gate: validate every release tag being pushed, build dist/ and
+# refuse a stale one, then run bin/check.
 #
 # Install once per clone:
 #   git config core.hooksPath .githooks
@@ -12,39 +12,27 @@ cd "$(dirname "$0")/.." || exit 1
 
 fail=0
 
-# 1. Every version tag being pushed must match the manifest in its own commit.
+# 1. Every release tag being pushed must match the manifest in its own commit.
+#    Both tag families are checked; the script infers the manifest.
 while read -r local_ref local_sha remote_ref remote_sha; do
 	case $local_sha in
 		*[!0]*) ;;
 		*) continue ;; # a deletion has an all-zero local sha
 	esac
 	case $remote_ref in
-		refs/tags/v[0-9]*)
+		refs/tags/v[0-9]*|refs/tags/cloudflare-v[0-9]*)
 			bin/check-version "${remote_ref#refs/tags/}" || fail=1
 			;;
 	esac
 done
 
-# 2. The checkout itself: the fence, the tag at HEAD (if any), the examples.
+# 2. The checkout itself: build dist/ first, then compare and check. This is
+#    the same order CI uses, so a local pass predicts the remote one.
+if ! out=$(bin/check-dist 2>&1); then printf '%s\n' "$out" >&2; fail=1; fi
+
+# 3. The fence, the tag at HEAD (if any), the suites, and the example.
 #    Quiet on success; the full output is shown only when it fails.
 if ! out=$(bin/check 2>&1); then printf '%s\n' "$out" >&2; fail=1; fi
-
-# 3. dist/ must match src/. CI checks this too, but CI is on the mirror and
-#    lags the canonical host, so a stale dist would be public before it runs.
-if [ -x node_modules/.bin/tsc ]; then
-	if command -v pnpm >/dev/null 2>&1; then
-		if ! out=$(pnpm build 2>&1); then printf '%s\n' "$out" >&2; fail=1; fi
-	else
-		if ! out=$(node_modules/.bin/tsc -p tsconfig.json 2>&1); then printf '%s\n' "$out" >&2; fail=1; fi
-	fi
-	if [ -n "$(git status --porcelain -- dist)" ]; then
-		printf 'pre-push: dist/ is stale — commit the rebuilt dist/\n' >&2
-		git --no-pager diff --stat -- dist >&2
-		fail=1
-	fi
-else
-	printf 'pre-push: skipping the dist/ freshness check (run pnpm install)\n' >&2
-fi
 
 if [ "$fail" -ne 0 ]; then
 	printf 'pre-push: push refused\n' >&2

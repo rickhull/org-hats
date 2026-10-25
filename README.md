@@ -3,13 +3,13 @@
 *A portable organizational authority subsystem — portable semantics, one
 reference runtime.*
 
-**The 1.x line on `main` is a deliberate break with the v0.4 surface.**
+**The 2.x line on `main` is a deliberate break with the v0.4 surface.**
 The v0.4 organization model — predicates, persistence port, request spine,
 and the Node SQLite adapter — is not here; it lives at its tags (`v0.4.4`
 last), and content returns only by being re-specified, never copied. The
-released line is the latest `v1.x` tag;
-`1.0.0` is historical. The Cloudflare runtime and demo are in place;
-Quartermaster's deployment of the reference runtime is under way.
+released line is the latest `v2.x` tag; `1.x` is historical. The Cloudflare
+runtime and demo are in place; Quartermaster's deployment of the reference
+runtime is under way.
 
 What ships here:
 

@@ -1,14 +1,21 @@
 #!/usr/bin/env sh
-# Release-metadata guard: a `vX.Y.Z` tag must match `package.json`'s version.
+# Release-metadata guard: a release tag must match its package manifest.
 #
-#   bin/check-version            # the tag at this checkout (or $GITHUB_REF in CI)
-#   bin/check-version v0.4.3     # audit a named tag against its own manifest
+#   bin/check-version               # tags at HEAD (or $GITHUB_REF in CI)
+#   bin/check-version v2.0.0        # audit a named root tag
+#   bin/check-version cloudflare-v0.2.0
 #
-# Static: it reads the manifest and the tag, builds nothing, runs nothing. A
-# commit with no version tag passes — there is nothing to reconcile. Invoked by
+# Two tag families, each tied to its own manifest:
+#   vX.Y.Z             -> package.json
+#   cloudflare-vX.Y.Z  -> packages/cloudflare/package.json
+#
+# Static: it reads manifests and tags, builds nothing, runs nothing. A commit
+# with no release tag passes — there is nothing to reconcile. Invoked by
 # bin/check (and so by CI on every push); safe to call from a git hook too.
 set -eu
-cd "$(dirname "$0")/.." || exit 1
+# CHECK_VERSION_ROOT lets the guard be tested against a throwaway repository;
+# it defaults to the checkout this script lives in.
+cd "${CHECK_VERSION_ROOT:-$(dirname "$0")/..}" || exit 1
 
 die() { printf 'check-version: %s\n' "$*" >&2; exit 1; }
 
@@ -16,10 +23,33 @@ manifest_version() { # a package.json on stdin -> its version on stdout
 	node -e 'const fs=require("fs");process.stdout.write(String(JSON.parse(fs.readFileSync(0,"utf8")).version||""))'
 }
 
-check() { # tag version
-	[ -n "$2" ] || die "no version in package.json"
-	[ "$1" = "v$2" ] || die "tag $1 does not match package.json version $2 (expected v$2)"
-	printf 'check-version: %s matches package.json %s\n' "$1" "$2"
+manifest_for() { # tag -> the manifest its version must match
+	case $1 in
+		cloudflare-v[0-9]*.[0-9]*.[0-9]*) printf '%s' packages/cloudflare/package.json ;;
+		v[0-9]*.[0-9]*.[0-9]*) printf '%s' package.json ;;
+		*) return 1 ;;
+	esac
+}
+
+tag_prefix_for() { # tag -> the prefix its manifest version must produce
+	case $1 in
+		cloudflare-*) printf '%s' cloudflare-v ;;
+		*) printf '%s' v ;;
+	esac
+}
+
+check() { # tag version manifest
+	expected="$(tag_prefix_for "$1")$2"
+	[ "$1" = "$expected" ] ||
+		die "tag $1 does not match $3 version $2 (expected $expected)"
+	printf 'check-version: %s matches %s %s\n' "$1" "$3" "$2"
+}
+
+check_tag() { # tag revision-expression
+	manifest=$(manifest_for "$1") || return 1
+	version=$(git show "$2:$manifest" 2>/dev/null | manifest_version) ||
+		die "could not read $manifest at $2"
+	check "$1" "$version" "$manifest"
 }
 
 command -v node >/dev/null 2>&1 || die "node is required"
@@ -29,24 +59,21 @@ command -v git >/dev/null 2>&1 || die "git is required"
 if [ "$#" -gt 0 ]; then
 	tag=${1#refs/tags/}
 	git rev-parse -q --verify "refs/tags/$tag" >/dev/null 2>&1 || die "no such tag: $tag"
-	version=$(git show "$tag:package.json" | manifest_version)
-	check "$tag" "$version"
+	manifest_for "$tag" >/dev/null 2>&1 || die "not a release tag: $tag"
+	check_tag "$tag" "$tag"
 	exit 0
 fi
 
-# Otherwise check the tag at this checkout: $GITHUB_REF in CI, else tags at HEAD.
-version=$(manifest_version <package.json)
+# Otherwise check the tag at this checkout: $GITHUB_REF in CI, else tags at
+# HEAD. Unknown tag families are not this guard's business.
 tags=
 case "${GITHUB_REF:-}" in refs/tags/*) tags=${GITHUB_REF#refs/tags/} ;; esac
 [ -n "$tags" ] || tags=$(git tag --points-at HEAD 2>/dev/null || true)
 
 checked=0
 for tag in $tags; do
-	case $tag in
-		v[0-9]*.[0-9]*.[0-9]*) ;;
-		*) continue ;; # a non-version tag is not this guard's business
-	esac
+	manifest=$(manifest_for "$tag") || continue
 	checked=1
-	check "$tag" "$version"
+	check_tag "$tag" HEAD
 done
 [ "$checked" -eq 1 ] || printf 'check-version: no version tag at this checkout (%s)\n' "${tags:-untagged}"

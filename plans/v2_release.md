@@ -1,9 +1,9 @@
 # v2.0.0 release gate
 
-**Status:** `v2.0.0` is tagged and pushed at `dccba61`; the root release gate
-is clear. What remains is the Cloudflare tag and the consumer's adoption.
-The phased plan that drove the source work is dissolved here: its results
-live in `docs/authority_redesign.md` § State ownership,
+**Status:** both releases are cut — root `v2.0.0` at `dccba61`, Cloudflare
+`cloudflare-v0.2.0` at `0a82e1a`. The only open item is Quartermaster's
+adoption/re-record. The phased plan that drove the source work is dissolved
+here: its results live in `docs/authority_redesign.md` § State ownership,
 `docs/cloudflare.md`, and `plans/claude_review.md` P0-P3.
 
 ## What must hold
@@ -40,9 +40,9 @@ live in `docs/authority_redesign.md` § State ownership,
       `~/git/quartermaster/notes/from-org-hats.md`. The source-break
       correction and the fixture change (`fixtures/bootstrap/operation.json`
       grants → `target`) were already sent on 2026-10-25.
-- [ ] Cut `cloudflare-v0.2.0` (package bumped from 0.1.0 to 0.2.0): the
+- [x] Cut `cloudflare-v0.2.0` at `0a82e1a` (package 0.1.0 → 0.2.0): the
       `token_endpoint` exchange fix, the roster projection and schema 2 → 3,
-      and the 2.0.0 command surface. Rick commits the bump and tags.
+      and the 2.0.0 command surface. Posted to Quartermaster.
 - [ ] Confirm Quartermaster's adoption/re-record and answer anything they
       raise about the fixture shape or the envelope handover.
 

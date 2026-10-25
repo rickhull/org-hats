@@ -1,8 +1,10 @@
 # Tests
 
 The suites are the executable specification. Run one suite with
-`node --test tests/<file>.test.ts`; `pnpm check` adds the compiler fence, the
-Cloudflare-import guard, the pilot, and the release-metadata guard.
+`node --test tests/<file>.test.ts`, all of them with `pnpm test`; `pnpm check`
+adds the compiler fence, the Cloudflare-import guard, the pilot, and the
+release-metadata guard. `pnpm verify` is the full local gate: `bin/check-dist`
+(build and freshness), `pnpm check`, then the Cloudflare workerd suites.
 
 - `contract.test.ts` — canonical JSON, byte codecs, version constants.
 - `model.test.ts` — decisions, worn-hat selection, participation transitions.

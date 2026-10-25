@@ -1,52 +1,87 @@
 #!/usr/bin/env sh
-# Cut a release: bump the version, rebuild dist/, run the check, commit, and tag.
+# Cut a release: bump a manifest, verify, rebuild dist/, commit, and tag.
 #
-#   bin/release patch        # 1.0.0 -> 1.0.1   (alias: bump_patch)
-#   bin/release minor        # 1.0.0 -> 1.1.0   (alias: bump_minor)
-#   bin/release major        # 1.0.0 -> 2.0.0   (alias: bump_major)
-#   bin/release 1.1.0        # an explicit version
+#   bin/release patch                 # root: vX.Y.Z from package.json
+#   bin/release minor
+#   bin/release major
+#   bin/release 2.1.0
+#   bin/release --package cloudflare minor
 #
-# The tag is taken from package.json — `v<version>` — so the tag and the
-# manifest can never disagree. `package.json` is the only place the current
-# version is pinned; docs refer to the latest tag, not a literal. Then
-# `pnpm build` refreshes dist/ so the CI freshness guard passes.
+# Two tag families, each tied to its own manifest:
+#   root        vX.Y.Z            package.json + dist/
+#   cloudflare  cloudflare-vX.Y.Z  packages/cloudflare/package.json
+#
+# The tag is taken from that manifest, and `bin/check-version` re-checks the
+# new tag before anything is pushed, so the manifest and tag cannot disagree.
+# `bin/check-dist` runs first, so a release commit cannot publish a stale
+# dist/.
 #
 # Options:
-#   --dry-run     print the plan and change nothing
-#   --push        push the branch and the tag to origin (default: local only)
-#   --no-verify   skip bin/check before committing
-#   -h, --help    this help
+#   --package root|cloudflare   which package to release (default: root)
+#   --dry-run                   print the plan and change nothing
+#   --push                      push the branch and tag to origin
+#   --no-verify                 skip the gates (the build still runs)
+#   --no-cloudflare             skip the Cloudflare suites on a root release
+#   -h, --help                  this help
 set -eu
 cd "$(dirname "$0")/.." || exit 1
 
 die() { printf 'release: %s\n' "$*" >&2; exit 1; }
-usage() { sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; }
 
+package=root
 bump=
 dry=false
 push=false
 verify=true
-for arg in "$@"; do
-	case $arg in
-		patch | bump_patch) bump=patch ;;
-		minor | bump_minor) bump=minor ;;
-		major | bump_major) bump=major ;;
-		--dry-run) dry=true ;;
-		--push) push=true ;;
-		--no-verify) verify=false ;;
-		-h | --help) usage; exit 0 ;;
-		-*) die "unknown option: $arg" ;;
-		*) bump=$arg ;;
+cloudflare=true
+
+while [ "$#" -gt 0 ]; do
+	case $1 in
+		--package)
+			[ "$#" -ge 2 ] || die "--package needs root or cloudflare"
+			package=$2
+			shift 2
+			;;
+		--package=*)
+			package=${1#--package=}
+			shift
+			;;
+		--dry-run) dry=true; shift ;;
+		--push) push=true; shift ;;
+		--no-verify) verify=false; shift ;;
+		--no-cloudflare) cloudflare=false; shift ;;
+		-h|--help) usage; exit 0 ;;
+		-*) die "unknown option: $1" ;;
+		*)
+			[ -z "$bump" ] || die "only one bump or version argument"
+			bump=$1
+			shift
+			;;
 	esac
 done
+
 [ -n "$bump" ] || { usage; exit 2; }
+
+case $package in
+	root)
+		manifest=package.json
+		tag_prefix=v
+		;;
+	cloudflare)
+		manifest=packages/cloudflare/package.json
+		tag_prefix=cloudflare-v
+		;;
+	*) die "unknown package: $package (root or cloudflare)" ;;
+esac
+[ -f "$manifest" ] || die "no manifest: $manifest"
 
 command -v git >/dev/null 2>&1 || die "git is required"
 command -v node >/dev/null 2>&1 || die "node is required"
+command -v pnpm >/dev/null 2>&1 || die "pnpm is required"
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not a git repository"
-[ -z "$(git status --porcelain)" ] || die "working tree is dirty — commit or stash first"
 
-current=$(node -p "require('./package.json').version")
+current=$(node -p "require('./$manifest').version")
 next=$(node -e '
 const [cur, bump] = process.argv.slice(1);
 const semver = /^[0-9]+\.[0-9]+\.[0-9]+$/;
@@ -61,46 +96,65 @@ console.log([maj, min, pat].join("."));
 ' "$current" "$bump") || die "could not compute the next version from '$bump'"
 
 [ "$next" != "$current" ] || die "already at $current"
-if git rev-parse -q --verify "refs/tags/v$next" >/dev/null 2>&1; then
-	die "tag v$next already exists"
+tag="${tag_prefix}${next}"
+if git rev-parse -q --verify "refs/tags/$tag" >/dev/null 2>&1; then
+	die "tag $tag already exists"
 fi
 
-printf 'release: %s -> %s  (tag v%s)\n' "$current" "$next" "$next"
-printf 'release: will bump package.json and rebuild dist/\n'
+printf 'release: %s -> %s  (%s)\n' "$current" "$next" "$tag"
+printf 'release: manifest %s\n' "$manifest"
 
 if $dry; then
 	printf 'release: dry run — nothing changed\n'
 	exit 0
 fi
 
+[ -z "$(git status --porcelain)" ] || die "working tree is dirty — commit or stash first"
+
 if $verify; then
+	printf '\n== check-dist ==\n'
+	bin/check-dist
+
 	printf '\n== bin/check ==\n'
 	bin/check
+
+	if [ "$package" = cloudflare ] || $cloudflare; then
+		printf '\n== Cloudflare suites ==\n'
+		pnpm check:cloudflare
+	fi
 fi
 
-# The manifest is the single pinned version. Docs name the latest tag rather
-# than a literal, so a release never rewrites historical statements.
+# The manifest is the single pinned version. Replace only that value so the
+# rest of the file's formatting is untouched.
 node -e 'const fs=require("fs"),p=process.argv[1],o=process.argv[2],n=process.argv[3];
-	fs.writeFileSync(p, fs.readFileSync(p,"utf8").split(o).join(n));' package.json "$current" "$next"
+	fs.writeFileSync(p, fs.readFileSync(p,"utf8").split(o).join(n));' "$manifest" "$current" "$next"
 
 printf '\n== build ==\n'
-if command -v pnpm >/dev/null 2>&1; then
-	pnpm build
-elif [ -x node_modules/.bin/tsc ]; then
-	node_modules/.bin/tsc -p tsconfig.json
-else
-	die "no build tool — install pnpm (pnpm install) and retry"
+pnpm build
+
+# A root release commits the rebuilt dist/. A Cloudflare release must not
+# change it: that would be a root source change smuggled into this tag.
+if [ "$package" = cloudflare ] && [ -n "$(git status --porcelain -- dist)" ]; then
+	die "dist/ changed during a Cloudflare release — commit the root build separately"
 fi
 
-git add -A
-git commit -q -m "v$next"
-git tag -a "v$next" -m "v$next"
-printf 'release: committed and tagged v%s (%s)\n' "$next" "$(git rev-parse --short HEAD)"
+if [ "$package" = root ]; then
+	git add "$manifest"
+	git add -A dist
+else
+	git add "$manifest"
+fi
+
+git commit -q -m "$tag"
+git tag -a "$tag" -m "$tag"
+
+# Post-tag check: the guard that would have caught a tag on the wrong commit.
+bin/check-version "$tag"
 
 if $push; then
 	git push origin HEAD
-	git push origin "v$next"
-	printf 'release: pushed branch and v%s to origin\n' "$next"
+	git push origin "$tag"
+	printf 'release: pushed branch and %s to origin\n' "$tag"
 else
-	printf 'release: push with\n  git push origin HEAD\n  git push origin v%s\n' "$next"
+	printf 'release: push with\n  git push origin HEAD\n  git push origin %s\n' "$tag"
 fi

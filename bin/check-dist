@@ -1,0 +1,33 @@
+#!/usr/bin/env sh
+# Build dist/ from src/ and fail if the committed output moved.
+#
+# Used by the pre-push hook and by CI, so the local gate and the remote gate
+# answer the same question in the same order: build, then compare. bin/check
+# deliberately does not build; it must stay safe to run against a checkout
+# without emitting anything.
+#
+# A release commit includes dist/. A stale directory — including a generated
+# file whose source was deleted or renamed — is a release bug, not a local
+# convenience.
+set -eu
+cd "$(dirname "$0")/.." || exit 1
+
+if [ ! -x node_modules/.bin/tsc ]; then
+	printf 'check-dist: skipped — run pnpm install to enable the build\n'
+	exit 0
+fi
+
+if command -v pnpm >/dev/null 2>&1; then
+	pnpm build
+else
+	node_modules/.bin/tsc -p tsconfig.json
+	node bin/fix-dts.mjs
+fi
+
+if [ -n "$(git status --porcelain -- dist)" ]; then
+	printf 'check-dist: dist/ is stale — commit the rebuilt dist/\n' >&2
+	git --no-pager diff --stat -- dist >&2
+	exit 1
+fi
+
+printf 'ok — dist/ matches src/\n'

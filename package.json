@@ -2,7 +2,8 @@
   "name": "org-hats",
   "version": "2.0.0",
   "type": "module",
-  "description": "A portable organizational authority subsystem — use-case authority runtime, signed access envelopes, and a verification-only access module. v1 in development; the v0.4 organization model lives at its tags.",
+  "engines": { "node": ">=24" },
+  "description": "A portable organizational authority subsystem — use-case authority runtime, signed access envelopes, and a verification-only access module. v2 line; the v0.4 organization model lives at its tags.",
   "license": "MIT",
   "author": "Rick <rick@thinkpad>",
   "repository": { "type": "git", "url": "git+https://codeberg.org/rickhull/org-hats.git" },
@@ -29,9 +30,12 @@
   "files": ["dist", "SECURITY.md"],
   "scripts": {
     "check": "bin/check",
+    "check:dist": "bin/check-dist",
     "typecheck": "tsc -p tsconfig.authority.json && tsc -p tsconfig.json --noEmit",
-    "build": "tsc -p tsconfig.json && node bin/fix-dts.mjs",
-    "check:cloudflare": "pnpm --filter org-hats-cloudflare typecheck && pnpm --filter org-hats-cloudflare test"
+    "test": "node --test tests/*.test.ts",
+    "build": "rm -rf dist && tsc -p tsconfig.json && node bin/fix-dts.mjs",
+    "check:cloudflare": "pnpm --filter org-hats-cloudflare typecheck && pnpm --filter org-hats-cloudflare test",
+    "verify": "bin/check-dist && bin/check && pnpm check:cloudflare"
   },
   "dependencies": {},
   "devDependencies": {

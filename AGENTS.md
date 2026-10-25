@@ -54,7 +54,9 @@ not applying.  No customer names, roster material, secrets, or key material.
 - When a change affects executable code, configuration, or tests, run
   `pnpm check` and `pnpm typecheck`; report what both said.  `pnpm check`
   runs the compiler fence, the cloudflare-import guard, and the `node --test`
-  suites; a single suite is `node --test tests/<file>.test.ts`.
+  suites; a single suite is `node --test tests/<file>.test.ts`.  The full
+  local gate is `pnpm verify` — `bin/check-dist` (build and dist freshness),
+  `pnpm check`, and `pnpm check:cloudflare`.
 - When every changed path is documentation (`*.md`), do not run application
   typechecks or tests; inspect the changed text and report that no automated
   check applies.
@@ -63,6 +65,8 @@ not applying.  No customer names, roster material, secrets, or key material.
   a local artifact.
 - The portable packages' suites must run without workerd or a Cloudflare
   account; runtime-specific tests belong to the future Cloudflare package.
+- When a handoff carries a commit-sized chunk of work, propose a one-line
+  commit message for it.
 
 ## Conventions
 

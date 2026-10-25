@@ -31,11 +31,11 @@ until it lands, Codeberg is the only live host and mirror CI is dark.
 
 ## CI
 
-CI runs on the **mirror**: GitHub Actions, [`.github/workflows/check.yml`](../.github/workflows/check.yml). On every push it installs, builds, **fails if the committed `dist/` is stale**, and runs `bin/check`; a tag push additionally fails if the tag does not match `package.json` — `bin/check-version`, run by `bin/check` and as its own early step. Because it lives on the mirror, a stalled sync stops CI as well as reach — check the mirror after any credential change.
+CI runs on the **mirror**: GitHub Actions, [`.github/workflows/check.yml`](../.github/workflows/check.yml). On every push it installs, runs **`bin/check-dist`** (build and fail if the committed `dist/` is stale), then runs `bin/check`. A tag push additionally fails if the tag does not match the manifest for its family — `bin/check-version`, run by `bin/check` and as its own early step. The workerd suites run in a separate job, after the same build. Because CI lives on the mirror, a stalled sync stops CI as well as reach — check the mirror after any credential change.
 
 ## The release
 
-Releases are cut with `bin/release` (bump → build → commit → tag; the tag comes from `package.json`) and pushed to both hosts. `v0.4.4` is the last v0.4 release; the v1 line tags from `main`, starting at `v1.0.0`, which is historical. `v0.1.0` was the first release.
+Releases are cut with `bin/release` (bump → verify → build → commit → tag; the tag comes from the manifest) and pushed to both hosts. `v0.4.4` is the last v0.4 release; `v1.0.0` is historical; the current line is v2.x. The Cloudflare reference runtime is released from the same script with `--package cloudflare`.
 
 A consumer pins one of:
 
@@ -44,21 +44,24 @@ A consumer pins one of:
 | Codeberg (canonical, immediate) | `git+https://codeberg.org/rickhull/org-hats.git#vX.Y.Z` |
 | GitHub (mirror, lagging) | `github:rickhull/org-hats#vX.Y.Z` |
 
-Replace `vX.Y.Z` with the release tag. `v0.4.4` remains the last frozen v0.4 pin; v1 releases start at `v1.0.0`, and the latest tag is the pin target — no plan tracks it. The Cloudflare package releases on its own cadence as `cloudflare-vX.Y.Z`, which the root version guard deliberately ignores. Prefer the Codeberg pin: the mirror's interval then never affects the consumer. The `github:` shorthand resolves only GitHub; a consumer whose CI is already GitHub-native may pin the mirror.
+Replace `vX.Y.Z` with the release tag. `v0.4.4` remains the last frozen v0.4 pin; the latest tag is the pin target — no plan tracks it. The Cloudflare package releases on its own cadence as `cloudflare-vX.Y.Z`; the same guard validates it against `packages/cloudflare/package.json`. Prefer the Codeberg pin: the mirror's interval then never affects the consumer. The `github:` shorthand resolves only GitHub; a consumer whose CI is already GitHub-native may pin the mirror.
 
 ## Release ritual
 
-From a clean release branch (`main` for v0.4, `v1` for the 1.x line):
+From a clean `main`:
 
 1. Cut it:
    ```sh
-   bin/release patch        # or minor, major, or an explicit X.Y.Z
+   bin/release patch                    # root: vX.Y.Z
+   bin/release --package cloudflare minor
    ```
-   That bumps `package.json`, runs `bin/check`, rebuilds `dist/`, commits
-   `vX.Y.Z`, and tags it — the manifest and the tag in one act. Docs name the
-   latest tag rather than a literal, so a release never rewrites history.
-   `--dry-run` previews; `--push` also pushes. **Never tag by hand:** the tag
-   comes from the manifest, so the two cannot disagree.
+   That bumps the selected manifest, runs `bin/check-dist` and `bin/check`
+   (plus the Cloudflare suites for a root release), rebuilds `dist/`, commits
+   the manifest and generated output, and tags the commit. It re-checks the
+   new tag with `bin/check-version` before anything is pushed — the tag and
+   manifest cannot disagree. `--dry-run` previews; `--push` also pushes.
+   `--no-cloudflare` skips the workspace suites on a root release.
+   **Never tag by hand.**
 2. Push to the canonical host (skip if `--push`ed):
    ```sh
    git push origin <branch>
@@ -73,8 +76,8 @@ From a clean release branch (`main` for v0.4, `v1` for the 1.x line):
 ## Discipline
 
 - **Tags are immutable.** Never move or delete `v0.1.0`; release by *adding* `v0.1.1`, never by rewriting a tagged commit. Force-pushing over a tag a consumer pinned is the one failure that breaks them silently.
-- **A version tag must match the manifest.** `bin/check-version` fails if a `vX.Y.Z` tag disagrees with `package.json` (it also audits any tag: `bin/check-version v0.4.3`). `bin/check` runs it, so CI enforces it on every push; `bin/release` keeps the two equal by construction. The committed `.githooks/pre-push` runs the whole gate before a push leaves the machine — install it once with `git config core.hooksPath .githooks`. CI remains the backstop.
-- **`dist/` must be fresh.** `bin/check` runs the fence but does not emit; only `pnpm build` does. **CI enforces it** on the mirror (`.github/workflows/check.yml`, GitHub Actions): on every push it builds, fails if `git status --porcelain -- dist` is non-empty, then runs `bin/check`.
+- **A release tag must match its manifest.** `bin/check-version` validates both families: `vX.Y.Z` against `package.json`, `cloudflare-vX.Y.Z` against `packages/cloudflare/package.json` (it also audits any tag: `bin/check-version v0.4.3`, `bin/check-version cloudflare-v0.2.0`). `bin/check` runs it, so CI enforces it on every push; `bin/release` keeps the two equal by construction and re-checks the tag it just made. The committed `.githooks/pre-push` runs the root gate before a push leaves the machine — install it once with `git config core.hooksPath .githooks`. CI remains the backstop.
+- **`dist/` must be fresh.** `bin/check` runs the fence but does not emit; `pnpm build` does. `bin/check-dist` builds and fails if `git status --porcelain -- dist` is non-empty; the pre-push hook and **CI** both run it, so the local gate and the remote gate answer the same question in the same order.
 - **CI rides the mirror.** sync-on-commit makes it timely, but the CI system *is* the mirror — a rotated PAT or a stalled sync silently stops CI as well as reach. Check the mirror after any credential change.
 - **Know which host the consumer pins.** Codeberg is canonical and immediate; GitHub trails by the sync. Prefer Codeberg.
 
