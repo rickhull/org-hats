@@ -55,9 +55,10 @@ Codeberg and then force-push the GitHub mirror; GitHub follows only when
 told.
 - **Codeberg is the truth.** GitHub holds no authority, only a copy.
 
-**Current status (2026-10-25):** GitHub is caught up through the manual
-catch-up (`v2.0.0`, `cloudflare-v0.2.0`, and the subsequent ops commits).
-Future updates happen when `bin/release --push` cuts a release.
+**Current status (2026-10-25):** GitHub carries the release pushes through
+`v2.0.0` and `cloudflare-v0.3.1`. Future updates happen when
+`bin/release --push` cuts a release; branch commits after the last release
+wait for the next one.
 
 **Historical anomaly:** `v0.4.3` points at `8d2551d` ("docs update /
 cleanup"), whose `package.json` is `0.4.2`; `v0.4.4` is the commit that fixes
@@ -124,6 +125,21 @@ A consumer pins one of:
 | GitHub (mirror, lagging) | `github:rickhull/org-hats#vX.Y.Z` |
 
 Replace `vX.Y.Z` with the release tag. `v0.4.4` remains the last frozen v0.4 pin; the latest tag is the pin target — no plan tracks it. The Cloudflare package releases on its own cadence as `cloudflare-vX.Y.Z`; the same guard validates it against `packages/cloudflare/package.json`. Prefer the Codeberg pin: the mirror's lag then never affects the consumer. The `github:` shorthand resolves only GitHub; a consumer whose CI is already GitHub-native may pin the mirror.
+
+## Deployment is not publishing
+
+A `cloudflare-v*` tag is the upstream release act; deploying it is the
+consuming host's act. The host verifies the tag and the production
+configuration at that commit, snapshots state, uploads a Worker Version,
+activates it, and verifies it. The shape is in
+[cloudflare.md](cloudflare.md#deployment-contract).
+
+Upstream does not ship a deploy porcelain: the Cloudflare account, Worker,
+secrets, traffic, and service binding belong to the deploying host. The
+reference deployment is live at `cloudflare-v0.3.1`; the host's ops
+porcelain owns `candidate` / `release` / `configure` / `smoke`, with the
+registry projection as its follow-on. State restore and the routing-facts
+backfill are acceptance acts, not deploy steps.
 
 ## Release ritual
 

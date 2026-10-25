@@ -425,15 +425,15 @@ Durable Object namespaces, or authority database rows. It does not reconstruct
 reach, fallback, participation, or worn-hat rules from envelope claims, and
 its product verbs map onto neutral access facts rather than extending them.
 
-The accepted contract is authority interface `1` and access envelope `1`,
-recorded in Quartermaster's `specs/login.md`. The portable v1 line and the
+The accepted contract is authority interface `2` and access envelope `1`,
+recorded in Quartermaster's `specs/login.md`. The portable v2 line and the
 Cloudflare reference runtime implement it; the consumer's deployment and
 stand-in retirement are tracked in their own plans. Quartermaster's
 `apps/authority-dev` and
 `packages/access` are temporary stand-ins and are deleted together when the
 consumer adopts the runtime binding, so it never grows a second envelope
-implementation. The review items that preceded the alpha are settled in the
-shipped contract: `supervisedTeamIds` is absent, the read policy is an axis
+implementation. The review items that preceded the release are settled in
+the shipped contract: `supervisedTeamIds` is absent, the read policy is an axis
 structure, `PrincipalEvidence.email` is absent, and the twins use `reviewer`
 rather than a people-management title.
 

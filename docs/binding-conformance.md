@@ -7,6 +7,9 @@ remains the workerd suite against the real coordinators
 binding and entrypoint preserve the public runtime behaviour for a dedicated,
 pre-bootstrapped operation without resetting it.*
 
+*The reference deployment is live at `cloudflare-v0.3.1`; this subset is the
+claim to rerun there.*
+
 ## Preconditions
 
 - A dedicated authority deployment at the accepted `cloudflare-v*` tag, with
@@ -20,7 +23,9 @@ pre-bootstrapped operation without resetting it.*
   delivering the roster image or `actor-disabled` message to the operation,
   for the stale-projection case.
 - No reset/bootstrap call. The smoke consumes the seeded operation; `refresh`
-  rotates its handle, so a rerun uses a fresh fixture or operation.
+  rotates its handle, so a rerun uses a fresh fixture or operation. The
+  disabled-actor case is one-shot: the actor stays disabled, so a rerun
+  needs a fresh actor (and a fresh fixture once its handle has rotated).
 
 ## Claim
 

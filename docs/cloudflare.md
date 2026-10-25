@@ -133,6 +133,37 @@ Two Wrangler configs, two purposes:
   comma-separated evidence-resolution directory; there is no global
   registry.
 
+## Deployment contract
+
+Upstream's release act ends at an immutable `cloudflare-v*` tag and its
+push. Deploying that tag — the host's Cloudflare account, Worker Versions,
+secrets, traffic, and service binding — is the consuming host's act. The
+reference deployment is live at `cloudflare-v0.3.1`; the host's ops
+porcelain owns the deploy verbs. A deployed tag can lag `main`; the tag is
+the deployment unit.
+
+The host-side shape the runtime supports:
+
+- verify the annotated tag, peel it to a commit, and require that commit's
+  package version and `wrangler.production.jsonc` (Worker name, no routes,
+  `workers_dev: false`);
+- export every named coordinator before upload; a failed export aborts;
+- upload a Worker Version tagged with the full upstream commit, serving no
+  traffic; activate it with `wrangler versions deploy`, never
+  `wrangler deploy`;
+- carry `AUTHORITY_ORGANIZATION_IDS` and `AUTHORITY_VERIFICATION_KEYS` as
+  the additive secrets; `OPS_TOKEN` and the signing trio survive a version
+  upload;
+- a configuration-only version changes only those two values and is tagged
+  with the code commit plus a digest of them;
+- activate at 100%, canary by percentage, and roll back by releasing the
+  previous tagged version; never delete a version.
+
+State restore, roster rebuild, routing-facts backfill, policy application,
+and the binding smoke are separate acceptance acts, not deploy steps. They
+are documented in [binding-conformance.md](binding-conformance.md) and
+[migration-v2.md](migration-v2.md).
+
 ## Operations routes
 
 `/ops/*` is authenticated by `OPS_TOKEN` as a bearer token, except the

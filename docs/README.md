@@ -24,8 +24,8 @@ public `org-hats` docs are normative for the seam.
   canonical encoding, signature transport, version and key compatibility.
 - [`cloudflare.md`](cloudflare.md) — the Cloudflare reference runtime as
   built: its coordinators, the Worker surface and the provider-callback
-  exchange, signing and key rotation, configuration, ops routes, and the
-  state lifecycle.
+  exchange, signing and key rotation, configuration, the deployment
+  contract, ops routes, and the state lifecycle.
 - [`binding-conformance.md`](binding-conformance.md) — the documented
   service-binding smoke subset and what it does not claim.
 - [`lexicon.md`](lexicon.md) — the normative vocabulary; it wins over loose
@@ -35,8 +35,8 @@ public `org-hats` docs are normative for the seam.
 - [`migration-v2.md`](migration-v2.md) — the 1.2 → 2.0 break: the
   `GrantTarget` command shape, interface version 2, and why envelope format
   1 keeps reading across it.
-- [`publishing.md`](publishing.md) — canonical host, mirror, CI, and the
-  release ritual.
+- [`publishing.md`](publishing.md) — canonical host, mirror, CI, the
+  release ritual, and why deployment is the consuming host's act.
 
 ## Tutorial
 

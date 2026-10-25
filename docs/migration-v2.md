@@ -91,6 +91,13 @@ declarations so that cannot regress silently.
   missing or disabled fails `not-admitted`, and an unavailable organization
   fails `unavailable`. The operation schema stays 4; interface 2 and envelope
   1 do not move.
+- The exchange in `cloudflare-v0.3.1` verifies ES256, but RS256 does not
+  verify (the SHA-256 algorithm parameter is missing), so a deployment of
+  that tag must use ES256 for the provider login. `main` carries the
+  corrected exchange and the RFC 8414/7515/7519/7636 tightenings: discovery
+  issuer/HTTPS validation, `crit` rejection, P-256-only ES256, a valid DER
+  conversion, `iat`/`nbf`/`azp`, optional-claim type checks, and the PKCE
+  verifier grammar. The next `cloudflare-v*` tag is the vehicle for them.
 - New operator verbs: `POST /reconcile-rosters` on an operation;
   `GET /ops/schema-status` reports `orgActors`, `disabledOrgActors`,
   `rosterSyncedAt`, and `rosterReconcileSeconds`; `GET /snapshot` reports
