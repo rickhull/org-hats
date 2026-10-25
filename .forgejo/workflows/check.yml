@@ -1,0 +1,41 @@
+# Codeberg's hosted Forgejo Actions: the portable gate only.
+#
+# `codeberg-small` is 2 CPU / 4 GB / 5 min. The root-only install keeps the
+# Cloudflare workspace (workerd, vitest, wrangler) off this runner; workerd
+# stays on the local/release rings. A local root-only run is well inside the
+# cap: install ~5s (warm store), build ~4s, check ~5s. The first hosted run is
+# the cold evidence.
+name: check
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: codeberg-small
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: https://code.forgejo.org/actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: https://code.forgejo.org/pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+
+      - name: Install Node
+        uses: https://code.forgejo.org/actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install root dependencies
+        run: pnpm install --frozen-lockfile --filter org-hats
+
+      - name: dist/ is committed and in sync with src/
+        run: bin/check-dist
+
+      - name: Check (fence, suites, example)
+        run: bin/check
