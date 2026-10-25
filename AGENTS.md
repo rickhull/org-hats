@@ -24,6 +24,12 @@ write only `~/git/quartermaster/notes/from-org-hats.md`; read only
 from this side is still a change made without its owner's review; ask in the
 note and let Quartermaster make it.
 
+Check the tail of `notes/from-quartermaster.md` twice every turn: at the
+start, before planning work, and again before handing off — a reply can
+land mid-turn.  A new section is incorporated or answered, never left
+unread in a handoff; if the work it needs does not fit this turn, say so
+in the handoff.
+
 Append dated sections, newest last, or clear a finished thread.  Read before
 appending: a wiped note is a different conversation.  Nothing binding lives
 only in a note; contracts move into `docs/` or `plans/` here, and into

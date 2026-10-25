@@ -7,11 +7,13 @@ export interface Env {
   readonly AUTHORITY_ORGANIZATION_IDS?: string;
   /** Ops bearer token. A deployment secret; the test var is a local value. */
   readonly OPS_TOKEN?: string;
-  /** Stable Ed25519 signing key: pkcs8 base64, its public raw base64, and id. */
+  /** The signing-key set, all or none: pkcs8 base64 private key, raw base64
+   * public half, and id. A partial set is rejected, and the halves are
+   * proven a pair at import. */
   readonly AUTHORITY_SIGNING_KEY?: string;
   readonly AUTHORITY_SIGNING_PUBLIC_KEY?: string;
   readonly AUTHORITY_SIGNING_KEY_ID?: string;
-  /** Additional verifier keys, `keyId:base64` comma-separated, for the
-   * verifier-first half of a rotation. */
+  /** The canonical serialized `VerifyKeySet` JSON — every key that should
+   * verify during the verifier-first half of a rotation. */
   readonly AUTHORITY_VERIFICATION_KEYS?: string;
 }

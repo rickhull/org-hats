@@ -14,9 +14,8 @@ import {
 import type { Env } from "./env";
 import {
   createCloudflareRuntime,
-  createEphemeralSigner,
   serializedVerificationKeys,
-  signerFromEnv,
+  signerFor,
   verificationKeys,
   type CloudflareSigner,
 } from "./runtime";
@@ -27,13 +26,6 @@ import { createCloudflareConformanceWorld } from "./conformance";
 export { Counter } from "./counter";
 export { OrganizationAuthority } from "./organization";
 export { OperationAuthority } from "./operation";
-
-let ephemeralPromise: Promise<CloudflareSigner> | undefined;
-const signerFor = async (env: Env): Promise<CloudflareSigner> => {
-  if (env.AUTHORITY_SIGNING_KEY !== undefined) return signerFromEnv(env);
-  ephemeralPromise ??= createEphemeralSigner();
-  return ephemeralPromise;
-};
 
 const keysFor = async (env: Env, signer: CloudflareSigner): Promise<ReadonlyMap<string, VerifyKey>> =>
   verificationKeys(env, signer);

@@ -40,7 +40,7 @@ operation-side participation revoke.
 `src/runtime.ts` implements `AuthorityRuntime` over the two coordinators;
 `AuthorityRuntimeEntrypoint` is the RPC service shape. `src/conformance.ts`
 boots and resets the coordinators from `CONFORMANCE_WORLD`, and the full
-25-case portable inventory now runs against them in workerd. The Worker
+26-case portable inventory now runs against them in workerd. The Worker
 exposes `/ops/verification-keys` for the public signing key.
 
 ## T6.5 — ops and state lifecycle
@@ -55,12 +55,16 @@ exposes `/ops/verification-keys` for the public signing key.
 - `GET  /ops/verification-keys` — public, no token
 
 Set `AUTHORITY_SIGNING_KEY` (pkcs8 base64), `AUTHORITY_SIGNING_PUBLIC_KEY`
-(raw base64), and `AUTHORITY_SIGNING_KEY_ID` for a stable signer.
+(raw base64), and `AUTHORITY_SIGNING_KEY_ID` for a stable signer. The three
+travel as a set: a partial configuration is an error, not a fallback, and
+the private and public halves are proven a pair at import — a mismatch
+fails loudly instead of publishing a key that verifies nothing.
 `AUTHORITY_VERIFICATION_KEYS` carries the canonical serialized
 `VerifyKeySet` from `org-hats/access` — the new key is installed there before
 the issuer switches, and the old entry is removed after its last envelope
-expires. Without the signing-key variables the runtime generates an
-ephemeral dev key per isolate.
+expires. Without any signing-key variables the runtime generates an
+ephemeral dev key per isolate; refusing that fallback in a deployment is
+the deploying tooling's call, not the runtime's.
 
 Export is canonical JSON per coordinator, not a SQLite-file copy; restore is
 typed and atomic. The restore drill covers the operation and organization

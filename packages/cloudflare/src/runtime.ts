@@ -54,37 +54,70 @@ export const createEphemeralSigner = async (keyId = `key-${crypto.randomUUID()}`
 export const verificationKeyOf = async (signer: CloudflareSigner): Promise<VerifyKey> =>
   ed25519VerifyKey(signer.keyId, await signer.publicKey());
 
-/** A signer from deployment configuration, or the ephemeral dev signer. */
+/** A signer from deployment configuration, or the ephemeral dev signer.
+ *
+ * The three signing variables travel as a set: none means the development
+ * fallback, a partial set is a configuration error — a deployment that
+ * meant to configure signing must not serve silently ephemeral — and a
+ * full set is proven a pair at import: the private half signs a fixed
+ * probe the public half must verify, so a mismatch is an error here, not
+ * an outage discovered when envelopes stop verifying. */
 export const signerFromEnv = async (env: Env): Promise<CloudflareSigner> => {
-  if (
-    env.AUTHORITY_SIGNING_KEY === undefined ||
-    env.AUTHORITY_SIGNING_PUBLIC_KEY === undefined ||
-    env.AUTHORITY_SIGNING_KEY_ID === undefined
-  ) {
-    return createEphemeralSigner();
+  const key = env.AUTHORITY_SIGNING_KEY;
+  const publicKeyRaw = env.AUTHORITY_SIGNING_PUBLIC_KEY;
+  const keyId = env.AUTHORITY_SIGNING_KEY_ID;
+  if (key === undefined || publicKeyRaw === undefined || keyId === undefined) {
+    const present = [
+      ...(key === undefined ? [] : ["AUTHORITY_SIGNING_KEY"]),
+      ...(publicKeyRaw === undefined ? [] : ["AUTHORITY_SIGNING_PUBLIC_KEY"]),
+      ...(keyId === undefined ? [] : ["AUTHORITY_SIGNING_KEY_ID"]),
+    ];
+    throw new Error(
+      `partial signing-key configuration: ${present.join(", ")} set; configure all three or none`,
+    );
   }
   const privateKey = await crypto.subtle.importKey(
     "pkcs8",
-    base64Decode(env.AUTHORITY_SIGNING_KEY),
+    base64Decode(key),
     { name: "Ed25519" },
     false,
     ["sign"],
   );
   const publicKey = (await crypto.subtle.importKey(
     "raw",
-    base64Decode(env.AUTHORITY_SIGNING_PUBLIC_KEY),
+    base64Decode(publicKeyRaw),
     { name: "Ed25519" },
     false,
     ["verify"],
   )) as CryptoKey;
-  const publicKeyBase64 = env.AUTHORITY_SIGNING_PUBLIC_KEY;
-  const keyId = env.AUTHORITY_SIGNING_KEY_ID;
+  const probe = "org-hats signing-key pair probe";
+  const probeSignature = await crypto.subtle.sign({ name: "Ed25519" }, privateKey, utf8(probe));
+  if (!(await crypto.subtle.verify({ name: "Ed25519" }, publicKey, probeSignature, utf8(probe)))) {
+    throw new Error("AUTHORITY_SIGNING_KEY and AUTHORITY_SIGNING_PUBLIC_KEY are not a key pair");
+  }
   return {
     keyId,
     sign: async (payload) =>
       base64UrlEncode(new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, privateKey, utf8(payload)))),
-    publicKey: async () => publicKeyBase64,
+    publicKey: async () => publicKeyRaw,
   };
+};
+
+/** Whether any signing variable is set — the set is all-or-none, so one
+ * is enough to demand the rest. */
+const hasSigningConfig = (env: Env): boolean =>
+  env.AUTHORITY_SIGNING_KEY !== undefined ||
+  env.AUTHORITY_SIGNING_PUBLIC_KEY !== undefined ||
+  env.AUTHORITY_SIGNING_KEY_ID !== undefined;
+
+let ephemeralSigner: Promise<CloudflareSigner> | undefined;
+
+/** The runtime's signer: a configured, proven pair, or the per-isolate
+ * development key when nothing is configured. */
+export const signerFor = async (env: Env): Promise<CloudflareSigner> => {
+  if (hasSigningConfig(env)) return signerFromEnv(env);
+  ephemeralSigner ??= createEphemeralSigner();
+  return ephemeralSigner;
 };
 
 /** The configured set plus the current signer, as one canonical set. */
