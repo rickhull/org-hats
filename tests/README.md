@@ -18,6 +18,10 @@ release-metadata guard. `pnpm verify` is the full local gate: `bin/check-dist`
 - `generative.test.ts` — 100 seeded states, duplicate commands, partial
   failure and outbox replay.
 - `v1.test.ts` — the portable modules load inside the fence.
+- `release-tools.test.ts` — the release-tag guard against throwaway
+  repositories, both tag families.
+- `gate-cache.test.ts` — the local per-commit gate marker, and its
+  invalidation by dirt or a new commit.
 
 The inventory ships as `org-hats/conformance`; `tests/conformance.test.ts` is
 only its in-memory runner. A case that cannot be expressed through the public

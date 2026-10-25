@@ -1,0 +1,74 @@
+#!/usr/bin/env sh
+# Local per-clone record of a commit whose pre-push gate has passed.
+#
+# The marker lives under .git/ and is valid only for the exact HEAD commit, a
+# clean working tree, and the same toolchain/installed dependency tree. It is
+# a convenience for pushing the same commit to a second remote (origin, then
+# the mirror); it is never a release authority. `bin/release` and CI run their
+# own gates.
+#
+#   bin/gate-cache check  <commit>   exit 0 only on a valid marker
+#   bin/gate-cache record <commit>   write a marker for the current HEAD
+#   bin/gate-cache clear  <commit>   remove a marker
+#
+# GATE_CACHE_ROOT lets the tool be tested against a throwaway repository; it
+# defaults to the checkout this script lives in.
+set -eu
+cd "${GATE_CACHE_ROOT:-$(dirname "$0")/..}" || exit 1
+
+die() { printf 'gate-cache: %s\n' "$*" >&2; exit 1; }
+
+dir=$(git rev-parse --git-dir)/org-hats-gates
+
+# Everything outside the commit that can change what the gate proves:
+# the runtime, the compiler, and the installed tree. A commit hash covers
+# the tracked source and scripts. The package-manager version is omitted
+# deliberately: the hook runs tsc and node directly, and the installed
+# tree's lockfile is the dependency fact that matters.
+fingerprint() {
+	{
+		node --version
+		uname -srm
+		printf 'TZ=%s\n' "${TZ:-}"
+		printf 'NODE_OPTIONS=%s\n' "${NODE_OPTIONS:-}"
+		node_modules/.bin/tsc --version 2>/dev/null || printf 'tsc=missing\n'
+		git hash-object pnpm-lock.yaml 2>/dev/null || printf 'lockfile=missing\n'
+		git hash-object node_modules/.pnpm/lock.yaml 2>/dev/null || printf 'installed-lockfile=missing\n'
+	} | git hash-object --stdin
+}
+
+require_head() {
+	[ -n "${1:-}" ] || die "a commit is required"
+	[ "$(git rev-parse HEAD)" = "$1" ] || die "$1 is not HEAD"
+	[ -z "$(git status --porcelain)" ] || die "working tree is dirty"
+}
+
+case ${1:-} in
+	check)
+		sha=${2:-}
+		[ -n "$sha" ] || exit 1
+		[ "$(git rev-parse HEAD)" = "$sha" ] || exit 1
+		[ -z "$(git status --porcelain)" ] || exit 1
+		[ -f "$dir/$sha" ] || exit 1
+		[ "$(cat "$dir/$sha")" = "$(fingerprint)" ] || exit 1
+		exit 0
+		;;
+	record)
+		sha=${2:-}
+		require_head "$sha"
+		mkdir -p "$dir"
+		fingerprint > "$dir/$sha.tmp"
+		mv "$dir/$sha.tmp" "$dir/$sha"
+		# Markers are tiny; keep a month of them and drop the rest.
+		find "$dir" -type f -mtime +30 -delete 2>/dev/null || true
+		;;
+	clear)
+		sha=${2:-}
+		[ -n "$sha" ] || exit 1
+		rm -f "$dir/$sha"
+		;;
+	*)
+		printf 'usage: bin/gate-cache check|record|clear <commit>\n' >&2
+		exit 2
+		;;
+esac

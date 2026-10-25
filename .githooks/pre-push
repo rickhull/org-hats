@@ -33,11 +33,28 @@ done
 
 # 2. The checkout itself: build dist/ first, then compare and check. This is
 #    the same order CI uses, so a local pass predicts the remote one.
-if ! out=$(bin/check-dist 2>&1); then printf '%s\n' "$out" >&2; fail=1; fi
+#
+#    A successful run is recorded for this exact commit under .git/ and reused
+#    when the same clean commit is pushed to a second remote. A dirty tree, a
+#    new commit, or a changed runtime/compiler/installed tree is not a hit.
+head_sha=$(git rev-parse HEAD)
+if [ -z "$(git status --porcelain)" ] && bin/gate-cache check "$head_sha" 2>/dev/null; then
+	printf 'pre-push: %s already gated in this checkout; skipping build and checks\n' \
+		"$(git rev-parse --short=12 "$head_sha")"
+else
+	code_fail=0
+	if ! out=$(bin/check-dist 2>&1); then printf '%s\n' "$out" >&2; code_fail=1; fi
 
-# 3. The fence, the tag at HEAD (if any), the suites, and the example.
-#    Quiet on success; the full output is shown only when it fails.
-if ! out=$(bin/check 2>&1); then printf '%s\n' "$out" >&2; fail=1; fi
+	# 3. The fence, the tag at HEAD (if any), the suites, and the example.
+	#    Quiet on success; the full output is shown only when it fails.
+	if ! out=$(bin/check 2>&1); then printf '%s\n' "$out" >&2; code_fail=1; fi
+
+	if [ "$code_fail" -eq 0 ] && [ -x node_modules/.bin/tsc ] &&
+		[ -z "$(git status --porcelain)" ]; then
+		bin/gate-cache record "$head_sha" >/dev/null 2>&1 || true
+	fi
+	[ "$code_fail" -eq 0 ] || fail=1
+fi
 
 if [ "$fail" -ne 0 ]; then
 	printf 'pre-push: push refused\n' >&2
