@@ -559,7 +559,11 @@ introduces.
 
 The public conformance inventory uses synthetic structural twins of
 Quartermaster's two concrete design tests: a persistent multi-site
-professional operation and a time-bounded, multi-venue festival burst. The
+professional operation and a time-bounded, multi-venue festival burst. A
+third twin is public history instead — the 1948–49 Berlin Airlift —
+carrying the coalition shape the first two do not: a host-nation ground
+workforce across several airfields of one operation, secondment as a
+crossed grant, and a coalition-wide read board. The
 twins carry the structural properties — multi-organization participation,
 site independence, short-lived teams, enrollment bursts — that prevent design
 for an imaginary generic customer. The real operations, their names, and

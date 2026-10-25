@@ -68,6 +68,21 @@ the deploying tooling's call, not the runtime's.
 
 Export is canonical JSON per coordinator, not a SQLite-file copy; restore is
 typed and atomic. The restore drill covers the operation and organization
+coordinators, and refresh handles issued before a wipe survive the round
+trip — recovery does not strand a session.
+
+## Production deployment
+
+`wrangler.production.jsonc` is the deploying operator's Worker:
+`workers_dev: false`, no routes, both coordinators, one fresh migration.
+Secrets come from an ignored operator file — `wrangler secret put` or
+`--secrets-file`: `OPS_TOKEN`, the all-or-none signing trio
+(`AUTHORITY_SIGNING_KEY`, `AUTHORITY_SIGNING_PUBLIC_KEY`,
+`AUTHORITY_SIGNING_KEY_ID` — proven a pair at startup),
+`AUTHORITY_VERIFICATION_KEYS` as the serialized `VerifyKeySet` JSON, and
+`AUTHORITY_ORGANIZATION_IDS`. The Worker is reachable through its service
+binding; the one-time bootstrap act runs over `wrangler dev --remote` with
+the ops token, since no `/ops/*` route is public.
 coordinators, and context returns names, wearable hats, and the selected hat.
 
 ## Portability constraint

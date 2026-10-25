@@ -75,8 +75,8 @@ not applying.  No customer names, roster material, secrets, or key material.
   from the old tree.
 - This is a public repository.  No customer or real-person names, no real
   rosters or manifests, anywhere — design tests are the synthetic twins
-  (Professional Operation, Festival), and real fixtures live in the
-  consumer's private repository.
+  (Professional Operation, Festival, and the public-history Berlin Airlift
+  twin), and real fixtures live in the consumer's private repository.
 - `docs/authority_redesign.md` is the normative architecture and
   `plans/v1.md` the forward plan; read the relevant section before changing
   the seam, the authority engine, or the access module.  The v0.4 public

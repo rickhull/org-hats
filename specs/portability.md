@@ -56,8 +56,10 @@ The design tests are the synthetic twins (Professional Operation,
 Festival); real rosters, customer names, and key material live with the
 consumer or the operator.
 
-*Held by:* the twins are the only fixtures; both relay notes are written
-as publishable; `SECURITY.md` exists before production data.
+*Held by:* the twins are the only fixtures — Professional Operation,
+Festival, and the Berlin Airlift twin (public history, invented people);
+both relay notes are written as publishable; `SECURITY.md` exists before
+production data.
 *If it breaks:* it is an incident, not a bug — exposure cannot be
 un-pushed from a public mirror.
 

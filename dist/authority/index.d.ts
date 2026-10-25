@@ -3,7 +3,7 @@ export { AUTHORITY_INTERFACE_VERSION } from "./types.js";
 export type { OrganizationReadPolicy, PolicyBundle, PolicyProblem, PolicyRole, ReadPolicy, } from "../policy.js";
 export { actionsOf, validatePolicyBundle } from "../policy.js";
 export type { TwinFixture } from "./twins.js";
-export { DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION, TWINS, } from "./twins.js";
+export { AIRLIFT, DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION, TWINS, } from "./twins.js";
 export { createInMemoryAuthority } from "./engine.js";
 export type { ClockLike, InMemoryAuthorityConfig, InMemoryAuthorityHandle, SignerLike, VerificationKeyMaterial, } from "./engine.js";
 export type { AccessEnvelopeClaimsV1, ActorId, Failure, FailureKind, IdempotencyKey, JsonValue, OperationId, OrganizationId, RefreshHandle, RefreshHandleOutcome, SiteBinding, SiteId, SignedAccessEnvelope, TeamId, } from "../contract.js";

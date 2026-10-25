@@ -49,6 +49,7 @@ export { actionsOf, validatePolicyBundle } from "../policy.ts";
 
 export type { TwinFixture } from "./twins.ts";
 export {
+  AIRLIFT,
   DANA_OKAFOR,
   FESTIVAL,
   FESTIVAL_BOOTH_COUNT,
@@ -57,8 +58,7 @@ export {
   TWINS,
 } from "./twins.ts";
 
-export { createInMemoryAuthority } from "./engine.ts";
-export type {
+export { createInMemoryAuthority } from "./engine.ts";export type {
   ClockLike,
   InMemoryAuthorityConfig,
   InMemoryAuthorityHandle,

@@ -18,6 +18,6 @@
 // material when the test is key-configuration parsing.
 export { AUTHORITY_INTERFACE_VERSION } from "./types.js";
 export { actionsOf, validatePolicyBundle } from "../policy.js";
-export { DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION, TWINS, } from "./twins.js";
+export { AIRLIFT, DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION, TWINS, } from "./twins.js";
 export { createInMemoryAuthority } from "./engine.js";
 export { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, canonicalJson, } from "../contract.js";

@@ -1,0 +1,36 @@
+// The Cloudflare reference runtime's production Worker — the deployment
+// shape Quartermaster's `reporting-stream-authority` uses.
+//
+// Differences from wrangler.jsonc (the test Worker): no committed
+// `OPS_TOKEN` (a secret, set once by the operator), no harness `Counter`
+// binding, and one fresh migration declaring both coordinators — a new
+// deployment has no incremental history to replay. No routes are
+// configured and `workers_dev` is false: the Worker is reachable through
+// its service binding and, for the one-time bootstrap act, `wrangler dev
+// --remote` with the ops token.
+//
+// The operator supplies, as secrets or vars from an ignored, operator-held
+// file (`wrangler secret put` / `--secrets-file`):
+//   OPS_TOKEN                     bearer token guarding /ops/*
+//   AUTHORITY_SIGNING_KEY         pkcs8 base64 — the signing trio is
+//   AUTHORITY_SIGNING_PUBLIC_KEY  raw base64     all-or-none and proven
+//   AUTHORITY_SIGNING_KEY_ID      a pair at startup
+//   AUTHORITY_VERIFICATION_KEYS   canonical serialized VerifyKeySet JSON
+//   AUTHORITY_ORGANIZATION_IDS    comma-separated evidence-resolution
+//                                 directory (no global registry)
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "reporting-stream-authority",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-24",
+  "workers_dev": false,
+  "durable_objects": {
+    "bindings": [
+      { "name": "ORGANIZATION", "class_name": "OrganizationAuthority" },
+      { "name": "OPERATION", "class_name": "OperationAuthority" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["OrganizationAuthority", "OperationAuthority"] }
+  ]
+}

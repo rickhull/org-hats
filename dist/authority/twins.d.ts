@@ -1,7 +1,7 @@
 import type { Snapshot } from "../model.js";
 import type { PolicyBundle } from "../policy.js";
 export interface TwinFixture {
-    readonly name: "professional" | "festival";
+    readonly name: "professional" | "festival" | "airlift";
     readonly snapshot: Snapshot;
     readonly policy: PolicyBundle;
 }
@@ -12,4 +12,5 @@ export declare const DANA_OKAFOR = "actor-8d3b77c1";
 export declare const PROFESSIONAL_OPERATION: TwinFixture;
 export declare const FESTIVAL_BOOTH_COUNT = 150;
 export declare const FESTIVAL: TwinFixture;
+export declare const AIRLIFT: TwinFixture;
 export declare const TWINS: readonly TwinFixture[];

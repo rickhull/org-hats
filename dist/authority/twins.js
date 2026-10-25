@@ -4,7 +4,11 @@
 // names: a persistent multi-site professional operation, and a time-bounded,
 // multi-venue festival burst. One organization and one of its actors
 // participate in both, which is the structural shape of "the same
-// organization actor, different operation-local hats".
+// organization actor, different operation-local hats". The third twin is
+// public history instead — the 1948–49 Berlin Airlift, for the coalition
+// shape the first two do not carry: a host-nation workforce inside a
+// multi-airfield operation, secondment across organizations, and a
+// coalition-wide read board under a bounded operation.
 //
 // A twin is a complete `Snapshot` plus the policy bundle in force, and it
 // must pass `invariantProblems` unchanged — the fixtures are data, and the
@@ -187,4 +191,153 @@ export const FESTIVAL = {
         ],
     },
 };
-export const TWINS = [PROFESSIONAL_OPERATION, FESTIVAL];
+// --- the airlift ------------------------------------------------------------------
+//
+// Bounded, multi-airfield, four organizations: two wings, the contract
+// carriers, and the host-nation ground handlers whose shifts work every
+// Berlin airfield. Whether the three Berlin airfields are one site or three
+// is the modelling judgement: they are three, because admission and reach
+// are per airfield — a foreman at Tempelhof has nothing at Gatow. Read reach
+// is the coalition tonnage board: every participating organization under
+// `all-participating`. The exchange officer carries the crossed grant — a
+// Plane Fare duty officer on a Ground Handling shift, the structural shape
+// of secondment.
+const airliftPolicy = {
+    format: 1,
+    id: "policy-vittles",
+    version: "2026-10.1",
+    actions: ["haul", "load", "dispatch", "service", "configure"],
+    roles: [
+        { title: "aircrew", actions: ["haul"] },
+        { title: "loadmaster", actions: ["load"] },
+        { title: "dispatcher", actions: ["dispatch"] },
+        { title: "line mechanic", actions: ["service"] },
+        { title: "duty officer", actions: ["dispatch", "configure"] },
+    ],
+    readPolicy: { organizations: "all-participating" },
+};
+const AOP = "op-4b8d2e67";
+const RHEIN_MAIN = "site-71c9d4e2";
+const FASSBERG = "site-38b6f0a9";
+const TEMPELHOF = "site-c5d2a8f7";
+const GATOW = "site-94a7c1e0";
+const TEGEL = "site-e3f8b2c6";
+export const AIRLIFT = {
+    name: "airlift",
+    policy: airliftPolicy,
+    snapshot: {
+        operations: [{ operationId: AOP, displayName: "Berlin Airlift", bounded: true }],
+        organizations: [
+            { organizationId: "org-6f1a93c4", displayName: "Vittles Airlift Wing" },
+            { organizationId: "org-2d7eb58a", displayName: "Plane Fare Air Group" },
+            { organizationId: "org-9c4b17f3", displayName: "Rhein Contract Carriers" },
+            { organizationId: "org-58e3a2d1", displayName: "Ground Handling Services Berlin" },
+        ],
+        actors: [
+            { organizationId: "org-6f1a93c4", actorId: "actor-4f7c2a19", displayName: "Charles Whitfield" },
+            { organizationId: "org-6f1a93c4", actorId: "actor-8b3d5e72", displayName: "Eleanor Voss" },
+            { organizationId: "org-6f1a93c4", actorId: "actor-2c9f6b84", displayName: "Walter Merrin" },
+            { organizationId: "org-6f1a93c4", actorId: "actor-5c2e8b97", displayName: "Henrik Tauber" },
+            { organizationId: "org-2d7eb58a", actorId: "actor-6e8a1d43", displayName: "Arthur Pemberton" },
+            { organizationId: "org-2d7eb58a", actorId: "actor-d54b9f26", displayName: "Mildred Carrow" },
+            { organizationId: "org-2d7eb58a", actorId: "actor-91f3c7e8", displayName: "Duncan Reeve" },
+            { organizationId: "org-9c4b17f3", actorId: "actor-73a5e2b0", displayName: "James Corrigan" },
+            { organizationId: "org-58e3a2d1", actorId: "actor-b86d4f31", displayName: "Jürgen Brandt" },
+            { organizationId: "org-58e3a2d1", actorId: "actor-42e9c0a7", displayName: "Ingrid Falk" },
+            { organizationId: "org-58e3a2d1", actorId: "actor-f17b3d64", displayName: "Werner Holst" },
+            { organizationId: "org-58e3a2d1", actorId: "actor-a93c8e50", displayName: "Clara Weiss" },
+        ],
+        sites: [
+            { siteId: RHEIN_MAIN, operationId: AOP, displayName: "Rhein-Main Airfield", aliases: ["rhein-main"] },
+            { siteId: FASSBERG, operationId: AOP, displayName: "Fassberg Station", aliases: ["fassberg"] },
+            { siteId: TEMPELHOF, operationId: AOP, displayName: "Tempelhof Airfield", aliases: ["tempelhof"] },
+            { siteId: GATOW, operationId: AOP, displayName: "Gatow Airfield", aliases: ["gatow"] },
+            { siteId: TEGEL, operationId: AOP, displayName: "Tegel Strip", aliases: ["tegel"] },
+        ],
+        teams: [
+            { teamId: "team-a41f8c73", siteId: RHEIN_MAIN, organizationId: "org-6f1a93c4", displayName: "Loading rack one" },
+            { teamId: "team-b79e2d50", siteId: RHEIN_MAIN, organizationId: "org-6f1a93c4", displayName: "Line maintenance" },
+            { teamId: "team-d62c9f14", siteId: RHEIN_MAIN, organizationId: "org-9c4b17f3", displayName: "Charter cell" },
+            { teamId: "team-f83a5b61", siteId: RHEIN_MAIN, organizationId: "org-6f1a93c4", displayName: "Raisin bomber crew" },
+            { teamId: "team-1e94c7a8", siteId: FASSBERG, organizationId: "org-2d7eb58a", displayName: "Fassberg dispatch" },
+            { teamId: "team-3c6f0d92", siteId: FASSBERG, organizationId: "org-2d7eb58a", displayName: "Havel boat crew" },
+            { teamId: "team-5a2b8e37", siteId: TEMPELHOF, organizationId: "org-58e3a2d1", displayName: "Ground shift one" },
+            { teamId: "team-7f9d4c15", siteId: TEMPELHOF, organizationId: "org-58e3a2d1", displayName: "Ground shift two" },
+            { teamId: "team-9b3e6a82", siteId: TEMPELHOF, organizationId: "org-6f1a93c4", displayName: "Tempelhof ops desk" },
+            { teamId: "team-c84b1f69", siteId: GATOW, organizationId: "org-58e3a2d1", displayName: "Gatow handling shift" },
+            { teamId: "team-e27a5c03", siteId: GATOW, organizationId: "org-2d7eb58a", displayName: "Gatow tower watch" },
+            { teamId: "team-6d1f9b74", siteId: TEGEL, organizationId: "org-58e3a2d1", displayName: "Tegel strip detail" },
+        ],
+        grants: [
+            {
+                grantId: "g-lift-1", operationId: AOP, organizationId: "org-6f1a93c4",
+                actorId: "actor-4f7c2a19", role: "duty officer",
+                target: { kind: "site", siteId: TEMPELHOF }, primary: true,
+            },
+            {
+                grantId: "g-lift-2", operationId: AOP, organizationId: "org-6f1a93c4",
+                actorId: "actor-8b3d5e72", role: "duty officer",
+                target: { kind: "site", siteId: RHEIN_MAIN }, primary: true,
+            },
+            {
+                grantId: "g-lift-3", operationId: AOP, organizationId: "org-6f1a93c4",
+                actorId: "actor-2c9f6b84", role: "aircrew",
+                target: { kind: "team", teamId: "team-f83a5b61" }, primary: true,
+            },
+            {
+                grantId: "g-lift-4", operationId: AOP, organizationId: "org-6f1a93c4",
+                actorId: "actor-5c2e8b97", role: "line mechanic",
+                target: { kind: "team", teamId: "team-b79e2d50" }, primary: true,
+            },
+            {
+                grantId: "g-lift-5", operationId: AOP, organizationId: "org-2d7eb58a",
+                actorId: "actor-6e8a1d43", role: "dispatcher",
+                target: { kind: "team", teamId: "team-1e94c7a8" }, primary: true,
+            },
+            {
+                grantId: "g-lift-6", operationId: AOP, organizationId: "org-2d7eb58a",
+                actorId: "actor-d54b9f26", role: "dispatcher",
+                target: { kind: "team", teamId: "team-e27a5c03" }, primary: true,
+            },
+            {
+                // the exchange officer: a Plane Fare duty officer seconded onto a
+                // Ground Handling shift — the crossed grant
+                grantId: "g-lift-7", operationId: AOP, organizationId: "org-2d7eb58a",
+                actorId: "actor-91f3c7e8", role: "duty officer",
+                target: { kind: "team", teamId: "team-5a2b8e37" }, primary: true,
+            },
+            {
+                grantId: "g-lift-8", operationId: AOP, organizationId: "org-9c4b17f3",
+                actorId: "actor-73a5e2b0", role: "aircrew",
+                target: { kind: "team", teamId: "team-d62c9f14" }, primary: true,
+            },
+            {
+                grantId: "g-lift-9", operationId: AOP, organizationId: "org-58e3a2d1",
+                actorId: "actor-b86d4f31", role: "loadmaster",
+                target: { kind: "site", siteId: TEMPELHOF }, primary: true,
+            },
+            {
+                grantId: "g-lift-10", operationId: AOP, organizationId: "org-58e3a2d1",
+                actorId: "actor-42e9c0a7", role: "loadmaster",
+                target: { kind: "team", teamId: "team-7f9d4c15" }, primary: true,
+            },
+            {
+                grantId: "g-lift-11", operationId: AOP, organizationId: "org-58e3a2d1",
+                actorId: "actor-f17b3d64", role: "loadmaster",
+                target: { kind: "team", teamId: "team-c84b1f69" }, primary: true,
+            },
+            {
+                grantId: "g-lift-12", operationId: AOP, organizationId: "org-58e3a2d1",
+                actorId: "actor-a93c8e50", role: "loadmaster",
+                target: { kind: "team", teamId: "team-6d1f9b74" }, primary: true,
+            },
+        ],
+        participations: [
+            { organizationId: "org-6f1a93c4", operationId: AOP, status: "active" },
+            { organizationId: "org-2d7eb58a", operationId: AOP, status: "active" },
+            { organizationId: "org-9c4b17f3", operationId: AOP, status: "active" },
+            { organizationId: "org-58e3a2d1", operationId: AOP, status: "active" },
+        ],
+    },
+};
+export const TWINS = [PROFESSIONAL_OPERATION, FESTIVAL, AIRLIFT];
