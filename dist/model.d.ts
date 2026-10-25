@@ -1,4 +1,4 @@
-import type { ActorId, OperationId, OrganizationId, SiteId, TeamId } from "./contract.js";
+import type { ActorId, GrantTarget, OperationId, OrganizationId, SiteId, TargetRef, TeamId } from "./contract.js";
 import type { PolicyBundle } from "./policy.js";
 export interface Organization {
     readonly organizationId: OrganizationId;
@@ -37,14 +37,7 @@ export interface Team {
     readonly organizationId: OrganizationId;
     readonly displayName?: string;
 }
-/** What a grant reaches: one team, or a site and every team at it. */
-export type GrantTarget = {
-    readonly kind: "team";
-    readonly teamId: TeamId;
-} | {
-    readonly kind: "site";
-    readonly siteId: SiteId;
-};
+export type { GrantTarget } from "./contract.js";
 /** A hat is an operation-local grant: this organization's actor may act in
  * this role over this target. `primary` marks the actor's default hat at
  * the operation; one per actor per operation. */
@@ -104,15 +97,24 @@ export type ParticipationTransition = {
  * operation invites and activates (activation is canonical); the
  * organization accepts; either side may revoke, terminally. */
 export declare const transitionParticipation: (organizationId: OrganizationId, operationId: OperationId, current: Participation | undefined, event: ParticipationEvent) => ParticipationTransition;
-export type TargetRef = {
-    readonly kind: "operation";
+export type ParticipationOutcome = {
+    readonly ok: true;
+    readonly participations: readonly Participation[];
+    readonly participation: Participation;
 } | {
-    readonly kind: "site";
-    readonly siteId: SiteId;
-} | {
-    readonly kind: "team";
-    readonly teamId: TeamId;
+    readonly ok: false;
+    readonly problem: string;
 };
+/** Apply an event to a participation list: find the current standing, decide
+ * with `transitionParticipation`, and return the new list. This is the only
+ * way a participation status should move — an adapter that writes the status
+ * directly is an adapter that can flip `revoked` back to `active`, which the
+ * state machine above refuses by construction.
+ *
+ * Seeding is not transitioning: bootstrap and restore install a declared
+ * status and must not come through here. */
+export declare const applyParticipationEvent: (participations: readonly Participation[], organizationId: OrganizationId, operationId: OperationId, event: ParticipationEvent) => ParticipationOutcome;
+export type { TargetRef } from "./contract.js";
 /** A grant reaches its own team; a site grant reaches the site and every
  * team at it. Nothing reaches a whole operation. */
 export declare const grantReaches: (snapshot: Snapshot, grant: Grant, target: TargetRef) => boolean;
@@ -138,7 +140,11 @@ export type DenialReason =
 /** the worn hat reaches the target but its role does not carry the action */
  | "no-capability"
 /** no grant reaches the target at all */
- | "out-of-reach";
+ | "out-of-reach"
+/** the worn grant names a role the active bundle does not carry: the
+ * snapshot and the policy disagree, which is an administrator's problem
+ * and not a statement about this actor's authority */
+ | "policy-inconsistent";
 export type Decision = {
     readonly allowed: true;
     readonly hat: WornHat;

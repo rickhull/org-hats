@@ -9,31 +9,38 @@
 // ConformanceWorld factory (the Cloudflare adapter in M6).
 //
 // The ids are a fresh scheme (`OH-*`), not the frozen v0.4 `OH-QM-*` ids.
-import { AUTHORITY_INTERFACE_VERSION, } from "./contract.js";
+import { AUTHORITY_INTERFACE_VERSION, actorId, operationId, organizationId, siteId, teamId, } from "./contract.js";
 import { createInMemoryAuthority } from "./authority/engine.js";
 import { DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION, } from "./authority/twins.js";
 import { decide, grantReaches, invariantProblems, readReach } from "./model.js";
 import { ed25519VerifyKey, verify, } from "./access/verify.js";
 // --- the world ---------------------------------------------------------------------
 const IDP = "conformance-idp";
-const MERIDIAN = "op-9f2e6ad4";
-const FESTIVAL_OP = "op-61a8e3f2";
-const HOME_OP = "op-conformance-home";
-const NORTH_ORG = "org-2b7c41de";
-const ATLAS_ORG = "org-a53e90f7";
-const CIDERS_ORG = "org-d94b1c6e";
-const PARK_ORG = "org-08f7a2b5";
-const INVITEE_ORG = "org-invitee";
-const INVITEE_ACTOR = "actor-inv-admin";
-const EAST = "site-e4a1c9b3";
-const WEST = "site-b8d620fa";
-const ROW = "site-5c2f87ad";
-const GATE = "site-a9e05c41";
-const HARBOR_TEAM = "team-2e8c64b9";
-const NORTH_TEAM = "team-c7d9e2a1";
-const NORTH_FLOOR = "team-f5b3a08d";
-const GATE_CREW = "team-3f8b52d6";
-const BOOTH_001 = "team-booth-001";
+const MERIDIAN = operationId("op-9f2e6ad4");
+const FESTIVAL_OP = operationId("op-61a8e3f2");
+const HOME_OP = operationId("op-conformance-home");
+const NORTH_ORG = organizationId("org-2b7c41de");
+const ATLAS_ORG = organizationId("org-a53e90f7");
+const CIDERS_ORG = organizationId("org-d94b1c6e");
+const PARK_ORG = organizationId("org-08f7a2b5");
+const INVITEE_ORG = organizationId("org-invitee");
+const INVITEE_ACTOR = actorId("actor-inv-admin");
+const EAST = siteId("site-e4a1c9b3");
+const WEST = siteId("site-b8d620fa");
+const ROW = siteId("site-5c2f87ad");
+const GATE = siteId("site-a9e05c41");
+const HARBOR_TEAM = teamId("team-2e8c64b9");
+const NORTH_TEAM = teamId("team-c7d9e2a1");
+const NORTH_FLOOR = teamId("team-f5b3a08d");
+const GATE_CREW = teamId("team-3f8b52d6");
+const BOOTH_001 = teamId("team-booth-001");
+// the actors conformance cases name directly, rather than through a
+// principal: one declaration each, so a case reads the name not the id
+const PRIYA = actorId("actor-11c2f8ab");
+const MARCO = actorId("actor-6e0d94b2");
+const SAM = actorId("actor-3a91c4d8");
+const LEN = actorId("actor-77f2b0e5");
+const NOBODY = actorId("actor-nobody");
 const principal = (label, subject, organizationId, actorId) => ({
     label,
     evidence: { provider: IDP, subject },
@@ -44,12 +51,12 @@ const principal = (label, subject, organizationId, actorId) => ({
  * matching links before running the cases. */
 export const CONFORMANCE_PRINCIPALS = {
     dana: principal("Dana Okafor", "dana", HARBOR_LOGISTICS, DANA_OKAFOR),
-    priya: principal("Priya Nandi", "priya", NORTH_ORG, "actor-11c2f8ab"),
-    marco: principal("Marco Reyes", "marco", NORTH_ORG, "actor-6e0d94b2"),
-    sam: principal("Sam Whitfield", "sam", HARBOR_LOGISTICS, "actor-3a91c4d8"),
-    len: principal("Len Chu", "len", ATLAS_ORG, "actor-77f2b0e5"),
-    iris: principal("Iris Bell", "iris", CIDERS_ORG, "actor-40e9d1a7"),
-    rosa: principal("Rosa Quill", "rosa", PARK_ORG, "actor-b17d39e8"),
+    priya: principal("Priya Nandi", "priya", NORTH_ORG, actorId("actor-11c2f8ab")),
+    marco: principal("Marco Reyes", "marco", NORTH_ORG, actorId("actor-6e0d94b2")),
+    sam: principal("Sam Whitfield", "sam", HARBOR_LOGISTICS, actorId("actor-3a91c4d8")),
+    len: principal("Len Chu", "len", ATLAS_ORG, actorId("actor-77f2b0e5")),
+    iris: principal("Iris Bell", "iris", CIDERS_ORG, actorId("actor-40e9d1a7")),
+    rosa: principal("Rosa Quill", "rosa", PARK_ORG, actorId("actor-b17d39e8")),
     inviteeAdmin: principal("Nia Fields", "invitee-admin", INVITEE_ORG, INVITEE_ACTOR),
 };
 /** An organization that exists but does not participate in Meridian — the
@@ -172,7 +179,7 @@ const admitInvitee = async (world) => {
         organizationId: INVITEE_ORG,
         actorId: invitee.actorId,
         role: "field",
-        teamId: NORTH_TEAM,
+        target: { kind: "team", teamId: NORTH_TEAM },
     }, envelopeAuth(admin.envelope), "conf-invitee-grant");
     assert(grant.ok, `grant failed: ${grant.ok ? "" : grant.failure.kind}`);
     return admin;
@@ -223,29 +230,29 @@ export const CONFORMANCE_CASES = [
         equal(decision.hat?.role, "coordinator", "worn role");
     }),
     modelCase("OH-MODEL-06", "deny/no-capability: the worn role does not carry the action", () => {
-        const decision = decide(professional, PROFESSIONAL_OPERATION.policy, NORTH_ORG, "actor-11c2f8ab", MERIDIAN, "configure", { kind: "team", teamId: NORTH_TEAM });
+        const decision = decide(professional, PROFESSIONAL_OPERATION.policy, NORTH_ORG, PRIYA, MERIDIAN, "configure", { kind: "team", teamId: NORTH_TEAM });
         assert(!decision.allowed, "expected deny");
         equal(decision.reason, "no-capability", "denial reason");
     }),
     modelCase("OH-MODEL-07", "deny/out-of-reach: no grant reaches the target", () => {
-        const decision = decide(professional, PROFESSIONAL_OPERATION.policy, NORTH_ORG, "actor-11c2f8ab", MERIDIAN, "review", { kind: "team", teamId: HARBOR_TEAM });
+        const decision = decide(professional, PROFESSIONAL_OPERATION.policy, NORTH_ORG, PRIYA, MERIDIAN, "review", { kind: "team", teamId: HARBOR_TEAM });
         assert(!decision.allowed, "expected deny");
         equal(decision.reason, "out-of-reach", "denial reason");
     }),
     modelCase("OH-MODEL-08", "deny/not-admitted: unknown, disabled, or non-participating actors", () => {
-        const unknown = decide(professional, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, "actor-nobody", MERIDIAN, "observe", { kind: "team", teamId: HARBOR_TEAM });
+        const unknown = decide(professional, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, NOBODY, MERIDIAN, "observe", { kind: "team", teamId: HARBOR_TEAM });
         assert(!unknown.allowed && unknown.reason === "not-admitted", "unknown actor");
         const disabledSnapshot = {
             ...professional,
-            actors: professional.actors.map((actor) => actor.actorId === "actor-3a91c4d8" ? { ...actor, disabled: true } : actor),
+            actors: professional.actors.map((actor) => actor.actorId === SAM ? { ...actor, disabled: true } : actor),
         };
-        const disabled = decide(disabledSnapshot, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, "actor-3a91c4d8", MERIDIAN, "observe", { kind: "team", teamId: HARBOR_TEAM });
+        const disabled = decide(disabledSnapshot, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, SAM, MERIDIAN, "observe", { kind: "team", teamId: HARBOR_TEAM });
         assert(!disabled.allowed && disabled.reason === "not-admitted", "disabled actor");
         const nonParticipating = {
             ...professional,
             participations: professional.participations.filter((participation) => participation.organizationId !== NORTH_ORG),
         };
-        const noParticipation = decide(nonParticipating, PROFESSIONAL_OPERATION.policy, NORTH_ORG, "actor-11c2f8ab", MERIDIAN, "review", { kind: "team", teamId: NORTH_TEAM });
+        const noParticipation = decide(nonParticipating, PROFESSIONAL_OPERATION.policy, NORTH_ORG, PRIYA, MERIDIAN, "review", { kind: "team", teamId: NORTH_TEAM });
         assert(!noParticipation.allowed && noParticipation.reason === "not-admitted", "non-participating organization");
     }),
     modelCase("OH-MODEL-09", "fallback: a primary that does not reach the target stands aside", () => {
@@ -257,13 +264,13 @@ export const CONFORMANCE_CASES = [
                     grantId: "g-conformance-fallback",
                     operationId: MERIDIAN,
                     organizationId: NORTH_ORG,
-                    actorId: "actor-11c2f8ab",
+                    actorId: PRIYA,
                     role: "admin",
                     target: { kind: "team", teamId: NORTH_FLOOR },
                 },
             ],
         };
-        const decision = decide(snapshot, PROFESSIONAL_OPERATION.policy, NORTH_ORG, "actor-11c2f8ab", MERIDIAN, "configure", { kind: "team", teamId: NORTH_FLOOR });
+        const decision = decide(snapshot, PROFESSIONAL_OPERATION.policy, NORTH_ORG, PRIYA, MERIDIAN, "configure", { kind: "team", teamId: NORTH_FLOOR });
         assert(decision.allowed, "expected fallback allow");
         equal(decision.hat?.grantId, "g-conformance-fallback", "fallback grant");
     }),
@@ -278,7 +285,7 @@ export const CONFORMANCE_CASES = [
         deepEqual(reach.readableTeamIds, [], "exceptional teams");
     }),
     modelCase("OH-MODEL-12", "read reach: a site grant reads every organization with a team at the site", () => {
-        const reach = readReach(professional, PROFESSIONAL_OPERATION.policy, ATLAS_ORG, "actor-77f2b0e5", MERIDIAN);
+        const reach = readReach(professional, PROFESSIONAL_OPERATION.policy, ATLAS_ORG, LEN, MERIDIAN);
         deepEqual([...reach.readableOrganizationIds].sort(), [HARBOR_LOGISTICS, ATLAS_ORG].sort(), "readable organizations");
     }),
     runtimeCase("OH-AUTH-01", "evidence issues a signed envelope; verification yields neutral access", async (world) => {
@@ -449,9 +456,9 @@ export const CONFORMANCE_CASES = [
             kind: "grant-hat",
             operationId: MERIDIAN,
             organizationId: NORTH_ORG,
-            actorId: "actor-6e0d94b2",
+            actorId: MARCO,
             role: "reviewer",
-            teamId: NORTH_TEAM,
+            target: { kind: "team", teamId: NORTH_TEAM },
         };
         const first = await command(world, grant, envelopeAuth(admin.envelope), "conf-grant-key");
         assert(first.ok && first.receipt.applied, "first grant applies");
@@ -461,6 +468,29 @@ export const CONFORMANCE_CASES = [
         expectFailure(denied, "invalid-command", "unknown role is denied");
         const reused = await command(world, grant, envelopeAuth(admin.envelope), "conf-denied-key");
         assert(reused.ok && reused.receipt.applied, "denial did not poison the key");
+    }),
+    runtimeCase("OH-CMD-03", "a grant stands on an actor and an active participation", async (world) => {
+        const admin = await issue(world, CONFORMANCE_PRINCIPALS.len, MERIDIAN);
+        const grant = {
+            kind: "grant-hat",
+            operationId: MERIDIAN,
+            organizationId: NORTH_ORG,
+            actorId: MARCO,
+            role: "reviewer",
+            target: { kind: "team", teamId: NORTH_TEAM },
+        };
+        // an actor nobody has heard of: a grant naming one is a snapshot
+        // `invariantProblems` calls broken, so the command must refuse it rather
+        // than commit it
+        const stranger = await command(world, { ...grant, actorId: NOBODY }, envelopeAuth(admin.envelope), "conf-grant-stranger");
+        expectFailure(stranger, "invalid-command", "a grant to an unknown actor is refused");
+        // an organization with no participation here has nothing for a grant to
+        // stand on
+        const outsider = await command(world, { ...grant, organizationId: INVITEE_ORG, actorId: INVITEE_ACTOR }, envelopeAuth(admin.envelope), "conf-grant-outsider");
+        assert(!outsider.ok, "a grant without a participation is refused");
+        // the same grant, with both in place, applies
+        const valid = await command(world, grant, envelopeAuth(admin.envelope), "conf-grant-valid");
+        assert(valid.ok && valid.receipt.applied, `a well-founded grant applies: ${valid.ok ? "" : valid.failure.kind}`);
     }),
     runtimeCase("OH-CMD-02", "request-access asks; it does not admit", async (world) => {
         const invitee = CONFORMANCE_PRINCIPALS.inviteeAdmin;
@@ -509,23 +539,36 @@ export const CONFORMANCE_CASES = [
         expectFailure(unknown, "invalid-signature", "unknown key id");
         const tampered = {
             ...issued.envelope,
-            claims: { ...issued.envelope.claims, readableOrganizationIds: ["org-everything"] },
+            claims: { ...issued.envelope.claims, readableOrganizationIds: [organizationId("org-everything")] },
         };
         const bad = await verify(tampered, world.keys, { now, expectedOperationId: MERIDIAN });
         expectFailure(bad, "invalid-signature", "tampered claims");
     }),
-    runtimeCase("OH-ACCESS-04", "versions fail closed before interpretation", async (world) => {
+    runtimeCase("OH-ACCESS-04", "the envelope version pair gates reading; the interface version is provenance", async (world) => {
         const issued = await issue(world, CONFORMANCE_PRINCIPALS.dana, MERIDIAN);
         const now = issued.envelope.claims.iat + 1;
         const wrongEnvelopeVersion = { ...issued.envelope, v: 2 };
         expectFailure(await verify(wrongEnvelopeVersion, world.keys, { now }), "wrong-interface-version", "envelope version");
         const wrongFormat = { ...issued.envelope, format: "not-ours" };
         expectFailure(await verify(wrongFormat, world.keys, { now }), "wrong-interface-version", "envelope format");
-        const wrongInterface = {
+        const wrongClaimsVersion = {
             ...issued.envelope,
-            claims: { ...issued.envelope.claims, interfaceVersion: 99 },
+            claims: { ...issued.envelope.claims, v: 2 },
         };
-        expectFailure(await verify(wrongInterface, world.keys, { now }), "wrong-interface-version", "interface version");
+        expectFailure(await verify(wrongClaimsVersion, world.keys, { now }), "wrong-interface-version", "claims version");
+        // The claims also record which interface issued them, and that is
+        // provenance, not a gate. Editing it after signing must therefore reach
+        // the signature check rather than be rejected as a version: an envelope
+        // outlives the call signatures that produced it. A genuinely re-signed
+        // envelope with a different interface version still reads;
+        // tests/access.test.ts covers that, since this inventory holds no issuer
+        // key with which to re-sign.
+        const differentInterface = {
+            ...issued.envelope,
+            // interface 1 was the previous call surface; this runtime declares 2.
+            claims: { ...issued.envelope.claims, interfaceVersion: 1 },
+        };
+        expectFailure(await verify(differentInterface, world.keys, { now }), "invalid-signature", "interface version is not a version gate");
     }),
 ];
 /** Run every case in a fresh world, so one case's mutations cannot mask

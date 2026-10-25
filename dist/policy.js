@@ -53,7 +53,10 @@ export const validatePolicyBundle = (bundle) => {
     }
     return problems;
 };
-/** The actions a role title carries under a validated bundle; `undefined`
- * when the title is not in the bundle — callers treat that as a validation
- * problem, never as "no actions". */
-export const actionsOf = (bundle, role) => bundle.roles.find((r) => r.title === role)?.actions;
+/** The actions a role title carries under a validated bundle.
+ * `{ found: false }` means the title is not in the bundle — callers treat
+ * that as a validation problem, never as "no actions". */
+export const actionsOf = (bundle, role) => {
+    const actions = bundle.roles.find((r) => r.title === role)?.actions;
+    return actions === undefined ? { found: false } : { found: true, actions };
+};

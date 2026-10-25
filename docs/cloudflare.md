@@ -21,14 +21,27 @@ storage:
   opaquely; parsed only by the provider-callback exchange).
 - **`OperationAuthority`** (`src/operation.ts`) — operation-local
   authority: sites, teams, grants, participation, the policy version,
-  refresh records, admission requests, audit, claims, and the outbox
-  carrying invitations and revocations to organization authority.
+  refresh records, admission requests, audit, claims, the outbox
+  carrying invitations and revocations to organization authority, and the
+  `org_actors` projection of each participating organization's roster.
 
 Every mutation commits with its audit event, idempotency claim, and outbox
 rows inside one `transactionSync`. Work spanning the two coordinators is a
 durable outbox message with a visible partial state and an alarm-driven
 retry — never a distributed transaction. A duplicate or mismatched
 principal link is refused at bootstrap: one identity is never two actors.
+
+No write path reads the other coordinator synchronously
+(docs/authority_redesign.md § State ownership). What the operation needs
+from an organization in order to decide — which actors exist and which are
+disabled — arrives as a stamped roster image: pushed when the organization
+changes, pulled by the operation every fifteen minutes to repair a lost
+push, applied as a monotonic full replace per organization. Operation
+bootstrap pulls once, so an operation whose fixture declares active
+participations and grants can issue on the next request. `GET
+/ops/schema-status` reports `orgActors`, `disabledOrgActors`, and
+`rosterSyncedAt` so a stale image is visible rather than inferred, and
+`POST /reconcile-rosters` on the operation forces a pull.
 
 **`AuthorityRuntimeEntrypoint`** (`src/index.ts`) is the Worker consumers
 bind to. Over a `services` binding it exposes the four portable
@@ -97,7 +110,8 @@ public key distribution:
 
 - `POST /ops/organization/bootstrap`, `POST /ops/operation/bootstrap` —
   typed, idempotent bootstrap
-- `GET /ops/schema-status?coordinator=organization|operation&id=…`
+- `GET /ops/schema-status?coordinator=organization|operation&id=…` —
+  includes the operation's roster-projection counts and freshness
 - `GET /ops/export?coordinator=…&id=…` — canonical JSON
 - `POST /ops/restore` — `{ coordinator, id, snapshot }`, typed and atomic
 - `GET /ops/verification-keys` — **public**, no token:
@@ -112,7 +126,11 @@ holding the binding is a standing door (the reference consumer built one).
 ## State lifecycle
 
 Export is canonical JSON per coordinator — plain rows, not a SQLite file —
-so the restore drill is about state semantics, not storage format.
+so the restore drill is about state semantics, not storage format. The
+`org_actors` projection is deliberately outside it: it is derived from the
+organizations, so a snapshot that carried it would restore a stale roster as
+authority. Restore clears it and rebuilds by pulling before returning, and
+`GET /snapshot` shows its contents for inspection.
 Restore is typed and atomic; a failed restore leaves the previous state
 intact. Refresh handles issued before a wipe survive the export → wipe →
 restore round trip: recovery does not strand a session.

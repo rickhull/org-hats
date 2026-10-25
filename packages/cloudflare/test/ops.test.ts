@@ -50,7 +50,7 @@ const opBootstrap = (operationId: string, organizationId: string) => ({
       organizationId,
       actorId: "actor-member",
       role: "field",
-      teamId: "team-ops",
+      target: { kind: "team", teamId: "team-ops" },
       primary: true,
     },
   ],

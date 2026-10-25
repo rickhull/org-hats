@@ -65,6 +65,11 @@ export const organizationTables: readonly TableSpec[] = [
   { name: "outbox", columns: ["id", "kind", "target", "payload", "created_at", "delivered_at"], orderBy: "id" },
 ];
 
+/** The operation's own facts. The `org_actors` projection is deliberately
+ * absent: it is derived from the organizations, and a snapshot that carried
+ * it would restore a stale roster as authority. Restore rebuilds it by
+ * pulling, which fails closed in the meantime — an actor missing from the
+ * projection is `not-admitted`, never wrongly admitted. */
 export const operationTables: readonly TableSpec[] = [
   { name: "operation", columns: ["operation_id", "display_name", "bounded", "policy_json", "admin_roles_json", "configure_actions_json", "envelope_lifetime_seconds", "created_at", "updated_at"], orderBy: "operation_id" },
   { name: "sites", columns: ["site_id", "display_name", "aliases_json", "created_at", "updated_at"], orderBy: "site_id" },

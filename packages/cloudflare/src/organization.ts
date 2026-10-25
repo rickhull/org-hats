@@ -32,6 +32,11 @@ type Result<T> =
 
 const now = (): number => Math.floor(Date.now() / 1000);
 
+/** Messages addressed to every operation this organization is known to,
+ * rather than to one named target: a roster image and an actor disable are
+ * both facts every participating operation must learn. */
+const FAN_OUT_KINDS = new Set(["actor-disabled", "roster"]);
+
 const failure = (kind: FailureKind, detail?: string): { readonly ok: false; readonly failure: Failure } => ({
   ok: false,
   failure: { kind, ...(detail !== undefined ? { detail } : {}) },
@@ -239,6 +244,35 @@ export class OrganizationAuthority extends DurableObject<Env> {
     };
   }
 
+  /** The authority-relevant tuple of every actor, for the projection the
+   * participating operations keep. Deliberately narrow: no display names, no
+   * principal links, no provider configuration — an operation decides with
+   * who exists and who is disabled, and learns nothing else. */
+  private roster(): readonly { readonly actorId: string; readonly disabled: boolean }[] {
+    return this.rows("SELECT actor_id, disabled FROM actors ORDER BY actor_id").map((row) => ({
+      actorId: String(row["actor_id"]),
+      disabled: Number(row["disabled"]) === 1,
+    }));
+  }
+
+  /** Push the roster to every operation this organization is known to. The
+   * immediate channel: a disable must not wait for the operations'
+   * reconciliation interval. The caller owns the transaction. */
+  private pushRoster(at: number): void {
+    this.outbox(
+      "roster",
+      "*",
+      {
+        kind: "roster",
+        organizationId: this.organizationId(),
+        actors: this.roster(),
+        // stamped so a delayed delivery cannot overwrite a newer image
+        at,
+      },
+      at,
+    );
+  }
+
   private bootstrap(input: BootstrapInput): Result<{ organizationId: string }> {
     const at = now();
     return this.ctx.storage.transactionSync(() => {
@@ -322,6 +356,12 @@ export class OrganizationAuthority extends DurableObject<Env> {
       if (existing === undefined) {
         this.audit("bootstrap", `organization ${input.organizationId} bootstrapped`, at);
       }
+      // A bootstrap before any invitation has no operation to notify; the
+      // operations populate themselves at their own bootstrap and reconcile
+      // afterwards. This push is what carries a re-bootstrap that adds or
+      // re-enables an actor to operations that already know this
+      // organization.
+      this.pushRoster(at);
       return value({ organizationId: input.organizationId });
     });
   }
@@ -403,6 +443,10 @@ export class OrganizationAuthority extends DurableObject<Env> {
         },
         at,
       );
+      // Acceptance is the moment the operation gains a roster to project:
+      // it sends the image alongside the acceptance so the operation does
+      // not have to wait for its own reconciliation to decide anything.
+      this.pushRoster(at);
       this.audit(input.actorId, `invitation ${invitationId} accepted`, at);
       this.claim(input.idempotencyKey, payload, at);
       return value({ applied: true, invitationId });
@@ -475,6 +519,10 @@ export class OrganizationAuthority extends DurableObject<Env> {
         },
         at,
       );
+      // `actor-disabled` revokes the refresh records; the roster image is
+      // what makes the operation's own decisions see the disable. Both
+      // travel, because they do different work.
+      this.pushRoster(at);
       this.audit(input.byActorId, `actor ${input.actorId} disabled`, at);
       this.claim(input.idempotencyKey, payload, at);
       return value({ applied: true });
@@ -538,7 +586,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
     for (const message of this.outboxRows()) {
       const kind = String(message["kind"]);
       const payload = message["payload"] as Record<string, unknown>;
-      const targets = kind === "actor-disabled"
+      const targets = FAN_OUT_KINDS.has(kind)
         ? [...new Set(this.rows("SELECT DISTINCT operation_id FROM invitations").map((row) => String(row["operation_id"])))]
         : [String(message["target"])];
       let ok = true;
@@ -708,6 +756,15 @@ export class OrganizationAuthority extends DurableObject<Env> {
         return actor === undefined
           ? json(failure("unauthenticated", "unknown actor"), 404)
           : json(value(actor));
+      }
+
+      if (request.method === "GET" && url.pathname === "/roster") {
+        // the reconciliation direction: an operation pulls this to repair a
+        // roster push that never arrived
+        return json(value({
+          organizationId: this.organizationId() ?? null,
+          actors: this.roster(),
+        }));
       }
 
       if (request.method === "GET" && url.pathname === "/idp-config") {

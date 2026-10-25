@@ -1,9 +1,12 @@
 // The verification-only module's engine: a signed envelope in, neutral
 // authority facts out (docs/authority_redesign.md § Access).
 //
-// The verifier checks signature, interface and format versions, expiry, and
-// the caller's expected operation/site binding — in that order of trust —
-// and fails closed on everything it does not recognize. It never rebuilds
+// The verifier checks the envelope format and version pair first, then the
+// signature, expiry, and the caller's expected operation/site binding — in
+// that order of trust — and fails closed on everything it does not
+// recognize. The claims' `interfaceVersion` is issuer provenance, not a
+// readability gate: the envelope outlives the call signatures that produced
+// it. It never rebuilds
 // reach, fallback, or worn-hat rules: the issuer computed those; the
 // verifier compares ids and evaluates the selected hat locally. Product
 // verbs are host code mapping onto these neutral targets.
@@ -11,7 +14,6 @@
 import {
   ACCESS_ENVELOPE_FORMAT,
   ACCESS_ENVELOPE_VERSION,
-  AUTHORITY_INTERFACE_VERSION,
   base64Decode,
   base64UrlDecode,
   canonicalJson,
@@ -21,11 +23,9 @@ import {
   type Failure,
   type JsonValue,
   type OperationId,
-  type OrganizationId,
+  type Unbranded,
   type SiteId,
-  type SiteBinding,
   type SignedAccessEnvelope,
-  type TeamId,
 } from "../contract.ts";
 import type { NeutralAccess, TargetRef } from "./types.ts";
 
@@ -36,13 +36,26 @@ export interface VerifyKey {
   verify(payload: string, signature: string): Promise<boolean>;
 }
 
+// Host-facing input: these must accept a plain string, so a host can pass
+// the operation and site ids it holds in its own configuration. Erased at
+// compile time.
+type AcceptsPlainString<T> = string extends T ? true : false;
+type Assert<T extends true> = T;
+type _ExpectedOperationIdIsPlain = Assert<
+  AcceptsPlainString<NonNullable<VerifyContext["expectedOperationId"]>>
+>;
+type _ExpectedSiteIdIsPlain = Assert<
+  AcceptsPlainString<NonNullable<VerifyContext["expectedSiteId"]>>
+>;
+
 export interface VerifyContext {
   /** Epoch seconds; defaults to the wall clock. Deterministic tests inject. */
   now?: number;
-  /** The operation the caller is serving; a mismatch is `wrong-binding`. */
-  expectedOperationId?: OperationId;
+  /** The operation the caller is serving; a mismatch is `wrong-binding`.
+   * Plain string: a host passes the id it holds in its own configuration. */
+  expectedOperationId?: Unbranded<OperationId>;
   /** The site the caller is serving, when the caller is a site. */
-  expectedSiteId?: SiteId;
+  expectedSiteId?: Unbranded<SiteId>;
 }
 
 export interface Verified {
@@ -101,10 +114,23 @@ const neutralAccess = (claims: AccessEnvelopeClaimsV1): NeutralAccess => ({
 });
 
 /**
- * Verify an envelope and yield neutral access. Fail-closed order: format and
- * versions first (nothing unrecognized is interpreted), then the signature
- * (an unknown key id cannot verify), then expiry, then the caller's expected
- * bindings.
+ * Verify an envelope and yield neutral access.
+ *
+ * Fail-closed order, and the order is the contract: the envelope format and
+ * both version fields first, so nothing unrecognized is ever interpreted;
+ * then the signature, because an unknown key id cannot verify; then expiry;
+ * then the caller's expected bindings last, since a binding mismatch is only
+ * meaningful once the claims are known to be authentic.
+ *
+ * What gates readability is the **envelope** version pair — `format`,
+ * `envelope.v`, and the claims' own `v`. The claims also record the
+ * `interfaceVersion` of the runtime that issued them, and that is
+ * deliberately *not* a gate: it is issuer provenance, not a statement about
+ * whether these claims can be read. An envelope outlives the call signatures
+ * that produced it (src/contract.ts), so a host whose issuer has since moved
+ * to a new command vocabulary must not have every live session rejected for
+ * it. Any change to what the claims *mean* moves `ACCESS_ENVELOPE_VERSION`,
+ * and that is what this checks.
  */
 export const verify = async (
   envelope: SignedAccessEnvelope,
@@ -114,8 +140,12 @@ export const verify = async (
   if (envelope.format !== ACCESS_ENVELOPE_FORMAT || envelope.v !== ACCESS_ENVELOPE_VERSION) {
     return failed({ kind: "wrong-interface-version", detail: "not a recognized access envelope" });
   }
-  if (envelope.claims.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) {
-    return failed({ kind: "wrong-interface-version" });
+  // The claims carry their own version, and it was never checked: a
+  // signature-valid `v: 2` claims payload inside a `v: 1` envelope was
+  // accepted and read as v1. The envelope's `v` is the wrapper's; this is
+  // the payload's, and they must agree.
+  if (envelope.claims.v !== ACCESS_ENVELOPE_VERSION) {
+    return failed({ kind: "wrong-interface-version", detail: "envelope and claims disagree on the version" });
   }
   const key = keys.get(envelope.keyId);
   if (key === undefined) {

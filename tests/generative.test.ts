@@ -327,7 +327,7 @@ test("duplicate commands: every mutating command claims its key", async () => {
     const engine = await setup();
     await applyTwice(
       engine,
-      { kind: "grant-hat", operationId: OP, organizationId: "org-2b7c41de", actorId: "actor-6e0d94b2", role: "reviewer", teamId: "team-c7d9e2a1" },
+      { kind: "grant-hat", operationId: OP, organizationId: "org-2b7c41de", actorId: "actor-6e0d94b2", role: "reviewer", target: { kind: "team", teamId: "team-c7d9e2a1" } },
       await len(engine),
       "dup-grant",
     );
@@ -425,7 +425,7 @@ test("idempotency misuse: the same key with a different payload is invalid", asy
     organizationId: "org-2b7c41de",
     actorId: "actor-6e0d94b2",
     role: "reviewer",
-    teamId: "team-c7d9e2a1",
+    target: { kind: "team", teamId: "team-c7d9e2a1" },
   };
   const first = await command(engine, body, admin, "misuse-key");
   assert.ok(first.ok && first.receipt.applied);

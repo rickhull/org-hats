@@ -122,7 +122,7 @@ test("the embedded specialist reads the organization that owns the team, not the
   const len = await issue(engine.runtime, LEN, MERIDIAN);
   const grant = await command(
     engine.runtime,
-    { kind: "grant-hat", operationId: MERIDIAN, organizationId: NORTH_ORG, actorId: MARCO_ID, role: "field", teamId: HARBOR_TEAM, primary: true },
+    { kind: "grant-hat", operationId: MERIDIAN, organizationId: NORTH_ORG, actorId: MARCO_ID, role: "field", target: { kind: "team", teamId: HARBOR_TEAM }, primary: true },
     { kind: "access-envelope", envelope: len.envelope },
     "scenarios-embed-1",
   );
@@ -153,7 +153,7 @@ test("the suspended guild's booth stays readable through a crossed grant, as an 
   // their working hat
   const cross = await command(
     engine.runtime,
-    { kind: "grant-hat", operationId: FESTIVAL_OP, organizationId: HARBOR_LOGISTICS, actorId: DANA_OKAFOR, role: "steward", teamId: BOOTH_001, primary: true },
+    { kind: "grant-hat", operationId: FESTIVAL_OP, organizationId: HARBOR_LOGISTICS, actorId: DANA_OKAFOR, role: "steward", target: { kind: "team", teamId: BOOTH_001 }, primary: true },
     { kind: "access-envelope", envelope: admin.envelope },
     "scenarios-cross-1",
   );
@@ -264,7 +264,7 @@ test("the shift change: the worn hat turns over at the next issuance, never mid-
   const len = await issue(engine.runtime, LEN, MERIDIAN);
   const grant = await command(
     engine.runtime,
-    { kind: "grant-hat", operationId: MERIDIAN, organizationId: NORTH_ORG, actorId: MARCO_ID, role: "reviewer", teamId: NORTH_FLOOR, primary: true },
+    { kind: "grant-hat", operationId: MERIDIAN, organizationId: NORTH_ORG, actorId: MARCO_ID, role: "reviewer", target: { kind: "team", teamId: NORTH_FLOOR }, primary: true },
     { kind: "access-envelope", envelope: len.envelope },
     "scenarios-shift-grant",
   );

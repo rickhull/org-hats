@@ -9,7 +9,9 @@ export interface ClockLike extends Clock {
 }
 /** Administration is deployment policy, never a hardcoded role title: the
  * host states which role titles administer an operation and which actors
- * administer an organization. */
+ * administer an organization. An operation with no declared `adminRoles` has
+ * no administering role title — administration then rests solely on holding
+ * a hat that carries one of `configureActions`. */
 export interface InMemoryAuthorityConfig {
     readonly fixtures?: readonly TwinFixture[];
     /** Verified-principal links created at bootstrap: evidence resolution

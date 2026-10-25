@@ -90,16 +90,24 @@ describe("OrganizationAuthority", () => {
     expect(misuse.body.ok).toBe(false);
     expect(misuse.body.failure?.kind).toBe("invalid-command");
 
+    // the acceptance plus the roster images bootstrap and accept each push;
+    // assert the kinds rather than a total, so a new channel does not read
+    // as a regression here
     const messages = await outbox(stub);
-    expect(messages.body.value).toHaveLength(1);
-    expect(messages.body.value?.[0]?.kind).toBe("acceptance");
-    expect(messages.body.value?.[0]?.target).toBe("op-accept");
+    const acceptances = messages.body.value?.filter((message) => message.kind === "acceptance") ?? [];
+    expect(acceptances).toHaveLength(1);
+    expect(acceptances[0]?.target).toBe("op-accept");
+    expect(messages.body.value?.filter((message) => message.kind === "roster").length).toBeGreaterThan(0);
+    expect(messages.body.value?.every((message) => message.kind === "acceptance" || message.kind === "roster")).toBe(true);
 
     const trail = await audit(stub);
     expect(trail.body.value?.some((entry) => entry.fact.includes("invitation inv-1 accepted"))).toBe(true);
 
-    const delivered = await call(stub, "POST", `/outbox/${messages.body.value?.[0]?.id}/delivered`);
-    expect(delivered.body.ok).toBe(true);
+    // marking every pending message delivered empties the pending list
+    for (const message of messages.body.value ?? []) {
+      const delivered = await call(stub, "POST", `/outbox/${message.id}/delivered`);
+      expect(delivered.body.ok).toBe(true);
+    }
     const empty = await outbox(stub);
     expect(empty.body.value).toHaveLength(0);
   });

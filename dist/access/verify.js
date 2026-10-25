@@ -1,13 +1,16 @@
 // The verification-only module's engine: a signed envelope in, neutral
 // authority facts out (docs/authority_redesign.md § Access).
 //
-// The verifier checks signature, interface and format versions, expiry, and
-// the caller's expected operation/site binding — in that order of trust —
-// and fails closed on everything it does not recognize. It never rebuilds
+// The verifier checks the envelope format and version pair first, then the
+// signature, expiry, and the caller's expected operation/site binding — in
+// that order of trust — and fails closed on everything it does not
+// recognize. The claims' `interfaceVersion` is issuer provenance, not a
+// readability gate: the envelope outlives the call signatures that produced
+// it. It never rebuilds
 // reach, fallback, or worn-hat rules: the issuer computed those; the
 // verifier compares ids and evaluates the selected hat locally. Product
 // verbs are host code mapping onto these neutral targets.
-import { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, AUTHORITY_INTERFACE_VERSION, base64Decode, base64UrlDecode, canonicalJson, utf8, } from "../contract.js";
+import { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, base64Decode, base64UrlDecode, canonicalJson, utf8, } from "../contract.js";
 const failed = (failure) => ({ failure });
 /** Pure and platform-free, for tests and alternate runtimes: accepts any
  * verify predicate. */
@@ -54,17 +57,34 @@ const neutralAccess = (claims) => ({
     expiresAt: () => claims.exp,
 });
 /**
- * Verify an envelope and yield neutral access. Fail-closed order: format and
- * versions first (nothing unrecognized is interpreted), then the signature
- * (an unknown key id cannot verify), then expiry, then the caller's expected
- * bindings.
+ * Verify an envelope and yield neutral access.
+ *
+ * Fail-closed order, and the order is the contract: the envelope format and
+ * both version fields first, so nothing unrecognized is ever interpreted;
+ * then the signature, because an unknown key id cannot verify; then expiry;
+ * then the caller's expected bindings last, since a binding mismatch is only
+ * meaningful once the claims are known to be authentic.
+ *
+ * What gates readability is the **envelope** version pair — `format`,
+ * `envelope.v`, and the claims' own `v`. The claims also record the
+ * `interfaceVersion` of the runtime that issued them, and that is
+ * deliberately *not* a gate: it is issuer provenance, not a statement about
+ * whether these claims can be read. An envelope outlives the call signatures
+ * that produced it (src/contract.ts), so a host whose issuer has since moved
+ * to a new command vocabulary must not have every live session rejected for
+ * it. Any change to what the claims *mean* moves `ACCESS_ENVELOPE_VERSION`,
+ * and that is what this checks.
  */
 export const verify = async (envelope, keys, context = {}) => {
     if (envelope.format !== ACCESS_ENVELOPE_FORMAT || envelope.v !== ACCESS_ENVELOPE_VERSION) {
         return failed({ kind: "wrong-interface-version", detail: "not a recognized access envelope" });
     }
-    if (envelope.claims.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) {
-        return failed({ kind: "wrong-interface-version" });
+    // The claims carry their own version, and it was never checked: a
+    // signature-valid `v: 2` claims payload inside a `v: 1` envelope was
+    // accepted and read as v1. The envelope's `v` is the wrapper's; this is
+    // the payload's, and they must agree.
+    if (envelope.claims.v !== ACCESS_ENVELOPE_VERSION) {
+        return failed({ kind: "wrong-interface-version", detail: "envelope and claims disagree on the version" });
     }
     const key = keys.get(envelope.keyId);
     if (key === undefined) {

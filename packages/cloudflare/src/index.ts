@@ -1,5 +1,6 @@
 import { WorkerEntrypoint } from "cloudflare:workers";
 import {
+  AUTHORITY_INTERFACE_VERSION,
   canonicalJson,
   type AccessFromEvidenceInput,
   type AccessIssue,
@@ -217,7 +218,7 @@ export default {
       const world = await demoWorld(env);
       // fixed dev evidence: Dana authenticated with a password just now
       const issued = await world.runtime.accessFromEvidence({
-        interfaceVersion: 1,
+        interfaceVersion: AUTHORITY_INTERFACE_VERSION,
         operationId: DEMO_OPERATION,
         evidence: {
           ...CONFORMANCE_PRINCIPALS.dana.evidence,

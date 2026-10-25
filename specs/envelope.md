@@ -40,9 +40,9 @@ the cheap window for growth closes.
 
 ### E4 — Verification fails closed, in a fixed order
 
-Format and versions first — nothing unrecognized is interpreted — then the
-signature against a known key id, then expiry, then the caller's expected
-bindings.
+Format and the envelope version pair first — nothing unrecognized is
+interpreted — then the signature against a known key id, then expiry, then
+the caller's expected bindings.
 
 *Held by:* the single `verify` order; `OH-ACCESS-01` through `OH-ACCESS-04`
 and the vectors.
@@ -85,14 +85,18 @@ engine default is 900 seconds, configurable.
 *If it breaks:* revocation latency becomes unbounded, or ordinary reads
 regain a control-plane dependency the projection exists to remove.
 
-### E8 — The envelope version and the interface version are independent
+### E8 — The envelope version gates reading; the interface version is provenance
 
-The envelope outlives the call signatures that produced it; each carries
-its own version, and a mismatch is a named failure, never a
-reinterpretation.
+The envelope outlives the call signatures that produced it. Its version
+pair — the `format` marker, the envelope's `v`, and the claims' own `v` —
+is what a verifier gates on. The claims' `interfaceVersion` records which
+authority interface issued them and is never compared with the verifier's,
+so a command-vocabulary break cannot strand a live envelope. A change to
+what the claims mean moves the envelope version instead.
 
-*Held by:* two separate constants and claim fields; `wrong-interface-version`
-on either.
+*Held by:* `verify`'s gate on the format and both `v` fields and its
+deliberate non-check of `interfaceVersion`; `OH-ACCESS-04`; the provenance
+vector.
 *If it breaks:* a call-signature change strands still-valid envelopes — or
 a format change strands still-valid callers — and rolling upgrades lose
 their ordering.

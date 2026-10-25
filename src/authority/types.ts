@@ -10,6 +10,8 @@ import type {
   Failed,
   AccessEnvelopeClaimsV1,
   ActorId,
+  GrantTarget,
+  Unbranded,
   AuthorityInterfaceVersion,
   Failure,
   IdempotencyKey,
@@ -58,7 +60,7 @@ interface Versioned {
  * actor is admitted and active. Issuance — not authentication — computes
  * reach under the active policy bundle and signs the envelope. */
 export interface AccessFromEvidenceInput extends Versioned {
-  readonly operationId: OperationId;
+  readonly operationId: Unbranded<OperationId>;
   readonly evidence: PrincipalEvidence;
 }
 
@@ -69,7 +71,7 @@ export interface AccessIssue {
 }
 
 export interface RefreshInput extends Versioned {
-  readonly operationId: OperationId;
+  readonly operationId: Unbranded<OperationId>;
   readonly handle: RefreshHandle;
 }
 
@@ -82,19 +84,19 @@ export interface ContextRequest extends Versioned {
 export interface HatSummary {
   readonly role: string;
   readonly actions: readonly string[];
-  readonly teamId?: TeamId;
-  readonly siteId?: SiteId;
+  /** Where the hat reaches: exactly one team or one site. */
+  readonly target: Unbranded<GrantTarget>;
   readonly primary: boolean;
 }
 
 export interface AuthorityContext {
   readonly actor: {
-    readonly organizationId: OrganizationId;
-    readonly actorId: ActorId;
+    readonly organizationId: Unbranded<OrganizationId>;
+    readonly actorId: Unbranded<ActorId>;
     readonly displayName?: string;
   };
   readonly organizationDisplayName?: string;
-  readonly operationId: OperationId;
+  readonly operationId: Unbranded<OperationId>;
   readonly operationDisplayName?: string;
   readonly participation: "invited" | "accepted" | "active" | "revoked";
   readonly wearableHats: readonly HatSummary[];
@@ -107,6 +109,12 @@ export interface AuthorityContext {
   readonly authTime?: number;
 }
 
+// The ids across this interface are plain strings — `Unbranded<ActorId>` and
+// so on, which resolves to `string` while keeping the kind readable. A host
+// passes ids it read from its own records and must not need to import a
+// constructor to do it; each runtime converts at its own command-handler
+// seam (docs/authority_redesign.md, src/contract.ts).
+
 // --- commands -----------------------------------------------------------------
 //
 // Typed discriminated unions; each body carries what the act needs, the
@@ -117,7 +125,7 @@ export type CommandAuthorization =
   | {
       readonly kind: "fresh-evidence";
       readonly evidence: PrincipalEvidence;
-      readonly operationId: OperationId;
+      readonly operationId: Unbranded<OperationId>;
     };
 
 interface CommandShell extends Versioned {
@@ -126,31 +134,32 @@ interface CommandShell extends Versioned {
 }
 
 export type ParticipationCommand =
-  | { readonly kind: "participation-invite"; readonly operationId: OperationId; readonly organizationId: OrganizationId }
+  | { readonly kind: "participation-invite"; readonly operationId: Unbranded<OperationId>; readonly organizationId: Unbranded<OrganizationId> }
   /** The organization accepts its pending invitation for this operation. */
-  | { readonly kind: "participation-accept"; readonly operationId: OperationId }
-  | { readonly kind: "participation-revoke"; readonly operationId: OperationId; readonly organizationId: OrganizationId; readonly by: "operation" | "organization" };
+  | { readonly kind: "participation-accept"; readonly operationId: Unbranded<OperationId> }
+  | { readonly kind: "participation-revoke"; readonly operationId: Unbranded<OperationId>; readonly organizationId: Unbranded<OrganizationId>; readonly by: "operation" | "organization" };
 
 export type AdmissionCommand =
-  | { readonly kind: "request-access"; readonly operationId: OperationId; readonly evidence: PrincipalEvidence; readonly note?: string }
-  | { readonly kind: "admit"; readonly operationId: OperationId; readonly organizationId: OrganizationId; readonly actorId: ActorId; readonly teamId?: TeamId };
+  | { readonly kind: "request-access"; readonly operationId: Unbranded<OperationId>; readonly evidence: PrincipalEvidence; readonly note?: string }
+  | { readonly kind: "admit"; readonly operationId: Unbranded<OperationId>; readonly organizationId: Unbranded<OrganizationId>; readonly actorId: Unbranded<ActorId>; readonly teamId?: Unbranded<TeamId> };
 
 export type GrantCommand =
   | {
       readonly kind: "grant-hat";
-      readonly operationId: OperationId;
-      readonly organizationId: OrganizationId;
-      readonly actorId: ActorId;
+      readonly operationId: Unbranded<OperationId>;
+      readonly organizationId: Unbranded<OrganizationId>;
+      readonly actorId: Unbranded<ActorId>;
       readonly role: string;
-      readonly teamId?: TeamId;
-      readonly siteId?: SiteId;
+      /** Exactly one team or one site — the type says so, so "neither" and
+       * "both" are unrepresentable rather than runtime-checked twice. */
+      readonly target: Unbranded<GrantTarget>;
       readonly primary?: boolean;
     }
-  | { readonly kind: "revoke-grant"; readonly operationId: OperationId; readonly grantId: string }
-  | { readonly kind: "select-hat"; readonly operationId: OperationId; readonly grantId: string };
+  | { readonly kind: "revoke-grant"; readonly operationId: Unbranded<OperationId>; readonly grantId: string }
+  | { readonly kind: "select-hat"; readonly operationId: Unbranded<OperationId>; readonly grantId: string };
 
 export type OrganizationCommand =
-  | { readonly kind: "disable-actor"; readonly organizationId: OrganizationId; readonly actorId: ActorId };
+  | { readonly kind: "disable-actor"; readonly organizationId: Unbranded<OrganizationId>; readonly actorId: Unbranded<ActorId> };
 
 export type AuthorityCommandBody =
   | ParticipationCommand
@@ -161,6 +170,31 @@ export type AuthorityCommandBody =
 /** A complete business act, validated as a whole before any adapter commits
  * it. */
 export type AuthorityCommand = CommandShell & AuthorityCommandBody;
+
+// The same seam assertion as `contract.ts`: a host must be able to build a
+// command from ids it read from its own records, with no constructor
+// imported. These are erased at compile time.
+type AcceptsPlainString<T> = string extends T ? true : false;
+type Assert<T extends true> = T;
+
+type _GrantCommandIdsArePlain = Assert<
+  AcceptsPlainString<Extract<GrantCommand, { kind: "grant-hat" }>["organizationId"]>
+>;
+type _GrantCommandTargetIsPlain = Assert<
+  AcceptsPlainString<
+    Extract<Extract<GrantCommand, { kind: "grant-hat" }>["target"], { kind: "team" }>["teamId"]
+  >
+>;
+type _ParticipationCommandIsPlain = Assert<
+  AcceptsPlainString<Extract<ParticipationCommand, { kind: "participation-invite" }>["operationId"]>
+>;
+type _AdmitCommandIsPlain = Assert<
+  AcceptsPlainString<Extract<AdmissionCommand, { kind: "admit" }>["actorId"]>
+>;
+type _HatSummaryTargetIsPlain = Assert<
+  AcceptsPlainString<Extract<HatSummary["target"], { kind: "site" }>["siteId"]>
+>;
+type _ContextIsPlain = Assert<AcceptsPlainString<AuthorityContext["operationId"]>>;
 
 export interface CommandReceipt {
   readonly idempotencyKey: IdempotencyKey;

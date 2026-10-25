@@ -3,10 +3,10 @@
 **Status:** slice 1 (`src/`) reviewed 2026-10-25 by three parallel
 report-only readers (flash model, read-only), findings judged and
 cross-verified against the Cloudflare code by the main agent. Findings
-below ride **v1.3.0** — the fix-policy call is resolved: this work is
-large enough on its own to justify a minor release, so behavior
-tightenings and additive API land alongside the mechanical fixes, no
-patch-release discipline needed. Pending slices: `packages/cloudflare`
+below ride the **2.0.0** release: `GrantTarget` landed as a breaking
+command change (`claude_review.md` P3), and the behavior tightenings and
+additive API here land alongside it, so no patch-release discipline is
+needed. Pending slices: `packages/cloudflare`
 (including the RFC-grounded exchange review), `tests/`, `bin/` and
 configs.
 
@@ -76,7 +76,7 @@ invariant; they are not `src/`-only bugs and they anchor slice 2.
 - [ ] Conformance: `failureOf` should import `Failure`; twin ids imported
   from `twins.ts` rather than re-declared; `admitInvitee` placement.
 
-## R3 — API additions (additive, 1.3.0)
+## R3 — API additions (additive, 2.0.0)
 
 - [ ] Root doesn't re-export the id aliases `model.ts` defines
   (`OrganizationId` etc.) — root consumers can't name them. Re-export
@@ -89,12 +89,12 @@ invariant; they are not `src/`-only bugs and they anchor slice 2.
 - [ ] `["admin"]` default role fallback (A9, found independently by two
   readers) — a hardcoded admin title where the invariant says titles are
   configuration. Decision: require an explicit/declared default rather
-  than falling back silently. Behavior change, sanctioned for 1.3.0.
+  than falling back silently. Behavior change, sanctioned for 2.0.0.
 - [ ] Non-admin-denial case added to the portable conformance inventory
   (authorize grant-hat by a non-admin → denied) — additive, both
   runtimes already exercise the shape.
 
-## R4 — Structural refactors (crystallization, 1.3.0)
+## R4 — Structural refactors (crystallization, 2.0.0)
 
 `engine.ts`'s header promises two coordinators communicating over an
 outbox; the code is one ~890-line closure interleaving both
@@ -125,13 +125,19 @@ coordinators' commands. This is the headline item.
 
 ## Release
 
-Ships as **v1.3.0**: additive API (root id re-exports, `NeutralAccess`
-accessors, new conformance case) plus sanctioned behavior tightenings
-(`admin`-default removal, actor/participation validation on grant,
-acceptance-after-revoke guard). Interface version and envelope version
-are unmoved — no re-record for existing consumers. Supersedes the
-`v1.2.1` heads-up already sent to Quartermaster (corrected in the relay
-note).
+The version call moved after this ledger was written. `grant-hat`'s
+`GrantTarget` break landed as **2.0.0**, with `AUTHORITY_INTERFACE_VERSION`
+at 2 (see `claude_review.md` P3). `ACCESS_ENVELOPE_VERSION` stays 1: the
+claims mean what they meant, and verification treats the claims'
+`interfaceVersion` as provenance, so envelopes issued under interface 1
+keep reading across the break.
+
+The additive API and behavior tightenings below ride the same major. The
+items landed in `claude_review.md` (the participation kernel, the roster
+projection, id branding, the exchange fix, the envelope version check, and
+the `GrantTarget` break) are recorded there; the unchecked boxes above are
+still work. Supersedes the `v1.2.1` heads-up already sent to Quartermaster
+(corrected in the relay note).
 
 When this plan is realized it is removed; the result belongs in `docs/`
 and the commit history.

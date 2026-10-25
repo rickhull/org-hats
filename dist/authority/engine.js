@@ -12,8 +12,8 @@
 // Determinism: the clock and signer are injected; a fixed clock plus a
 // fresh signer gives reproducible behavior (ids, failure kinds, receipts)
 // without pinning signature bytes.
-import { canonicalJson, ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, AUTHORITY_INTERFACE_VERSION, } from "../contract.js";
-import { invariantProblems, readReach, wearableGrants, } from "../model.js";
+import { canonicalJson, ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, AUTHORITY_INTERFACE_VERSION, actorId, operationId, organizationId, siteId, teamId, } from "../contract.js";
+import { applyParticipationEvent, readReach, wearableGrants, } from "../model.js";
 import { actionsOf } from "../policy.js";
 import { counter, sha256Hex, systemClock, webCryptoSigner } from "./internal.js";
 const factsOf = (evidence) => evidence.amr === undefined && evidence.authTime === undefined
@@ -38,8 +38,11 @@ const defaultHat = (grants, bundle) => {
     const sorted = [...grants].sort((a, b) => (rank(a) < rank(b) ? -1 : rank(a) > rank(b) ? 1 : 0));
     const chosen = sorted[0];
     if (chosen === undefined)
-        return undefined;
-    return { grant: chosen, actions: actionsOf(bundle, chosen.role) ?? [] };
+        return { ok: false, reason: "no-grant" };
+    const role = actionsOf(bundle, chosen.role);
+    if (!role.found)
+        return { ok: false, reason: "unknown-role", role: chosen.role };
+    return { ok: true, grant: chosen, actions: role.actions };
 };
 export const createInMemoryAuthority = async (config = {}) => {
     const clock = config.clock ?? systemClock();
@@ -145,23 +148,42 @@ export const createInMemoryAuthority = async (config = {}) => {
             }
             if (delivered.has(message.id))
                 continue;
-            if (message.kind === "invitation" && message.invitationId !== undefined) {
-                const org = orgs.get(message.target);
+            if (message.kind === "invitation" && message.invitationId !== undefined && message.operationId !== undefined) {
+                // the outbox address is a plain string because a message routes to
+                // either coordinator; `kind` says which, so the conversion is here
+                const org = orgs.get(organizationId(message.target));
                 if (org !== undefined && !org.invitations.has(message.invitationId)) {
-                    org.invitations.set(message.invitationId, { operationId: message.operationId ?? "", status: "pending" });
+                    org.invitations.set(message.invitationId, { operationId: message.operationId, status: "pending" });
                 }
             }
             if (message.kind === "acceptance" && message.invitationId !== undefined) {
-                const op = ops.get(message.target);
+                const op = ops.get(operationId(message.target));
                 const invitation = op?.invitations.get(message.invitationId);
                 if (op !== undefined && invitation !== undefined && invitation.status === "invited") {
-                    invitation.status = "accepted";
-                    op.participations = op.participations.map((p) => p.organizationId === invitation.organizationId ? { ...p, status: "active" } : p);
-                    op.audit.push({ at: clock.now(), by: "outbox", fact: `participation ${invitation.organizationId} active (canonical)` });
+                    // Two events, in the model's order: the organization accepted, and
+                    // the operation activates. Jumping straight to `active` is what let
+                    // an acceptance delivered after a revoke flip `revoked` back —
+                    // `transitionParticipation` refuses both steps from `revoked`, so
+                    // the delivery is now a no-op against a terminal state.
+                    const accepted = applyParticipationEvent(op.participations, invitation.organizationId, op.operationId, { kind: "accept", by: "organization" });
+                    if (!accepted.ok) {
+                        op.audit.push({ at: clock.now(), by: "outbox", fact: `acceptance for ${invitation.organizationId} not applied: ${accepted.problem}` });
+                    }
+                    else {
+                        const activated = applyParticipationEvent(accepted.participations, invitation.organizationId, op.operationId, { kind: "activate", by: "operation" });
+                        if (!activated.ok) {
+                            op.audit.push({ at: clock.now(), by: "outbox", fact: `activation for ${invitation.organizationId} not applied: ${activated.problem}` });
+                        }
+                        else {
+                            invitation.status = "accepted";
+                            op.participations = [...activated.participations];
+                            op.audit.push({ at: clock.now(), by: "outbox", fact: `participation ${invitation.organizationId} active (canonical)` });
+                        }
+                    }
                 }
             }
             if (message.kind === "actor-disabled" && message.operationId !== undefined) {
-                const op = ops.get(message.target);
+                const op = ops.get(operationId(message.target));
                 if (op !== undefined) {
                     for (const record of op.refreshRecords) {
                         if (record.organizationId === message.organizationId && record.actorId === message.actorId) {
@@ -198,7 +220,7 @@ export const createInMemoryAuthority = async (config = {}) => {
     const commitClaim = (claims, command) => {
         claims.set(command.idempotencyKey, { payloadHash: payloadHash(command), receiptApplied: true });
     };
-    const resolvePrincipal = async (authorization, operationId) => {
+    const resolvePrincipal = async (authorization, boundTo) => {
         if (authorization.kind === "fresh-evidence") {
             const link = [...orgs.values()]
                 .flatMap((o) => [...o.principalLinks.entries()].map(([k, v]) => ({ k, v })))
@@ -226,16 +248,49 @@ export const createInMemoryAuthority = async (config = {}) => {
         }
         if (clock.now() >= claims.exp)
             return { kind: "expired" };
-        if (operationId !== undefined && claims.operationId !== operationId)
+        if (boundTo !== undefined && claims.operationId !== boundTo)
             return { kind: "wrong-binding" };
-        const roles = adminRoles[claims.operationId] ?? ["admin"];
+        // No declared admin role means no role administers this operation —
+        // a visible denial. Falling back to a hardcoded `["admin"]` applied a
+        // title this file's own charter says is configuration, and silently
+        // granted administration to whoever happened to hold it. Cloudflare's
+        // coordinator already reads an undeclared set as empty; this matches it.
+        // The command-handler seam: envelope claims carry plain strings, and
+        // this is where they become domain ids.
+        const claimedOperation = operationId(claims.operationId);
+        const claimedOrganization = organizationId(claims.actor.organizationId);
+        const claimedActor = actorId(claims.actor.actorId);
+        const roles = adminRoles[claimedOperation] ?? [];
         const adminHat = claims.hat.actions.some((a) => configureActions.includes(a)) || roles.includes(claims.hat.role);
         return {
-            organizationId: claims.actor.organizationId,
-            actorId: claims.actor.actorId,
+            organizationId: claimedOrganization,
+            actorId: claimedActor,
             adminOfOperation: adminHat,
-            adminOfOrganization: (orgAdmins[claims.actor.organizationId] ?? []).includes(claims.actor.actorId),
+            adminOfOrganization: (orgAdmins[claimedOrganization] ?? []).includes(claimedActor),
         };
+    };
+    /** Revoke one organization's participation through the state machine.
+     *
+     * Revoking twice is a safe retry rather than a failure: the state the
+     * caller asked for is the state that holds, and a retry under a fresh
+     * idempotency key must not read as an error. "Not participating" is a
+     * different thing and stays a denial. Whether a repeat is idempotent is
+     * the adapter's policy; that `revoked` never moves back is the model's,
+     * and `applyParticipationEvent` is what enforces it. */
+    const revokeParticipation = (op, organizationId, by) => {
+        const current = op.participations.find((p) => p.organizationId === organizationId && p.operationId === op.operationId);
+        if (current === undefined)
+            return { ok: false, problem: "the organization is not participating" };
+        if (current.status === "revoked")
+            return { ok: true };
+        const revoked = applyParticipationEvent(op.participations, organizationId, op.operationId, {
+            kind: "revoke",
+            by,
+        });
+        if (!revoked.ok)
+            return revoked;
+        op.participations = [...revoked.participations];
+        return { ok: true };
     };
     const revokeRefreshRecords = (op, organizationId, actorId) => {
         for (const record of op.refreshRecords) {
@@ -258,8 +313,13 @@ export const createInMemoryAuthority = async (config = {}) => {
         if (wearable.length === 0)
             return { kind: "not-admitted" };
         const hat = defaultHat(wearable, op.policy);
-        if (hat === undefined)
-            return { kind: "not-admitted" };
+        if (!hat.ok) {
+            // an inconsistency between the grants and the active bundle is not a
+            // statement about this actor: fail closed, and say which role
+            return hat.reason === "unknown-role"
+                ? { kind: "unavailable", detail: `the policy bundle no longer carries the role "${hat.role}"` }
+                : { kind: "not-admitted" };
+        }
         const hatTeamIds = new Set();
         const hatSiteIds = new Set();
         if (hat.grant.target.kind === "site") {
@@ -292,7 +352,10 @@ export const createInMemoryAuthority = async (config = {}) => {
             .filter((s) => siteIds.has(s.siteId))
             .map((s) => ({ siteId: s.siteId, aliases: [...s.aliases] }));
         const reach = readReach(snapshot, op.policy, organizationId, actorId, op.operationId);
-        const carriesConfigure = (g) => (actionsOf(op.policy, g.role) ?? []).some((a) => configureActions.includes(a));
+        const carriesConfigure = (g) => {
+            const role = actionsOf(op.policy, g.role);
+            return role.found && role.actions.some((a) => configureActions.includes(a));
+        };
         const siteIdOfGrant = (g) => {
             if (g.target.kind === "site")
                 return g.target.siteId;
@@ -358,7 +421,9 @@ export const createInMemoryAuthority = async (config = {}) => {
             const versionFail = checkVersion(input.interfaceVersion);
             if (versionFail !== undefined)
                 return failed(versionFail);
-            const op = ops.get(input.operationId);
+            // the seam: the request carries plain strings, `op.operationId` is
+            // the domain id from here down
+            const op = ops.get(operationId(input.operationId));
             if (op === undefined)
                 return failed({ kind: "wrong-binding", detail: "unknown operation" });
             const link = [...orgs.values()]
@@ -376,7 +441,7 @@ export const createInMemoryAuthority = async (config = {}) => {
             const versionFail = checkVersion(input.interfaceVersion);
             if (versionFail !== undefined)
                 return failed(versionFail);
-            const op = ops.get(input.operationId);
+            const op = ops.get(operationId(input.operationId));
             if (op === undefined)
                 return failed({ kind: "wrong-binding", detail: "unknown operation" });
             const hash = await sha256Hex(input.handle);
@@ -412,33 +477,54 @@ export const createInMemoryAuthority = async (config = {}) => {
             }
             if (clock.now() >= envelope.claims.exp)
                 return failed({ kind: "expired" });
-            const op = ops.get(envelope.claims.operationId);
+            const op = ops.get(operationId(envelope.claims.operationId));
             const snapshot = op !== undefined ? snapshotOf(op.operationId) : undefined;
             if (op === undefined || snapshot === undefined)
                 return failed({ kind: "wrong-binding" });
-            const { organizationId, actorId } = envelope.claims.actor;
-            const wearable = wearableGrants(snapshot, organizationId, actorId, op.operationId);
-            const actor = orgs.get(organizationId)?.actors.find((a) => a.actorId === actorId);
-            const orgName = orgs.get(organizationId)?.displayName;
-            const participation = snapshot.participations.find((p) => p.organizationId === organizationId);
-            const selectedPrimary = wearable.find((g) => g.role === envelope.claims.hat.role)?.primary === true;
+            // the same seam, on the context path
+            const organizationId_ = organizationId(envelope.claims.actor.organizationId);
+            const actorId_ = actorId(envelope.claims.actor.actorId);
+            const wearable = wearableGrants(snapshot, organizationId_, actorId_, op.operationId);
+            const actor = orgs.get(organizationId_)?.actors.find((a) => a.actorId === actorId_);
+            const orgName = orgs.get(organizationId_)?.displayName;
+            const participation = snapshot.participations.find((p) => p.organizationId === organizationId_);
+            // the grant the envelope's hat was selected from: its own target, not
+            // the expanded reach the claims carry
+            const selected = wearable.find((g) => g.role === envelope.claims.hat.role);
+            // Presentation still may not invent an action list. A grant naming a
+            // role the bundle dropped makes the context unanswerable, not empty.
+            const hats = [];
+            for (const g of wearable) {
+                const role = actionsOf(op.policy, g.role);
+                if (!role.found) {
+                    return failed({ kind: "unavailable", detail: `the policy bundle no longer carries the role "${g.role}"` });
+                }
+                hats.push({
+                    role: g.role,
+                    actions: [...role.actions],
+                    target: g.target,
+                    primary: g.primary === true,
+                });
+            }
             return {
-                actor: { organizationId, actorId, ...(actor?.displayName !== undefined ? { displayName: actor.displayName } : {}) },
+                actor: { organizationId: organizationId_, actorId: actorId_, ...(actor?.displayName !== undefined ? { displayName: actor.displayName } : {}) },
                 ...(orgName !== undefined ? { organizationDisplayName: orgName } : {}),
                 operationId: op.operationId,
                 ...(op.displayName !== undefined ? { operationDisplayName: op.displayName } : {}),
                 participation: participation?.status ?? "revoked",
-                wearableHats: wearable.map((g) => ({
-                    role: g.role,
-                    actions: actionsOf(op.policy, g.role) ?? [],
-                    ...(g.target.kind === "team" ? { teamId: g.target.teamId } : { siteId: g.target.siteId }),
-                    primary: g.primary === true,
-                })),
-                selectedHat: {
-                    role: envelope.claims.hat.role,
-                    actions: [...envelope.claims.hat.actions],
-                    primary: selectedPrimary,
-                },
+                wearableHats: hats,
+                // absent when no wearable grant matches the envelope's hat: the
+                // context cannot name a target it does not hold
+                ...(selected === undefined
+                    ? {}
+                    : {
+                        selectedHat: {
+                            role: envelope.claims.hat.role,
+                            actions: [...envelope.claims.hat.actions],
+                            target: selected.target,
+                            primary: selected.primary === true,
+                        },
+                    }),
                 sites: [...envelope.claims.sites],
                 ...(envelope.claims.amr !== undefined ? { amr: [...envelope.claims.amr] } : {}),
                 ...(envelope.claims.auth_time !== undefined ? { authTime: envelope.claims.auth_time } : {}),
@@ -451,7 +537,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                 return fail(versionFail.kind);
             // request-access needs no administrator: the evidence is the request
             if (inputCommand.kind === "request-access") {
-                const op = ops.get(inputCommand.operationId);
+                const op = ops.get(operationId(inputCommand.operationId));
                 if (op === undefined)
                     return fail("wrong-binding", "unknown operation");
                 const replay = checkClaim(op.claims, inputCommand);
@@ -468,18 +554,20 @@ export const createInMemoryAuthority = async (config = {}) => {
                 op.audit.push({ at: clock.now(), by: `${link.v.organizationId}/${link.v.actorId}`, fact: `access request ${requestId}` });
                 return ok(inputCommand.idempotencyKey, true);
             }
-            const operationId = inputCommand.kind === "disable-actor"
+            // which operation this command binds to, if any: `disable-actor` is
+            // organization-scoped and binds to none
+            const boundOperation = inputCommand.kind === "disable-actor"
                 ? undefined
                 : "operationId" in inputCommand
-                    ? inputCommand.operationId
+                    ? operationId(inputCommand.operationId)
                     : undefined;
-            const principalOrFailure = await resolvePrincipal(inputCommand.authorization, operationId);
+            const principalOrFailure = await resolvePrincipal(inputCommand.authorization, boundOperation);
             if ("kind" in principalOrFailure)
                 return fail(principalOrFailure.kind, principalOrFailure.detail);
             switch (inputCommand.kind) {
                 case "participation-invite": {
-                    const op = ops.get(inputCommand.operationId);
-                    const org = orgs.get(inputCommand.organizationId);
+                    const op = ops.get(operationId(inputCommand.operationId));
+                    const org = orgs.get(organizationId(inputCommand.organizationId));
                     if (op === undefined)
                         return fail("wrong-binding", "unknown operation");
                     if (org === undefined)
@@ -489,17 +577,18 @@ export const createInMemoryAuthority = async (config = {}) => {
                     const replay = checkClaim(op.claims, inputCommand);
                     if (replay !== undefined)
                         return replay;
-                    if (op.participations.some((p) => p.organizationId === inputCommand.organizationId)) {
-                        return fail("denied", "the organization is already participating");
-                    }
+                    const invitee = organizationId(inputCommand.organizationId);
+                    const invited = applyParticipationEvent(op.participations, invitee, op.operationId, { kind: "invite", by: "operation" });
+                    if (!invited.ok)
+                        return fail("denied", invited.problem);
                     commitClaim(op.claims, inputCommand);
                     const invitationId = `inv-${nextId()}`;
-                    op.invitations.set(invitationId, { organizationId: inputCommand.organizationId, status: "invited" });
-                    op.participations.push({ organizationId: inputCommand.organizationId, operationId: inputCommand.operationId, status: "invited" });
+                    op.invitations.set(invitationId, { organizationId: invitee, status: "invited" });
+                    op.participations = [...invited.participations];
                     outbox.push({
-                        id: `ob-${nextId()}`, to: "org", target: inputCommand.organizationId,
-                        kind: "invitation", invitationId, operationId: inputCommand.operationId,
-                        organizationId: inputCommand.organizationId,
+                        id: `ob-${nextId()}`, to: "org", target: invitee,
+                        kind: "invitation", invitationId, operationId: op.operationId,
+                        organizationId: invitee,
                     });
                     op.audit.push({ at: clock.now(), by: `${principalOrFailure.organizationId}/${principalOrFailure.actorId}`, fact: `invitation ${invitationId} to ${inputCommand.organizationId}` });
                     return ok(inputCommand.idempotencyKey, true);
@@ -535,7 +624,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                 }
                 case "participation-revoke": {
                     if (inputCommand.by === "operation") {
-                        const op = ops.get(inputCommand.operationId);
+                        const op = ops.get(operationId(inputCommand.operationId));
                         if (op === undefined)
                             return fail("wrong-binding", "unknown operation");
                         if (!principalOrFailure.adminOfOperation)
@@ -543,8 +632,10 @@ export const createInMemoryAuthority = async (config = {}) => {
                         const replay = checkClaim(op.claims, inputCommand);
                         if (replay !== undefined)
                             return replay;
+                        const revoked = revokeParticipation(op, organizationId(inputCommand.organizationId), "operation");
+                        if (!revoked.ok)
+                            return fail("denied", revoked.problem);
                         commitClaim(op.claims, inputCommand);
-                        op.participations = op.participations.map((p) => p.organizationId === inputCommand.organizationId ? { ...p, status: "revoked" } : p);
                         for (const record of op.refreshRecords) {
                             if (record.organizationId === inputCommand.organizationId)
                                 record.revoked = true;
@@ -552,7 +643,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                         op.audit.push({ at: clock.now(), by: `${principalOrFailure.organizationId}/${principalOrFailure.actorId}`, fact: `participation ${inputCommand.organizationId} revoked` });
                         return ok(inputCommand.idempotencyKey, true);
                     }
-                    const org = orgs.get(inputCommand.organizationId);
+                    const org = orgs.get(organizationId(inputCommand.organizationId));
                     if (org === undefined)
                         return fail("wrong-binding", "unknown organization");
                     if (!principalOrFailure.adminOfOrganization)
@@ -560,11 +651,13 @@ export const createInMemoryAuthority = async (config = {}) => {
                     const replay = checkClaim(org.claims, inputCommand);
                     if (replay !== undefined)
                         return replay;
-                    const op = ops.get(inputCommand.operationId);
+                    const op = ops.get(operationId(inputCommand.operationId));
                     if (op === undefined)
                         return fail("wrong-binding", "unknown operation");
+                    const revoked = revokeParticipation(op, organizationId(inputCommand.organizationId), "organization");
+                    if (!revoked.ok)
+                        return fail("denied", revoked.problem);
                     commitClaim(org.claims, inputCommand);
-                    op.participations = op.participations.map((p) => p.organizationId === inputCommand.organizationId ? { ...p, status: "revoked" } : p);
                     for (const record of op.refreshRecords) {
                         if (record.organizationId === inputCommand.organizationId)
                             record.revoked = true;
@@ -573,7 +666,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                     return ok(inputCommand.idempotencyKey, true);
                 }
                 case "admit": {
-                    const op = ops.get(inputCommand.operationId);
+                    const op = ops.get(operationId(inputCommand.operationId));
                     if (op === undefined)
                         return fail("wrong-binding", "unknown operation");
                     if (!principalOrFailure.adminOfOperation)
@@ -581,7 +674,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                     const replay = checkClaim(op.claims, inputCommand);
                     if (replay !== undefined)
                         return replay;
-                    const actor = orgs.get(inputCommand.organizationId)?.actors.find((a) => a.actorId === inputCommand.actorId);
+                    const actor = orgs.get(organizationId(inputCommand.organizationId))?.actors.find((a) => a.actorId === inputCommand.actorId);
                     if (actor === undefined)
                         return fail("invalid-command", "unknown actor");
                     commitClaim(op.claims, inputCommand);
@@ -590,7 +683,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                     return ok(inputCommand.idempotencyKey, true);
                 }
                 case "grant-hat": {
-                    const op = ops.get(inputCommand.operationId);
+                    const op = ops.get(operationId(inputCommand.operationId));
                     if (op === undefined)
                         return fail("wrong-binding", "unknown operation");
                     if (!principalOrFailure.adminOfOperation)
@@ -598,36 +691,47 @@ export const createInMemoryAuthority = async (config = {}) => {
                     const replay = checkClaim(op.claims, inputCommand);
                     if (replay !== undefined)
                         return replay;
-                    if (actionsOf(op.policy, inputCommand.role) === undefined)
+                    if (!actionsOf(op.policy, inputCommand.role).found)
                         return fail("invalid-command", `unknown role "${inputCommand.role}"`);
-                    if (inputCommand.teamId !== undefined && !op.teams.some((t) => t.teamId === inputCommand.teamId)) {
+                    // A grant stands on an actor and a participation. Without these
+                    // two the command commits a grant `invariantProblems` would flag
+                    // live — "names an unknown actor", "has no participation to stand
+                    // on" — which is a snapshot the model says cannot exist.
+                    const granteeOrganization = organizationId(inputCommand.organizationId);
+                    const granteeActor = actorId(inputCommand.actorId);
+                    const grantee = orgs.get(granteeOrganization)?.actors.find((a) => a.actorId === granteeActor);
+                    if (grantee === undefined)
+                        return fail("invalid-command", "unknown actor");
+                    if (!op.participations.some((p) => p.organizationId === granteeOrganization && p.status === "active")) {
+                        return fail("denied", "the organization does not actively participate in this operation");
+                    }
+                    // What remains is existence. "Exactly one target" is no longer a
+                    // check: `GrantTarget` is a two-arm union, so neither-and-both are
+                    // unrepresentable, and the four guards this replaced — one pair
+                    // per runtime — are gone with them.
+                    const grantTarget = inputCommand.target.kind === "team"
+                        ? { kind: "team", teamId: teamId(inputCommand.target.teamId) }
+                        : { kind: "site", siteId: siteId(inputCommand.target.siteId) };
+                    if (grantTarget.kind === "team" && !op.teams.some((t) => t.teamId === grantTarget.teamId)) {
                         return fail("invalid-command", "unknown team");
                     }
-                    if (inputCommand.siteId !== undefined && !op.sites.some((s) => s.siteId === inputCommand.siteId)) {
+                    if (grantTarget.kind === "site" && !op.sites.some((s) => s.siteId === grantTarget.siteId)) {
                         return fail("invalid-command", "unknown site");
-                    }
-                    if (inputCommand.teamId !== undefined && inputCommand.siteId !== undefined) {
-                        return fail("invalid-command", "a grant reaches one target");
-                    }
-                    if (inputCommand.teamId === undefined && inputCommand.siteId === undefined) {
-                        return fail("invalid-command", "a grant needs a target");
                     }
                     commitClaim(op.claims, inputCommand);
                     const grantId = `g-${nextId()}`;
                     const grant = {
                         grantId,
-                        operationId: inputCommand.operationId,
-                        organizationId: inputCommand.organizationId,
-                        actorId: inputCommand.actorId,
+                        operationId: op.operationId,
+                        organizationId: granteeOrganization,
+                        actorId: granteeActor,
                         role: inputCommand.role,
-                        target: inputCommand.teamId !== undefined
-                            ? { kind: "team", teamId: inputCommand.teamId }
-                            : { kind: "site", siteId: inputCommand.siteId ?? "" },
+                        target: grantTarget,
                         ...(inputCommand.primary === true ? { primary: true } : {}),
                     };
                     if (inputCommand.primary === true) {
                         op.grants = op.grants.map((g) => {
-                            if (g.organizationId !== inputCommand.organizationId || g.actorId !== inputCommand.actorId)
+                            if (g.organizationId !== granteeOrganization || g.actorId !== granteeActor)
                                 return g;
                             const { primary: _dropped, ...rest } = g;
                             return rest;
@@ -638,7 +742,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                     return ok(inputCommand.idempotencyKey, true);
                 }
                 case "revoke-grant": {
-                    const op = ops.get(inputCommand.operationId);
+                    const op = ops.get(operationId(inputCommand.operationId));
                     if (op === undefined)
                         return fail("wrong-binding", "unknown operation");
                     if (!principalOrFailure.adminOfOperation)
@@ -656,7 +760,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                     return ok(inputCommand.idempotencyKey, true);
                 }
                 case "select-hat": {
-                    const op = ops.get(inputCommand.operationId);
+                    const op = ops.get(operationId(inputCommand.operationId));
                     if (op === undefined)
                         return fail("wrong-binding", "unknown operation");
                     if (!principalOrFailure.adminOfOperation && !(principalOrFailure.organizationId !== undefined &&
@@ -684,7 +788,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                     return ok(inputCommand.idempotencyKey, true);
                 }
                 case "disable-actor": {
-                    const org = orgs.get(inputCommand.organizationId);
+                    const org = orgs.get(organizationId(inputCommand.organizationId));
                     if (org === undefined)
                         return fail("wrong-binding", "unknown organization");
                     if (!principalOrFailure.adminOfOrganization)
@@ -700,7 +804,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                     for (const op of ops.values()) {
                         outbox.push({
                             id: `ob-${nextId()}`, to: "op", target: op.operationId, operationId: op.operationId,
-                            kind: "actor-disabled", organizationId: inputCommand.organizationId, actorId: inputCommand.actorId,
+                            kind: "actor-disabled", organizationId: org.organizationId, actorId: actorId(inputCommand.actorId),
                         });
                     }
                     org.audit.push({ at: clock.now(), by: `${org.organizationId}/${principalOrFailure.actorId}`, fact: `actor ${inputCommand.actorId} disabled` });

@@ -68,22 +68,48 @@ function sitting two imports away that was supposed to be canonical.
 
 ### Action: P0 — shared transition kernel (precondition for `code_review.md` R1)
 
-- [ ] Route every participation-status mutation through *read current
-  state → call `transitionParticipation` → write only on `ok: true`* —
-  in-memory directly, Cloudflare via a `SELECT` before the `UPDATE` in
-  the same transaction, decided by the same predicate the TS function
-  encodes. Land the acceptance-after-revoke fix through this, not as an
-  independent patch per runtime.
-- [ ] Design the cross-DO seam `grant-hat` needs to validate the actor:
-  Cloudflare's operation coordinator has no local actor table (actors
-  live in the organization Durable Object), so this isn't a missing
-  `if`, it's a missing RPC. Model it as a `VerifiedActor` token only a
-  successful cross-binding lookup can produce; land the in-memory half
-  (actor validation reachable in the same closure) independently now.
+- [x] Route every participation-status mutation through *read current
+  state → call `transitionParticipation` → write only on `ok: true`*.
+  Landed better than specified: Cloudflare calls the **same function**,
+  not an adjacent predicate — the `SELECT` supplies `current`, and
+  `transitionParticipation` is pure and synchronous so it runs inside
+  `transactionSync`. `model.ts` gained `applyParticipationEvent` as the
+  list-level kernel the in-memory engine routes through. Seven write
+  paths now route (in-memory invite, both revoke halves, outbox
+  acceptance; Cloudflare invite, intake acceptance, intake revocation,
+  revokeParticipation). Two runtime divergences surfaced and were settled
+  in the model's favour: Cloudflare allowed re-invite after revoke
+  (revoke is terminal, so it no longer does), and in-memory silently
+  succeeded when revoking a non-participant (now `denied`, matching
+  Cloudflare). Revoking twice stays a successful no-change receipt —
+  idempotency is the adapter's policy, the no-un-revoke rule is the
+  model's.
+- [x] Design the cross-DO seam `grant-hat` needs to validate the actor.
+  Resolved **not** as an RPC and not as a `VerifiedActor` token. A
+  synchronous cross-object read cannot be atomic — `transactionSync` has
+  no `await` — so it would have bought a check-then-act window at the
+  price of a second object's availability on the write path. Instead the
+  operation holds a projection of each participating organization's
+  roster (`org_actors`: actor id and disabled only), pushed on change and
+  reconciled on an interval, so the check is a local read inside the same
+  transaction as the insert. Both runtimes now refuse a grant to an
+  unknown actor (`invalid-command`) or a non-participating organization
+  (`denied`), pinned by the new `OH-CMD-03` conformance case, which passes
+  against the real coordinators in workerd.
+
+  This also closed a wider hole the review did not name: the operation
+  coordinator had no actors table at all, so `modelSnapshot` fabricated
+  `actors: [{ organizationId, actorId }]` for whoever was asking, making
+  `wearableGrants`' actor-existence and `disabled` clauses structurally
+  vacuous in the deployed runtime. Refresh in particular rested entirely
+  on the `actor-disabled` outbox message arriving. The standing rule is
+  now recorded in `docs/authority_redesign.md` § State ownership: no
+  synchronous cross-coordinator read on a write path; a fact a decision
+  needs is projected into the coordinator that must decide.
 
 ## Type-system leverage
 
-### Action: P1 — type-safety work (1.3.0)
+### Action: P1 — type-safety work (2.0.0)
 
 1. **Brand the id types — highest leverage, single change.**
    `contract.ts:20-24` declares `OrganizationId`, `ActorId`,
@@ -93,8 +119,9 @@ function sitting two imports away that was supposed to be canonical.
    `wearableGrants(snapshot, organizationId, actorId, operationId)`,
    `decide(snapshot, bundle, organizationId, actorId, operationId,
    action, target)` — and an argument-order slip compiles clean today.
-   Decided: do this for 1.3.0, scoped to internal domain types only (see
-   the worked plan below) — not the public command/evidence surface.
+   Decided and landed for 2.0.0, scoped to internal domain types only —
+   not the public command/evidence surface. `Unbranded<T>` marks the
+   boundary shapes; each runtime converts at its own seam.
 
 2. **`GrantTarget` should be the command's target field, not two
    optionals.** `model.ts` already has the right shape —
@@ -136,80 +163,38 @@ function sitting two imports away that was supposed to be canonical.
    {kind:"none"}`), turns a forgotten configuration into a construction
    failure instead of a silently-applied hardcoded title.
 
-- [ ] **Brand the id types** (item 1). Worked plan below.
-- [ ] **`GrantTarget` as the command's target field** (item 2), in both
-  `authority/types.ts` and Cloudflare's `operation.ts`.
-- [ ] **Tighten `actionsOf`'s return contract** (item 3) so `hatOf` can't
-  silently coalesce "unknown role" into "no actions."
-- [ ] **Move `TargetRef` into `contract.ts`** (item 4), imported by both
+- [x] **Brand the id types** (item 1). Landed with one change of approach:
+  the ~500 literal sites the worked plan anticipated were cut to a handful
+  by converting at boundaries instead of at every literal. `Unbranded<T>`
+  (a mapped type derived from the branded types, so it cannot drift) marks
+  the shape hand-written or decoded data has *before* it enters the domain:
+  the twins convert once through `twin()`, the Cloudflare coordinators
+  through a new shared row decoder (`packages/cloudflare/src/row.ts`,
+  replacing 76 hand-rolled `String(row[...])` calls), and each runtime at
+  its command-handler seam. Fixture coherence is what `invariantProblems`
+  checks; the brand's job is the function boundaries. Two latent `?? ""`
+  fallbacks surfaced and were removed rather than cast away.
+- [x] **`GrantTarget` as the command's target field** (item 2), in both
+  `authority/types.ts` and Cloudflare's `operation.ts`. Landed for 2.0.0:
+  `grant-hat` carries `target: Unbranded<GrantTarget>`, `HatSummary` carries
+  the same, and both runtimes' duplicate "exactly one target" checks are
+  unreachable by construction. The version call is the major break recorded
+  in P3.
+- [x] **Tighten `actionsOf`'s return contract** (item 3). Returns
+  `{found: true, actions} | {found: false}`; all ten callers decide
+  explicitly, where six previously wrote `?? []`. An unknown role at
+  decision time is now a distinct `policy-inconsistent` denial, and
+  issuance/context fail `unavailable` naming the role rather than issuing a
+  wearable-but-powerless hat. Also extracted `firstByRank`, so the ranked
+  selection the model owns is written once instead of twice in `model.ts`.
+- [x] **Move `TargetRef` into `contract.ts`** (item 4), re-exported by both
   `model.ts` and `access/types.ts`.
-- [ ] **Make admin-role/org-admin config explicit, not fallback-default**
-  (item 5) on `InMemoryAuthorityConfig`.
-
-### Worked plan: id branding (decided — internal types only)
-
-`contract.ts:13-19`'s comment currently states the opposite of this
-plan: "The named aliases are documentation, not brands... they are
-plain strings so data stays open and inspectable." That claim about
-runtime representation stays true — a branded type is `string & {tag}`,
-erased at compile time, so `JSON.stringify`/`parse` see no difference
-and the wire format never changes. Only the comment's literal "not
-brands" goes false; it gets rewritten, not silently contradicted.
-
-Scoping to the public surface (`AuthorityCommand`, `PrincipalEvidence`,
-`AuthorityContext`) would make this a consumer-facing interface change
-needing re-review with Quartermaster under `AGENTS.md`'s rule, for zero
-wire-format benefit. Scoping instead to **`model.ts`'s internal domain
-types** (`Organization`, `Actor`, `Grant`, `Participation`, `Snapshot`)
-and the id-taking functions (`decide`, `wearableGrants`, `selectWornHat`,
-`grantReaches`, `readReach`, `invariantProblems`), mirrored in
-`OpState`/`OrgState` and D1 row-mapping in `packages/cloudflare`,
-protects exactly where every argument-order risk actually lives, touches
-no consumer-facing type, and needs no re-review.
-
-- [ ] **Step 1 — brand mechanism in `contract.ts`.** Replace the five
-  plain aliases:
-  ```ts
-  declare const brand: unique symbol;
-  type Branded<B extends string> = string & { readonly [brand]: B };
-  export type OrganizationId = Branded<"OrganizationId">;
-  export type ActorId = Branded<"ActorId">;
-  export type OperationId = Branded<"OperationId">;
-  export type SiteId = Branded<"SiteId">;
-  export type TeamId = Branded<"TeamId">;
-  ```
-  Rewrite the comment above them: runtime representation is still a
-  plain, opaque, caller-supplied string (JSON-transparent); the
-  compile-time brand only stops a function expecting one from silently
-  accepting another.
-- [ ] **Step 2 — one constructor per type**, also in `contract.ts`:
-  ```ts
-  export const organizationId = (raw: string): OrganizationId => raw as OrganizationId;
-  // actorId, operationId, siteId, teamId, same shape
-  ```
-- [ ] **Step 3 — cast at the command-handler seam**, once per runtime.
-  In-memory: `engine.ts`'s `command()`, immediately after
-  `resolvePrincipal`, convert `inputCommand`'s id fields before they
-  reach any `model.ts` call. Cloudflare: the equivalent point in each
-  coordinator's command entry, plus the 22 `row["organization_id"]`-style
-  D1 row-mapping sites (`organizationId(String(row["organization_id"]))`).
-  The public command/evidence/context types keep plain `string` fields —
-  unchanged, no re-review needed.
-- [ ] **Step 4 — let the compiler drive the rest.** `model.ts`,
-  `engine.ts`, `operation.ts` internals, `twins.ts`, `conformance.ts`,
-  and the test fixtures will fail to compile wherever a raw string
-  literal meets a now-branded field — this is the bulk of the diff
-  (twins and conformance fixtures build `Organization`/`Actor`/`Grant`/
-  `Snapshot` objects from dozens of inline string literals each). Fix by
-  wrapping each literal in its Step 2 constructor. Mechanical and
-  compiler-guided: a missed site is a build failure, not a shipped bug.
-  Candidate for the `agentic-sweep` skill — fan the resulting
-  compile-error list across files, since each fix is independently
-  verifiable ("wrap this literal in its constructor").
-- [ ] **Step 5 — verify.** `pnpm check && pnpm typecheck`. Confirm the
-  public `AuthorityCommand`/`PrincipalEvidence`/`AccessEnvelopeClaimsV1`
-  surface is unchanged — diff the generated `.d.ts` for those three
-  types specifically and expect no change.
+- [x] **Make admin-role config explicit, not fallback-default** (item 5).
+  The `?? ["admin"]` is gone: an operation with no declared admin role has
+  no administering role title, which is a visible denial. This also aligns
+  the runtimes — Cloudflare's coordinator already read an undeclared set as
+  empty. `orgAdmins[...] ?? []` was left alone; an empty list is already
+  the correct reading there.
 
 ## Action: P2 — exchange bug (urgent, blocks real provider login)
 
@@ -224,21 +209,73 @@ test fixture masked this by pointing `authorization_endpoint` at the
 token URL. Acknowledged back to Quartermaster in
 `notes/from-org-hats.md`, 2026-10-25.
 
-- [ ] Add `tokenEndpoint` to `Discovery`, parse `token_endpoint` from the
-  discovery document in `discoveryOf`.
-- [ ] POST the code exchange to `discovery.tokenEndpoint`, not
+- [x] Add `tokenEndpoint` to `Discovery`, parse `token_endpoint` from the
+  discovery document in `discoveryOf`. Landed: `authorizationEndpoint` is
+  dropped rather than kept — nothing reads it once the POST is corrected,
+  since the browser redirect is the host's.
+- [x] POST the code exchange to `discovery.tokenEndpoint`, not
   `authorizationEndpoint`.
-- [ ] Fix the test fixture to use distinct authorization/token URLs, and
-  assert the token POST lands on the token endpoint specifically.
-- [ ] This must land before (or as part of) the next `cloudflare-v*` tag
-  — `cloudflare-v0.1.0` is not safe for real-provider login until fixed.
+- [x] Fix the test fixture to use distinct authorization/token URLs, and
+  assert the token POST lands on the token endpoint specifically. Verified
+  by reintroducing the defect: all five exchange cases fail with "the
+  provider refused the code (404)", the real-provider shape.
+- [x] Landed in source. The next `cloudflare-v*` tag carries it;
+  `cloudflare-v0.1.0` was not safe for real-provider login.
+
+## Action: P3 — the 2.0.0 interface break (landed with P1 item 2)
+
+`grant-hat`'s command now carries `target: GrantTarget` instead of two
+independent optionals, so `AuthorityCommand` changes shape. That is a
+breaking interface, not an additive one: `AUTHORITY_INTERFACE_VERSION`
+moves from 1 to 2 and the release is a major (`2.0.0`). A 1.x caller
+reaching a 2.x runtime gets `wrong-interface-version` before any command
+is interpreted, rather than a shape error halfway through one.
+
+The break is deliberately cheap for sessions. `verify` gates reading on
+the **envelope version pair** — `format`, the envelope's `v`, and the
+claims' own `v` — and never on the claims' `interfaceVersion`, which is
+issuer provenance. An envelope signed under interface 1 therefore keeps
+verifying under a 2.x runtime, and no live session drops because the call
+vocabulary changed. `ACCESS_ENVELOPE_VERSION` stays 1: the meaning of the
+claims did not move. Checking the claims' `v` also closes the hole where a
+signature-valid `v: 2` payload inside a `v: 1` envelope was read as v1.
+
+- [x] Bump `AUTHORITY_INTERFACE_VERSION` to 2. The runtime call surfaces
+  continue to refuse a caller whose declared version is not theirs.
+- [x] Gate `verify` on the claims' `v` as well as the envelope's, and stop
+  comparing `interfaceVersion` with the verifier's.
+- [x] Update the access vectors and `OH-ACCESS-04`: the version pair fails
+  closed, and a differently-issued envelope is provenance, not a version
+  failure.
+- [ ] The release itself is `plans/v2_release.md`: migration note, demo
+  smoke, `v2.0.0` tag, and the post-tag relay. The source break is landed.
+
+## Found while landing: `tests/` is not typechecked
+
+`tsconfig.json` includes only `src/**/*.ts`, and `node --test` strips types
+without checking them, so no tool checks the suites or `examples/`. This is
+how a fixture can keep sending a shape the interface no longer accepts and
+fail only at runtime — which happened when `grant-hat` moved to a single
+`target`: the compiler was silent and six tests died with
+`Cannot read properties of undefined`.
+
+A `tsconfig.tests.json` extending the build config over `src`, `tests`, and
+`examples` reports **173 errors** across ten files. They are not stale
+fixtures; they are test-ergonomic patterns that never had to typecheck —
+narrowing `Failed | Verified` by reaching for `.failure`, passing claims
+where `JsonValue` is wanted, fixtures that now need `Unbranded`. Worth doing
+and worth doing deliberately, as its own pass; not folded into this one.
+
+The published-surface fence in `bin/check` (`tests/consumer-surface.ts`)
+covers the shapes a *consumer* builds, which is the part that would
+otherwise break silently for Quartermaster.
 
 ## Sequencing
 
 P0 and P2 are both correctness-blocking and independent of each other —
 either can start first. P1 is type-safety hardening riding the same
-1.3.0 release and is independent of P0/P2; all five items, including
-id-branding, can proceed in parallel with the others. Id-branding and
+2.0.0 release as P3; all five items, including id-branding, can proceed in
+parallel with the others. Id-branding and
 P0 both touch `engine.ts`'s command handler and `operation.ts`'s
 coordinators — worth sequencing P0 first in those two files so the
 transition-kernel routing lands on unbranded types, then id-branding's

@@ -14,6 +14,22 @@
 // must pass `invariantProblems` unchanged — the fixtures are data, and the
 // invariants judge them like any other state. Invented people and
 // organizations only.
+import { actorId, organizationId } from "../contract.js";
+/** A twin written as plain data, then branded once on the way in.
+ *
+ * The ids here are hand-written literals whose whole purpose is to show the
+ * structure — which organization has a team at which site, which actor wears
+ * which hat in two operations. Wrapping each of the two hundred-odd literals
+ * in a constructor would bury exactly that. So the conversion happens once,
+ * at the boundary where fixture data becomes domain data, the same way each
+ * runtime converts once at its command-handler seam.
+ *
+ * What makes this safe rather than a loophole: these fixtures are judged by
+ * `invariantProblems`, which is what actually catches a team id written into
+ * an organization field. `tests/twins.test.ts` asserts every twin reports no
+ * problems, and the shape above is derived from `Snapshot`, so it cannot
+ * drift from it. */
+const twin = (fixture) => fixture;
 // --- the professional operation ------------------------------------------------
 //
 // Persistent, multi-site, multi-organization: crews that stay for the life
@@ -33,12 +49,12 @@ const professionalPolicy = {
 };
 /** The organization that also joins the festival, and the actor who works
  * both — the cross-operation pair the conformance scenarios exercise. */
-export const HARBOR_LOGISTICS = "org-4c1f9a2e";
-export const DANA_OKAFOR = "actor-8d3b77c1";
+export const HARBOR_LOGISTICS = organizationId("org-4c1f9a2e");
+export const DANA_OKAFOR = actorId("actor-8d3b77c1");
 const OP = "op-9f2e6ad4";
 const EAST = "site-e4a1c9b3";
 const WEST = "site-b8d620fa";
-export const PROFESSIONAL_OPERATION = {
+export const PROFESSIONAL_OPERATION = twin({
     name: "professional",
     policy: professionalPolicy,
     snapshot: {
@@ -98,7 +114,7 @@ export const PROFESSIONAL_OPERATION = {
             { organizationId: "org-a53e90f7", operationId: OP, status: "active" },
         ],
     },
-};
+});
 // --- the festival ---------------------------------------------------------------
 //
 // Time-bounded, multi-venue, a short-lived team burst: one hundred fifty
@@ -137,7 +153,7 @@ const boothTeams = () => {
     }
     return teams;
 };
-export const FESTIVAL = {
+export const FESTIVAL = twin({
     name: "festival",
     policy: festivalPolicy,
     snapshot: {
@@ -190,7 +206,7 @@ export const FESTIVAL = {
             { organizationId: HARBOR_LOGISTICS, operationId: FOP, status: "active" },
         ],
     },
-};
+});
 // --- the airlift ------------------------------------------------------------------
 //
 // Bounded, multi-airfield, four organizations: two wings, the contract
@@ -222,7 +238,7 @@ const FASSBERG = "site-38b6f0a9";
 const TEMPELHOF = "site-c5d2a8f7";
 const GATOW = "site-94a7c1e0";
 const TEGEL = "site-e3f8b2c6";
-export const AIRLIFT = {
+export const AIRLIFT = twin({
     name: "airlift",
     policy: airliftPolicy,
     snapshot: {
@@ -339,5 +355,5 @@ export const AIRLIFT = {
             { organizationId: "org-58e3a2d1", operationId: AOP, status: "active" },
         ],
     },
-};
+});
 export const TWINS = [PROFESSIONAL_OPERATION, FESTIVAL, AIRLIFT];

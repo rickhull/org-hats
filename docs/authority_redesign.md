@@ -205,14 +205,16 @@ thin module that maps product facts onto these neutral targets. The
 important properties are:
 
 - callers do not interpret raw claims;
-- verification checks signature, issuer, interface version, expiry,
-  operation, and site binding before returning access;
+- verification gates on the envelope format and version pair, then checks
+  the signature, expiry, operation, and site binding before returning
+  access; the claims' `interfaceVersion` is issuer provenance, not a gate,
+  because the envelope outlives the interface that issued it;
 - read reach is computed by authority from the active policy bundle before
   issuance; the verifier evaluates binding and the selected hat locally and
   never rebuilds organization unions, peer reach, fallback, or worn-hat rules;
 - the projection contains permanent identifiers and only the compact facts
   needed for local product decisions; and
-- unsupported versions fail closed.
+- an unsupported envelope version fails closed.
 
 The module uses portable cryptographic interfaces or Web Platform primitives.
 It does not know how sessions are transported and does not import Cloudflare
@@ -314,6 +316,54 @@ One operation-authority instance owns operation-local authority:
 
 Removing an actor from one operation does not remove the actor from their
 organization or another operation.
+
+The operation also holds a **projection** of each participating
+organization's roster: the authority-relevant tuple only — the actor
+identifier and whether the actor is disabled. It holds no display names, no
+verified-principal links, and no identity-provider configuration; those stay
+with the organization, which remains the only writer of any of it, including
+the roster the projection copies.
+
+The projection exists because a decision must be local. Operation authority
+answers whether an actor holds a wearable hat, and that answer depends on
+whether the actor exists and is enabled — organization-owned facts. A
+synchronous read across the two coordinators could not make the answer
+atomic (the storage transaction cannot await), so it would buy a
+check-then-act window at the price of a second object's availability on
+every write. The standing rule instead: **no synchronous cross-coordinator
+read on a write path** — a fact a decision needs is projected into the
+coordinator that must decide.
+
+Two channels keep it true, doing different work:
+
+- the organization **pushes** an image when its roster changes, so a disable
+  travels immediately; and
+- the operation **pulls** each actively participating organization's roster
+  on an interval, which repairs an image whose delivery was lost.
+
+The push carries the security property; the interval is a convergence
+budget, never the revocation window. Images are stamped and applied
+monotonically, because the outbox may deliver a delayed message after a
+newer one and an older image must not resurrect a disabled actor. Revocation
+of issued access stays what it was: the actor-disabled message revokes
+refresh records, and an envelope's lifetime bounds the rest.
+
+The projection is derived, so it is not state to back up: a coordinator
+export carries the operation's own facts and leaves the projection out, and a
+restore clears it and rebuilds by pulling. The failure direction is the safe
+one — an actor absent from the projection reads as unknown and is not
+admitted, never wrongly admitted — and the operator's inspection view
+reports the projection's contents and age so staleness is visible rather
+than inferred.
+
+The projection carries the full roster of actively participating
+organizations, which is what keeps the portable model's `Snapshot.actors`
+meaning the shared organization directory it has always meant. The intended
+end state is narrower — only actors **admitted** to the operation, written
+by the admission command itself, so an operation knows only the people
+introduced to it and the shared object holds less roster material. That is a
+re-specification of the model rather than a projection change, and it waits
+for its own pass.
 
 Work spanning the two coordinators is an explicit, retryable workflow with
 idempotent messages and visible partial states. It is not presented as a

@@ -1,4 +1,4 @@
-import type { Failed, ActorId, AuthorityInterfaceVersion, Failure, IdempotencyKey, OperationId, OrganizationId, RefreshHandle, RefreshHandleOutcome, SignedAccessEnvelope, SiteBinding, SiteId, TeamId } from "../contract.js";
+import type { Failed, ActorId, GrantTarget, Unbranded, AuthorityInterfaceVersion, Failure, IdempotencyKey, OperationId, OrganizationId, RefreshHandle, RefreshHandleOutcome, SignedAccessEnvelope, SiteBinding, TeamId } from "../contract.js";
 export { AUTHORITY_INTERFACE_VERSION } from "../contract.js";
 /** Typed, verified principal evidence — what an identity adapter (or a host
  * that verified evidence itself) supplies to authority. Authority resolves
@@ -31,7 +31,7 @@ interface Versioned {
  * actor is admitted and active. Issuance — not authentication — computes
  * reach under the active policy bundle and signs the envelope. */
 export interface AccessFromEvidenceInput extends Versioned {
-    readonly operationId: OperationId;
+    readonly operationId: Unbranded<OperationId>;
     readonly evidence: PrincipalEvidence;
 }
 /** A new envelope plus the explicit refresh-handle outcome, together. */
@@ -40,7 +40,7 @@ export interface AccessIssue {
     readonly refresh: RefreshHandleOutcome;
 }
 export interface RefreshInput extends Versioned {
-    readonly operationId: OperationId;
+    readonly operationId: Unbranded<OperationId>;
     readonly handle: RefreshHandle;
 }
 /** Presentation context for the signed-in actor, proven by a valid envelope.
@@ -51,18 +51,18 @@ export interface ContextRequest extends Versioned {
 export interface HatSummary {
     readonly role: string;
     readonly actions: readonly string[];
-    readonly teamId?: TeamId;
-    readonly siteId?: SiteId;
+    /** Where the hat reaches: exactly one team or one site. */
+    readonly target: Unbranded<GrantTarget>;
     readonly primary: boolean;
 }
 export interface AuthorityContext {
     readonly actor: {
-        readonly organizationId: OrganizationId;
-        readonly actorId: ActorId;
+        readonly organizationId: Unbranded<OrganizationId>;
+        readonly actorId: Unbranded<ActorId>;
         readonly displayName?: string;
     };
     readonly organizationDisplayName?: string;
-    readonly operationId: OperationId;
+    readonly operationId: Unbranded<OperationId>;
     readonly operationDisplayName?: string;
     readonly participation: "invited" | "accepted" | "active" | "revoked";
     readonly wearableHats: readonly HatSummary[];
@@ -80,7 +80,7 @@ export type CommandAuthorization = {
 } | {
     readonly kind: "fresh-evidence";
     readonly evidence: PrincipalEvidence;
-    readonly operationId: OperationId;
+    readonly operationId: Unbranded<OperationId>;
 };
 interface CommandShell extends Versioned {
     readonly idempotencyKey: IdempotencyKey;
@@ -88,53 +88,54 @@ interface CommandShell extends Versioned {
 }
 export type ParticipationCommand = {
     readonly kind: "participation-invite";
-    readonly operationId: OperationId;
-    readonly organizationId: OrganizationId;
+    readonly operationId: Unbranded<OperationId>;
+    readonly organizationId: Unbranded<OrganizationId>;
 }
 /** The organization accepts its pending invitation for this operation. */
  | {
     readonly kind: "participation-accept";
-    readonly operationId: OperationId;
+    readonly operationId: Unbranded<OperationId>;
 } | {
     readonly kind: "participation-revoke";
-    readonly operationId: OperationId;
-    readonly organizationId: OrganizationId;
+    readonly operationId: Unbranded<OperationId>;
+    readonly organizationId: Unbranded<OrganizationId>;
     readonly by: "operation" | "organization";
 };
 export type AdmissionCommand = {
     readonly kind: "request-access";
-    readonly operationId: OperationId;
+    readonly operationId: Unbranded<OperationId>;
     readonly evidence: PrincipalEvidence;
     readonly note?: string;
 } | {
     readonly kind: "admit";
-    readonly operationId: OperationId;
-    readonly organizationId: OrganizationId;
-    readonly actorId: ActorId;
-    readonly teamId?: TeamId;
+    readonly operationId: Unbranded<OperationId>;
+    readonly organizationId: Unbranded<OrganizationId>;
+    readonly actorId: Unbranded<ActorId>;
+    readonly teamId?: Unbranded<TeamId>;
 };
 export type GrantCommand = {
     readonly kind: "grant-hat";
-    readonly operationId: OperationId;
-    readonly organizationId: OrganizationId;
-    readonly actorId: ActorId;
+    readonly operationId: Unbranded<OperationId>;
+    readonly organizationId: Unbranded<OrganizationId>;
+    readonly actorId: Unbranded<ActorId>;
     readonly role: string;
-    readonly teamId?: TeamId;
-    readonly siteId?: SiteId;
+    /** Exactly one team or one site — the type says so, so "neither" and
+     * "both" are unrepresentable rather than runtime-checked twice. */
+    readonly target: Unbranded<GrantTarget>;
     readonly primary?: boolean;
 } | {
     readonly kind: "revoke-grant";
-    readonly operationId: OperationId;
+    readonly operationId: Unbranded<OperationId>;
     readonly grantId: string;
 } | {
     readonly kind: "select-hat";
-    readonly operationId: OperationId;
+    readonly operationId: Unbranded<OperationId>;
     readonly grantId: string;
 };
 export type OrganizationCommand = {
     readonly kind: "disable-actor";
-    readonly organizationId: OrganizationId;
-    readonly actorId: ActorId;
+    readonly organizationId: Unbranded<OrganizationId>;
+    readonly actorId: Unbranded<ActorId>;
 };
 export type AuthorityCommandBody = ParticipationCommand | AdmissionCommand | GrantCommand | OrganizationCommand;
 /** A complete business act, validated as a whole before any adapter commits

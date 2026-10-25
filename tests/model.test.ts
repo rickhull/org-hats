@@ -9,6 +9,7 @@ import {
   decide,
   invariantProblems,
   selectWornHat,
+  applyParticipationEvent,
   transitionParticipation,
   type Grant,
   type Snapshot,
@@ -157,4 +158,55 @@ test("participation: invite → accept → activate is canonical; revoke is term
   const revoked = transitionParticipation(org, op, active.ok ? active.participation : undefined, { kind: "revoke", by: "organization" });
   assert.ok(revoked.ok && revoked.participation.status === "revoked");
   assert.ok(!transitionParticipation(org, op, revoked.ok ? revoked.participation : undefined, { kind: "activate", by: "operation" }).ok);
+});
+
+test("participation: applyParticipationEvent is the only way a status moves", () => {
+  const org = "org-new"; const op = OP;
+  const invited = applyParticipationEvent([], org, op, { kind: "invite", by: "operation" });
+  assert.ok(invited.ok);
+  assert.deepEqual(invited.participations, [{ organizationId: org, operationId: op, status: "invited" }]);
+
+  // an unrelated participation is carried through untouched
+  const other = { organizationId: "org-other", operationId: op, status: "active" } as const;
+  const accepted = applyParticipationEvent(
+    [other, ...invited.participations],
+    org,
+    op,
+    { kind: "accept", by: "organization" },
+  );
+  assert.ok(accepted.ok);
+  assert.equal(accepted.participation.status, "accepted");
+  assert.deepEqual(accepted.participations.find((p) => p.organizationId === "org-other"), other);
+
+  const active = applyParticipationEvent(accepted.participations, org, op, { kind: "activate", by: "operation" });
+  assert.ok(active.ok && active.participation.status === "active");
+  const revoked = applyParticipationEvent(active.participations, org, op, { kind: "revoke", by: "operation" });
+  assert.ok(revoked.ok && revoked.participation.status === "revoked");
+
+  // the whole point: nothing moves a revoked participation back, and a
+  // refusal returns no list, so an adapter cannot write one by accident
+  for (const event of [
+    { kind: "accept", by: "organization" },
+    { kind: "activate", by: "operation" },
+    { kind: "invite", by: "operation" },
+    { kind: "revoke", by: "operation" },
+  ] as const) {
+    const refused = applyParticipationEvent(revoked.participations, org, op, event);
+    assert.ok(!refused.ok, `${event.kind} must be refused from revoked`);
+    assert.ok(!("participations" in refused));
+  }
+
+  // a participation that is not there at all is a different refusal
+  const absent = applyParticipationEvent([], org, op, { kind: "revoke", by: "operation" });
+  assert.ok(!absent.ok);
+  assert.equal(absent.problem, "the organization is not participating");
+
+  // the operation's participation is matched by both ids, never one
+  const elsewhere = applyParticipationEvent(
+    [{ organizationId: org, operationId: "op-elsewhere", status: "active" }],
+    org,
+    op,
+    { kind: "revoke", by: "operation" },
+  );
+  assert.ok(!elsewhere.ok, "a participation in another operation is not this one");
 });

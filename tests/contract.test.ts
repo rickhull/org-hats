@@ -57,7 +57,13 @@ test("canonicalJson renders scalars, arrays, and nesting without whitespace", ()
 test("the format constants are stable strings — changing one is a format change", () => {
   assert.equal(ACCESS_ENVELOPE_FORMAT, "org-hats.access");
   assert.equal(ACCESS_ENVELOPE_VERSION, 1);
-  assert.equal(AUTHORITY_INTERFACE_VERSION, 1);
+});
+
+test("the interface version names the call surface, not the wire format", () => {
+  // 1.x callers used the two-optional grant shape; 2 carries GrantTarget.
+  // Envelope readability does not move with it — claims record the issuing
+  // interface as provenance, and the format pair above gates.
+  assert.equal(AUTHORITY_INTERFACE_VERSION, 2);
 });
 
 test("signature transport is unpadded base64url and round-trips", () => {

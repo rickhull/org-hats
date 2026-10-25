@@ -3,8 +3,8 @@
 *The v1 format contract for `SignedAccessEnvelope`. The TypeScript types in
 `src/contract.ts` are the normative shape; this document records the
 encoding, signing, and compatibility rules the types cannot. The format is
-owned by `org-hats`; issuers and verifiers declare version overlap and
-neither invents fields silently (see
+owned by `org-hats`; issuers and verifiers declare envelope-version overlap
+and neither invents fields silently (see
 [authority_redesign.md](authority_redesign.md) § Access).*
 
 ## Envelope
@@ -28,7 +28,8 @@ claims and nobody but the issuer writes them.
 
 | Claim | Meaning |
 | --- | --- |
-| `v`, `interfaceVersion` | envelope format and authority interface versions; mismatches fail closed |
+| `v` | claims format version; it must equal the envelope's `v`, and an unrecognized value is `wrong-interface-version` |
+| `interfaceVersion` | the authority interface that issued these claims — provenance, not a readability gate (see § Version and key compatibility) |
 | `operationId` | the one operation this envelope is scoped to |
 | `actor` | `(organizationId, actorId)` — the organization-scoped actor |
 | `hat` | the selected, worn hat: role title, its actions, and the team/site ids it reaches |
@@ -68,6 +69,13 @@ in v1; another is a format-version change, not a bundle option.
 
 ## Version and key compatibility
 
+- The gate on reading is the **envelope version pair**: the `format` marker,
+  the envelope's `v`, and the claims' own `v`. The claims'
+  `interfaceVersion` records which authority interface issued them and is
+  deliberately not compared with the verifier's. An envelope outlives the
+  call signatures that produced it, so a command-vocabulary break must not
+  strand live sessions; a change to what the claims *mean* moves
+  `ACCESS_ENVELOPE_VERSION` instead. `OH-ACCESS-04` pins this distinction.
 - Verifier-first rollout: deploy a verifier accepting old and new versions,
   then the issuer, and retire the old version only after its maximum
   envelope lifetime has elapsed.
@@ -79,10 +87,11 @@ in v1; another is a format-version change, not a bundle option.
   algorithm, and raw public key). Parsing fails closed on an empty set,
   duplicate ids, a non-Ed25519 algorithm, or malformed key material. The set,
   not a single key, is the rotation unit.
-- Unsupported versions, wrong operation/site binding, expiry, and failed
-  signatures are closed failure kinds (`wrong-interface-version`,
-  `wrong-binding`, `expired`, `invalid-signature`); the deploying host owns
-  the product response to each.
+- An unsupported envelope version, wrong operation/site binding, expiry,
+  and a failed signature are closed failure kinds
+  (`wrong-interface-version`, `wrong-binding`, `expired`,
+  `invalid-signature`); the deploying host owns the product response to
+  each.
 - Additive optional claims (v1 gained `amr` and `auth_time` this way) need
   no format-version bump: canonical serialization covers whatever claims
   exist, so an older verifier accepts a newer issuer's envelope and
@@ -93,6 +102,6 @@ in v1; another is a format-version change, not a bundle option.
 Committed as data at `tests/fixtures/envelope-vectors.json` (a clearly
 labeled test-only keypair, so signatures are byte-exact across
 implementations) and exercised by `tests/access.test.ts`: canonical
-serialization; expiry; wrong interface version; wrong operation binding;
-wrong site binding; forged signature; tampered claims; unknown key id; key
-rotation and retirement.
+serialization; expiry; wrong envelope and claims version; interface-version
+provenance; wrong operation binding; wrong site binding; forged signature;
+tampered claims; unknown key id; key rotation and retirement.

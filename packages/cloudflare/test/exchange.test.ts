@@ -7,6 +7,7 @@
 
 import { env } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { AUTHORITY_INTERFACE_VERSION } from "org-hats/authority";
 import { base64UrlEncode, utf8 } from "org-hats/access";
 import type { Env } from "../src/env";
 import {
@@ -88,7 +89,7 @@ const serve = (
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
 const input = (overrides: Partial<EvidenceFromProviderCodeInput> = {}): EvidenceFromProviderCodeInput => ({
-  interfaceVersion: 1 as const,
+  interfaceVersion: AUTHORITY_INTERFACE_VERSION,
   operationId: "op-9f2e6ad4",
   issuer: ISSUER,
   clientId: CLIENT_ID,
@@ -110,13 +111,22 @@ const claims = (amr: string[], authTime: number, nonce = "nonce-1") => ({
   auth_time: authTime,
 });
 
-const DISCOVERY = { authorization_endpoint: `${ISSUER}/token`, jwks_uri: `${ISSUER}/jwks` };
+// Distinct authorization and token URLs: a standards-compliant provider
+// serves the browser redirect at one and the code exchange at the other, so
+// a fixture that points both at /token cannot catch a POST to the wrong one.
+const AUTHORIZATION_URL = `${ISSUER}/authorize`;
+const TOKEN_URL = `${ISSUER}/token`;
+const DISCOVERY = {
+  authorization_endpoint: AUTHORIZATION_URL,
+  token_endpoint: TOKEN_URL,
+  jwks_uri: `${ISSUER}/jwks`,
+};
 
 const serveIdp = (jwksBodies: unknown[], idToken: string): Served =>
   serve([
     { method: "GET", url: `${ISSUER}/.well-known/openid-configuration`, bodies: [DISCOVERY] },
     { method: "GET", url: `${ISSUER}/jwks`, bodies: jwksBodies },
-    { method: "POST", url: `${ISSUER}/token`, bodies: [{ id_token: idToken }] },
+    { method: "POST", url: TOKEN_URL, bodies: [{ id_token: idToken }] },
   ]);
 
 describe("the provider-callback exchange", () => {
@@ -146,9 +156,13 @@ describe("the provider-callback exchange", () => {
       amr: ["hwk", "pin"],
       authTime,
     });
-    // the token POST carried exactly the explicit input set plus the secret
+    // the code exchange lands on the token endpoint, never the browser
+    // redirect's authorization endpoint
     const post = served.requests.find((r) => r.method === "POST");
     expect(post).toBeDefined();
+    expect(post?.url).toBe(TOKEN_URL);
+    expect(served.requests.filter((r) => r.url === AUTHORIZATION_URL)).toHaveLength(0);
+    // the token POST carried exactly the explicit input set plus the secret
     const body = new URLSearchParams(post?.body ?? "");
     expect(body.get("code")).toBe("auth-code-1");
     expect(body.get("code_verifier")).toBe("verifier-1");

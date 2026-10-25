@@ -68,6 +68,8 @@ Normative documents:
 - [`docs/lexicon.md`](docs/lexicon.md) — the normative vocabulary: the words
   this repository uses, and the ones it rejects.
 - [`docs/migration-v1.md`](docs/migration-v1.md) — the 0.4 → v1 deltas.
+- [`docs/migration-v2.md`](docs/migration-v2.md) — the 1.2 → 2.0 deltas:
+  the `GrantTarget` command shape and the interface-version break.
 - [`SECURITY.md`](SECURITY.md) — reporting and coordinated disclosure.
 - [`plans/README.md`](plans/README.md) — the plans index; a plan names
   work in flight and is removed when realized.

@@ -31,9 +31,14 @@ const world = (suffix: string): World => {
 const bootstrapOrganization = async (current: World) =>
   call(current.org, "POST", "/bootstrap", organizationBootstrap(current.orgId));
 
-const bootstrapOperation = async (current: World) =>
+/** `participating` declares the organization active at bootstrap, the shape
+ * a seeded deployment uses: bootstrap also pulls the roster, so the grant
+ * preconditions — an actor in the projection, an active participation — are
+ * satisfied without walking the invitation workflow. */
+const bootstrapOperation = async (current: World, participating = false) =>
   call(current.op, "POST", "/bootstrap", {
     operationId: current.opId,
+    ...(participating ? { participations: [{ organizationId: current.orgId, status: "active" }] } : {}),
     displayName: "Test Operation",
     policy: {
       format: 1,
@@ -57,7 +62,7 @@ const bootstrapOperation = async (current: World) =>
         organizationId: current.orgId,
         actorId: MEMBER,
         role: "field",
-        teamId: TEAM,
+        target: { kind: "team", teamId: TEAM },
         primary: true,
       },
     ],
@@ -81,6 +86,82 @@ const drain = async (stub: DurableObjectStub) =>
   call<{ delivered: number; pending: number }>(stub, "POST", "/drain");
 
 describe("OperationAuthority", () => {
+  it("refuses an acceptance delivered after the participation was revoked", async () => {
+    // The outbox retries, so an acceptance can arrive against a state that
+    // has moved on. `UPDATE participations SET status = 'active'` had no
+    // current-state guard, and no CHECK constraint can express a transition
+    // — only a set of legal strings — so the fix is to decide with the
+    // portable state machine before writing.
+    const current = world("accept-after-revoke");
+    await bootstrapOrganization(current);
+    await bootstrapOperation(current);
+
+    const invited = await invite(current, "invite-race");
+    expect(invited.body.ok).toBe(true);
+    const invitationId = invited.body.value?.invitationId ?? "";
+
+    const revoked = await call(current.op, "POST", "/revoke-participation", {
+      organizationId: current.orgId,
+      byActorId: ADMIN,
+      idempotencyKey: "revoke-race",
+    });
+    expect(revoked.body.ok).toBe(true);
+
+    // the acceptance lands late, carrying the invitation it was issued for
+    const late = await call(current.op, "POST", "/intake", {
+      messageId: "late-acceptance",
+      kind: "acceptance",
+      invitationId,
+    });
+    expect(late.body.ok).toBe(true);
+
+    const snapshot = await call<Record<string, unknown>>(current.op, "GET", "/snapshot");
+    const participations = snapshot.body.value?.["participations"] as { organization_id: string; status: string }[];
+    expect(participations.find((p) => p.organization_id === current.orgId)?.status).toBe("revoked");
+
+    const trail = await call<readonly { fact: string }[]>(current.op, "GET", "/audit");
+    expect(trail.body.value?.some((entry) => entry.fact.includes("not applied: cannot accept from revoked"))).toBe(true);
+  });
+
+  it("revoking twice is a safe retry; revoking a non-participant is denied", async () => {
+    const current = world("revoke-twice");
+    await bootstrapOrganization(current);
+    await bootstrapOperation(current);
+    await invite(current, "invite-twice");
+
+    const revoke = async (key: string, organizationId = current.orgId) =>
+      call(current.op, "POST", "/revoke-participation", {
+        organizationId,
+        byActorId: ADMIN,
+        idempotencyKey: key,
+      });
+
+    expect((await revoke("twice-1")).body.ok).toBe(true);
+    // a fresh key is not a replay, and must still read as success
+    expect((await revoke("twice-2")).body.ok).toBe(true);
+
+    const stranger = await revoke("twice-3", "org-stranger");
+    expect(stranger.body.ok).toBe(false);
+    expect(stranger.body.failure?.kind).toBe("denied");
+  });
+
+  it("refuses to re-invite a revoked organization: revoke is terminal", async () => {
+    const current = world("reinvite");
+    await bootstrapOrganization(current);
+    await bootstrapOperation(current);
+    await invite(current, "reinvite-1");
+    await call(current.op, "POST", "/revoke-participation", {
+      organizationId: current.orgId,
+      byActorId: ADMIN,
+      idempotencyKey: "reinvite-revoke",
+    });
+
+    const again = await invite(current, "reinvite-2");
+    expect(again.body.ok).toBe(false);
+    expect(again.body.failure?.kind).toBe("denied");
+    expect(again.body.failure?.detail).toContain("already participating");
+  });
+
   it("moves an invitation through org authority and back as active participation", async () => {
     const current = world("flow");
     await bootstrapOrganization(current);
@@ -97,7 +178,10 @@ describe("OperationAuthority", () => {
     const accepted = await accept(current);
     expect(accepted.body.ok).toBe(true);
     expect(accepted.body.value?.applied).toBe(true);
-    expect((await drain(current.org)).body.value).toEqual({ delivered: 1, pending: 0 });
+    // the acceptance plus the roster images the organization pushed; every
+    // message must land, so assert nothing is left pending rather than a
+    // delivered count a new channel would change
+    expect((await drain(current.org)).body.value?.pending).toBe(0);
 
     const snapshot = await call<Record<string, unknown>>(current.op, "GET", "/snapshot");
     const participations = snapshot.body.value?.["participations"] as { organization_id: string; status: string }[];
@@ -128,16 +212,70 @@ describe("OperationAuthority", () => {
     expect(orgStatus.body.value?.["invitations"]).toBe(1);
   });
 
+  it("refuses a grant to an unknown actor or a non-participating organization", async () => {
+    const current = world("grant-preconditions");
+    await bootstrapOrganization(current);
+    await bootstrapOperation(current, true);
+
+    const base = {
+      organizationId: current.orgId,
+      actorId: MEMBER,
+      role: "lead",
+      target: { kind: "team", teamId: TEAM },
+      byActorId: ADMIN,
+    };
+
+    // an actor the operation has never heard of: the projection is what
+    // makes this answerable at all, since actors live in the other object
+    const stranger = await call(current.op, "POST", "/grant", {
+      ...base,
+      actorId: "actor-nobody",
+      grantId: "g-stranger",
+      idempotencyKey: "grant-stranger",
+    });
+    expect(stranger.body.ok).toBe(false);
+    expect(stranger.body.failure?.kind).toBe("invalid-command");
+    expect(stranger.body.failure?.detail).toBe("unknown actor");
+
+    // a real actor of an organization that does not participate here
+    const outsider = await call(current.op, "POST", "/grant", {
+      ...base,
+      organizationId: "org-outsider",
+      grantId: "g-outsider",
+      idempotencyKey: "grant-outsider",
+    });
+    expect(outsider.body.ok).toBe(false);
+    expect(outsider.body.failure?.kind).toBe("invalid-command");
+
+    // and once the participation is revoked, no new grant stands on it
+    await call(current.op, "POST", "/revoke-participation", {
+      organizationId: current.orgId,
+      byActorId: ADMIN,
+      idempotencyKey: "grant-precondition-revoke",
+    });
+    const afterRevoke = await call(current.op, "POST", "/grant", {
+      ...base,
+      grantId: "g-after-revoke",
+      idempotencyKey: "grant-after-revoke",
+    });
+    expect(afterRevoke.body.ok).toBe(false);
+    expect(afterRevoke.body.failure?.kind).toBe("denied");
+    expect(afterRevoke.body.failure?.detail).toContain("actively participate");
+  });
+
   it("grants, selects, revokes, and revokes refresh records idempotently", async () => {
     const current = world("grants");
-    await bootstrapOperation(current);
+    // the organization first: bootstrap pulls its roster, and a grant now
+    // stands on an actor the operation knows and an active participation
+    await bootstrapOrganization(current);
+    await bootstrapOperation(current, true);
 
     const grant = await call<{ applied: boolean; grantId?: string }>(current.op, "POST", "/grant", {
       grantId: "g-new",
       organizationId: current.orgId,
       actorId: MEMBER,
       role: "lead",
-      teamId: TEAM,
+      target: { kind: "team", teamId: TEAM },
       byActorId: ADMIN,
       idempotencyKey: "grant-1",
     });
@@ -148,7 +286,7 @@ describe("OperationAuthority", () => {
       organizationId: current.orgId,
       actorId: MEMBER,
       role: "lead",
-      teamId: TEAM,
+      target: { kind: "team", teamId: TEAM },
       byActorId: ADMIN,
       idempotencyKey: "grant-1",
     });
@@ -159,7 +297,7 @@ describe("OperationAuthority", () => {
       organizationId: current.orgId,
       actorId: MEMBER,
       role: "field",
-      teamId: TEAM,
+      target: { kind: "team", teamId: TEAM },
       byActorId: ADMIN,
       idempotencyKey: "grant-1",
     });
@@ -213,8 +351,11 @@ describe("OperationAuthority", () => {
       idempotencyKey: "disable-1",
     });
     expect(disabled.body.ok).toBe(true);
+    // the disable travels as two messages doing two jobs: `actor-disabled`
+    // revokes the refresh records, the roster image makes the operation's
+    // own decisions see it
     const delivery = await drain(current.org);
-    expect(delivery.body.value?.delivered).toBe(1);
+    expect(delivery.body.value?.pending).toBe(0);
 
     const snapshot = await call<Record<string, unknown>>(current.op, "GET", "/snapshot");
     const records = snapshot.body.value?.["refreshRecords"] as { handle_hash: string; revoked: number }[];
@@ -267,7 +408,7 @@ describe("OperationAuthority", () => {
           organizationId: current.orgId,
           actorId: MEMBER,
           role: "field",
-          teamId: TEAM,
+          target: { kind: "team", teamId: TEAM },
           primary: true,
         },
       ],

@@ -28,6 +28,9 @@ public `org-hats` docs are normative for the seam.
   usage elsewhere.
 - [`migration-v1.md`](migration-v1.md) — the 0.4 → v1 crossing, including
   the 1.1 break.
+- [`migration-v2.md`](migration-v2.md) — the 1.2 → 2.0 break: the
+  `GrantTarget` command shape, interface version 2, and why envelope format
+  1 keeps reading across it.
 - [`publishing.md`](publishing.md) — canonical host, mirror, CI, and the
   release ritual.
 

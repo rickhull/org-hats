@@ -95,7 +95,7 @@ export const createCloudflareConformanceWorld = async (env: Env): Promise<Confor
         organizationId: grant.organizationId,
         actorId: grant.actorId,
         role: grant.role,
-        ...(grant.target.kind === "team" ? { teamId: grant.target.teamId } : { siteId: grant.target.siteId }),
+        target: grant.target,
         ...(grant.primary === true ? { primary: true } : {}),
         ...(grant.revoked === true ? { revoked: true } : {}),
       })),

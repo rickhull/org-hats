@@ -6,5 +6,5 @@ export type { TwinFixture } from "./twins.js";
 export { AIRLIFT, DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION, TWINS, } from "./twins.js";
 export { createInMemoryAuthority } from "./engine.js";
 export type { ClockLike, InMemoryAuthorityConfig, InMemoryAuthorityHandle, SignerLike, VerificationKeyMaterial, } from "./engine.js";
-export type { AccessEnvelopeClaimsV1, ActorId, Failure, FailureKind, IdempotencyKey, JsonValue, OperationId, OrganizationId, RefreshHandle, RefreshHandleOutcome, SiteBinding, SiteId, SignedAccessEnvelope, TeamId, } from "../contract.js";
-export { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, canonicalJson, } from "../contract.js";
+export type { AccessEnvelopeClaimsV1, ActorId, Failure, GrantTarget, FailureKind, IdempotencyKey, JsonValue, OperationId, OrganizationId, RefreshHandle, RefreshHandleOutcome, SiteBinding, SiteId, SignedAccessEnvelope, TeamId, Unbranded, } from "../contract.js";
+export { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, actorId, canonicalJson, operationId, organizationId, siteId, teamId, } from "../contract.js";

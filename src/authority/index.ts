@@ -70,6 +70,7 @@ export type {
   AccessEnvelopeClaimsV1,
   ActorId,
   Failure,
+  GrantTarget,
   FailureKind,
   IdempotencyKey,
   JsonValue,
@@ -81,9 +82,15 @@ export type {
   SiteId,
   SignedAccessEnvelope,
   TeamId,
+  Unbranded,
 } from "../contract.ts";
 export {
   ACCESS_ENVELOPE_FORMAT,
   ACCESS_ENVELOPE_VERSION,
+  actorId,
   canonicalJson,
+  operationId,
+  organizationId,
+  siteId,
+  teamId,
 } from "../contract.ts";

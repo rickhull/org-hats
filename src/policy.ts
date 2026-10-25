@@ -89,8 +89,22 @@ export const validatePolicyBundle = (bundle: PolicyBundle): readonly PolicyProbl
   return problems;
 };
 
-/** The actions a role title carries under a validated bundle; `undefined`
- * when the title is not in the bundle — callers treat that as a validation
- * problem, never as "no actions". */
-export const actionsOf = (bundle: PolicyBundle, role: string): readonly string[] | undefined =>
-  bundle.roles.find((r) => r.title === role)?.actions;
+/** What a role title carries under a validated bundle, or that the bundle
+ * does not name it at all.
+ *
+ * A result rather than `readonly string[] | undefined` because the
+ * distinction is the whole point and `?? []` erased it: an unknown role
+ * silently became a wearable-but-powerless hat instead of the visible
+ * inconsistency it is. Six of this function's callers wrote `?? []`. A
+ * union cannot be coalesced the same way. */
+export type RoleActions =
+  | { readonly found: true; readonly actions: readonly string[] }
+  | { readonly found: false };
+
+/** The actions a role title carries under a validated bundle.
+ * `{ found: false }` means the title is not in the bundle — callers treat
+ * that as a validation problem, never as "no actions". */
+export const actionsOf = (bundle: PolicyBundle, role: string): RoleActions => {
+  const actions = bundle.roles.find((r) => r.title === role)?.actions;
+  return actions === undefined ? { found: false } : { found: true, actions };
+};

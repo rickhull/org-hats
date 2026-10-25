@@ -9,13 +9,26 @@
 // Nothing here is re-exported from the v0.4 root (src/index.ts); it becomes
 // public through the `org-hats/authority` and `org-hats/access` subpaths,
 // whose names this specification pass settles.
+/** The only way to make a branded id: a named, deliberate conversion at the
+ * boundary where an opaque caller-supplied string becomes a domain id. */
+export const organizationId = (raw) => raw;
+export const actorId = (raw) => raw;
+export const operationId = (raw) => raw;
+export const siteId = (raw) => raw;
+export const teamId = (raw) => raw;
 // --- versions -----------------------------------------------------------------
-/** The authority interface version. Every runtime call and every envelope
- * carries it; a mismatch is the `wrong-interface-version` failure, never a
- * silent reinterpretation. */
-export const AUTHORITY_INTERFACE_VERSION = 1;
-/** The envelope format version, independent of the interface version: the
- * envelope outlives the call signatures that produced it. */
+/** The authority interface version. Every runtime call carries it, and a
+ * mismatch is the `wrong-interface-version` failure, never a silent
+ * reinterpretation. An envelope records it as provenance — which interface
+ * issued the claims — but `verify` never gates reading on it: the envelope
+ * outlives the call signatures that produced it, so a command-surface break
+ * must not strand live sessions. The envelope's own version pair is what
+ * gates. */
+export const AUTHORITY_INTERFACE_VERSION = 2;
+/** The envelope and claims format version. This, with the format marker and
+ * the envelope's own `v`, is what `verify` gates reading on. It moves only
+ * when the meaning of the claims changes, never for a command-surface
+ * change. */
 export const ACCESS_ENVELOPE_VERSION = 1;
 export const ACCESS_ENVELOPE_FORMAT = "org-hats.access";
 const isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);

@@ -7,8 +7,8 @@ export interface TwinFixture {
 }
 /** The organization that also joins the festival, and the actor who works
  * both — the cross-operation pair the conformance scenarios exercise. */
-export declare const HARBOR_LOGISTICS = "org-4c1f9a2e";
-export declare const DANA_OKAFOR = "actor-8d3b77c1";
+export declare const HARBOR_LOGISTICS: import("../contract.js").OrganizationId;
+export declare const DANA_OKAFOR: import("../contract.js").ActorId;
 export declare const PROFESSIONAL_OPERATION: TwinFixture;
 export declare const FESTIVAL_BOOTH_COUNT = 150;
 export declare const FESTIVAL: TwinFixture;

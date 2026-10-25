@@ -42,7 +42,10 @@ const failed = (failure: Failure): EvidenceFromProviderCodeResult => ({ ok: fals
 // triggers exactly one refetch per exchange, which is the rotation window.
 
 interface Discovery {
-  readonly authorizationEndpoint: string;
+  /** The token endpoint, where the authorization code is exchanged. The
+   * authorization endpoint is the browser redirect and belongs to the host;
+   * the exchange never needs it. */
+  readonly tokenEndpoint: string;
   readonly jwksUri: string;
 }
 
@@ -68,11 +71,11 @@ const discoveryOf = async (issuer: string): Promise<Discovery> => {
   const cached = discoveryCache.get(issuer);
   if (cached !== undefined && cached.expiresAt > nowSeconds()) return cached.value;
   const url = `${issuer.replace(/\/+$/, "")}/.well-known/openid-configuration`;
-  const document = (await fetchJson(url)) as { authorization_endpoint?: unknown; jwks_uri?: unknown };
-  if (typeof document.authorization_endpoint !== "string" || typeof document.jwks_uri !== "string") {
+  const document = (await fetchJson(url)) as { token_endpoint?: unknown; jwks_uri?: unknown };
+  if (typeof document.token_endpoint !== "string" || typeof document.jwks_uri !== "string") {
     throw new Error("the discovery document lacks its endpoints");
   }
-  const value: Discovery = { authorizationEndpoint: document.authorization_endpoint, jwksUri: document.jwks_uri };
+  const value: Discovery = { tokenEndpoint: document.token_endpoint, jwksUri: document.jwks_uri };
   discoveryCache.set(issuer, { value, expiresAt: nowSeconds() + DISCOVERY_TTL_SECONDS });
   return value;
 };
@@ -262,7 +265,7 @@ export const exchangeCodeForEvidence = async (
   });
   let idToken: string;
   try {
-    const response = await fetch(discovery.authorizationEndpoint, {
+    const response = await fetch(discovery.tokenEndpoint, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body,

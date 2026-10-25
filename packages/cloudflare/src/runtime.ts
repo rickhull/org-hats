@@ -11,6 +11,7 @@ import {
   type AuthorityRuntime,
   type CommandResult,
   type ContextRequest,
+  type HatSummary,
   type Failure,
   type RefreshInput,
   type SignedAccessEnvelope,
@@ -392,13 +393,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
       operationId: string;
       operationDisplayName?: string;
       participation: "invited" | "accepted" | "active" | "revoked";
-      wearableHats: readonly {
-        role: string;
-        actions: readonly string[];
-        teamId?: string;
-        siteId?: string;
-        primary: boolean;
-      }[];
+      wearableHats: readonly HatSummary[];
     }>(operation(claims.operationId), "POST", "/context", {
       organizationId: claims.actor.organizationId,
       actorId: claims.actor.actorId,
@@ -425,8 +420,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
             selectedHat: {
               role: claims.hat.role,
               actions: [...claims.hat.actions],
-              ...(selected.teamId === undefined ? {} : { teamId: selected.teamId }),
-              ...(selected.siteId === undefined ? {} : { siteId: selected.siteId }),
+              target: selected.target,
               primary: selected.primary,
             },
           }),
@@ -504,8 +498,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
           organizationId: input.organizationId,
           actorId: input.actorId,
           role: input.role,
-          ...(input.teamId === undefined ? {} : { teamId: input.teamId }),
-          ...(input.siteId === undefined ? {} : { siteId: input.siteId }),
+          target: input.target,
           ...(input.primary === true ? { primary: true } : {}),
           byActorId: authorized.actorId,
         });

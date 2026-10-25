@@ -8,7 +8,6 @@ import { readFileSync } from "node:fs";
 
 import {
   ACCESS_ENVELOPE_FORMAT,
-  AUTHORITY_INTERFACE_VERSION,
   canonicalJson,
   type AccessEnvelopeClaimsV1,
   type SignedAccessEnvelope,
@@ -104,12 +103,46 @@ test("verification fails closed in a fixed order when faults combine", async () 
 });
 
 test("wrong versions fail closed, never reinterpreted", async () => {
+  const now = vectors.claims.iat + 1;
   const badFormat = { ...envelopeOf(vectors.claims), format: "something.else" };
-  assert.equal((await verify(badFormat, keys, { now: vectors.claims.iat + 1 })).failure.kind, "wrong-interface-version");
+  assert.equal((await verify(badFormat, keys, { now })).failure.kind, "wrong-interface-version");
   const badVersion = { ...envelopeOf(vectors.claims), v: 2 };
-  assert.equal((await verify(badVersion, keys, { now: vectors.claims.iat + 1 })).failure.kind, "wrong-interface-version");
-  const badInterface = envelopeOf({ ...vectors.claims, interfaceVersion: 99 as never });
-  assert.equal((await verify(badInterface, keys, { now: vectors.claims.iat + 1 })).failure.kind, "wrong-interface-version");
+  assert.equal((await verify(badVersion, keys, { now })).failure.kind, "wrong-interface-version");
+
+  // The claims carry their own version, and it has to agree with the
+  // wrapper's. This was unchecked: a signature-valid `v: 2` claims payload
+  // inside a `v: 1` envelope was accepted and read as v1.
+  const claimsVersionDisagrees = envelopeOf({ ...vectors.claims, v: 2 as never });
+  const disagreement = await verify(claimsVersionDisagrees, keys, { now });
+  assert.equal(disagreement.failure.kind, "wrong-interface-version");
+  assert.match(disagreement.failure.detail ?? "", /disagree on the version/);
+});
+
+test("the issuing interface version is provenance, not a gate on reading", async () => {
+  // An envelope outlives the call signatures that produced it. The claims
+  // record which runtime interface issued them, but a verifier must not
+  // reject live sessions because the issuer has since moved to a new command
+  // vocabulary — nothing about what these claims *mean* changed. What governs
+  // readability is the envelope version pair, asserted above.
+  //
+  // Signed here rather than reusing the vector signature, because the point
+  // is a *valid* envelope whose issuing interface version differs.
+  const signer = await webCryptoSigner("key-provenance");
+  const signerKey = await ed25519VerifyKey("key-provenance", await signer.publicKey());
+  // 1 is the interface the vectors were issued under; 2 is current.
+  const claims = { ...vectors.claims, interfaceVersion: 1 as never };
+  const envelope: SignedAccessEnvelope = {
+    format: ACCESS_ENVELOPE_FORMAT,
+    v: 1,
+    keyId: "key-provenance",
+    claims,
+    signature: await signer.sign(canonicalJson(claims)),
+  };
+  const verified = await verify(envelope, new Map([[signerKey.keyId, signerKey]]), {
+    now: vectors.claims.iat + 1,
+  });
+  assert.ok(!("failure" in verified), "a different issuing interface version still reads");
+  assert.equal(verified.claims.interfaceVersion, 1 as never, "and is reported unchanged");
 });
 
 test("wrong-binding: another operation, or a site the envelope is not admitted to", async () => {

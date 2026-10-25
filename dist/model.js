@@ -53,6 +53,28 @@ export const transitionParticipation = (organizationId, operationId, current, ev
         return { ok: false, problem: `cannot activate from ${current.status}` };
     return { ok: true, participation: { ...current, status: "active" } };
 };
+/** Apply an event to a participation list: find the current standing, decide
+ * with `transitionParticipation`, and return the new list. This is the only
+ * way a participation status should move — an adapter that writes the status
+ * directly is an adapter that can flip `revoked` back to `active`, which the
+ * state machine above refuses by construction.
+ *
+ * Seeding is not transitioning: bootstrap and restore install a declared
+ * status and must not come through here. */
+export const applyParticipationEvent = (participations, organizationId, operationId, event) => {
+    const current = participations.find((p) => p.organizationId === organizationId && p.operationId === operationId);
+    const transition = transitionParticipation(organizationId, operationId, current, event);
+    if (!transition.ok)
+        return transition;
+    const participation = transition.participation;
+    const next = current === undefined
+        ? [...participations, participation]
+        : participations.map((p) => (p === current ? participation : p));
+    return { ok: true, participations: next, participation };
+};
+/** Looks up by a plain string: the team id comes from a caller-supplied
+ * `TargetRef`, which the host builds from its own records. Comparing it
+ * against stored ids is the point; it is not itself a domain id yet. */
 const siteOfTeam = (snapshot, teamId) => snapshot.teams.find((t) => t.teamId === teamId)?.siteId;
 /** A grant reaches its own team; a site grant reaches the site and every
  * team at it. Nothing reaches a whole operation. */
@@ -84,22 +106,33 @@ export const wearableGrants = (snapshot, organizationId, actorId, operationId) =
         g.actorId === actorId &&
         g.revoked !== true);
 };
-const hatOf = (bundle, grant) => ({
-    grantId: grant.grantId,
-    role: grant.role,
-    actions: actionsOf(bundle, grant.role) ?? [],
-    target: grant.target,
-});
+/** The one ranked selection: the primary first, then the deterministic
+ * order by (role, target id, grant id). Both `selectWornHat` and `decide`
+ * read it, so the rule is written once. */
+const firstByRank = (grants) => {
+    const rank = (g) => `${g.primary === true ? 0 : 1}|${g.role}|${g.target.kind === "team" ? g.target.teamId : g.target.siteId}|${g.grantId}`;
+    return [...grants].sort((a, b) => (rank(a) < rank(b) ? -1 : rank(a) > rank(b) ? 1 : 0))[0];
+};
+/** A hat the bundle can describe. `undefined` when the grant names a role
+ * the bundle does not carry: that is a snapshot inconsistency
+ * (`invariantProblems` reports it), never a role with no actions. */
+const hatOf = (bundle, grant) => {
+    const role = actionsOf(bundle, grant.role);
+    if (!role.found)
+        return undefined;
+    return {
+        grantId: grant.grantId,
+        role: grant.role,
+        actions: role.actions,
+        target: grant.target,
+    };
+};
 /** Worn-hat selection, operation-local: the primary when it is wearable at
  * the target, otherwise the deterministic first by (role, target id, grant
  * id). A revoked or disabled primary never blocks the fallback. */
 export const selectWornHat = (snapshot, bundle, organizationId, actorId, operationId, target) => {
     const wearable = wearableGrants(snapshot, organizationId, actorId, operationId).filter((g) => grantReaches(snapshot, g, target));
-    if (wearable.length === 0)
-        return undefined;
-    const rank = (g) => `${g.primary === true ? 0 : 1}|${g.role}|${g.target.kind === "team" ? g.target.teamId : g.target.siteId}|${g.grantId}`;
-    const sorted = [...wearable].sort((a, b) => (rank(a) < rank(b) ? -1 : rank(a) > rank(b) ? 1 : 0));
-    const chosen = sorted[0];
+    const chosen = firstByRank(wearable);
     if (chosen === undefined)
         return undefined;
     return hatOf(bundle, chosen);
@@ -114,12 +147,17 @@ export const decide = (snapshot, bundle, organizationId, actorId, operationId, a
     const wearable = wearableGrants(snapshot, organizationId, actorId, operationId);
     if (wearable.length === 0)
         return { allowed: false, reason: "not-admitted" };
-    if (!wearable.some((g) => grantReaches(snapshot, g, target))) {
+    const reaching = wearable.filter((g) => grantReaches(snapshot, g, target));
+    const chosen = firstByRank(reaching);
+    if (chosen === undefined)
         return { allowed: false, reason: "out-of-reach" };
-    }
-    const hat = selectWornHat(snapshot, bundle, organizationId, actorId, operationId, target);
+    // An unknown role is not a hat with no actions. Collapsing the two is
+    // what `actionsOf`'s contract forbids: it would deny with
+    // `no-capability`, describing the actor, when the fault is that the
+    // snapshot and the bundle disagree.
+    const hat = hatOf(bundle, chosen);
     if (hat === undefined)
-        return { allowed: false, reason: "out-of-reach" };
+        return { allowed: false, reason: "policy-inconsistent" };
     if (!hat.actions.includes(action))
         return { allowed: false, reason: "no-capability" };
     return { allowed: true, hat };
@@ -201,7 +239,7 @@ export const invariantProblems = (snapshot, bundle) => {
             p.status !== "revoked")) {
             problems.push(`grant ${grant.grantId} has no participation to stand on`);
         }
-        if (actionsOf(bundle, grant.role) === undefined) {
+        if (!actionsOf(bundle, grant.role).found) {
             problems.push(`grant ${grant.grantId} names the unknown role "${grant.role}"`);
         }
         if (grant.target.kind === "team" && !teams.has(grant.target.teamId)) {
@@ -213,9 +251,11 @@ export const invariantProblems = (snapshot, bundle) => {
         if (grant.target.kind === "site" && sites.get(grant.target.siteId)?.operationId !== grant.operationId) {
             problems.push(`grant ${grant.grantId} reaches a site outside its operation`);
         }
-        if (grant.target.kind === "team" && teams.get(grant.target.teamId)?.siteId !== undefined) {
-            const siteId = teams.get(grant.target.teamId)?.siteId;
-            if (sites.get(siteId ?? "")?.operationId !== grant.operationId) {
+        if (grant.target.kind === "team") {
+            const siteOfTarget = teams.get(grant.target.teamId)?.siteId;
+            // an unknown team is already reported above; this asks only whether a
+            // known team's site belongs to the grant's operation
+            if (siteOfTarget !== undefined && sites.get(siteOfTarget)?.operationId !== grant.operationId) {
                 problems.push(`grant ${grant.grantId} reaches a team outside its operation`);
             }
         }

@@ -3,20 +3,36 @@ import {
   ACCESS_ENVELOPE_VERSION,
   AUTHORITY_INTERFACE_VERSION,
   actionsOf,
+  actorId,
   canonicalJson,
+  operationId,
+  organizationId,
+  siteId,
+  teamId,
   validatePolicyBundle,
   type AccessEnvelopeClaimsV1,
+  type ActorId,
   type FailureKind,
+  type GrantTarget,
   type HatSummary,
   type JsonValue,
+  type OperationId,
+  type OrganizationId,
   type PolicyBundle,
   type RefreshHandleOutcome,
   type SiteBinding,
+  type SiteId,
+  type TeamId,
+  type Unbranded,
 } from "org-hats/authority";
 import {
   readReach,
+  transitionParticipation,
   wearableGrants,
   type Grant,
+  type Participation,
+  type ParticipationEvent,
+  type ParticipationTransition,
   type Snapshot,
 } from "org-hats";
 import type { Env } from "./env";
@@ -27,11 +43,26 @@ import {
   type ExportSnapshot,
   type StateRow,
 } from "./state";
+import {
+  rowActorId,
+  rowFlag,
+  rowOperationId,
+  rowOrganizationId,
+  rowSiteId,
+  rowTeamId,
+  rowText,
+} from "./row";
 
 /** One operation authority. The object owns operation-local facts: sites,
  * teams, grants, participation, policy, refresh records, audit, claims, and
  * the outbox that carries invitations to organization authority. */
-const SCHEMA_VERSION = "2";
+const SCHEMA_VERSION = "3";
+
+/** How stale the org-actor projection may get before reconciliation pulls it
+ * again. The push channel carries a change immediately; this interval bounds
+ * only how long a *dropped* message can go unrepaired, so it is a
+ * convergence budget and never the revocation window. */
+const ROSTER_RECONCILE_SECONDS = 15 * 60;
 
 type Row = Record<string, string | number | null>;
 
@@ -75,6 +106,35 @@ const asArray = (input: unknown, field: string): unknown[] => {
   return input;
 };
 
+// The command-handler seam: a request body carries opaque strings, and these
+// are where one becomes a domain id. Declared outside the class so the
+// coordinator's `organizationId`/`actorId` parameters cannot shadow them.
+const asOrganizationId = (input: unknown, field: string): OrganizationId =>
+  organizationId(asString(input, field));
+const asActorId = (input: unknown, field: string): ActorId => actorId(asString(input, field));
+const asOperationId = (input: unknown, field: string): OperationId =>
+  operationId(asString(input, field));
+const asSiteId = (input: unknown, field: string): SiteId => siteId(asString(input, field));
+const asTeamId = (input: unknown, field: string): TeamId => teamId(asString(input, field));
+
+/** A grant target, from a request body. The union is what makes "exactly
+ * one target" a parse concern rather than a validation concern: the body
+ * either names a team or a site, and anything else never becomes a
+ * `GrantTarget` at all. */
+const asGrantTarget = (input: unknown, field: string): Unbranded<GrantTarget> => {
+  const target = asRecord(input);
+  const kind = asString(target["kind"], `${field}.kind`);
+  if (kind === "team") return { kind: "team", teamId: asString(target["teamId"], `${field}.teamId`) };
+  if (kind === "site") return { kind: "site", siteId: asString(target["siteId"], `${field}.siteId`) };
+  throw new Error(`${field}.kind must be "team" or "site"`);
+};
+
+/** The three columns a target is stored as: the discriminant and the two
+ * nullable id columns. Written once, so the rows cannot disagree with the
+ * union. */
+const targetColumns = (target: Unbranded<GrantTarget>): readonly [string, string | null, string | null] =>
+  target.kind === "team" ? ["team", target.teamId, null] : ["site", null, target.siteId];
+
 interface SiteInput {
   readonly siteId: string;
   readonly displayName?: string;
@@ -93,8 +153,7 @@ interface GrantInput {
   readonly organizationId: string;
   readonly actorId: string;
   readonly role: string;
-  readonly teamId?: string;
-  readonly siteId?: string;
+  readonly target: Unbranded<GrantTarget>;
   readonly primary?: boolean;
   readonly revoked?: boolean;
 }
@@ -125,6 +184,13 @@ interface InviteInput {
   readonly idempotencyKey: string;
 }
 
+/** One organization actor as the projection carries it: who they are and
+ * whether they are disabled. Nothing else crosses — see `org_actors`. */
+interface RosterActor {
+  readonly actorId: string;
+  readonly disabled: boolean;
+}
+
 interface IntakeMessage {
   readonly messageId: string;
   readonly kind: string;
@@ -132,6 +198,13 @@ interface IntakeMessage {
   readonly organizationId?: string;
   readonly operationId?: string;
   readonly actorId?: string;
+  /** A `roster` message carries the organization's whole actor list: the
+   * organization is the only writer, so a delivered image is the truth for
+   * that organization and applying it is a full replace. */
+  readonly actors?: readonly RosterActor[];
+  /** When a `roster` image was taken, so a delayed delivery cannot overwrite
+   * a newer image. */
+  readonly at?: number;
 }
 
 interface GrantCommand {
@@ -139,8 +212,7 @@ interface GrantCommand {
   readonly organizationId: string;
   readonly actorId: string;
   readonly role: string;
-  readonly teamId?: string;
-  readonly siteId?: string;
+  readonly target: Unbranded<GrantTarget>;
   readonly primary?: boolean;
   readonly byActorId: string;
   readonly idempotencyKey: string;
@@ -240,6 +312,20 @@ export class OperationAuthority extends DurableObject<Env> {
         updated_at INTEGER NOT NULL
       )`,
     );
+    // The org-actor projection: the authority-relevant tuple of a
+    // participating organization's roster, and nothing more. Display names,
+    // principal links, and provider configuration stay in the organization
+    // object, which is the only writer of any of it — this operation holds a
+    // copy solely so a decision it must make is a local, atomic read.
+    sql.exec(
+      `CREATE TABLE IF NOT EXISTS org_actors (
+        organization_id TEXT NOT NULL,
+        actor_id TEXT NOT NULL,
+        disabled INTEGER NOT NULL DEFAULT 0,
+        synced_at INTEGER NOT NULL,
+        PRIMARY KEY (organization_id, actor_id)
+      )`,
+    );
     sql.exec(
       `CREATE TABLE IF NOT EXISTS grants (
         grant_id TEXT PRIMARY KEY,
@@ -311,6 +397,12 @@ export class OperationAuthority extends DurableObject<Env> {
     );
     if (!refreshColumns.has("amr_json")) sql.exec("ALTER TABLE refresh_records ADD COLUMN amr_json TEXT");
     if (!refreshColumns.has("auth_time")) sql.exec("ALTER TABLE refresh_records ADD COLUMN auth_time INTEGER");
+    // Every migration above is additive and runs unconditionally, so after
+    // this constructor the object *is* at the current schema: the recorded
+    // version must say so. `INSERT OR IGNORE` alone would leave an object
+    // created at an earlier version reporting that version forever while
+    // carrying the newer tables and columns.
+    sql.exec("UPDATE meta SET value = ? WHERE key = 'schema_version'", SCHEMA_VERSION);
   }
 
   private rows(query: string, ...bindings: (string | number | null)[]): Row[] {
@@ -321,9 +413,9 @@ export class OperationAuthority extends DurableObject<Env> {
     return this.rows(query, ...bindings)[0];
   }
 
-  private operationId(): string | undefined {
+  private operationId(): OperationId | undefined {
     const row = this.one("SELECT operation_id FROM operation LIMIT 1");
-    return row === undefined ? undefined : String(row["operation_id"]);
+    return row === undefined ? undefined : rowOperationId(row);
   }
 
   private policy(): PolicyBundle | undefined {
@@ -383,6 +475,140 @@ export class OperationAuthority extends DurableObject<Env> {
       organizationId,
       actorId,
     );
+  }
+
+  /** Apply a roster image for one organization. A full replace, because the
+   * organization owns its roster: an actor the image omits is an actor that
+   * no longer exists, and must not survive here.
+   *
+   * Monotonic in the image's own timestamp, not in arrival order. The outbox
+   * delivers a message whose target was briefly unreachable after a later
+   * one, so without this an older image could overwrite a newer one and
+   * resurrect a disabled actor until the next reconciliation. Returns false
+   * when the image was ignored as stale. The caller owns the transaction. */
+  private replaceRoster(
+    organizationId: string,
+    actors: readonly RosterActor[],
+    imageAt: number,
+    at: number,
+  ): boolean {
+    const key = `roster_at:${organizationId}`;
+    const applied = Number(this.one("SELECT value FROM meta WHERE key = ?", key)?.["value"] ?? 0);
+    if (imageAt < applied) return false;
+    this.ctx.storage.sql.exec("DELETE FROM org_actors WHERE organization_id = ?", organizationId);
+    for (const actor of actors) {
+      this.ctx.storage.sql.exec(
+        "INSERT INTO org_actors (organization_id, actor_id, disabled, synced_at) VALUES (?, ?, ?, ?)",
+        organizationId,
+        actor.actorId,
+        actor.disabled ? 1 : 0,
+        imageAt,
+      );
+    }
+    for (const [metaKey, metaValue] of [[key, imageAt], ["roster_synced_at", at]] as const) {
+      this.ctx.storage.sql.exec(
+        "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        metaKey,
+        String(metaValue),
+      );
+    }
+    return true;
+  }
+
+  /** Pull one organization's roster. The reconciliation direction: used to
+   * repair a dropped push, never to carry a revocation — it cannot run
+   * inside `transactionSync`, which has no `await`. */
+  private async pullRoster(organizationId: string): Promise<boolean> {
+    const stub = this.env.ORGANIZATION.get(this.env.ORGANIZATION.idFromName(organizationId));
+    const response = await stub.fetch("https://organization.internal/roster");
+    if (!response.ok) return false;
+    const body = (await response.json()) as {
+      readonly ok?: boolean;
+      readonly value?: { readonly actors?: readonly RosterActor[] };
+    };
+    const actors = body.value?.actors;
+    if (body.ok !== true || actors === undefined) return false;
+    const at = now();
+    this.ctx.storage.transactionSync(() => {
+      // a pull reads the organization's state as it is right now, so its
+      // image is current by construction and never loses to a stored stamp
+      this.replaceRoster(organizationId, actors, at, at);
+    });
+    return true;
+  }
+
+  /** Reconcile every actively participating organization's roster, at most
+   * once per `ROSTER_RECONCILE_SECONDS` unless forced. Convergence after a
+   * lost message; the immediate path is the push channel. */
+  private async reconcileRosters(force = false): Promise<{ synced: number; organizations: number }> {
+    const last = Number(this.one("SELECT value FROM meta WHERE key = 'roster_synced_at'")?.["value"] ?? 0);
+    const organizationIds = this.rows(
+      "SELECT organization_id FROM participations WHERE status = 'active' ORDER BY organization_id",
+    ).map((row) => String(row["organization_id"]));
+    if (!force && now() - last < ROSTER_RECONCILE_SECONDS) {
+      return { synced: 0, organizations: organizationIds.length };
+    }
+    let synced = 0;
+    for (const organizationId of organizationIds) {
+      if (await this.pullRoster(organizationId)) synced += 1;
+    }
+    return { synced, organizations: organizationIds.length };
+  }
+
+  /** Decide a participation move with the portable state machine, against
+   * the row as it stands.
+   *
+   * The same function the in-memory engine routes through — not an adjacent
+   * copy of the rule. The `SELECT` supplies `current`, the decision is pure
+   * and synchronous, so it runs inside `transactionSync` and the write that
+   * follows commits with it. An `UPDATE ... SET status = 'active'` without
+   * this is how an acceptance delivered after a revoke flipped `revoked`
+   * back: no `CHECK` constraint can express a transition, only a set of
+   * legal strings. */
+  private participationTransition(organization: string, event: ParticipationEvent): ParticipationTransition {
+    const operation = this.operationId();
+    if (operation === undefined) return { ok: false, problem: "the operation is not bootstrapped" };
+    const organization_ = organizationId(organization);
+    const row = this.one("SELECT status FROM participations WHERE organization_id = ?", organization);
+    const current: Participation | undefined = row === undefined
+      ? undefined
+      : {
+          organizationId: organization_,
+          operationId: operation,
+          status: rowText(row, "status") as Participation["status"],
+        };
+    return transitionParticipation(organization_, operation, current, event);
+  }
+
+  private writeParticipation(participation: Participation, at: number): void {
+    this.ctx.storage.sql.exec(
+      `INSERT INTO participations (organization_id, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(organization_id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`,
+      participation.organizationId,
+      participation.status,
+      at,
+      at,
+    );
+  }
+
+  /** Revoke a participation through the state machine. An already-revoked
+   * participation is a safe retry — the state the caller asked for is the
+   * state that holds — while a participation that was never there is a
+   * denial. Idempotency is this adapter's policy; that `revoked` never moves
+   * back is the model's. */
+  private revokeParticipationRow(
+    organizationId: string,
+    by: "operation" | "organization",
+    at: number,
+  ): { readonly ok: true } | { readonly ok: false; readonly problem: string } {
+    const row = this.one("SELECT status FROM participations WHERE organization_id = ?", organizationId);
+    if (row === undefined) return { ok: false, problem: "the organization is not participating" };
+    if (String(row["status"]) === "revoked") return { ok: true };
+    const revoked = this.participationTransition(organizationId, { kind: "revoke", by });
+    if (!revoked.ok) return { ok: false, problem: revoked.problem };
+    this.writeParticipation(revoked.participation, at);
+    return { ok: true };
   }
 
   private bootstrap(input: BootstrapInput): Result<{ operationId: string }> {
@@ -454,9 +680,7 @@ export class OperationAuthority extends DurableObject<Env> {
           grant.organizationId,
           grant.actorId,
           grant.role,
-          grant.teamId === undefined ? "site" : "team",
-          grant.teamId ?? null,
-          grant.siteId ?? null,
+          ...targetColumns(grant.target),
           grant.primary === true ? 1 : 0,
           grant.revoked === true ? 1 : 0,
           at,
@@ -491,10 +715,12 @@ export class OperationAuthority extends DurableObject<Env> {
     return this.ctx.storage.transactionSync(() => {
       const replay = this.replay(input.idempotencyKey, payload);
       if (replay !== undefined) return replay;
-      const existing = this.one("SELECT status FROM participations WHERE organization_id = ?", input.organizationId);
-      if (existing !== undefined && String(existing["status"]) !== "revoked") {
-        return failure("denied", "the organization is already participating");
-      }
+      // Revoke is terminal, so an invite only ever starts from nothing. The
+      // previous `status != 'revoked'` guard let a revoked organization be
+      // re-invited here while the in-memory engine refused it; the state
+      // machine settles the disagreement in the model's favour.
+      const invited = this.participationTransition(input.organizationId, { kind: "invite", by: "operation" });
+      if (!invited.ok) return failure("denied", invited.problem);
       this.ctx.storage.sql.exec(
         `INSERT INTO invitations (invitation_id, organization_id, status, created_at, updated_at)
          VALUES (?, ?, 'invited', ?, ?)`,
@@ -503,14 +729,7 @@ export class OperationAuthority extends DurableObject<Env> {
         at,
         at,
       );
-      this.ctx.storage.sql.exec(
-        `INSERT INTO participations (organization_id, status, created_at, updated_at)
-         VALUES (?, 'invited', ?, ?)
-         ON CONFLICT(organization_id) DO UPDATE SET status = 'invited', updated_at = excluded.updated_at`,
-        input.organizationId,
-        at,
-        at,
-      );
+      this.writeParticipation(invited.participation, at);
       this.outbox(
         "invitation",
         input.organizationId,
@@ -542,17 +761,30 @@ export class OperationAuthority extends DurableObject<Env> {
         );
         if (invitation === undefined) return failure("unavailable", "invitation is not recorded yet");
         const organizationId = String(invitation["organization_id"]);
-        this.ctx.storage.sql.exec(
-          "UPDATE invitations SET status = 'active', updated_at = ? WHERE invitation_id = ?",
-          at,
-          input.invitationId,
-        );
-        this.ctx.storage.sql.exec(
-          "UPDATE participations SET status = 'active', updated_at = ? WHERE organization_id = ?",
-          at,
-          organizationId,
-        );
-        this.audit("outbox", `participation ${organizationId} active (canonical)`, at);
+        // Two events in the model's order — the organization accepted, the
+        // operation activates — rather than one jump to `active`. Both steps
+        // refuse to run from `revoked`, which is what makes an acceptance
+        // delivered after a revoke a recorded no-op instead of a
+        // resurrection. The message is still delivered: it arrived, it just
+        // did not apply, and retrying it forever would not help.
+        const accepted = this.participationTransition(organizationId, { kind: "accept", by: "organization" });
+        if (!accepted.ok) {
+          this.audit("outbox", `acceptance for ${organizationId} not applied: ${accepted.problem}`, at);
+        } else {
+          this.writeParticipation(accepted.participation, at);
+          const activated = this.participationTransition(organizationId, { kind: "activate", by: "operation" });
+          if (!activated.ok) {
+            this.audit("outbox", `activation for ${organizationId} not applied: ${activated.problem}`, at);
+          } else {
+            this.writeParticipation(activated.participation, at);
+            this.ctx.storage.sql.exec(
+              "UPDATE invitations SET status = 'active', updated_at = ? WHERE invitation_id = ?",
+              at,
+              input.invitationId,
+            );
+            this.audit("outbox", `participation ${organizationId} active (canonical)`, at);
+          }
+        }
       } else if (input.kind === "participation-revoked") {
         if (input.organizationId === undefined) return failure("invalid-command", "revocation needs an organizationId");
         this.ctx.storage.sql.exec(
@@ -560,22 +792,36 @@ export class OperationAuthority extends DurableObject<Env> {
           at,
           input.organizationId,
         );
-        this.ctx.storage.sql.exec(
-          "UPDATE participations SET status = 'revoked', updated_at = ? WHERE organization_id = ?",
-          at,
-          input.organizationId,
-        );
+        const revoked = this.revokeParticipationRow(input.organizationId, "organization", at);
         this.ctx.storage.sql.exec(
           "UPDATE refresh_records SET revoked = 1 WHERE organization_id = ?",
           input.organizationId,
         );
-        this.audit("outbox", `participation ${input.organizationId} revoked`, at);
+        this.audit(
+          "outbox",
+          revoked.ok
+            ? `participation ${input.organizationId} revoked`
+            : `participation ${input.organizationId} not revoked: ${revoked.problem}`,
+          at,
+        );
       } else if (input.kind === "actor-disabled") {
         if (input.organizationId === undefined || input.actorId === undefined) {
           return failure("invalid-command", "actor-disabled needs organizationId and actorId");
         }
         this.revokeRefreshRecords(input.organizationId, input.actorId);
         this.audit("outbox", `actor ${input.organizationId}/${input.actorId} disabled; refresh records revoked`, at);
+      } else if (input.kind === "roster") {
+        if (input.organizationId === undefined) return failure("invalid-command", "roster needs an organizationId");
+        if (input.actors === undefined) return failure("invalid-command", "roster needs an actors list");
+        const imageAt = input.at ?? at;
+        const applied = this.replaceRoster(input.organizationId, input.actors, imageAt, at);
+        this.audit(
+          "outbox",
+          applied
+            ? `roster for ${input.organizationId}: ${input.actors.length} actors, ${input.actors.filter((actor) => actor.disabled).length} disabled`
+            : `roster for ${input.organizationId} ignored: image ${imageAt} is older than the applied one`,
+          at,
+        );
       } else {
         return failure("invalid-command", `unknown intake kind ${input.kind}`);
       }
@@ -590,13 +836,8 @@ export class OperationAuthority extends DurableObject<Env> {
     return this.ctx.storage.transactionSync(() => {
       const replay = this.replay(idempotencyKey, payload);
       if (replay !== undefined) return replay;
-      const participation = this.one("SELECT status FROM participations WHERE organization_id = ?", organizationId);
-      if (participation === undefined) return failure("denied", "the organization is not participating");
-      this.ctx.storage.sql.exec(
-        "UPDATE participations SET status = 'revoked', updated_at = ? WHERE organization_id = ?",
-        at,
-        organizationId,
-      );
+      const revoked = this.revokeParticipationRow(organizationId, "operation", at);
+      if (!revoked.ok) return failure("denied", revoked.problem);
       this.ctx.storage.sql.exec(
         "UPDATE invitations SET status = 'revoked', updated_at = ? WHERE organization_id = ?",
         at,
@@ -627,8 +868,7 @@ export class OperationAuthority extends DurableObject<Env> {
       organizationId: input.organizationId,
       actorId: input.actorId,
       role: input.role,
-      teamId: input.teamId ?? null,
-      siteId: input.siteId ?? null,
+      target: input.target,
       primary: input.primary === true,
       byActorId: input.byActorId,
     });
@@ -637,14 +877,36 @@ export class OperationAuthority extends DurableObject<Env> {
       if (replay !== undefined) return replay;
       const policy = this.policy();
       if (policy === undefined) return failure("unavailable", "operation is not bootstrapped");
-      if (actionsOf(policy, input.role) === undefined) return failure("invalid-command", `unknown role ${input.role}`);
-      if ((input.teamId === undefined) === (input.siteId === undefined)) {
-        return failure("invalid-command", "a grant needs exactly one target");
+      if (!actionsOf(policy, input.role).found) return failure("invalid-command", `unknown role ${input.role}`);
+      // A grant stands on an actor and a participation. The actor is an
+      // organization-owned fact, so this reads the projection rather than
+      // the other coordinator: a local, atomic check inside the same
+      // transaction as the insert, where a cross-object lookup before the
+      // transaction could only have offered a check-then-act window.
+      if (this.one(
+        "SELECT 1 AS present FROM org_actors WHERE organization_id = ? AND actor_id = ?",
+        input.organizationId,
+        input.actorId,
+      ) === undefined) {
+        return failure("invalid-command", "unknown actor");
       }
-      if (input.teamId !== undefined && this.one("SELECT 1 AS present FROM teams WHERE team_id = ?", input.teamId) === undefined) {
+      const standing = this.one("SELECT status FROM participations WHERE organization_id = ?", input.organizationId);
+      if (standing === undefined || String(standing["status"]) !== "active") {
+        return failure("denied", "the organization does not actively participate in this operation");
+      }
+      // "exactly one target" is no longer checked here: `GrantTarget` is a
+      // two-arm union, so neither-and-both never reach this far. What is
+      // left is existence.
+      if (
+        input.target.kind === "team" &&
+        this.one("SELECT 1 AS present FROM teams WHERE team_id = ?", input.target.teamId) === undefined
+      ) {
         return failure("invalid-command", "unknown team");
       }
-      if (input.siteId !== undefined && this.one("SELECT 1 AS present FROM sites WHERE site_id = ?", input.siteId) === undefined) {
+      if (
+        input.target.kind === "site" &&
+        this.one("SELECT 1 AS present FROM sites WHERE site_id = ?", input.target.siteId) === undefined
+      ) {
         return failure("invalid-command", "unknown site");
       }
       if (input.primary === true) {
@@ -663,9 +925,7 @@ export class OperationAuthority extends DurableObject<Env> {
         input.organizationId,
         input.actorId,
         input.role,
-        input.teamId === undefined ? "site" : "team",
-        input.teamId ?? null,
-        input.siteId ?? null,
+        ...targetColumns(input.target),
         input.primary === true ? 1 : 0,
         at,
         at,
@@ -801,6 +1061,12 @@ export class OperationAuthority extends DurableObject<Env> {
     }
     const pending = this.outboxRows().length;
     if (pending > 0) await this.ctx.storage.setAlarm(Date.now() + 1000);
+    // Reconciliation rides the drain the Worker already calls around every
+    // command, so an operation in use converges without a standing alarm.
+    // The cadence guard makes this a no-op on all but one call per interval;
+    // an idle operation makes no decisions to be stale about, and the next
+    // command reconciles before one is made.
+    await this.reconcileRosters();
     return { delivered, pending };
   }
 
@@ -830,6 +1096,11 @@ export class OperationAuthority extends DurableObject<Env> {
       accessRequests: count("access_requests"),
       outbox: this.outboxRows().length,
       audit: count("audit"),
+      orgActors: count("org_actors"),
+      disabledOrgActors: Number(this.one("SELECT COUNT(*) AS n FROM org_actors WHERE disabled = 1")?.["n"] ?? 0),
+      // so an operator reads a stale projection rather than inferring one
+      rosterSyncedAt: Number(this.one("SELECT value FROM meta WHERE key = 'roster_synced_at'")?.["value"] ?? 0),
+      rosterReconcileSeconds: ROSTER_RECONCILE_SECONDS,
     };
   }
 
@@ -858,6 +1129,9 @@ export class OperationAuthority extends DurableObject<Env> {
       invitations: this.rows("SELECT invitation_id, organization_id, status FROM invitations ORDER BY invitation_id"),
       refreshRecords: this.rows("SELECT handle_hash, organization_id, actor_id, revoked, superseded, amr_json, auth_time FROM refresh_records ORDER BY handle_hash"),
       accessRequests: this.rows("SELECT request_id, organization_id, actor_id, note FROM access_requests ORDER BY request_id"),
+      // derived, and inspectable: `/snapshot` is the operator's view, while
+      // `/export` carries only the operation's own facts
+      orgActors: this.rows("SELECT organization_id, actor_id, disabled, synced_at FROM org_actors ORDER BY organization_id, actor_id"),
     };
   }
 
@@ -871,45 +1145,56 @@ export class OperationAuthority extends DurableObject<Env> {
     return row === undefined ? 900 : Number(row["envelope_lifetime_seconds"]);
   }
 
-  private modelSnapshot(organizationId: string, actorId: string): Snapshot | undefined {
+  /** The operation's state as the portable model reads it. The
+   * organizations and actors come from the projection: they are the facts
+   * the organization owns, copied here so `wearableGrants` can enforce
+   * actor existence and the disabled flag — which it cannot do against a
+   * roster the operation does not hold. */
+  private modelSnapshot(): Snapshot | undefined {
     const operationId = this.operationId();
     if (operationId === undefined) return undefined;
     const sites = this.rows("SELECT site_id, display_name, aliases_json FROM sites").map((row) => ({
-      siteId: String(row["site_id"]),
+      siteId: rowSiteId(row),
       operationId,
-      ...(row["display_name"] === null ? {} : { displayName: String(row["display_name"]) }),
-      aliases: JSON.parse(String(row["aliases_json"])) as string[],
+      ...(row["display_name"] === null ? {} : { displayName: rowText(row, "display_name") }),
+      aliases: JSON.parse(rowText(row, "aliases_json")) as string[],
     }));
     const teams = this.rows("SELECT team_id, site_id, organization_id, display_name FROM teams").map((row) => ({
-      teamId: String(row["team_id"]),
-      siteId: String(row["site_id"]),
-      organizationId: String(row["organization_id"]),
-      ...(row["display_name"] === null ? {} : { displayName: String(row["display_name"]) }),
+      teamId: rowTeamId(row),
+      siteId: rowSiteId(row),
+      organizationId: rowOrganizationId(row),
+      ...(row["display_name"] === null ? {} : { displayName: rowText(row, "display_name") }),
     }));
     const grants: Grant[] = this.rows("SELECT * FROM grants").map((row) => ({
-      grantId: String(row["grant_id"]),
+      grantId: rowText(row, "grant_id"),
       operationId,
-      organizationId: String(row["organization_id"]),
-      actorId: String(row["actor_id"]),
-      role: String(row["role"]),
+      organizationId: rowOrganizationId(row),
+      actorId: rowActorId(row),
+      role: rowText(row, "role"),
       target: row["target_kind"] === "team"
-        ? { kind: "team", teamId: String(row["team_id"]) }
-        : { kind: "site", siteId: String(row["site_id"]) },
-      ...(Number(row["is_primary"]) === 1 ? { primary: true } : {}),
-      ...(Number(row["revoked"]) === 1 ? { revoked: true } : {}),
+        ? { kind: "team", teamId: rowTeamId(row) }
+        : { kind: "site", siteId: rowSiteId(row) },
+      ...(rowFlag(row, "is_primary") ? { primary: true } : {}),
+      ...(rowFlag(row, "revoked") ? { revoked: true } : {}),
     }));
     const participations = this.rows("SELECT organization_id, status FROM participations").map((row) => ({
-      organizationId: String(row["organization_id"]),
+      organizationId: rowOrganizationId(row),
       operationId,
-      status: String(row["status"]) as "invited" | "accepted" | "active" | "revoked",
+      status: rowText(row, "status") as "invited" | "accepted" | "active" | "revoked",
+    }));
+    const actors = this.rows("SELECT organization_id, actor_id, disabled FROM org_actors").map((row) => ({
+      organizationId: rowOrganizationId(row),
+      actorId: rowActorId(row),
+      ...(rowFlag(row, "disabled") ? { disabled: true } : {}),
     }));
     const organizationIds = [...new Set([
       ...teams.map((team) => team.organizationId),
       ...participations.map((participation) => participation.organizationId),
+      ...actors.map((actor) => actor.organizationId),
     ])];
     return {
       organizations: organizationIds.map((id) => ({ organizationId: id })),
-      actors: [{ organizationId, actorId }],
+      actors,
       operations: [{ operationId }],
       sites,
       teams,
@@ -918,13 +1203,13 @@ export class OperationAuthority extends DurableObject<Env> {
     };
   }
 
-  private buildClaims(organizationId: string, actorId: string, auth?: AuthenticationFacts): Result<{
+  private buildClaims(organizationId: OrganizationId, actorId: ActorId, auth?: AuthenticationFacts): Result<{
     readonly claims: AccessEnvelopeClaimsV1;
   }> {
     const operationId = this.operationId();
     const policy = this.policy();
     if (operationId === undefined || policy === undefined) return failure("unavailable", "operation is not bootstrapped");
-    const snapshot = this.modelSnapshot(organizationId, actorId);
+    const snapshot = this.modelSnapshot();
     if (snapshot === undefined) return failure("unavailable", "operation is not bootstrapped");
     const wearable = wearableGrants(snapshot, organizationId, actorId, operationId);
     if (wearable.length === 0) return failure("not-admitted");
@@ -932,7 +1217,13 @@ export class OperationAuthority extends DurableObject<Env> {
       `${grant.primary === true ? 0 : 1}|${grant.role}|${grant.target.kind === "team" ? grant.target.teamId : grant.target.siteId}|${grant.grantId}`;
     const hat = [...wearable].sort((left, right) => rank(left) < rank(right) ? -1 : rank(left) > rank(right) ? 1 : 0)[0];
     if (hat === undefined) return failure("not-admitted");
-    const actions = actionsOf(policy, hat.role) ?? [];
+    const role = actionsOf(policy, hat.role);
+    // the grants and the active bundle disagreeing is an administrator's
+    // inconsistency, not an empty action list for this actor
+    if (!role.found) {
+      return failure("unavailable", `the policy bundle no longer carries the role "${hat.role}"`);
+    }
+    const actions = role.actions;
     const teams = snapshot.teams;
     const hatTeamIds = new Set<string>();
     const hatSiteIds = new Set<string>();
@@ -962,8 +1253,8 @@ export class OperationAuthority extends DurableObject<Env> {
     const configureActions = this.configureActions();
     const configurableSiteIds = [...new Set(
       wearable.flatMap((grant) => {
-        const carried = actionsOf(policy, grant.role) ?? [];
-        if (!carried.some((action) => configureActions.includes(action))) return [];
+        const carried = actionsOf(policy, grant.role);
+        if (!carried.found || !carried.actions.some((action) => configureActions.includes(action))) return [];
         if (grant.target.kind === "site") return [grant.target.siteId];
         const teamId = grant.target.teamId;
         const team = teams.find((candidate) => candidate.teamId === teamId);
@@ -1012,7 +1303,7 @@ export class OperationAuthority extends DurableObject<Env> {
     return { handle, at };
   }
 
-  private async issue(organizationId: string, actorId: string, auth?: AuthenticationFacts): Promise<Result<{
+  private async issue(organizationId: OrganizationId, actorId: ActorId, auth?: AuthenticationFacts): Promise<Result<{
     readonly claims: AccessEnvelopeClaimsV1;
     readonly refresh: RefreshHandleOutcome;
   }>> {
@@ -1035,8 +1326,8 @@ export class OperationAuthority extends DurableObject<Env> {
     if (record === undefined) return failure("unauthenticated", "unknown refresh handle");
     if (Number(record["revoked"]) === 1) return failure("unauthenticated", "refresh handle revoked");
     if (Number(record["superseded"]) === 1) return failure("unauthenticated", "refresh handle superseded");
-    const organizationId = String(record["organization_id"]);
-    const actorId = String(record["actor_id"]);
+    const organization = rowOrganizationId(record);
+    const actor = rowActorId(record);
     // the authentication event, not the envelope, survives the chain
     const auth: AuthenticationFacts | undefined =
       record["amr_json"] === null && record["auth_time"] === null
@@ -1045,13 +1336,13 @@ export class OperationAuthority extends DurableObject<Env> {
             ...(record["amr_json"] === null ? {} : { amr: JSON.parse(String(record["amr_json"])) as string[] }),
             ...(record["auth_time"] === null ? {} : { authTime: Number(record["auth_time"]) }),
           };
-    const built = this.buildClaims(organizationId, actorId, auth);
+    const built = this.buildClaims(organization, actor, auth);
     if (!built.ok) return built;
     this.ctx.storage.sql.exec(
       "UPDATE refresh_records SET superseded = 1 WHERE handle_hash = ?",
       hash,
     );
-    const next = await this.newRefresh(organizationId, actorId, auth);
+    const next = await this.newRefresh(organization, actor, auth);
     return value({ claims: built.value.claims, refresh: { kind: "rotated", handle: next.handle } });
   }
 
@@ -1068,14 +1359,21 @@ export class OperationAuthority extends DurableObject<Env> {
       "audit",
       "claims",
       "outbox",
+      "org_actors",
     ]) {
       this.ctx.storage.sql.exec(`DELETE FROM ${table}`);
     }
+    // the projection's stamps go with it: a reset object that keeps
+    // `roster_at:*` would refuse the next image as stale and decide against
+    // a roster it no longer holds
+    this.ctx.storage.sql.exec(
+      "DELETE FROM meta WHERE key = 'roster_synced_at' OR key LIKE 'roster_at:%'",
+    );
     return value({ reset: true });
   }
 
-  private context(organizationId: string, actorId: string, role: string): Result<{
-    readonly operationId: string;
+  private context(organizationId: OrganizationId, actorId: ActorId, role: string): Result<{
+    readonly operationId: OperationId;
     readonly operationDisplayName?: string;
     readonly participation: "invited" | "accepted" | "active" | "revoked";
     readonly wearableHats: readonly HatSummary[];
@@ -1089,21 +1387,31 @@ export class OperationAuthority extends DurableObject<Env> {
       organizationId,
     );
     const status = participation === undefined ? "revoked" : String(participation["status"]);
-    const wearable = this.rows(
+    // Presentation may not invent an action list either: a grant naming a
+    // role the bundle dropped makes the context unanswerable, not empty.
+    const wearable: HatSummary[] = [];
+    for (const row of this.rows(
       "SELECT role, target_kind, team_id, site_id, is_primary FROM grants WHERE organization_id = ? AND actor_id = ? AND revoked = 0 ORDER BY grant_id",
       organizationId,
       actorId,
-    ).map((row) => ({
-      role: String(row["role"]),
-      actions: [...(actionsOf(policy, String(row["role"])) ?? [])],
-      ...(row["target_kind"] === "team"
-        ? { teamId: String(row["team_id"]) }
-        : { siteId: String(row["site_id"]) }),
-      primary: Number(row["is_primary"]) === 1,
-    }));
+    )) {
+      const title = String(row["role"]);
+      const carried = actionsOf(policy, title);
+      if (!carried.found) {
+        return failure("unavailable", `the policy bundle no longer carries the role "${title}"`);
+      }
+      wearable.push({
+        role: title,
+        actions: [...carried.actions],
+        target: row["target_kind"] === "team"
+          ? { kind: "team", teamId: rowText(row, "team_id") }
+          : { kind: "site", siteId: rowText(row, "site_id") },
+        primary: rowFlag(row, "is_primary"),
+      });
+    }
     return value({
-      operationId: String(operation["operation_id"]),
-      ...(operation["display_name"] === null ? {} : { operationDisplayName: String(operation["display_name"]) }),
+      operationId: rowOperationId(operation),
+      ...(operation["display_name"] === null ? {} : { operationDisplayName: rowText(operation, "display_name") }),
       participation: status as "invited" | "accepted" | "active" | "revoked",
       wearableHats: wearable,
     });
@@ -1117,6 +1425,11 @@ export class OperationAuthority extends DurableObject<Env> {
     };
   }
 
+  /** Restore the operation's own facts. The org-actor projection is not in
+   * the snapshot (see `operationTables`) and is cleared here, so a restored
+   * object decides nothing from a stale roster: every actor reads as
+   * unknown — `not-admitted` — until a rebuild lands. The caller rebuilds
+   * by pulling immediately afterwards. */
   private restoreSnapshot(input: unknown): Result<{ restored: boolean }> {
     if (typeof input !== "object" || input === null) return failure("invalid-command", "snapshot must be an object");
     const snapshot = input as Partial<ExportSnapshot>;
@@ -1130,11 +1443,19 @@ export class OperationAuthority extends DurableObject<Env> {
         operationTables,
         snapshot.tables as Readonly<Record<string, readonly StateRow[]>>,
       );
+      // the projection is derived, so it is dropped rather than restored,
+      // along with the stamps that would make a later image look stale
+      this.ctx.storage.sql.exec("DELETE FROM org_actors");
+      this.ctx.storage.sql.exec(
+        "DELETE FROM meta WHERE key = 'roster_synced_at' OR key LIKE 'roster_at:%'",
+      );
     });
     return value({ restored: true });
   }
 
   async alarm(): Promise<void> {
+    // `drain` reconciles behind the cadence guard, so the retry alarm
+    // doubles as the projection's backstop.
     await this.drain();
   }
 
@@ -1179,8 +1500,7 @@ export class OperationAuthority extends DurableObject<Env> {
               organizationId: asString(grant["organizationId"], "organizationId"),
               actorId: asString(grant["actorId"], "actorId"),
               role: asString(grant["role"], "role"),
-              ...(grant["teamId"] === undefined ? {} : { teamId: asString(grant["teamId"], "teamId") }),
-              ...(grant["siteId"] === undefined ? {} : { siteId: asString(grant["siteId"], "siteId") }),
+              target: asGrantTarget(grant["target"], "target"),
               ...(grant["primary"] === true ? { primary: true } : {}),
               ...(grant["revoked"] === true ? { revoked: true } : {}),
             };
@@ -1195,7 +1515,14 @@ export class OperationAuthority extends DurableObject<Env> {
             };
           }),
         };
-        return json(this.bootstrap(input));
+        const bootstrapped = this.bootstrap(input);
+        // Populate the projection before anything reads it. A bootstrap that
+        // declares active participations and grants must be able to issue on
+        // the next request, and the push channel carries only changes made
+        // after the relationship exists — so the first image has to be
+        // pulled here.
+        if (bootstrapped.ok) await this.reconcileRosters(true);
+        return json(bootstrapped);
       }
 
       if (request.method === "POST" && url.pathname === "/invite") {
@@ -1217,6 +1544,16 @@ export class OperationAuthority extends DurableObject<Env> {
           ...(body["organizationId"] === undefined ? {} : { organizationId: asString(body["organizationId"], "organizationId") }),
           ...(body["operationId"] === undefined ? {} : { operationId: asString(body["operationId"], "operationId") }),
           ...(body["actorId"] === undefined ? {} : { actorId: asString(body["actorId"], "actorId") }),
+          ...(typeof body["at"] === "number" ? { at: body["at"] } : {}),
+          ...(body["actors"] === undefined ? {} : {
+            actors: asArray(body["actors"], "actors").map((entry) => {
+              const actor = asRecord(entry);
+              return {
+                actorId: asString(actor["actorId"], "actorId"),
+                disabled: actor["disabled"] === true,
+              };
+            }),
+          }),
         });
         return json(result, result.ok ? 200 : 503);
       }
@@ -1237,8 +1574,7 @@ export class OperationAuthority extends DurableObject<Env> {
           organizationId: asString(body["organizationId"], "organizationId"),
           actorId: asString(body["actorId"], "actorId"),
           role: asString(body["role"], "role"),
-          ...(body["teamId"] === undefined ? {} : { teamId: asString(body["teamId"], "teamId") }),
-          ...(body["siteId"] === undefined ? {} : { siteId: asString(body["siteId"], "siteId") }),
+          target: asGrantTarget(body["target"], "target"),
           ...(body["primary"] === true ? { primary: true } : {}),
           byActorId: asString(body["byActorId"], "byActorId"),
           idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
@@ -1304,8 +1640,8 @@ export class OperationAuthority extends DurableObject<Env> {
                 ...(body["authTime"] === undefined ? {} : { authTime: Number(body["authTime"]) }),
               };
         const result = await this.issue(
-          asString(body["organizationId"], "organizationId"),
-          asString(body["actorId"], "actorId"),
+          asOrganizationId(body["organizationId"], "organizationId"),
+          asActorId(body["actorId"], "actorId"),
           auth,
         );
         return json(result, result.ok ? 200 : 400);
@@ -1332,10 +1668,16 @@ export class OperationAuthority extends DurableObject<Env> {
       if (request.method === "POST" && url.pathname === "/context") {
         const body = await readBody();
         return json(this.context(
-          asString(body["organizationId"], "organizationId"),
-          asString(body["actorId"], "actorId"),
+          asOrganizationId(body["organizationId"], "organizationId"),
+          asActorId(body["actorId"], "actorId"),
           asString(body["role"], "role"),
         ));
+      }
+
+      if (request.method === "POST" && url.pathname === "/reconcile-rosters") {
+        // forced reconciliation, for an operator repairing a stale
+        // projection and for tests that must not wait out the cadence
+        return json(value(await this.reconcileRosters(true)));
       }
 
       if (request.method === "POST" && url.pathname === "/drain") {
@@ -1344,7 +1686,13 @@ export class OperationAuthority extends DurableObject<Env> {
 
       if (request.method === "GET" && url.pathname === "/status") return json(value(this.status()));
       if (request.method === "GET" && url.pathname === "/export") return json(value(this.exportSnapshot()));
-      if (request.method === "POST" && url.pathname === "/restore") return json(this.restoreSnapshot(await request.json()));
+      if (request.method === "POST" && url.pathname === "/restore") {
+        const restored = this.restoreSnapshot(await request.json());
+        // rebuild the derived projection, so a restored operation can decide
+        // again without waiting for the reconciliation interval
+        if (restored.ok) await this.reconcileRosters(true);
+        return json(restored);
+      }
       if (request.method === "GET" && url.pathname === "/snapshot") return json(value(this.snapshot()));
       if (request.method === "GET" && url.pathname === "/audit") {
         return json(value(this.rows("SELECT seq, at, actor, fact FROM audit ORDER BY seq")));
