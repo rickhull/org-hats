@@ -5,12 +5,11 @@ report-only readers (flash model, read-only), findings judged and
 cross-verified against the Cloudflare code by the main agent. The review's
 findings rode the **2.0.0** release: `GrantTarget` landed as the breaking
 command change (`claude_review.md` P3), alongside the behavior tightenings
-and additive API. R1, R2, and R3 are now fully reconciled — every
-correctness and mechanical item landed or was closed as stale/kept-
-deliberately on 2026-10-25, tests-first through the public seams. Remaining:
-R4's engine-coordinator split (its shared primitives and mechanical pass
-landed), and R5. Pending slices: `packages/cloudflare` (including the
-RFC-grounded exchange review), `tests/`, `bin/`, and configs.
+and additive API. R1, R2, R3, and R4 are now fully reconciled — every
+correctness, mechanical, and structural item landed or was closed as
+stale/kept-deliberately on 2026-10-25, tests-first through the public
+seams. Remaining: R5 — the pending review slices for `packages/cloudflare`
+(including the RFC-grounded exchange review), `tests/`, `bin/`, and configs.
 
 The two cross-runtime findings below were fixed in 2.0.0; the rest of the
 ledger is reconciled as marked.
@@ -174,12 +173,23 @@ ledger is reconciled as marked.
 
 ## R4 — Structural refactors (crystallization, 2.0.0)
 
-`engine.ts`'s header promises two coordinators communicating over an
-outbox; the code is one ~890-line closure interleaving both
-coordinators' commands. This is the headline item.
+`engine.ts`'s header promised two coordinators communicating over an
+outbox; the code was one ~890-line closure interleaving both
+coordinators' commands. This was the headline item.
 
-- [ ] Split `engine.ts` into coordinator modules with a gated-handler
+- [x] Split `engine.ts` into coordinator modules with a gated-handler
   shape shared between them.
+  Landed 2026-10-25: `src/authority/organization.ts` owns actors, principal
+  links, org-side participation, and invitations; `operation.ts` owns
+  sites, teams, grants, policy, op-side participation, refresh records,
+  access requests, and the session surface; `outbox.ts` owns delivery;
+  `state.ts` holds the shared state shapes and pure helpers, and
+  `result.ts` the three result constructors. `engine.ts` is now bootstrap,
+  the version/delivery gate, and a dispatch that routes each kind to the
+  coordinator that owns it. `CommandHandler` is the one handler shape both
+  coordinators expose. Behavior is unchanged: the existing 111 portable and
+  49 workerd tests were the characterization net, green after every
+  extraction.
 - [x] Lift envelope-claims assembly — duplicated nearly line-for-line
   between `engine.ts` and Cloudflare's `operation.ts` — into one shared
   pure module under `src/`.

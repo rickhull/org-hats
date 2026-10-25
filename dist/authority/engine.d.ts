@@ -1,8 +1,8 @@
 import { type ActorId, type OperationId, type OrganizationId, type VerificationKeyMaterial } from "../contract.js";
-import { type Snapshot } from "../model.js";
+import type { Snapshot } from "../model.js";
+import { type Clock, type Signer } from "./internal.js";
 import type { TwinFixture } from "./twins.js";
 import type { AuthorityRuntime } from "./types.js";
-import { type Clock, type Signer } from "./internal.js";
 export type SignerLike = Signer;
 export type ClockLike = Clock;
 /** Administration is deployment policy, never a hardcoded role title: the

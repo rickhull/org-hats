@@ -8,9 +8,9 @@ planned is released, adopted, and documented in `docs/`.
 
 - `code_review.md` — whole-tree code review and crystallization, one
   major subdirectory at a time. Slice 1 (`src/`) is reconciled against the
-  released 2.0 line: R1/R2/R3 are landed, R4's shared claims assembler,
-  ranked selection, and mechanical pass have landed, and the remaining R4
-  engine-coordinator split plus R5 are live.
+  released 2.0 line: R1/R2/R3 are landed, R4 is complete (the engine now
+  splits into organization, operation, outbox, state, and result modules),
+  and R5 is live.
 - `test_suite_review.md` — the test-suite fanout: fragility and dependency
   findings, the rings, and the remaining coverage gaps in priority order.
   The typecheck gate is landed; the coverage slice follows.

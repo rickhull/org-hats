@@ -1,56 +1,42 @@
 // The portable authority engine, in memory — the reference implementation of
 // `AuthorityRuntime` (docs/authority_redesign.md § Authority).
 //
-// Two coordinators mirror the deployed shape: an organization authority
-// (actors, principal links, org-side participation) and an operation
-// authority (sites, teams, grants, op-side participation, policy, refresh
-// records). Between them is an outbox with visible partial states and
-// retryable delivery — never a distributed transaction. The engine owns
-// ordering, validation, idempotency, audit, and issuance; callers receive
-// use cases, not storage.
+// Two coordinators mirror the deployed shape: `organization.ts` owns actors,
+// principal links, org-side participation, and invitations; `operation.ts`
+// owns sites, teams, grants, policy, op-side participation, refresh records,
+// and issuance. Between them is an outbox (`outbox.ts`) with visible partial
+// states and retryable delivery — never a distributed transaction. This file
+// is the wiring: bootstrap, the two coordinators, the version gate, and the
+// dispatch that routes each command to the coordinator that owns it.
 //
 // Determinism: the clock and signer are injected; a fixed clock plus a
 // fresh signer gives reproducible behavior (ids, failure kinds, receipts)
 // without pinning signature bytes.
 
 import {
-  canonicalJson,
-  epochSeconds,
-  type AccessEnvelopeClaimsV1,
+  AUTHORITY_INTERFACE_VERSION,
+  operationId,
   type ActorId,
   type AuthorityInterfaceVersion,
-  type EpochSeconds,
   type Failure,
-  type IdempotencyKey,
-  type JsonValue,
   type OperationId,
   type OrganizationId,
-  type RefreshHandle,
-  type RefreshHandleOutcome,
-  type SignedAccessEnvelope,
-  type SiteId,
-  type TeamId,
   type VerificationKeyMaterial,
-  ACCESS_ENVELOPE_FORMAT,
-  ACCESS_ENVELOPE_VERSION,
-  AUTHORITY_INTERFACE_VERSION,
-  actorId,
-  isFailed,
-  operationId,
-  organizationId,
-  siteId,
-  teamId,
 } from "../contract.ts";
+import type { Snapshot } from "../model.ts";
+import { counter, systemClock, webCryptoSigner, type Clock, type Signer } from "./internal.ts";
+import { createOperationCoordinator } from "./operation.ts";
+import { createOrganizationCoordinator } from "./organization.ts";
+import { deliverPending } from "./outbox.ts";
+import { fail, failed } from "./result.ts";
 import {
-  applyParticipationEvent,
-  wearableGrants,
-  type Grant,
-  type Participation,
-  type Snapshot,
-} from "../model.ts";
-import type { PolicyBundle } from "../policy.ts";
-import { actionsOf } from "../policy.ts";
-import { assembleAccessClaims, authenticationFactsOf, type AuthenticationFacts } from "./claims.ts";
+  principalKey,
+  snapshotOf as snapshotFrom,
+  type OpState,
+  type OrgState,
+  type OutboxMessage,
+  type PrincipalLink,
+} from "./state.ts";
 import type { TwinFixture } from "./twins.ts";
 import type {
   AccessFromEvidenceInput,
@@ -61,11 +47,8 @@ import type {
   CommandResult,
   ContextRequest,
   Failed,
-  HatSummary,
-  PrincipalEvidence,
   RefreshInput,
 } from "./types.ts";
-import { counter, sha256Hex, systemClock, webCryptoSigner, type Clock, type Signer } from "./internal.ts";
 
 // --- configuration ---------------------------------------------------------------
 
@@ -104,76 +87,6 @@ export interface InMemoryAuthorityConfig {
   readonly transportFailures?: number;
 }
 
-// --- coordinator state ------------------------------------------------------------
-
-interface AuditEvent {
-  readonly at: EpochSeconds;
-  readonly by: string;
-  readonly fact: string;
-}
-
-interface Claim {
-  readonly payloadHash: string;
-  readonly receiptApplied: boolean;
-}
-
-interface OrgState {
-  readonly organizationId: OrganizationId;
-  readonly displayName?: string;
-  actors: { organizationId: OrganizationId; actorId: ActorId; displayName?: string; disabled?: boolean }[];
-  /** Org-side invitations received from operations, by invitation id. */
-  invitations: Map<string, { operationId: OperationId; status: "pending" | "accepted" }>;
-  audit: AuditEvent[];
-  claims: Map<IdempotencyKey, Claim>;
-}
-
-interface RefreshRecord {
-  readonly handleHash: string;
-  readonly operationId: OperationId;
-  readonly organizationId: OrganizationId;
-  readonly actorId: ActorId;
-  /** The authentication facts of the issuing evidence; every refresh of
-   * this handle chain re-issues them unchanged. */
-  readonly amr?: readonly string[];
-  readonly authTime?: number;
-  revoked: boolean;
-  superseded: boolean;
-}
-
-/** How and when the principal authenticated, as the evidence stated it.
- * Opaque to authority: carried into claims, context, and refresh records,
- * never interpreted. */
-const factsOf = (evidence: PrincipalEvidence): AuthenticationFacts | undefined =>
-  authenticationFactsOf(evidence);
-
-interface OpState {
-  readonly operationId: OperationId;
-  readonly displayName?: string;
-  readonly slug?: string;
-  readonly bounded?: boolean;
-  policy: PolicyBundle;
-  sites: { siteId: SiteId; operationId: OperationId; displayName?: string; path?: string; aliases: readonly string[] }[];
-  teams: { teamId: TeamId; siteId: SiteId; organizationId: OrganizationId; displayName?: string }[];
-  grants: Grant[];
-  participations: Participation[];
-  /** Op-side invitation records, by invitation id. */
-  invitations: Map<string, { organizationId: OrganizationId; status: "invited" | "accepted" }>;
-  refreshRecords: RefreshRecord[];
-  accessRequests: { requestId: string; organizationId: OrganizationId; actorId: ActorId; note?: string }[];
-  audit: AuditEvent[];
-  claims: Map<IdempotencyKey, Claim>;
-}
-
-interface OutboxMessage {
-  readonly id: string;
-  readonly target: string;
-  readonly kind: "invitation" | "acceptance" | "actor-disabled";
-  readonly invitationId?: string;
-  readonly operationId?: OperationId;
-  readonly organizationId?: OrganizationId;
-  readonly actorId?: ActorId;
-}
-
 // --- the engine --------------------------------------------------------------------
 
 export type { VerificationKeyMaterial } from "../contract.ts";
@@ -195,22 +108,7 @@ export interface InMemoryAuthorityHandle {
   invitationsOf(organizationId: OrganizationId): ReadonlyMap<string, { operationId: OperationId; status: string }>;
 }
 
-const V = AUTHORITY_INTERFACE_VERSION;
 const nextSigningKey = counter();
-const failed = (failure: Failure): Failed => ({ failure });
-const fail = (kind: Failure["kind"], detail?: string): { ok: false; failure: Failure } => ({
-  ok: false,
-  failure: { kind, ...(detail !== undefined ? { detail } : {}) },
-});
-
-/** The principal-link key: the (provider, subject) pair encoded as JSON, so
- * no split of the two strings can collide with another — ":" concatenation
- * made `"a:b"/"c"` and `"a"/"b:c"` the same link. */
-const principalKey = (provider: string, subject: string): string => JSON.stringify([provider, subject]);
-const ok = (idempotencyKey: string, applied: boolean): CommandResult => ({
-  ok: true,
-  receipt: { idempotencyKey, applied },
-});
 
 export const createInMemoryAuthority = async (
   config: InMemoryAuthorityConfig = {},
@@ -229,7 +127,7 @@ export const createInMemoryAuthority = async (
    * (provider, subject) pair: "a:b"/"c" and "a"/"b:c" are different links,
    * and one identity is never two actors — the guard must hold across
    * organizations, not just within one. */
-  const principalLinks = new Map<string, { organizationId: OrganizationId; actorId: ActorId }>();
+  const principalLinks = new Map<string, PrincipalLink>();
   const outbox: OutboxMessage[] = [];
   const delivered = new Set<string>();
   const nextId = counter();
@@ -302,631 +200,115 @@ export const createInMemoryAuthority = async (
     });
   }
 
-  const snapshotOf = (operationId: OperationId): Snapshot | undefined => {
-    const op = ops.get(operationId);
-    if (op === undefined) return undefined;
-    // Every list is copied: the snapshot is a caller's to hold and mutate,
-    // and a shared array would make engine state the caller's to corrupt.
-    // `readonly` on the type says the same thing; this is the runtime half.
-    return {
-      organizations: [...allOrganizations],
-      actors: [...allActors],
-      operations: [...ops.values()].map((o) => ({
-        operationId: o.operationId,
-        ...(o.displayName !== undefined ? { displayName: o.displayName } : {}),
-        ...(o.slug !== undefined ? { slug: o.slug } : {}),
-        ...(o.bounded !== undefined ? { bounded: o.bounded } : {}),
-      })),
-      sites: [...op.sites],
-      teams: [...op.teams],
-      grants: [...op.grants],
-      participations: [...op.participations],
-    };
-  };
+  const snapshotOf = (operationOf: OperationId): Snapshot | undefined =>
+    snapshotFrom(ops, allOrganizations, allActors, operationOf);
 
-  // --- outbox delivery ------------------------------------------------------------
+  const operations = createOperationCoordinator({
+    orgs,
+    ops,
+    principalLinks,
+    outbox,
+    clock,
+    signer,
+    nextId,
+    lifetime,
+    configureActions,
+    snapshotOf,
+  });
+  const organizations = createOrganizationCoordinator({
+    orgs,
+    ops,
+    principalLinks,
+    outbox,
+    clock,
+    signer,
+    nextId,
+    adminRoles,
+    orgAdmins,
+    configureActions,
+  });
 
-  const deliverPending = async (): Promise<number> => {
-    let count = 0;
-    for (const message of [...outbox]) {
-      if (transportFailures > 0) {
-        transportFailures -= 1;
-        continue; // the attempt failed; the message stays pending and retryable
-      }
-      if (delivered.has(message.id)) continue;
-      if (message.kind === "invitation" && message.invitationId !== undefined && message.operationId !== undefined) {
-        // the outbox address is a plain string because a message routes to
-        // either coordinator; `kind` says which, so the conversion is here
-        const org = orgs.get(organizationId(message.target));
-        if (org !== undefined && !org.invitations.has(message.invitationId)) {
-          org.invitations.set(message.invitationId, { operationId: message.operationId, status: "pending" });
+  // The outbox drain. `failTransport` consumes the injected failures, so a
+  // message whose attempt failed stays in the outbox for the next call.
+  const deliver = (): Promise<number> =>
+    deliverPending({
+      orgs,
+      ops,
+      outbox,
+      delivered,
+      failTransport: () => {
+        if (transportFailures > 0) {
+          transportFailures -= 1;
+          return true;
         }
-      }
-      if (message.kind === "acceptance" && message.invitationId !== undefined) {
-        const op = ops.get(operationId(message.target));
-        const invitation = op?.invitations.get(message.invitationId);
-        if (op !== undefined && invitation !== undefined && invitation.status === "invited") {
-          // Two events, in the model's order: the organization accepted, and
-          // the operation activates. Jumping straight to `active` is what let
-          // an acceptance delivered after a revoke flip `revoked` back —
-          // `transitionParticipation` refuses both steps from `revoked`, so
-          // the delivery is now a no-op against a terminal state.
-          const accepted = applyParticipationEvent(
-            op.participations,
-            invitation.organizationId,
-            op.operationId,
-            { kind: "accept", by: "organization" },
-          );
-          if (!accepted.ok) {
-            op.audit.push({ at: clock.now(), by: "outbox", fact: `acceptance for ${invitation.organizationId} not applied: ${accepted.problem}` });
-          } else {
-            const activated = applyParticipationEvent(
-              accepted.participations,
-              invitation.organizationId,
-              op.operationId,
-              { kind: "activate", by: "operation" },
-            );
-            if (!activated.ok) {
-              op.audit.push({ at: clock.now(), by: "outbox", fact: `activation for ${invitation.organizationId} not applied: ${activated.problem}` });
-            } else {
-              invitation.status = "accepted";
-              op.participations = [...activated.participations];
-              op.audit.push({ at: clock.now(), by: "outbox", fact: `participation ${invitation.organizationId} active (canonical)` });
-            }
-          }
-        }
-      }
-      if (message.kind === "actor-disabled" && message.operationId !== undefined) {
-        const op = ops.get(operationId(message.target));
-        if (op !== undefined) {
-          for (const record of op.refreshRecords) {
-            if (record.organizationId === message.organizationId && record.actorId === message.actorId) {
-              record.revoked = true;
-            }
-          }
-        }
-      }
-      delivered.add(message.id);
-      outbox.splice(outbox.indexOf(message), 1);
-      count += 1;
-    }
-    return count;
-  };
-
-  // --- helpers ----------------------------------------------------------------------
+        return false;
+      },
+      now: () => clock.now(),
+    });
 
   const checkVersion = (v: AuthorityInterfaceVersion): Failure | undefined =>
-    v !== V ? { kind: "wrong-interface-version" } : undefined;
-
-  const payloadHash = (command: AuthorityCommand): string => {
-    const { idempotencyKey: _k, authorization: _a, ...rest } = command;
-    return canonicalJson(rest as JsonValue);
-  };
-
-  /** A retry claims its earlier result; the same key with a different
-   * payload is a misuse, not a retry. Checking is pure — the claim is
-   * committed with the mutation it guards, so a denied command never
-   * poisons its key. */
-  const checkClaim = (
-    claims: Map<IdempotencyKey, Claim>,
-    command: AuthorityCommand,
-  ): CommandResult | undefined => {
-    const existing = claims.get(command.idempotencyKey);
-    if (existing === undefined) return undefined;
-    if (existing.payloadHash !== payloadHash(command)) {
-      return fail("invalid-command", "idempotency key reused with a different payload");
-    }
-    return ok(command.idempotencyKey, false);
-  };
-  const commitClaim = (claims: Map<IdempotencyKey, Claim>, command: AuthorityCommand): void => {
-    claims.set(command.idempotencyKey, { payloadHash: payloadHash(command), receiptApplied: true });
-  };
-
-  interface Principal {
-    readonly organizationId: OrganizationId;
-    readonly actorId: ActorId;
-    readonly adminOfOperation: boolean;
-    readonly adminOfOrganization: boolean;
-  }
-
-  const resolvePrincipal = async (authorization: AuthorityCommand["authorization"], boundTo?: OperationId): Promise<Principal | Failure> => {
-    if (authorization.kind === "fresh-evidence") {
-      const link = principalLinks.get(principalKey(authorization.evidence.provider, authorization.evidence.subject));
-      if (link === undefined) return { kind: "unauthenticated", detail: "no principal link for this evidence" };
-      const org = orgs.get(link.organizationId);
-      const actor = org?.actors.find((a) => a.actorId === link.actorId);
-      if (org === undefined || actor === undefined) return { kind: "unauthenticated" };
-      if (actor.disabled) return { kind: "not-admitted", detail: "actor disabled" };
-      return {
-        organizationId: link.organizationId,
-        actorId: link.actorId,
-        adminOfOperation: false,
-        adminOfOrganization: (orgAdmins[link.organizationId] ?? []).includes(link.actorId),
-      };
-    }
-    const claims = authorization.envelope.claims;
-    if (authorization.envelope.format !== ACCESS_ENVELOPE_FORMAT) return { kind: "invalid-signature" };
-    if (!(await signer.verify(canonicalJson(claims as unknown as JsonValue), authorization.envelope.signature))) {
-      return { kind: "invalid-signature" };
-    }
-    if (clock.now() >= claims.exp) return { kind: "expired" };
-    if (boundTo !== undefined && claims.operationId !== boundTo) return { kind: "wrong-binding" };
-    // No declared admin role means no role administers this operation —
-    // a visible denial. Falling back to a hardcoded `["admin"]` applied a
-    // title this file's own charter says is configuration, and silently
-    // granted administration to whoever happened to hold it. Cloudflare's
-    // coordinator already reads an undeclared set as empty; this matches it.
-    // The command-handler seam: envelope claims carry plain strings, and
-    // this is where they become domain ids.
-    const claimedOperation = operationId(claims.operationId);
-    const claimedOrganization = organizationId(claims.actor.organizationId);
-    const claimedActor = actorId(claims.actor.actorId);
-    const roles = adminRoles[claimedOperation] ?? [];
-    const adminHat = claims.hat.actions.some((a) => configureActions.includes(a)) || roles.includes(claims.hat.role);
-    return {
-      organizationId: claimedOrganization,
-      actorId: claimedActor,
-      adminOfOperation: adminHat,
-      adminOfOrganization: (orgAdmins[claimedOrganization] ?? []).includes(claimedActor),
-    };
-  };
-
-  /** Revoke one organization's participation through the state machine.
-   *
-   * Revoking twice is a safe retry rather than a failure: the state the
-   * caller asked for is the state that holds, and a retry under a fresh
-   * idempotency key must not read as an error. "Not participating" is a
-   * different thing and stays a denial. Whether a repeat is idempotent is
-   * the adapter's policy; that `revoked` never moves back is the model's,
-   * and `applyParticipationEvent` is what enforces it. */
-  const revokeParticipation = (
-    op: OpState,
-    organizationId: OrganizationId,
-    by: "operation" | "organization",
-  ): { ok: true } | { ok: false; problem: string } => {
-    const current = op.participations.find(
-      (p) => p.organizationId === organizationId && p.operationId === op.operationId,
-    );
-    if (current === undefined) return { ok: false, problem: "the organization is not participating" };
-    if (current.status === "revoked") return { ok: true };
-    const revoked = applyParticipationEvent(op.participations, organizationId, op.operationId, {
-      kind: "revoke",
-      by,
-    });
-    if (!revoked.ok) return revoked;
-    op.participations = [...revoked.participations];
-    return { ok: true };
-  };
-
-  const revokeRefreshRecords = (op: OpState, organizationId: OrganizationId, actorId: ActorId): void => {
-    for (const record of op.refreshRecords) {
-      if (record.organizationId === organizationId && record.actorId === actorId) record.revoked = true;
-    }
-  };
-
-  // --- issuance -----------------------------------------------------------------------
-
-  const buildEnvelope = (
-    op: OpState,
-    organizationId: OrganizationId,
-    actorId: ActorId,
-    auth?: AuthenticationFacts,
-  ): AccessEnvelopeClaimsV1 | Failure => {
-    const org = orgs.get(organizationId);
-    const actor = org?.actors.find((a) => a.actorId === actorId);
-    if (org === undefined || actor === undefined) return { kind: "unauthenticated" };
-    if (actor.disabled) return { kind: "not-admitted", detail: "actor disabled" };
-    const snapshot = snapshotOf(op.operationId);
-    if (snapshot === undefined) return { kind: "wrong-binding" };
-    return assembleAccessClaims({
-      snapshot,
-      policy: op.policy,
-      operationId: op.operationId,
-      organizationId,
-      actorId,
-      configureActions,
-      envelopeLifetimeSeconds: lifetime,
-      issuedAt: clock.now(),
-      ...(auth !== undefined ? { auth } : {}),
-    });
-  };
-
-  const issue = async (
-    op: OpState,
-    organizationId: OrganizationId,
-    actorId: ActorId,
-    auth?: AuthenticationFacts,
-  ): Promise<AccessIssue | { ok: false; failure: Failure }> => {
-    const claims = buildEnvelope(op, organizationId, actorId, auth);
-    if ("kind" in claims) return { ok: false, failure: claims };
-    const signature = await signer.sign(canonicalJson(claims as unknown as JsonValue));
-    const envelope: SignedAccessEnvelope = {
-      format: ACCESS_ENVELOPE_FORMAT,
-      v: ACCESS_ENVELOPE_VERSION,
-      keyId: signer.keyId,
-      claims,
-      signature,
-    };
-    const handle: RefreshHandle = `rh-${nextId()}`;
-    op.refreshRecords.push({
-      handleHash: await sha256Hex(handle),
-      operationId: op.operationId,
-      organizationId,
-      actorId,
-      ...(auth?.amr !== undefined ? { amr: [...auth.amr] } : {}),
-      ...(auth?.authTime !== undefined ? { authTime: auth.authTime } : {}),
-      revoked: false,
-      superseded: false,
-    });
-    const refresh: RefreshHandleOutcome = { kind: "rotated", handle };
-    return { envelope, refresh };
-  };
+    v !== AUTHORITY_INTERFACE_VERSION ? { kind: "wrong-interface-version" } : undefined;
 
   // --- the runtime ----------------------------------------------------------------------
+  //
+  // The version gate precedes the drain in every method: a call the runtime
+  // refuses must not even deliver pending coordinator messages — a rejected
+  // caller causes no side effects, and delivery is one.
 
   const runtime: AuthorityRuntime = {
-    // The version gate precedes the drain in every method: a call the
-    // runtime refuses must not even deliver pending coordinator messages —
-    // a rejected caller causes no side effects, and delivery is one.
     async accessFromEvidence(input: AccessFromEvidenceInput): Promise<AccessIssue | Failed> {
       const versionFail = checkVersion(input.interfaceVersion);
       if (versionFail !== undefined) return failed(versionFail);
-      await deliverPending();
-      // the seam: the request carries plain strings, `op.operationId` is
-      // the domain id from here down
-      const op = ops.get(operationId(input.operationId));
-      if (op === undefined) return failed({ kind: "wrong-binding", detail: "unknown operation" });
-      const link = principalLinks.get(principalKey(input.evidence.provider, input.evidence.subject));
-      if (link === undefined) return failed({ kind: "unauthenticated", detail: "no principal link for this evidence" });
-      const result = await issue(op, link.organizationId, link.actorId, factsOf(input.evidence));
-      if (isFailed(result)) return failed(result.failure);
-      return result;
+      await deliver();
+      return operations.accessFromEvidence(input);
     },
 
     async refresh(input: RefreshInput): Promise<AccessIssue | Failed> {
       const versionFail = checkVersion(input.interfaceVersion);
       if (versionFail !== undefined) return failed(versionFail);
-      await deliverPending();
-      const op = ops.get(operationId(input.operationId));
-      if (op === undefined) return failed({ kind: "wrong-binding", detail: "unknown operation" });
-      const hash = await sha256Hex(input.handle);
-      const record = op.refreshRecords.find((r) => r.handleHash === hash);
-      if (record === undefined) return failed({ kind: "unauthenticated", detail: "unknown refresh handle" });
-      if (record.revoked) return failed({ kind: "unauthenticated", detail: "refresh handle revoked" });
-      if (record.superseded) return failed({ kind: "unauthenticated", detail: "refresh handle superseded" });
-      // Supersede before issue, deliberately: the handle was consumed by
-      // this attempt, and if issuance then fails — the actor disabled, the
-      // participation revoked — the old handle must not survive to be
-      // refreshed again. One attempt, one handle; fail closed rather than
-      // risk two live handles.
-      record.superseded = true;
-      // the authentication event, not the envelope, survives the chain
-      const result = await issue(op, record.organizationId, record.actorId, authenticationFactsOf(record));
-      if (isFailed(result)) return failed(result.failure);
-      return result;
+      await deliver();
+      return operations.refresh(input);
     },
 
     async context(input: ContextRequest): Promise<AuthorityContext | Failed> {
       const versionFail = checkVersion(input.interfaceVersion);
       if (versionFail !== undefined) return failed(versionFail);
-      await deliverPending();
-      const { envelope } = input;
-      if (envelope.format !== ACCESS_ENVELOPE_FORMAT) return failed({ kind: "invalid-signature" });
-      if (!(await signer.verify(canonicalJson(envelope.claims as unknown as JsonValue), envelope.signature))) {
-        return failed({ kind: "invalid-signature" });
-      }
-      if (clock.now() >= envelope.claims.exp) return failed({ kind: "expired" });
-      const op = ops.get(operationId(envelope.claims.operationId));
-      const snapshot = op !== undefined ? snapshotOf(op.operationId) : undefined;
-      if (op === undefined || snapshot === undefined) return failed({ kind: "wrong-binding" });
-      // the same seam, on the context path
-      const organizationId_ = organizationId(envelope.claims.actor.organizationId);
-      const actorId_ = actorId(envelope.claims.actor.actorId);
-      const wearable = wearableGrants(snapshot, organizationId_, actorId_, op.operationId);
-      const actor = orgs.get(organizationId_)?.actors.find((a) => a.actorId === actorId_);
-      const orgName = orgs.get(organizationId_)?.displayName;
-      const participation = snapshot.participations.find((p) => p.organizationId === organizationId_);
-      // the grant the envelope's hat was selected from: its own target, not
-      // the expanded reach the claims carry
-      const selected = wearable.find((g) => g.role === envelope.claims.hat.role);
-      // Presentation still may not invent an action list. A grant naming a
-      // role the bundle dropped makes the context unanswerable, not empty.
-      const hats: HatSummary[] = [];
-      for (const g of wearable) {
-        const role = actionsOf(op.policy, g.role);
-        if (!role.found) {
-          return failed({ kind: "unavailable", detail: `the policy bundle no longer carries the role "${g.role}"` });
-        }
-        hats.push({
-          role: g.role,
-          actions: [...role.actions],
-          target: g.target,
-          primary: g.primary === true,
-        });
-      }
-      return {
-        actor: { organizationId: organizationId_, actorId: actorId_, ...(actor?.displayName !== undefined ? { displayName: actor.displayName } : {}) },
-        ...(orgName !== undefined ? { organizationDisplayName: orgName } : {}),
-        operationId: op.operationId,
-        ...(op.displayName !== undefined ? { operationDisplayName: op.displayName } : {}),
-        participation: participation?.status ?? "revoked",
-        wearableHats: hats,
-        // absent when no wearable grant matches the envelope's hat: the
-        // context cannot name a target it does not hold
-        ...(selected === undefined
-          ? {}
-          : {
-              selectedHat: {
-                role: envelope.claims.hat.role,
-                actions: [...envelope.claims.hat.actions],
-                target: selected.target,
-                primary: selected.primary === true,
-              },
-            }),
-        sites: [...envelope.claims.sites],
-        ...(envelope.claims.amr !== undefined ? { amr: [...envelope.claims.amr] } : {}),
-        ...(envelope.claims.auth_time !== undefined ? { authTime: envelope.claims.auth_time } : {}),
-      };
+      await deliver();
+      return operations.context(input);
     },
 
     async command(inputCommand: AuthorityCommand): Promise<CommandResult> {
       const versionFail = checkVersion(inputCommand.interfaceVersion);
       if (versionFail !== undefined) return fail(versionFail.kind);
-      await deliverPending();
+      await deliver();
 
       // request-access needs no administrator: the evidence is the request
-      if (inputCommand.kind === "request-access") {
-        const op = ops.get(operationId(inputCommand.operationId));
-        if (op === undefined) return fail("wrong-binding", "unknown operation");
-        const replay = checkClaim(op.claims, inputCommand);
-        if (replay !== undefined) return replay;
-        const link = principalLinks.get(principalKey(inputCommand.evidence.provider, inputCommand.evidence.subject));
-        if (link === undefined) return fail("unauthenticated", "no principal link for this evidence");
-        commitClaim(op.claims, inputCommand);
-        const requestId = `ar-${nextId()}`;
-        op.accessRequests.push({
-          requestId,
-          organizationId: link.organizationId,
-          actorId: link.actorId,
-          ...(inputCommand.note !== undefined ? { note: inputCommand.note } : {}),
-        });
-        op.audit.push({
-          at: clock.now(),
-          by: `${link.organizationId}/${link.actorId}`,
-          fact: `access request ${requestId}${inputCommand.note !== undefined ? `: ${inputCommand.note}` : ""}`,
-        });
-        return ok(inputCommand.idempotencyKey, true);
-      }
+      if (inputCommand.kind === "request-access") return operations.requestAccess(inputCommand);
 
       // which operation this command binds to, if any: `disable-actor` is
       // organization-scoped and binds to none
-      const boundOperation =
-        inputCommand.kind === "disable-actor"
-          ? undefined
-          : "operationId" in inputCommand
-            ? operationId(inputCommand.operationId)
-            : undefined;
-      const principalOrFailure = await resolvePrincipal(inputCommand.authorization, boundOperation);
+      const boundOperation = inputCommand.kind === "disable-actor"
+        ? undefined
+        : "operationId" in inputCommand
+          ? operationId(inputCommand.operationId)
+          : undefined;
+      const principalOrFailure = await organizations.resolvePrincipal(inputCommand.authorization, boundOperation);
       if ("kind" in principalOrFailure) return fail(principalOrFailure.kind, principalOrFailure.detail);
 
       switch (inputCommand.kind) {
-        case "participation-invite": {
-          const op = ops.get(operationId(inputCommand.operationId));
-          const org = orgs.get(organizationId(inputCommand.organizationId));
-          if (op === undefined) return fail("wrong-binding", "unknown operation");
-          if (org === undefined) return fail("wrong-binding", "unknown organization");
-          if (!principalOrFailure.adminOfOperation) return fail("denied", "the caller does not administer this operation");
-          const replay = checkClaim(op.claims, inputCommand);
-          if (replay !== undefined) return replay;
-          const invitee = organizationId(inputCommand.organizationId);
-          const invited = applyParticipationEvent(
-            op.participations,
-            invitee,
-            op.operationId,
-            { kind: "invite", by: "operation" },
-          );
-          if (!invited.ok) return fail("denied", invited.problem);
-          commitClaim(op.claims, inputCommand);
-          const invitationId = `inv-${nextId()}`;
-          op.invitations.set(invitationId, { organizationId: invitee, status: "invited" });
-          op.participations = [...invited.participations];
-          outbox.push({
-            id: `ob-${nextId()}`, target: invitee,
-            kind: "invitation", invitationId, operationId: op.operationId,
-            organizationId: invitee,
-          });
-          op.audit.push({ at: clock.now(), by: `${principalOrFailure.organizationId}/${principalOrFailure.actorId}`, fact: `invitation ${invitationId} to ${inputCommand.organizationId}` });
-          return ok(inputCommand.idempotencyKey, true);
-        }
-        case "participation-accept": {
-          const org = orgs.get(principalOrFailure.organizationId);
-          if (org === undefined) return fail("wrong-binding");
-          if (!principalOrFailure.adminOfOrganization) return fail("denied", "the caller does not administer this organization");
-          const replay = checkClaim(org.claims, inputCommand);
-          if (replay !== undefined) return replay;
-          const found = [...org.invitations.entries()].find(
-            ([, invitation]) => invitation.operationId === inputCommand.operationId,
-          );
-          const invitationId = found?.[0];
-          const invitation = found?.[1];
-          if (invitationId === undefined || invitation === undefined) return fail("denied", "no such invitation");
-          if (invitation.status !== "pending") return fail("denied", `invitation already ${invitation.status}`);
-          commitClaim(org.claims, inputCommand);
-          invitation.status = "accepted";
-          const op = ops.get(invitation.operationId);
-          if (op !== undefined) {
-            outbox.push({
-              id: `ob-${nextId()}`, target: invitation.operationId,
-              kind: "acceptance", invitationId,
-              operationId: invitation.operationId, organizationId: org.organizationId,
-            });
-          }
-          org.audit.push({ at: clock.now(), by: `${org.organizationId}/${principalOrFailure.actorId}`, fact: `invitation ${invitationId} accepted` });
-          return ok(inputCommand.idempotencyKey, true);
-        }
-        case "participation-revoke": {
-          if (inputCommand.by === "operation") {
-            const op = ops.get(operationId(inputCommand.operationId));
-            if (op === undefined) return fail("wrong-binding", "unknown operation");
-            if (!principalOrFailure.adminOfOperation) return fail("denied", "the caller does not administer this operation");
-            const replay = checkClaim(op.claims, inputCommand);
-            if (replay !== undefined) return replay;
-            const revoked = revokeParticipation(op, organizationId(inputCommand.organizationId), "operation");
-            if (!revoked.ok) return fail("denied", revoked.problem);
-            commitClaim(op.claims, inputCommand);
-            for (const record of op.refreshRecords) {
-              if (record.organizationId === inputCommand.organizationId) record.revoked = true;
-            }
-            op.audit.push({ at: clock.now(), by: `${principalOrFailure.organizationId}/${principalOrFailure.actorId}`, fact: `participation ${inputCommand.organizationId} revoked` });
-            return ok(inputCommand.idempotencyKey, true);
-          }
-          const org = orgs.get(organizationId(inputCommand.organizationId));
-          if (org === undefined) return fail("wrong-binding", "unknown organization");
-          if (!principalOrFailure.adminOfOrganization) return fail("denied", "the caller does not administer this organization");
-          const replay = checkClaim(org.claims, inputCommand);
-          if (replay !== undefined) return replay;
-          const op = ops.get(operationId(inputCommand.operationId));
-          if (op === undefined) return fail("wrong-binding", "unknown operation");
-          const revoked = revokeParticipation(op, organizationId(inputCommand.organizationId), "organization");
-          if (!revoked.ok) return fail("denied", revoked.problem);
-          commitClaim(org.claims, inputCommand);
-          for (const record of op.refreshRecords) {
-            if (record.organizationId === inputCommand.organizationId) record.revoked = true;
-          }
-          org.audit.push({ at: clock.now(), by: `${org.organizationId}/${principalOrFailure.actorId}`, fact: `participation in ${inputCommand.operationId} revoked` });
-          return ok(inputCommand.idempotencyKey, true);
-        }
-        case "admit": {
-          const op = ops.get(operationId(inputCommand.operationId));
-          if (op === undefined) return fail("wrong-binding", "unknown operation");
-          if (!principalOrFailure.adminOfOperation) return fail("denied", "the caller does not administer this operation");
-          const replay = checkClaim(op.claims, inputCommand);
-          if (replay !== undefined) return replay;
-          const actor = orgs.get(organizationId(inputCommand.organizationId))?.actors.find((a) => a.actorId === inputCommand.actorId);
-          if (actor === undefined) return fail("invalid-command", "unknown actor");
-          commitClaim(op.claims, inputCommand);
-          op.accessRequests = op.accessRequests.filter(
-            (r) => !(r.organizationId === inputCommand.organizationId && r.actorId === inputCommand.actorId),
-          );
-          op.audit.push({ at: clock.now(), by: `${principalOrFailure.organizationId}/${principalOrFailure.actorId}`, fact: `admitted ${inputCommand.organizationId}/${inputCommand.actorId}` });
-          return ok(inputCommand.idempotencyKey, true);
-        }
-        case "grant-hat": {
-          const op = ops.get(operationId(inputCommand.operationId));
-          if (op === undefined) return fail("wrong-binding", "unknown operation");
-          if (!principalOrFailure.adminOfOperation) return fail("denied", "the caller does not administer this operation");
-          const replay = checkClaim(op.claims, inputCommand);
-          if (replay !== undefined) return replay;
-          if (!actionsOf(op.policy, inputCommand.role).found) return fail("invalid-command", `unknown role "${inputCommand.role}"`);
-          // A grant stands on an actor and a participation. Without these
-          // two the command commits a grant `invariantProblems` would flag
-          // live — "names an unknown actor", "has no participation to stand
-          // on" — which is a snapshot the model says cannot exist.
-          const granteeOrganization = organizationId(inputCommand.organizationId);
-          const granteeActor = actorId(inputCommand.actorId);
-          const grantee = orgs.get(granteeOrganization)?.actors.find((a) => a.actorId === granteeActor);
-          if (grantee === undefined) return fail("invalid-command", "unknown actor");
-          if (!op.participations.some(
-            (p) => p.organizationId === granteeOrganization && p.status === "active",
-          )) {
-            return fail("denied", "the organization does not actively participate in this operation");
-          }
-          // What remains is existence. "Exactly one target" is no longer a
-          // check: `GrantTarget` is a two-arm union, so neither-and-both are
-          // unrepresentable, and the four guards this replaced — one pair
-          // per runtime — are gone with them.
-          const grantTarget: Grant["target"] = inputCommand.target.kind === "team"
-            ? { kind: "team", teamId: teamId(inputCommand.target.teamId) }
-            : { kind: "site", siteId: siteId(inputCommand.target.siteId) };
-          if (grantTarget.kind === "team" && !op.teams.some((t) => t.teamId === grantTarget.teamId)) {
-            return fail("invalid-command", "unknown team");
-          }
-          if (grantTarget.kind === "site" && !op.sites.some((s) => s.siteId === grantTarget.siteId)) {
-            return fail("invalid-command", "unknown site");
-          }
-          commitClaim(op.claims, inputCommand);
-          const grantId = `g-${nextId()}`;
-          const grant: Grant = {
-            grantId,
-            operationId: op.operationId,
-            organizationId: granteeOrganization,
-            actorId: granteeActor,
-            role: inputCommand.role,
-            target: grantTarget,
-            ...(inputCommand.primary === true ? { primary: true } : {}),
-          };
-          if (inputCommand.primary === true) {
-            op.grants = op.grants.map((g) => {
-              if (g.organizationId !== granteeOrganization || g.actorId !== granteeActor) return g;
-              const { primary: _dropped, ...rest } = g;
-              return rest;
-            });
-          }
-          op.grants.push(grant);
-          op.audit.push({ at: clock.now(), by: `${principalOrFailure.organizationId}/${principalOrFailure.actorId}`, fact: `grant ${grantId} (${inputCommand.role}) to ${inputCommand.organizationId}/${inputCommand.actorId}` });
-          return ok(inputCommand.idempotencyKey, true);
-        }
-        case "revoke-grant": {
-          const op = ops.get(operationId(inputCommand.operationId));
-          if (op === undefined) return fail("wrong-binding", "unknown operation");
-          if (!principalOrFailure.adminOfOperation) return fail("denied", "the caller does not administer this operation");
-          const replay = checkClaim(op.claims, inputCommand);
-          if (replay !== undefined) return replay;
-          const grant = op.grants.find((g) => g.grantId === inputCommand.grantId);
-          if (grant === undefined) return fail("invalid-command", "unknown grant");
-          commitClaim(op.claims, inputCommand);
-          op.grants = op.grants.map((g) => (g.grantId === inputCommand.grantId ? { ...g, revoked: true } : g));
-          revokeRefreshRecords(op, grant.organizationId, grant.actorId);
-          op.audit.push({ at: clock.now(), by: `${principalOrFailure.organizationId}/${principalOrFailure.actorId}`, fact: `grant ${inputCommand.grantId} revoked; refresh records revoked` });
-          return ok(inputCommand.idempotencyKey, true);
-        }
-        case "select-hat": {
-          const op = ops.get(operationId(inputCommand.operationId));
-          if (op === undefined) return fail("wrong-binding", "unknown operation");
-          const selectsOwn = op.grants.some(
-            (g) =>
-              g.grantId === inputCommand.grantId &&
-              g.organizationId === principalOrFailure.organizationId &&
-              g.actorId === principalOrFailure.actorId,
-          );
-          if (!principalOrFailure.adminOfOperation && !selectsOwn) {
-            return fail("denied", "an actor selects their own hat or an administrator does");
-          }
-          const replay = checkClaim(op.claims, inputCommand);
-          if (replay !== undefined) return replay;
-          const grant = op.grants.find((g) => g.grantId === inputCommand.grantId);
-          if (grant === undefined) return fail("invalid-command", "unknown grant");
-          commitClaim(op.claims, inputCommand);
-          op.grants = op.grants.map((g) => {
-            if (g.grantId === inputCommand.grantId) return { ...g, primary: true };
-            if (g.organizationId === grant.organizationId && g.actorId === grant.actorId) {
-              const { primary: _dropped, ...rest } = g;
-              return rest;
-            }
-            return g;
-          });
-          op.audit.push({ at: clock.now(), by: `${principalOrFailure.organizationId}/${principalOrFailure.actorId}`, fact: `primary hat set to grant ${inputCommand.grantId}` });
-          return ok(inputCommand.idempotencyKey, true);
-        }
-        case "disable-actor": {
-          const org = orgs.get(organizationId(inputCommand.organizationId));
-          if (org === undefined) return fail("wrong-binding", "unknown organization");
-          if (!principalOrFailure.adminOfOrganization) return fail("denied", "the caller does not administer this organization");
-          const replay = checkClaim(org.claims, inputCommand);
-          if (replay !== undefined) return replay;
-          const actor = org.actors.find((a) => a.actorId === inputCommand.actorId);
-          if (actor === undefined) return fail("invalid-command", "unknown actor");
-          commitClaim(org.claims, inputCommand);
-          actor.disabled = true;
-          for (const op of ops.values()) {
-            outbox.push({
-              id: `ob-${nextId()}`, target: op.operationId, operationId: op.operationId,
-              kind: "actor-disabled", organizationId: org.organizationId, actorId: actorId(inputCommand.actorId),
-            });
-          }
-          org.audit.push({ at: clock.now(), by: `${org.organizationId}/${principalOrFailure.actorId}`, fact: `actor ${inputCommand.actorId} disabled` });
-          return ok(inputCommand.idempotencyKey, true);
-        }
+        case "participation-accept":
+        case "disable-actor":
+          return organizations.command(inputCommand, principalOrFailure);
+        case "participation-revoke":
+          return inputCommand.by === "operation"
+            ? operations.command(inputCommand, principalOrFailure)
+            : organizations.command(inputCommand, principalOrFailure);
+        case "participation-invite":
+        case "admit":
+        case "grant-hat":
+        case "revoke-grant":
+        case "select-hat":
+          return operations.command(inputCommand, principalOrFailure);
         default: {
           // The exhaustiveness witness: this arm is `never` when every
           // command kind has a case, so adding one fails the build here
@@ -948,16 +330,16 @@ export const createInMemoryAuthority = async (
       algorithm: signer.algorithm,
       publicKey: await signer.publicKey(),
     }),
-    drainOutbox: deliverPending,
+    drainOutbox: deliver,
     pendingOutbox: () => outbox.length,
     snapshotOf,
-    invitationsOf: (organizationId) =>
+    invitationsOf: (organizationOf) =>
       new Map(
-        [...(orgs.get(organizationId)?.invitations.entries() ?? [])].map(
+        [...(orgs.get(organizationOf)?.invitations.entries() ?? [])].map(
           ([invitationId, invitation]) => [invitationId, { operationId: invitation.operationId, status: invitation.status }],
         ),
       ),
-    accessRequestsOf: (operationId) =>
-      (ops.get(operationId)?.accessRequests ?? []).map((request) => ({ ...request })),
+    accessRequestsOf: (operationOf) =>
+      (ops.get(operationOf)?.accessRequests ?? []).map((request) => ({ ...request })),
   };
 };
