@@ -21,29 +21,31 @@ import { createInMemoryAuthority } from "../src/authority/engine.ts";
 import { fixedClock, webCryptoSigner } from "../src/authority/internal.ts";
 import { verify } from "../src/access/verify.ts";
 import { ed25519VerifyKey } from "../src/access/verify.ts";
+import { actorId, operationId, organizationId, siteId, teamId } from "../src/contract.ts";
+import { failureOf, successOf } from "./helpers.ts";
 
-const MERIDIAN = "op-9f2e6ad4";
-const FESTIVAL_OP = "op-61a8e3f2";
-const AIRLIFT_OP = "op-4b8d2e67";
-const NORTH_ORG = "org-2b7c41de";
-const CIDERS_ORG = "org-d94b1c6e";
-const HARBOR_TEAM = "team-2e8c64b9";
-const NORTH_TEAM = "team-c7d9e2a1";
-const NORTH_FLOOR = "team-f5b3a08d";
-const BOOTH_001 = "team-booth-001";
+const MERIDIAN = operationId("op-9f2e6ad4");
+const FESTIVAL_OP = operationId("op-61a8e3f2");
+const AIRLIFT_OP = operationId("op-4b8d2e67");
+const NORTH_ORG = organizationId("org-2b7c41de");
+const CIDERS_ORG = organizationId("org-d94b1c6e");
+const HARBOR_TEAM = teamId("team-2e8c64b9");
+const NORTH_TEAM = teamId("team-c7d9e2a1");
+const NORTH_FLOOR = teamId("team-f5b3a08d");
+const BOOTH_001 = teamId("team-booth-001");
 
 // the airlift world
-const VITTLES_WING = "org-6f1a93c4";
-const PLANE_FARE = "org-2d7eb58a";
-const RHEIN_CARRIERS = "org-9c4b17f3";
-const GROUND_HANDLING = "org-58e3a2d1";
-const TEMPELHOF = "site-c5d2a8f7";
-const FASSBERG = "site-38b6f0a9";
-const SHIFT_ONE = "team-5a2b8e37";
-const SHIFT_TWO = "team-7f9d4c15";
-const OPS_DESK = "team-9b3e6a82";
-const GATOW_SHIFT = "team-c84b1f69";
-const FASSBERG_DISPATCH = "team-1e94c7a8";
+const VITTLES_WING = organizationId("org-6f1a93c4");
+const PLANE_FARE = organizationId("org-2d7eb58a");
+const RHEIN_CARRIERS = organizationId("org-9c4b17f3");
+const GROUND_HANDLING = organizationId("org-58e3a2d1");
+const TEMPELHOF = siteId("site-c5d2a8f7");
+const FASSBERG = siteId("site-38b6f0a9");
+const SHIFT_ONE = teamId("team-5a2b8e37");
+const SHIFT_TWO = teamId("team-7f9d4c15");
+const OPS_DESK = teamId("team-9b3e6a82");
+const GATOW_SHIFT = teamId("team-c84b1f69");
+const FASSBERG_DISPATCH = teamId("team-1e94c7a8");
 
 const LEN: PrincipalEvidence = { provider: "test-idp", subject: "len" };
 const DANA: PrincipalEvidence = { provider: "test-idp", subject: "dana" };
@@ -54,14 +56,14 @@ const WHITFIELD: PrincipalEvidence = { provider: "test-idp", subject: "whitfield
 const REEVE: PrincipalEvidence = { provider: "test-idp", subject: "reeve" };
 const BRANDT: PrincipalEvidence = { provider: "test-idp", subject: "brandt" };
 
-const MARCO_ID = "actor-6e0d94b2";
-const IRIS_ID = "actor-40e9d1a7";
-const SAM_ID = "actor-3a91c4d8";
-const LEN_ID = "actor-77f2b0e5";
-const FALK_ID = "actor-42e9c0a7";
-const WHITFIELD_ID = "actor-4f7c2a19";
-const REEVE_ID = "actor-91f3c7e8";
-const BRANDT_ID = "actor-b86d4f31";
+const MARCO_ID = actorId("actor-6e0d94b2");
+const IRIS_ID = actorId("actor-40e9d1a7");
+const SAM_ID = actorId("actor-3a91c4d8");
+const LEN_ID = actorId("actor-77f2b0e5");
+const FALK_ID = actorId("actor-42e9c0a7");
+const WHITFIELD_ID = actorId("actor-4f7c2a19");
+const REEVE_ID = actorId("actor-91f3c7e8");
+const BRANDT_ID = actorId("actor-b86d4f31");
 
 const setup = async () => {
   const engine = await createInMemoryAuthority({
@@ -69,7 +71,7 @@ const setup = async () => {
     signer: await webCryptoSigner("key-scenarios"),
     fixtures: [PROFESSIONAL_OPERATION, FESTIVAL, AIRLIFT],
     principalLinks: [
-      { provider: LEN.provider, subject: LEN.subject, organizationId: "org-a53e90f7", actorId: LEN_ID },
+      { provider: LEN.provider, subject: LEN.subject, organizationId: organizationId("org-a53e90f7"), actorId: LEN_ID },
       { provider: DANA.provider, subject: DANA.subject, organizationId: HARBOR_LOGISTICS, actorId: DANA_OKAFOR },
       { provider: MARCO.provider, subject: MARCO.subject, organizationId: NORTH_ORG, actorId: MARCO_ID },
       { provider: IRIS.provider, subject: IRIS.subject, organizationId: CIDERS_ORG, actorId: IRIS_ID },
@@ -97,8 +99,7 @@ const issue = async (
   operationId: string,
 ) => {
   const result = await engine.accessFromEvidence(evidence(subject, operationId));
-  assert.ok(!("failure" in result), `issuance failed: ${"failure" in result ? result.failure.kind : ""}`);
-  return result;
+  return successOf(result);
 };
 
 const command = async (
@@ -132,11 +133,10 @@ test("the embedded specialist reads the organization that owns the team, not the
   // read reach follows the target: the Harbor-owned team makes Harbor
   // readable to a North actor
   assert.deepEqual([...after.envelope.claims.readableOrganizationIds].sort(), [HARBOR_LOGISTICS, NORTH_ORG].sort());
-  const verified = await verify(after.envelope, keys, {
+  const verified = successOf(await verify(after.envelope, keys, {
     now: after.envelope.claims.iat + 1,
     expectedOperationId: MERIDIAN,
-  });
-  assert.ok(!("failure" in verified));
+  }));
   assert.equal(verified.access.mayAct("observe", { kind: "team", teamId: HARBOR_TEAM }), true);
 });
 
@@ -175,11 +175,10 @@ test("the suspended guild's booth stays readable through a crossed grant, as an 
     [HARBOR_LOGISTICS, "org-08f7a2b5"].sort(),
   );
   assert.ok(after.envelope.claims.readableTeamIds.includes(BOOTH_001));
-  const verified = await verify(after.envelope, keys, {
+  const verified = successOf(await verify(after.envelope, keys, {
     now: after.envelope.claims.iat + 1,
     expectedOperationId: FESTIVAL_OP,
-  });
-  assert.ok(!("failure" in verified));
+  }));
   // read reach narrows; act capability at the booth does not
   assert.equal(verified.access.mayAct("flag", { kind: "team", teamId: BOOTH_001 }), true);
 });
@@ -196,8 +195,8 @@ test("suspension cuts both ways: the guild's own people lose fresh access, live 
   );
   assert.ok(revoke.ok);
 
-  const refused = await engine.runtime.accessFromEvidence(evidence(IRIS, FESTIVAL_OP));
-  assert.equal(refused.failure.kind, "not-admitted");
+  const refused = failureOf(await engine.runtime.accessFromEvidence(evidence(IRIS, FESTIVAL_OP)));
+  assert.equal(refused.kind, "not-admitted");
 
   const stillLive = await verify(live.envelope, keys, {
     now: live.envelope.claims.iat + 1,
@@ -206,12 +205,12 @@ test("suspension cuts both ways: the guild's own people lose fresh access, live 
   assert.ok(!("failure" in stillLive), "the live envelope survives suspension to expiry");
 
   assert.equal(live.refresh.kind, "rotated");
-  const dead = await engine.runtime.refresh({
+  const dead = failureOf(await engine.runtime.refresh({
     interfaceVersion: AUTHORITY_INTERFACE_VERSION,
     operationId: FESTIVAL_OP,
     handle: live.refresh.kind === "rotated" ? live.refresh.handle : "",
-  });
-  assert.equal(dead.failure.kind, "unauthenticated");
+  }));
+  assert.equal(dead.kind, "unauthenticated");
 });
 
 test("the departing administrator: administration survives to expiry, fresh proof does not", async () => {
@@ -245,15 +244,15 @@ test("the departing administrator: administration survives to expiry, fresh proo
     "scenarios-disable-sam-2",
   );
   assert.equal(viaEvidence.ok, false);
-  assert.equal(viaEvidence.failure.kind, "not-admitted");
+  assert.equal(failureOf(viaEvidence).kind, "not-admitted");
 
   assert.equal(dana.refresh.kind, "rotated");
-  const dead = await engine.runtime.refresh({
+  const dead = failureOf(await engine.runtime.refresh({
     interfaceVersion: AUTHORITY_INTERFACE_VERSION,
     operationId: MERIDIAN,
     handle: dana.refresh.kind === "rotated" ? dana.refresh.handle : "",
-  });
-  assert.equal(dead.failure.kind, "unauthenticated");
+  }));
+  assert.equal(dead.kind, "unauthenticated");
 });
 
 test("the shift change: the worn hat turns over at the next issuance, never mid-envelope", async () => {
@@ -271,11 +270,10 @@ test("the shift change: the worn hat turns over at the next issuance, never mid-
   assert.ok(grant.ok);
 
   // the envelope already in the field still wears the old hat
-  const stillOld = await verify(before.envelope, keys, {
+  const stillOld = successOf(await verify(before.envelope, keys, {
     now: before.envelope.claims.iat + 1,
     expectedOperationId: MERIDIAN,
-  });
-  assert.ok(!("failure" in stillOld));
+  }));
   assert.equal(stillOld.claims.hat.role, "field");
 
   // the next issuance wears the new primary
@@ -302,8 +300,7 @@ test("one identity is never two actors: a conflicting principal link is refused 
 
   // re-linking the same actor is idempotent, not a conflict
   const engine = await createInMemoryAuthority({ ...base, principalLinks: [danaLink, danaLink] });
-  const issued = await engine.runtime.accessFromEvidence(evidence(DANA, MERIDIAN));
-  assert.ok(!("failure" in issued));
+  const issued = successOf(await engine.runtime.accessFromEvidence(evidence(DANA, MERIDIAN)));
   assert.equal(issued.envelope.claims.actor.actorId, DANA_OKAFOR);
 });
 
@@ -317,11 +314,10 @@ test("the coalition tonnage board: a Berlin shift lead reads every participating
     [VITTLES_WING, PLANE_FARE, RHEIN_CARRIERS, GROUND_HANDLING].sort(),
   );
   assert.deepEqual(falk.envelope.claims.readableTeamIds, []);
-  const verified = await verify(falk.envelope, keys, {
+  const verified = successOf(await verify(falk.envelope, keys, {
     now: falk.envelope.claims.iat + 1,
     expectedOperationId: AIRLIFT_OP,
-  });
-  assert.ok(!("failure" in verified));
+  }));
   assert.equal(verified.access.mayAct("load", { kind: "team", teamId: SHIFT_TWO }), true);
   assert.equal(verified.access.mayAct("haul", { kind: "team", teamId: SHIFT_TWO }), false);
 });
@@ -331,11 +327,10 @@ test("the exchange officer: secondment is a crossed grant onto another organizat
   const reeve = await issue(engine.runtime, REEVE, AIRLIFT_OP);
   // one worn hat: the Ground Handling shift, not the home station at Fassberg
   assert.deepEqual(reeve.envelope.claims.hat.teamIds, [SHIFT_ONE]);
-  const verified = await verify(reeve.envelope, keys, {
+  const verified = successOf(await verify(reeve.envelope, keys, {
     now: reeve.envelope.claims.iat + 1,
     expectedOperationId: AIRLIFT_OP,
-  });
-  assert.ok(!("failure" in verified));
+  }));
   assert.equal(verified.access.mayAct("dispatch", { kind: "team", teamId: SHIFT_ONE }), true);
   assert.equal(verified.access.mayAct("dispatch", { kind: "team", teamId: FASSBERG_DISPATCH }), false);
 });
@@ -343,12 +338,11 @@ test("the exchange officer: secondment is a crossed grant onto another organizat
 test("one airfield is one site: a Tempelhof foreman reaches every team there and nothing at Gatow", async () => {
   const { engine, keys } = await setup();
   const brandt = await issue(engine.runtime, BRANDT, AIRLIFT_OP);
-  const verified = await verify(brandt.envelope, keys, {
+  const verified = successOf(await verify(brandt.envelope, keys, {
     now: brandt.envelope.claims.iat + 1,
     expectedOperationId: AIRLIFT_OP,
     expectedSiteId: TEMPELHOF,
-  });
-  assert.ok(!("failure" in verified));
+  }));
   // every team at Tempelhof, including the wing's ops desk — site reach
   // crosses organizations — but the load action stays the worn hat's
   for (const teamId of [SHIFT_ONE, SHIFT_TWO, OPS_DESK]) {
@@ -370,8 +364,8 @@ test("the host nation stands down, the lift continues: the board shrinks, the se
   assert.ok(revoke.ok);
 
   // the ground handlers lose fresh access; the wing does not
-  const refused = await engine.runtime.accessFromEvidence(evidence(FALK, AIRLIFT_OP));
-  assert.equal(refused.failure.kind, "not-admitted");
+  const refused = failureOf(await engine.runtime.accessFromEvidence(evidence(FALK, AIRLIFT_OP)));
+  assert.equal(refused.kind, "not-admitted");
 
   const after = await issue(engine.runtime, WHITFIELD, AIRLIFT_OP);
   assert.deepEqual(

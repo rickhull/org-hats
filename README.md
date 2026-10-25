@@ -49,8 +49,9 @@ For the full gate:
 pnpm verify
 ```
 
-That runs the portable suites, the compiler fences, the pilot, and the
-Cloudflare workerd suite. `pnpm test` runs only the portable suites;
+That runs the portable suites, the compiler fences, the test/example
+typecheck, the pilot, and the Cloudflare workerd suite. `pnpm test` runs only
+the portable suites;
 `pnpm check:cloudflare` runs only the reference runtime's typecheck and tests.
 The Cloudflare suite runs locally; it needs no Cloudflare account.
 

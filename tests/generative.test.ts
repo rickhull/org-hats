@@ -31,9 +31,11 @@ import {
   CONFORMANCE_PRINCIPALS,
   CONFORMANCE_WORLD,
 } from "../src/conformance.ts";
+import { actorId, operationId, organizationId, siteId, teamId, type OrganizationId } from "../src/contract.ts";
 import { mulberry32, pick } from "./helpers.ts";
 
-const OP = "op-9f2e6ad4";
+const OP = operationId("op-9f2e6ad4");
+const INVITEE_ORG = organizationId("org-invitee");
 
 // --- the generator ----------------------------------------------------------------
 // The PRNG and pick come from tests/helpers.ts.
@@ -55,19 +57,19 @@ const bundleFor = (seed: number): PolicyBundle => ({
 
 const snapshotFor = (seed: number): Snapshot => {
   const rng = mulberry32(seed);
-  const operationId = `op-generated-${seed}`;
+  const op = operationId(`op-generated-${seed}`);
   const organizations = Array.from({ length: 2 + Math.floor(rng() * 3) }, (_, i) => ({
-    organizationId: `org-${seed}-${i}`,
+    organizationId: organizationId(`org-${seed}-${i}`),
   }));
   const sites = Array.from({ length: 1 + Math.floor(rng() * 3) }, (_, i) => ({
-    siteId: `site-${seed}-${i}`,
-    operationId,
+    siteId: siteId(`site-${seed}-${i}`),
+    operationId: op,
     aliases: [`s${i}`],
   }));
   const teams = sites.flatMap((site) => {
     const count = Math.floor(rng() * 3);
     return Array.from({ length: count }, (_, i) => ({
-      teamId: `team-${seed}-${site.siteId}-${i}`,
+      teamId: teamId(`team-${seed}-${site.siteId}-${i}`),
       siteId: site.siteId,
       organizationId: pick(rng, organizations).organizationId,
       displayName: `Team ${i}`,
@@ -76,14 +78,14 @@ const snapshotFor = (seed: number): Snapshot => {
   const actors = organizations.flatMap((organization) =>
     Array.from({ length: 1 + Math.floor(rng() * 3) }, (_, i) => ({
       organizationId: organization.organizationId,
-      actorId: `actor-${seed}-${organization.organizationId}-${i}`,
+      actorId: actorId(`actor-${seed}-${organization.organizationId}-${i}`),
       ...(rng() < 0.15 ? { disabled: true } : {}),
     })),
   );
   const statuses = ["active", "active", "active", "invited", "accepted", "revoked"] as const;
   const participations = organizations.map((organization) => ({
     organizationId: organization.organizationId,
-    operationId,
+    operationId: op,
     status: pick(rng, statuses),
   }));
   const activeOrganizations = new Set(
@@ -106,7 +108,7 @@ const snapshotFor = (seed: number): Snapshot => {
       if (primary) primaries.add(key);
       grants.push({
         grantId: `g-${seed}-${grants.length}`,
-        operationId,
+        operationId: op,
         organizationId: actor.organizationId,
         actorId: actor.actorId,
         role: pick(rng, ["field", "lead", "admin"]),
@@ -117,7 +119,7 @@ const snapshotFor = (seed: number): Snapshot => {
     }
   }
   return {
-    operations: [{ operationId }],
+    operations: [{ operationId: op }],
     organizations,
     actors,
     sites,
@@ -224,7 +226,7 @@ test("generated states: read reach matches the policy axis and the reached teams
         : [...new Set(
             [...reached]
               .map((teamId) => snapshot.teams.find((team) => team.teamId === teamId)?.organizationId)
-              .filter((organizationId): organizationId is string => organizationId !== undefined),
+              .filter((organizationId): organizationId is OrganizationId => organizationId !== undefined),
           )].sort();
       assert.deepEqual([...reach.readableOrganizationIds].sort(), expectedOrganizations, `seed ${seed}: organization axis`);
 
@@ -465,7 +467,7 @@ test("partial workflow failure: retries converge, replays are no-ops, and state 
   assert.equal(await engine.drainOutbox(), 1);
   assert.equal(engine.pendingOutbox(), 0);
   assert.equal(await engine.drainOutbox(), 0);
-  const invitation = [...engine.invitationsOf("org-invitee").values()][0];
+  const invitation = [...engine.invitationsOf(INVITEE_ORG).values()][0];
   assert.equal(invitation?.status, "pending");
 
   const accept = await command(
@@ -477,8 +479,8 @@ test("partial workflow failure: retries converge, replays are no-ops, and state 
   assert.ok(accept.ok);
   assert.equal(engine.pendingOutbox(), 1);
   // the acceptance ack is pending: the operation still records invited
-  assert.equal(engine.snapshotOf(OP)?.participations.find((p) => p.organizationId === "org-invitee")?.status, "invited");
+  assert.equal(engine.snapshotOf(OP)?.participations.find((p) => p.organizationId === INVITEE_ORG)?.status, "invited");
   assert.equal(await engine.drainOutbox(), 1);
-  assert.equal(engine.snapshotOf(OP)?.participations.find((p) => p.organizationId === "org-invitee")?.status, "active");
+  assert.equal(engine.snapshotOf(OP)?.participations.find((p) => p.organizationId === INVITEE_ORG)?.status, "active");
   assert.equal(await engine.drainOutbox(), 0);
 });

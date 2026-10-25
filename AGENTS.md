@@ -58,9 +58,10 @@ not applying.  No customer names, roster material, secrets, or key material.
 
 - When a change affects executable code, configuration, or tests, run
   `pnpm check` and `pnpm typecheck`; report what both said.  `pnpm check`
-  runs the compiler fence, the cloudflare-import guard, and the `node --test`
-  suites; a single suite is `node --test tests/<file>.test.ts`.  The full
-  local gate is `pnpm verify` — `bin/check-dist` (build and dist freshness),
+  runs the compiler fence, the cloudflare-import guard, the tests/examples
+  typecheck, and the `node --test` suites; a single suite is
+  `node --test tests/<file>.test.ts`.  The full local gate is `pnpm verify` —
+  `bin/check-dist` (build and dist freshness),
   `pnpm check`, and `pnpm check:cloudflare`.  The rings are in
   `tests/README.md`.
 - Do not run `pnpm check` concurrently with `bin/check-dist` or `pnpm verify`

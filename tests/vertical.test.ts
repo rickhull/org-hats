@@ -11,6 +11,7 @@ import { createInMemoryAuthority } from "../src/authority/engine.ts";
 import { fixedClock, webCryptoSigner } from "../src/authority/internal.ts";
 import { ed25519VerifyKey, verify } from "../src/access/verify.ts";
 import { DANA_OKAFOR, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION } from "../src/authority/twins.ts";
+import { failureOf, successOf } from "./helpers.ts";
 
 const OP = "op-9f2e6ad4";
 const WEST = "site-b8d620fa";
@@ -47,8 +48,7 @@ test("evidence to neutral access, end to end", async () => {
     expectedOperationId: OP,
     expectedSiteId: WEST,
   });
-  assert.ok(!("failure" in verified));
-  const { access } = verified;
+  const { access } = successOf(verified);
   assert.equal(access.operationId, OP);
   assert.equal(access.mayAct("resolve", { kind: "team", teamId: "team-2e8c64b9" }), true);
   assert.equal(access.mayAct("configure", { kind: "team", teamId: "team-2e8c64b9" }), false);
@@ -61,5 +61,5 @@ test("evidence to neutral access, end to end", async () => {
     expectedOperationId: OP,
     expectedSiteId: WEST,
   });
-  assert.equal(expired.failure.kind, "expired");
+  assert.equal(failureOf(expired).kind, "expired");
 });

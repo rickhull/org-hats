@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # The module check: the portable fence, the cloudflare-import guard, the
-# v1 suites, then the release-metadata guard. A failure anywhere fails the run.
+# tests/examples typecheck, the v1 suites, then the release-metadata guard.
+# A failure anywhere fails the run.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -42,6 +43,15 @@ if [ -x node_modules/.bin/tsc ]; then
   echo "ok — a consumer builds commands and reads claims without an id constructor"
 else
   echo "(skipped — run 'pnpm install' to enable the fence)"
+fi
+
+echo
+echo "== fence: tests and examples typecheck =="
+if [ -x node_modules/.bin/tsc ]; then
+  node_modules/.bin/tsc -p tsconfig.tests.json
+  echo "ok — suites and examples typecheck"
+else
+  echo "(skipped — run 'pnpm install' to enable the test typecheck)"
 fi
 
 echo

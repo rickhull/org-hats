@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import type { PolicyBundle } from "../src/policy.ts";
 import { validatePolicyBundle } from "../src/policy.ts";
 import { FESTIVAL, PROFESSIONAL_OPERATION } from "../src/authority/twins.ts";
+import { uncheckedPolicy } from "./helpers.ts";
 
 test("both twin bundles validate cleanly", () => {
   assert.deepEqual(validatePolicyBundle(PROFESSIONAL_OPERATION.policy), []);
@@ -44,11 +45,11 @@ test("a duplicate action in the vocabulary is rejected", () => {
 });
 
 test("an unknown read policy is rejected", () => {
-  const bundle = { ...base, readPolicy: { organizations: "everyone-always" } };
+  const bundle = uncheckedPolicy({ ...base, readPolicy: { organizations: "everyone-always" } });
   assert.ok(validatePolicyBundle(bundle).some((p) => p.includes("read policy")));
 });
 
 test("a wrong format number is rejected", () => {
-  const bundle = { ...base, format: 2 };
+  const bundle = uncheckedPolicy({ ...base, format: 2 });
   assert.ok(validatePolicyBundle(bundle).some((p) => p.includes("format")));
 });

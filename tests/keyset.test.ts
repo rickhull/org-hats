@@ -20,6 +20,7 @@ import {
   VERIFY_KEY_SET_VERSION,
 } from "../src/access/keys.ts";
 import { verify } from "../src/access/verify.ts";
+import { asJson, successOf } from "./helpers.ts";
 
 const vectors = JSON.parse(
   readFileSync(new URL("./fixtures/envelope-vectors.json", import.meta.url), "utf8"),
@@ -65,11 +66,10 @@ test("a key set round-trips and verifies the committed vector", async () => {
     claims: vectors.claims,
     signature: vectors.signature,
   };
-  const verified = await verify(envelope, await verificationKeysFrom(serialized), {
+  const verified = successOf(await verify(envelope, await verificationKeysFrom(serialized), {
     now: vectors.claims.iat + 1,
-  });
-  assert.ok(!("failure" in verified));
-  assert.equal(canonicalJson(verified.claims), vectors.canonical);
+  }));
+  assert.equal(canonicalJson(asJson(verified.claims)), vectors.canonical);
 });
 
 test("an empty key set is refused", () => {

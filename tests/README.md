@@ -12,8 +12,8 @@ release-metadata guard. `pnpm verify` is the full local gate: `bin/check-dist`
   suite; `pnpm --filter org-hats-cloudflare exec vitest run test/<file>.test.ts`
   for one workerd suite. Use while iterating; this is where a change's own
   evidence should come from.
-- **Ring 1 — portable.** `pnpm check` (fences, portable suites, pilot, tag
-  audit).
+- **Ring 1 — portable.** `pnpm check` (fences, test/example typecheck,
+  portable suites, pilot, tag audit).
 - **Ring 2 — workspace.** `pnpm check-dist && pnpm check:cloudflare` when
   `src/`, `dist/`, `package.json`, or `packages/cloudflare/` changes.
   `check-dist` cleans and rebuilds `dist/`; run it before the workerd suites
@@ -25,6 +25,12 @@ release-metadata guard. `pnpm verify` is the full local gate: `bin/check-dist`
 `pnpm test:tools` runs the release-guard suites alone
 (`release-tools.test.ts`, `gate-cache.test.ts`); they need only Node and git
 and are part of ring 1.
+
+The root suites and `examples/` are typechecked by `tsconfig.tests.json` as
+part of `bin/check`; `pnpm typecheck:tests` is the targeted command.
+`pnpm typecheck` remains the build-config check over `src/`. A fixture that
+drifts from the public types now fails the gate instead of failing at
+runtime.
 
 - `contract.test.ts` — canonical JSON, byte codecs, version constants.
 - `model.test.ts` — decisions, worn-hat selection, participation transitions.

@@ -7,8 +7,8 @@ findings rode the **2.0.0** release: `GrantTarget` landed as the breaking
 command change (`claude_review.md` P3), alongside the behavior tightenings
 and additive API. This ledger is reconciled against the released 2.0 line:
 the R1/R2/R3 items checked below are fixed; the remaining R1/R2/R3 findings
-plus R4 and R5 are live. The typechecked-test pass is its own plan,
-`typechecked_tests.md`. Pending slices: `packages/cloudflare` (including
+plus R4 and R5 are live. The typechecked-test pass is landed; see
+`tests/README.md`. Pending slices: `packages/cloudflare` (including
 the RFC-grounded exchange review), `tests/`, `bin/`, and configs.
 
 The two cross-runtime findings below were fixed in 2.0.0; the rest of the
@@ -139,8 +139,8 @@ coordinators' commands. This is the headline item.
   fixes from R1), runtime, the exchange (RFC 8414/7515/7519/7636
   grounded — already landed per Quartermaster's relay note, review it
   against the RFCs), entrypoint, ops, wrangler configs.
-- [ ] `tests/`: portable suite organization review. The typechecked-test
-  pass is its own plan, `typechecked_tests.md`.
+- [ ] `tests/`: portable suite organization review. The suites and examples
+  now typecheck in `bin/check`.
 - [ ] `bin/`: `check`, `release`, `check-version`, `fix-dts`.
 
 ## Release

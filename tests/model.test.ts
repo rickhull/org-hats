@@ -11,16 +11,35 @@ import {
   selectWornHat,
   applyParticipationEvent,
   transitionParticipation,
+  type Decision,
   type Grant,
   type Snapshot,
 } from "../src/model.ts";
 import type { PolicyBundle } from "../src/policy.ts";
 import { DANA_OKAFOR, FESTIVAL, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION } from "../src/authority/twins.ts";
+import { actorId, operationId, organizationId, siteId, teamId } from "../src/contract.ts";
 
 const MER = PROFESSIONAL_OPERATION.snapshot;
-const OP = "op-9f2e6ad4";
-const EAST = "site-e4a1c9b3";
-const WEST = "site-b8d620fa";
+const OP = operationId("op-9f2e6ad4");
+const EAST = siteId("site-e4a1c9b3");
+const WEST = siteId("site-b8d620fa");
+const LEN_ORG = organizationId("org-a53e90f7");
+const LEN = actorId("actor-77f2b0e5");
+const NOBODY = actorId("actor-nobody");
+const NEW_ORG = organizationId("org-new");
+const ELSEWHERE = operationId("op-elsewhere");
+const reasonOf = (decision: Decision): string => {
+  if (decision.allowed) throw new Error("expected a denial");
+  return decision.reason;
+};
+const withoutSlug = <T extends { slug?: string }>(value: T): Omit<T, "slug"> => {
+  const { slug: _slug, ...rest } = value;
+  return rest;
+};
+const withoutPath = <T extends { path?: string }>(value: T): Omit<T, "path"> => {
+  const { path: _path, ...rest } = value;
+  return rest;
+};
 const meridian = (action: string, target: Parameters<typeof decide>[6]) =>
   decide(MER, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, DANA_OKAFOR, OP, action, target);
 
@@ -47,11 +66,11 @@ test("routing facts are complete, unique, and valid labels", () => {
     /share the path/,
   );
   assert.match(
-    problems({ ...base, operations: [{ ...operation, slug: undefined }] }),
+    problems({ ...base, operations: [withoutSlug(operation)] }),
     /has site paths but no slug/,
   );
   assert.match(
-    problems({ ...base, sites: base.sites.map((site, index) => index === 0 ? { ...site, path: undefined } : site) }),
+    problems({ ...base, sites: base.sites.map((site, index) => index === 0 ? withoutPath(site) : site) }),
     /has a slug but a site without a path/,
   );
   assert.match(
@@ -71,8 +90,8 @@ test("routing facts are complete, unique, and valid labels", () => {
   assert.equal(
     problems({
       ...base,
-      operations: [{ ...operation, slug: undefined }],
-      sites: base.sites.map((site) => ({ ...site, path: undefined })),
+      operations: [withoutSlug(operation)],
+      sites: base.sites.map(withoutPath),
     }),
     "",
   );
@@ -87,23 +106,23 @@ test("allow: the worn hat carries the action and reaches the target", () => {
 test("deny/no-capability: the role reaches but does not carry the action", () => {
   const d = meridian("configure", { kind: "team", teamId: "team-2e8c64b9" });
   assert.ok(!d.allowed);
-  assert.equal(d.reason, "no-capability");
+  assert.equal(reasonOf(d), "no-capability");
 });
 
 test("deny/out-of-reach: no grant reaches the target", () => {
   const d = meridian("observe", { kind: "team", teamId: "team-c7d9e2a1" });
   assert.ok(!d.allowed);
-  assert.equal(d.reason, "out-of-reach");
+  assert.equal(reasonOf(d), "out-of-reach");
 });
 
 test("deny/out-of-reach: nothing reaches a whole operation", () => {
   const d = meridian("observe", { kind: "operation" });
   assert.ok(!d.allowed);
-  assert.equal(d.reason, "out-of-reach");
+  assert.equal(reasonOf(d), "out-of-reach");
 });
 
 test("deny/not-admitted: unknown actor, disabled actor, or no participation", () => {
-  assert.equal(decide(MER, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, "actor-nobody", OP, "observe", { kind: "team", teamId: "team-2e8c64b9" }).reason, "not-admitted");
+  assert.equal(reasonOf(decide(MER, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, NOBODY, OP, "observe", { kind: "team", teamId: "team-2e8c64b9" })), "not-admitted");
 
   const disabled: Snapshot = {
     ...MER,
@@ -112,7 +131,7 @@ test("deny/not-admitted: unknown actor, disabled actor, or no participation", ()
     ),
   };
   assert.equal(
-    decide(disabled, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, DANA_OKAFOR, OP, "resolve", { kind: "team", teamId: "team-2e8c64b9" }).reason,
+    reasonOf(decide(disabled, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, DANA_OKAFOR, OP, "resolve", { kind: "team", teamId: "team-2e8c64b9" })),
     "not-admitted",
   );
 
@@ -121,20 +140,20 @@ test("deny/not-admitted: unknown actor, disabled actor, or no participation", ()
     participations: MER.participations.filter((p) => p.organizationId !== HARBOR_LOGISTICS),
   };
   assert.equal(
-    decide(uninvited, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, DANA_OKAFOR, OP, "resolve", { kind: "team", teamId: "team-2e8c64b9" }).reason,
+    reasonOf(decide(uninvited, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, DANA_OKAFOR, OP, "resolve", { kind: "team", teamId: "team-2e8c64b9" })),
     "not-admitted",
   );
 });
 
 test("a site grant reaches every team at the site, and the site itself", () => {
   // Len's admin hat is site-scoped at West Yard
-  const d = decide(MER, PROFESSIONAL_OPERATION.policy, "org-a53e90f7", "actor-77f2b0e5", OP, "configure", { kind: "site", siteId: WEST });
+  const d = decide(MER, PROFESSIONAL_OPERATION.policy, LEN_ORG, LEN, OP, "configure", { kind: "site", siteId: WEST });
   assert.ok(d.allowed);
-  const atTeam = decide(MER, PROFESSIONAL_OPERATION.policy, "org-a53e90f7", "actor-77f2b0e5", OP, "resolve", { kind: "team", teamId: "team-9a1f73e0" });
+  const atTeam = decide(MER, PROFESSIONAL_OPERATION.policy, LEN_ORG, LEN, OP, "resolve", { kind: "team", teamId: "team-9a1f73e0" });
   assert.ok(atTeam.allowed);
-  const elsewhere = decide(MER, PROFESSIONAL_OPERATION.policy, "org-a53e90f7", "actor-77f2b0e5", OP, "resolve", { kind: "site", siteId: EAST });
+  const elsewhere = decide(MER, PROFESSIONAL_OPERATION.policy, LEN_ORG, LEN, OP, "resolve", { kind: "site", siteId: EAST });
   assert.ok(!elsewhere.allowed);
-  assert.equal(elsewhere.reason, "out-of-reach");
+  assert.equal(reasonOf(elsewhere), "out-of-reach");
 });
 
 test("a revoked hat is never wearable and never blocks the fallback", () => {
@@ -143,7 +162,7 @@ test("a revoked hat is never wearable and never blocks the fallback", () => {
     grants: MER.grants.map((g) => (g.grantId === "g-mer-3" ? { ...g, revoked: true } : g)),
   };
   assert.equal(
-    decide(revoked, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, DANA_OKAFOR, OP, "review", { kind: "team", teamId: "team-2e8c64b9" }).reason,
+    reasonOf(decide(revoked, PROFESSIONAL_OPERATION.policy, HARBOR_LOGISTICS, DANA_OKAFOR, OP, "review", { kind: "team", teamId: "team-2e8c64b9" })),
     "not-admitted",
   );
 
@@ -156,7 +175,7 @@ test("a revoked hat is never wearable and never blocks the fallback", () => {
       {
         grantId: "g-mer-6", operationId: OP, organizationId: HARBOR_LOGISTICS,
         actorId: DANA_OKAFOR, role: "field",
-        target: { kind: "team", teamId: "team-2e8c64b9" },
+        target: { kind: "team", teamId: teamId("team-2e8c64b9") },
       },
     ],
   };
@@ -170,7 +189,7 @@ test("a primary that does not reach the target stands aside for the fallback", (
   // Dana primary = team at West; asking at the festival gate, the site admin
   // hat is the only wearable one there
   const F = FESTIVAL.snapshot;
-  const hat = selectWornHat(F, FESTIVAL.policy, HARBOR_LOGISTICS, DANA_OKAFOR, "op-61a8e3f2", { kind: "site", siteId: "site-a9e05c41" });
+  const hat = selectWornHat(F, FESTIVAL.policy, HARBOR_LOGISTICS, DANA_OKAFOR, operationId("op-61a8e3f2"), { kind: "site", siteId: "site-a9e05c41" });
   assert.equal(hat?.role, "admin");
   assert.equal(hat?.grantId, "g-fest-4");
 });
@@ -179,7 +198,7 @@ test("selection is deterministic: same rank orders by role, target, then grant i
   const bundle: PolicyBundle = PROFESSIONAL_OPERATION.policy;
   const grant = (grantId: string, role: string): Grant => ({
     grantId, operationId: OP, organizationId: HARBOR_LOGISTICS,
-    actorId: DANA_OKAFOR, role, target: { kind: "team", teamId: "team-2e8c64b9" },
+    actorId: DANA_OKAFOR, role, target: { kind: "team", teamId: teamId("team-2e8c64b9") },
   });
   const snapshot: Snapshot = {
     ...MER,
@@ -194,14 +213,14 @@ test("selection is deterministic: same rank orders by role, target, then grant i
 });
 
 test("participation: invite → accept → activate is canonical; revoke is terminal", () => {
-  const org = "org-new"; const op = OP;
+  const org = NEW_ORG; const op = OP;
   const invite = transitionParticipation(org, op, undefined, { kind: "invite", by: "operation" });
   assert.ok(invite.ok && invite.participation.status === "invited");
-  assert.ok(!transitionParticipation(org, op, undefined, { kind: "invite", by: "organization" }).ok);
+  assert.ok(!transitionParticipation(org, op, undefined, { kind: "invite", by: "organization" } as never).ok);
   const accepted = transitionParticipation(org, op, invite.ok ? invite.participation : undefined, { kind: "accept", by: "organization" });
   assert.ok(accepted.ok && accepted.participation.status === "accepted");
   // the operation cannot accept, the organization cannot activate
-  assert.ok(!transitionParticipation(org, op, invite.ok ? invite.participation : undefined, { kind: "accept", by: "operation" }).ok);
+  assert.ok(!transitionParticipation(org, op, invite.ok ? invite.participation : undefined, { kind: "accept", by: "operation" } as never).ok);
   const active = transitionParticipation(org, op, accepted.ok ? accepted.participation : undefined, { kind: "activate", by: "operation" });
   assert.ok(active.ok && active.participation.status === "active");
   const revoked = transitionParticipation(org, op, active.ok ? active.participation : undefined, { kind: "revoke", by: "organization" });
@@ -210,13 +229,13 @@ test("participation: invite → accept → activate is canonical; revoke is term
 });
 
 test("participation: applyParticipationEvent is the only way a status moves", () => {
-  const org = "org-new"; const op = OP;
+  const org = NEW_ORG; const op = OP;
   const invited = applyParticipationEvent([], org, op, { kind: "invite", by: "operation" });
   assert.ok(invited.ok);
   assert.deepEqual(invited.participations, [{ organizationId: org, operationId: op, status: "invited" }]);
 
   // an unrelated participation is carried through untouched
-  const other = { organizationId: "org-other", operationId: op, status: "active" } as const;
+  const other = { organizationId: organizationId("org-other"), operationId: op, status: "active" } as const;
   const accepted = applyParticipationEvent(
     [other, ...invited.participations],
     org,
@@ -225,7 +244,7 @@ test("participation: applyParticipationEvent is the only way a status moves", ()
   );
   assert.ok(accepted.ok);
   assert.equal(accepted.participation.status, "accepted");
-  assert.deepEqual(accepted.participations.find((p) => p.organizationId === "org-other"), other);
+  assert.deepEqual(accepted.participations.find((p) => p.organizationId === other.organizationId), other);
 
   const active = applyParticipationEvent(accepted.participations, org, op, { kind: "activate", by: "operation" });
   assert.ok(active.ok && active.participation.status === "active");
@@ -252,7 +271,7 @@ test("participation: applyParticipationEvent is the only way a status moves", ()
 
   // the operation's participation is matched by both ids, never one
   const elsewhere = applyParticipationEvent(
-    [{ organizationId: org, operationId: "op-elsewhere", status: "active" }],
+    [{ organizationId: org, operationId: ELSEWHERE, status: "active" }],
     org,
     op,
     { kind: "revoke", by: "operation" },

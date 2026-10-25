@@ -60,11 +60,11 @@ test("the airlift is a bounded multi-airfield coalition", () => {
   assert.ok(ghsSites.size >= 3, "ground handling spans at least three airfields");
   // the exchange officer: a grant whose target team belongs to another
   // organization — secondment as a crossed grant
-  const crossed = s.grants.filter(
-    (g) =>
-      g.target.kind === "team" &&
-      s.teams.find((t) => t.teamId === g.target.teamId)?.organizationId !== g.organizationId,
-  );
+  const crossed = s.grants.filter((g) => {
+    if (g.target.kind !== "team") return false;
+    const target = g.target.teamId;
+    return s.teams.find((t) => t.teamId === target)?.organizationId !== g.organizationId;
+  });
   assert.equal(crossed.length, 1);
   assert.equal(crossed[0]?.actorId, "actor-91f3c7e8");
 });

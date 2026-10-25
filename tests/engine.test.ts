@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { canonicalJson } from "../src/contract.ts";
+import { actorId, canonicalJson, operationId, organizationId, siteId, teamId } from "../src/contract.ts";
 import type { TwinFixture } from "../src/authority/twins.ts";
 import {
   DANA_OKAFOR,
@@ -17,8 +17,18 @@ import type { AuthorityCommand, PrincipalEvidence } from "../src/authority/types
 import { AUTHORITY_INTERFACE_VERSION } from "../src/authority/types.ts";
 import { createInMemoryAuthority } from "../src/authority/engine.ts";
 import { fixedClock, webCryptoSigner } from "../src/authority/internal.ts";
+import { asJson, failureOf, fixtureSnapshot, successOf } from "./helpers.ts";
 
-const OP = "op-9f2e6ad4"; // Meridian
+const OP = operationId("op-9f2e6ad4"); // Meridian
+const LEN_ORG = organizationId("org-a53e90f7");
+const LEN_ID = actorId("actor-77f2b0e5");
+const MARCO_ORG = organizationId("org-2b7c41de");
+const MARCO_ID = actorId("actor-6e0d94b2");
+const INVITEE_ORG = organizationId("org-invitee");
+const INVITEE_ACTOR = actorId("actor-inv-admin");
+const TITLED_OP = operationId("op-titled");
+const TITLED_ORG = organizationId("org-titled");
+const TITLED_ACTOR = actorId("actor-titled");
 const LEN = { provider: "test-idp", subject: "len" } as const;
 const DANA = { provider: "test-idp", subject: "dana" } as const;
 const MARCO = { provider: "test-idp", subject: "marco" } as const;
@@ -29,7 +39,7 @@ const INVITEE_ADMIN = { provider: "test-idp", subject: "inv-admin" } as const;
 const invitee: TwinFixture = {
   name: "professional",
   policy: PROFESSIONAL_OPERATION.policy,
-  snapshot: {
+  snapshot: fixtureSnapshot({
     operations: [{ operationId: "op-dummy", displayName: "Dummy Home Op" }],
     organizations: [{ organizationId: "org-invitee", displayName: "Cedar Works" }],
     actors: [
@@ -39,7 +49,7 @@ const invitee: TwinFixture = {
     teams: [],
     grants: [],
     participations: [{ organizationId: "org-invitee", operationId: "op-dummy", status: "active" }],
-  },
+  }),
 };
 
 const setup = async (transportFailures = 0, envelopeLifetimeSeconds?: number) => {
@@ -52,23 +62,30 @@ const setup = async (transportFailures = 0, envelopeLifetimeSeconds?: number) =>
     ...(envelopeLifetimeSeconds !== undefined ? { envelopeLifetimeSeconds } : {}),
     fixtures: [PROFESSIONAL_OPERATION, FESTIVAL, invitee],
     principalLinks: [
-      { provider: LEN.provider, subject: LEN.subject, organizationId: "org-a53e90f7", actorId: "actor-77f2b0e5" },
+      { provider: LEN.provider, subject: LEN.subject, organizationId: LEN_ORG, actorId: LEN_ID },
       { provider: DANA.provider, subject: DANA.subject, organizationId: HARBOR_LOGISTICS, actorId: DANA_OKAFOR },
-      { provider: MARCO.provider, subject: MARCO.subject, organizationId: "org-2b7c41de", actorId: "actor-6e0d94b2" },
-      { provider: INVITEE_ADMIN.provider, subject: INVITEE_ADMIN.subject, organizationId: "org-invitee", actorId: "actor-inv-admin" },
+      { provider: MARCO.provider, subject: MARCO.subject, organizationId: MARCO_ORG, actorId: MARCO_ID },
+      { provider: INVITEE_ADMIN.provider, subject: INVITEE_ADMIN.subject, organizationId: INVITEE_ORG, actorId: INVITEE_ACTOR },
     ],
-    orgAdmins: { "org-invitee": ["actor-inv-admin"], [HARBOR_LOGISTICS]: [DANA_OKAFOR] },
+    orgAdmins: { [INVITEE_ORG]: [INVITEE_ACTOR], [HARBOR_LOGISTICS]: [DANA_OKAFOR] },
   });
   return { engine, clock, signer };
 };
 
-const evidence = (subject: PrincipalEvidence, operationId = OP) => ({
+const evidence = (subject: PrincipalEvidence, operationId: string = OP) => ({
   interfaceVersion: AUTHORITY_INTERFACE_VERSION,
   operationId,
   evidence: subject,
 });
 
-const cmd = (body: Omit<AuthorityCommand, "interfaceVersion" | "idempotencyKey" | "authorization">, authorization: AuthorityCommand["authorization"], key: string): AuthorityCommand => ({
+type CommandBody = {
+  [K in AuthorityCommand["kind"]]: Omit<
+    Extract<AuthorityCommand, { kind: K }>,
+    "interfaceVersion" | "idempotencyKey" | "authorization"
+  >;
+}[AuthorityCommand["kind"]];
+
+const cmd = (body: CommandBody, authorization: AuthorityCommand["authorization"], key: string): AuthorityCommand => ({
   interfaceVersion: AUTHORITY_INTERFACE_VERSION,
   idempotencyKey: key,
   authorization,
@@ -86,18 +103,18 @@ test("issuance: evidence resolves the actor, computes reach, and signs", async (
   assert.equal(envelope.claims.hat.role, "coordinator");
   assert.deepEqual(envelope.claims.readableOrganizationIds, [HARBOR_LOGISTICS]);
   assert.equal(envelope.claims.exp - envelope.claims.iat, 900);
-  assert.ok(await signer.verify(canonicalJson(envelope.claims), envelope.signature));
+  assert.ok(await signer.verify(canonicalJson(asJson(envelope.claims)), envelope.signature));
 });
 
 test("issuance failures: unknown evidence, actor without admission", async () => {
   const { engine } = await setup();
   const unknown = await engine.runtime.accessFromEvidence(evidence({ provider: "test-idp", subject: "nobody" }));
-  assert.equal(unknown.failure.kind, "unauthenticated");
+  assert.equal(failureOf(unknown).kind, "unauthenticated");
   // Iris belongs to the festival, not Meridian
   const iris = await engine.runtime.accessFromEvidence(evidence({ provider: "test-idp", subject: "iris" }));
-  assert.equal(iris.failure.kind, "unauthenticated"); // no principal link at all
+  assert.equal(failureOf(iris).kind, "unauthenticated"); // no principal link at all
   const wrongOp = await engine.runtime.accessFromEvidence(evidence(DANA, "op-nonesuch"));
-  assert.equal(wrongOp.failure.kind, "wrong-binding");
+  assert.equal(failureOf(wrongOp).kind, "wrong-binding");
 });
 
 test("refresh: rotation with explicit outcomes; a superseded handle is dead", async () => {
@@ -114,8 +131,8 @@ test("refresh: rotation with explicit outcomes; a superseded handle is dead", as
   const replay = await engine.runtime.refresh({
     interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: first.refresh.handle,
   });
-  assert.equal(replay.failure.kind, "unauthenticated");
-  assert.match(replay.failure.detail ?? "", /superseded/);
+  assert.equal(failureOf(replay).kind, "unauthenticated");
+  assert.match(failureOf(replay).detail ?? "", /superseded/);
 });
 
 test("the envelope lifetime is configuration, not a constant", async () => {
@@ -153,7 +170,7 @@ test("amr and auth_time: copied from evidence, preserved through refresh, surfac
   assert.equal(context.authTime, 1_699_999_000);
   // the methods are signed facts: tampering them breaks the signature
   const forged = { ...second.envelope, claims: { ...second.envelope.claims, amr: ["pwd"] } };
-  assert.ok(!(await signer.verify(canonicalJson(forged.claims), forged.signature)));
+  assert.ok(!(await signer.verify(canonicalJson(asJson(forged.claims)), forged.signature)));
 });
 
 test("the bounded window: a revoked grant kills refresh, not the live envelope", async () => {
@@ -175,8 +192,8 @@ test("the bounded window: a revoked grant kills refresh, not the live envelope",
   const dead = await engine.runtime.refresh({
     interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: danaIssue.refresh.handle,
   });
-  assert.equal(dead.failure.kind, "unauthenticated");
-  assert.match(dead.failure.detail ?? "", /revoked/);
+  assert.equal(failureOf(dead).kind, "unauthenticated");
+  assert.match(failureOf(dead).detail ?? "", /revoked/);
 });
 
 test("disable-actor: issuance stops immediately; the outbox revokes refresh records", async () => {
@@ -191,12 +208,12 @@ test("disable-actor: issuance stops immediately; the outbox revokes refresh reco
   ));
   assert.ok(disable.ok);
   const blocked = await engine.runtime.accessFromEvidence(evidence(DANA));
-  assert.equal(blocked.failure.kind, "not-admitted");
+  assert.equal(failureOf(blocked).kind, "not-admitted");
   if (danaIssue.refresh.kind !== "rotated") return;
   const dead = await engine.runtime.refresh({
     interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: danaIssue.refresh.handle,
   });
-  assert.equal(dead.failure.kind, "unauthenticated");
+  assert.equal(failureOf(dead).kind, "unauthenticated");
 });
 
 test("participation: an acceptance delivered after a revoke does not resurrect it", async () => {
@@ -217,7 +234,7 @@ test("participation: an acceptance delivered after a revoke does not resurrect i
   ));
   assert.ok(invite.ok);
   await engine.drainOutbox();
-  assert.equal(engine.invitationsOf("org-invitee").size, 1);
+  assert.equal(engine.invitationsOf(INVITEE_ORG).size, 1);
 
   const revoke = await engine.runtime.command(cmd(
     { kind: "participation-revoke", operationId: OP, organizationId: "org-invitee", by: "operation" },
@@ -248,7 +265,7 @@ test("participation: an acceptance delivered after a revoke does not resurrect i
     "a revoked participation stays revoked",
   );
   const after = await engine.runtime.accessFromEvidence(evidence(INVITEE_ADMIN));
-  assert.equal(after.failure.kind, "not-admitted", "no issuance against a revoked participation");
+  assert.equal(failureOf(after).kind, "not-admitted", "no issuance against a revoked participation");
 });
 
 test("participation: revoking twice is a safe retry; revoking a non-participant is denied", async () => {
@@ -281,7 +298,7 @@ test("participation: revoking twice is a safe retry; revoking a non-participant 
   // never participating is a different thing, and is refused
   const stranger = await engine.runtime.command(revokeCmd("twice-3", "org-stranger"));
   assert.ok(!stranger.ok);
-  assert.equal(stranger.failure.kind, "denied");
+  assert.equal(failureOf(stranger).kind, "denied");
 });
 
 test("participation: invite → accept → active, with a visible partial state and retry", async () => {
@@ -308,7 +325,7 @@ test("participation: invite → accept → active, with a visible partial state 
 
   const delivered = await engine.drainOutbox();
   assert.equal(delivered, 1);
-  assert.equal(engine.invitationsOf("org-invitee").size, 1);
+  assert.equal(engine.invitationsOf(INVITEE_ORG).size, 1);
   const accept = await engine.runtime.command(cmd(
     { kind: "participation-accept", operationId: OP },
     { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
@@ -349,7 +366,7 @@ test("idempotency: retries claim their result; misuse and denials do not poison"
     { ...grantBody, role: "wizard" }, { kind: "access-envelope", envelope: len.envelope }, "grant-key-1",
   ));
   assert.equal(denied.ok, false);
-  assert.equal(denied.failure.kind, "invalid-command");
+  assert.equal(failureOf(denied).kind, "invalid-command");
   const applied = await engine.runtime.command(cmd(
     { ...grantBody }, { kind: "access-envelope", envelope: len.envelope }, "grant-key-1",
   ));
@@ -362,7 +379,7 @@ test("idempotency: retries claim their result; misuse and denials do not poison"
     { ...grantBody, role: "field" }, { kind: "access-envelope", envelope: len.envelope }, "grant-key-1",
   ));
   assert.ok(!misuse.ok);
-  assert.equal(misuse.failure.kind, "invalid-command");
+  assert.equal(failureOf(misuse).kind, "invalid-command");
 });
 
 test("authorization: administration is policy, not a hardcoded role", async () => {
@@ -376,7 +393,7 @@ test("authorization: administration is policy, not a hardcoded role", async () =
     "dana-grant",
   ));
   assert.ok(!denied.ok);
-  assert.equal(denied.failure.kind, "denied");
+  assert.equal(failureOf(denied).kind, "denied");
   // and a caller with the wrong interface version learns it immediately
   const stale = await engine.runtime.command({
     interfaceVersion: 99 as never, idempotencyKey: "stale",
@@ -385,7 +402,7 @@ test("authorization: administration is policy, not a hardcoded role", async () =
     actorId: DANA_OKAFOR, role: "field", target: { kind: "team", teamId: "team-2e8c64b9" },
   });
   assert.ok(!stale.ok);
-  assert.equal(stale.failure.kind, "wrong-interface-version");
+  assert.equal(failureOf(stale).kind, "wrong-interface-version");
 });
 
 test("authorization: an undeclared admin role grants nothing by default", async () => {
@@ -403,12 +420,12 @@ test("authorization: an undeclared admin role grants nothing by default", async 
   const titled: TwinFixture = {
     name: "professional",
     policy,
-    snapshot: {
+    snapshot: fixtureSnapshot({
       operations: [{ operationId: "op-titled" }],
       organizations: [{ organizationId: "org-titled" }],
       actors: [{ organizationId: "org-titled", actorId: "actor-titled" }],
       sites: [{ siteId: "site-titled", operationId: "op-titled", aliases: [] }],
-      teams: [{ target: { kind: "team", teamId: "team-titled" }, siteId: "site-titled", organizationId: "org-titled" }],
+      teams: [{ teamId: "team-titled", siteId: "site-titled", organizationId: "org-titled" }],
       grants: [{
         grantId: "g-titled",
         operationId: "op-titled",
@@ -419,20 +436,20 @@ test("authorization: an undeclared admin role grants nothing by default", async 
         primary: true,
       }],
       participations: [{ organizationId: "org-titled", operationId: "op-titled", status: "active" }],
-    },
+    }),
   };
   const engine = await createInMemoryAuthority({
     clock,
     signer,
     fixtures: [titled],
     principalLinks: [
-      { provider: "test-idp", subject: "titled", organizationId: "org-titled", actorId: "actor-titled" },
+      { provider: "test-idp", subject: "titled", organizationId: TITLED_ORG, actorId: TITLED_ACTOR },
     ],
     // deliberately no adminRoles, and the role carries no configure action
   });
   const issued = await engine.runtime.accessFromEvidence({
     interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-    operationId: "op-titled",
+    operationId: TITLED_OP,
     evidence: { provider: "test-idp", subject: "titled" },
   });
   assert.ok(!("failure" in issued));
@@ -444,7 +461,7 @@ test("authorization: an undeclared admin role grants nothing by default", async 
     "titled-grant",
   ));
   assert.ok(!attempt.ok, "a hat titled admin does not administer an operation by title alone");
-  assert.equal(attempt.failure.kind, "denied");
+  assert.equal(failureOf(attempt).kind, "denied");
 });
 
 test("request-access and admit: asking is not being admitted", async () => {
@@ -459,7 +476,7 @@ test("request-access and admit: asking is not being admitted", async () => {
     "req-orphan",
   ));
   assert.equal(orphan.ok, false);
-  assert.equal(orphan.failure.kind, "unauthenticated");
+  assert.equal(failureOf(orphan).kind, "unauthenticated");
 
   // a linked principal can ask; the request is recorded, not admission
   const request = await engine.runtime.command(cmd(
@@ -470,7 +487,7 @@ test("request-access and admit: asking is not being admitted", async () => {
   assert.ok(request.ok, request.ok ? "" : request.failure.kind);
   const beforeAdmit = await engine.runtime.accessFromEvidence(evidence(INVITEE_ADMIN));
   assert.ok("failure" in beforeAdmit);
-  assert.equal(beforeAdmit.failure.kind, "not-admitted", "asking did not admit");
+  assert.equal(failureOf(beforeAdmit).kind, "not-admitted", "asking did not admit");
 
   // admission is a separate, administrator act
   const admitted = await engine.runtime.command(cmd(
@@ -497,5 +514,5 @@ test("select-hat: an actor selects their own hat; a stranger cannot", async () =
     "marco-stranger",
   ));
   assert.ok(!stranger.ok);
-  assert.equal(stranger.failure.kind, "denied");
+  assert.equal(failureOf(stranger).kind, "denied");
 });
