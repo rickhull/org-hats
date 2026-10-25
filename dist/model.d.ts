@@ -65,6 +65,18 @@ export interface Grant {
      * is immediate for new issuance. */
     readonly revoked?: boolean;
 }
+/** A grant that has survived the revocation filter: `revoked` is absent or
+ * `false`, never `true`. `wearableGrants` returns these and the decision
+ * path takes them, so the filter is in the signature rather than a
+ * convention callers must know. `Snapshot.grants` keeps revoked records
+ * for audit; only the decision path sees `ActiveGrant`. */
+export type ActiveGrant = Grant & {
+    readonly revoked?: false;
+};
+/** The named narrowing behind the revocation filter. This is the runtime
+ * check the type records — the predicate is where the claim is made, and
+ * `wearableGrants` routes every grant through it. */
+export declare const isActiveGrant: (grant: Grant) => grant is ActiveGrant;
 /** One organization's standing at one operation. `active` is canonical —
  * recorded by the operation, and the only state under which hats are
  * wearable. */
@@ -130,8 +142,9 @@ export type { TargetRef } from "./contract.js";
  * team at it. Nothing reaches a whole operation. */
 export declare const grantReaches: (snapshot: Snapshot, grant: Grant, target: TargetRef) => boolean;
 /** The grants an actor could wear at this operation right now: not revoked,
- * actor enabled, and the organization's participation active. */
-export declare const wearableGrants: (snapshot: Snapshot, organizationId: OrganizationId, actorId: ActorId, operationId: OperationId) => readonly Grant[];
+ * actor enabled, and the organization's participation active. The return
+ * type says the revocation filter ran: every element is an `ActiveGrant`. */
+export declare const wearableGrants: (snapshot: Snapshot, organizationId: OrganizationId, actorId: ActorId, operationId: OperationId) => readonly ActiveGrant[];
 /** A grant resolved to what a decision carries: the role's actions under the
  * bundle and where the hat reaches. Historical acts keep this snapshot. */
 export interface WornHat {

@@ -97,6 +97,18 @@ export interface Grant {
   readonly revoked?: boolean;
 }
 
+/** A grant that has survived the revocation filter: `revoked` is absent or
+ * `false`, never `true`. `wearableGrants` returns these and the decision
+ * path takes them, so the filter is in the signature rather than a
+ * convention callers must know. `Snapshot.grants` keeps revoked records
+ * for audit; only the decision path sees `ActiveGrant`. */
+export type ActiveGrant = Grant & { readonly revoked?: false };
+
+/** The named narrowing behind the revocation filter. This is the runtime
+ * check the type records — the predicate is where the claim is made, and
+ * `wearableGrants` routes every grant through it. */
+export const isActiveGrant = (grant: Grant): grant is ActiveGrant => grant.revoked !== true;
+
 /** One organization's standing at one operation. `active` is canonical —
  * recorded by the operation, and the only state under which hats are
  * wearable. */
@@ -219,13 +231,14 @@ export const grantReaches = (snapshot: Snapshot, grant: Grant, target: TargetRef
 };
 
 /** The grants an actor could wear at this operation right now: not revoked,
- * actor enabled, and the organization's participation active. */
+ * actor enabled, and the organization's participation active. The return
+ * type says the revocation filter ran: every element is an `ActiveGrant`. */
 export const wearableGrants = (
   snapshot: Snapshot,
   organizationId: OrganizationId,
   actorId: ActorId,
   operationId: OperationId,
-): readonly Grant[] => {
+): readonly ActiveGrant[] => {
   const actor = snapshot.actors.find(
     (a) => a.organizationId === organizationId && a.actorId === actorId,
   );
@@ -237,13 +250,14 @@ export const wearableGrants = (
       p.status === "active",
   );
   if (!participating) return [];
-  return snapshot.grants.filter(
-    (g) =>
-      g.operationId === operationId &&
-      g.organizationId === organizationId &&
-      g.actorId === actorId &&
-      g.revoked !== true,
-  );
+  return snapshot.grants
+    .filter(
+      (g) =>
+        g.operationId === operationId &&
+        g.organizationId === organizationId &&
+        g.actorId === actorId,
+    )
+    .filter(isActiveGrant);
 };
 
 /** A grant resolved to what a decision carries: the role's actions under the
@@ -257,9 +271,10 @@ export interface WornHat {
 
 /** The one ranked selection: the primary first, then the deterministic
  * order by (role, target id, grant id). Both `selectWornHat` and `decide`
- * read it, so the rule is written once. */
-const firstByRank = (grants: readonly Grant[]): Grant | undefined => {
-  const rank = (g: Grant): string =>
+ * read it, so the rule is written once. Only active grants enter — the
+ * revocation filter happened upstream in `wearableGrants`. */
+const firstByRank = (grants: readonly ActiveGrant[]): ActiveGrant | undefined => {
+  const rank = (g: ActiveGrant): string =>
     `${g.primary === true ? 0 : 1}|${g.role}|${g.target.kind === "team" ? g.target.teamId : g.target.siteId}|${g.grantId}`;
   return [...grants].sort((a, b) => (rank(a) < rank(b) ? -1 : rank(a) > rank(b) ? 1 : 0))[0];
 };
@@ -267,7 +282,7 @@ const firstByRank = (grants: readonly Grant[]): Grant | undefined => {
 /** A hat the bundle can describe. `undefined` when the grant names a role
  * the bundle does not carry: that is a snapshot inconsistency
  * (`invariantProblems` reports it), never a role with no actions. */
-const hatOf = (bundle: PolicyBundle, grant: Grant): WornHat | undefined => {
+const hatOf = (bundle: PolicyBundle, grant: ActiveGrant): WornHat | undefined => {
   const role = actionsOf(bundle, grant.role);
   if (!role.found) return undefined;
   return {

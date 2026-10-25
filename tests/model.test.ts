@@ -8,9 +8,12 @@ import assert from "node:assert/strict";
 import {
   decide,
   invariantProblems,
+  isActiveGrant,
   selectWornHat,
+  wearableGrants,
   applyParticipationEvent,
   transitionParticipation,
+  type ActiveGrant,
   type Decision,
   type Grant,
   type Snapshot,
@@ -183,6 +186,36 @@ test("a revoked hat is never wearable and never blocks the fallback", () => {
   assert.ok(d.allowed);
   assert.equal(d.hat.role, "field");
   assert.equal(d.hat.grantId, "g-mer-6");
+});
+
+test("the revocation filter is the ActiveGrant refinement, checked once", () => {
+  // `wearableGrants` routes every grant through `isActiveGrant`, and its
+  // return type records that. The predicate is the runtime check the type
+  // claims; absent, explicit false, and true are its whole vocabulary.
+  const revokedGrant: Grant = { ...MER.grants[0]!, revoked: true };
+  assert.ok(!isActiveGrant(revokedGrant));
+  assert.ok(isActiveGrant({ ...MER.grants[0]! }));
+  assert.ok(isActiveGrant({ ...MER.grants[0]!, revoked: false }));
+
+  const revoked: Snapshot = {
+    ...MER,
+    grants: [
+      ...MER.grants.map((g) => (g.grantId === "g-mer-3" ? { ...g, revoked: true } : g)),
+      {
+        grantId: "g-mer-6", operationId: OP, organizationId: HARBOR_LOGISTICS,
+        actorId: DANA_OKAFOR, role: "field",
+        target: { kind: "team", teamId: teamId("team-2e8c64b9") },
+      },
+    ],
+  };
+  const wearable = wearableGrants(revoked, HARBOR_LOGISTICS, DANA_OKAFOR, OP);
+  // the revoked primary is gone and only the fallback survives
+  assert.deepEqual(wearable.map((g) => g.grantId), ["g-mer-6"]);
+  assert.ok(wearable.every(isActiveGrant));
+  const survivors: readonly ActiveGrant[] = wearable;
+  assert.equal(survivors.length, 1);
+  // while `Snapshot.grants` keeps the revoked record for audit
+  assert.ok(revoked.grants.some((g) => g.grantId === "g-mer-3" && g.revoked === true));
 });
 
 test("a primary that does not reach the target stands aside for the fallback", () => {

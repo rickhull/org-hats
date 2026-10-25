@@ -23,6 +23,7 @@ import type {
   TargetRef,
 } from "../src/contract.ts";
 import type { NeutralAccess } from "../src/access/types.ts";
+import { wearableGrants, type ActiveGrant, type Grant } from "../src/model.ts";
 import type {
   AccessFromEvidenceInput,
   AuthorityCommand,
@@ -104,6 +105,21 @@ type _CommandsSpeakCurrent = Expect<
 
 type _CommandFailureIsOkDiscriminated = Expect<
   Equal<Extract<CommandResult, { ok: false }>["failure"], Failure>
+>;
+
+// --- the revocation filter lives in the type ---------------------------------------
+//
+// `wearableGrants` has run `isActiveGrant`; a grant carrying `revoked:
+// true` cannot enter the decision path, and the refinement never widens
+// back to `Grant` on the way out.
+
+type _ActiveGrantRevokedIsNeverTrue = Expect<Equal<ActiveGrant["revoked"], false | undefined>>;
+type _ActiveGrantIsAGrant = Expect<Equal<ActiveGrant extends Grant ? true : false, true>>;
+type _RevokedGrantIsNotActive = Expect<
+  Equal<(Grant & { revoked: true }) extends ActiveGrant ? true : false, false>
+>;
+type _WearableGrantsYieldActive = Expect<
+  Equal<ReturnType<typeof wearableGrants>[number], ActiveGrant>
 >;
 
 test("public-surface type assertions are compile-time only", () => {

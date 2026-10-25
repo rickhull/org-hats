@@ -44,6 +44,7 @@ import {
   applyParticipationEvent,
   readReach,
   wearableGrants,
+  type ActiveGrant,
   type Grant,
   type Participation,
   type Snapshot,
@@ -221,12 +222,12 @@ const ok = (idempotencyKey: string, applied: boolean): CommandResult => ({
  * inconsistency, and `?? []` used to report the second as the first with an
  * empty action list. */
 type DefaultHat =
-  | { readonly ok: true; readonly grant: Grant; readonly actions: readonly string[] }
+  | { readonly ok: true; readonly grant: ActiveGrant; readonly actions: readonly string[] }
   | { readonly ok: false; readonly reason: "no-grant" }
   | { readonly ok: false; readonly reason: "unknown-role"; readonly role: string };
 
-const defaultHat = (grants: readonly Grant[], bundle: PolicyBundle): DefaultHat => {
-  const rank = (g: Grant): string =>
+const defaultHat = (grants: readonly ActiveGrant[], bundle: PolicyBundle): DefaultHat => {
+  const rank = (g: ActiveGrant): string =>
     `${g.primary === true ? 0 : 1}|${g.role}|${g.target.kind === "team" ? g.target.teamId : g.target.siteId}|${g.grantId}`;
   const sorted = [...grants].sort((a, b) => (rank(a) < rank(b) ? -1 : rank(a) > rank(b) ? 1 : 0));
   const chosen = sorted[0];

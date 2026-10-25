@@ -19,6 +19,10 @@
 // This module is data and pure functions: no I/O, no storage, no clock, no
 // Cloudflare, compiled with `types: []`.
 import { actionsOf } from "./policy.js";
+/** The named narrowing behind the revocation filter. This is the runtime
+ * check the type records — the predicate is where the claim is made, and
+ * `wearableGrants` routes every grant through it. */
+export const isActiveGrant = (grant) => grant.revoked !== true;
 /** The visible, retryable workflow — never a distributed transaction. The
  * operation invites and activates (activation is canonical); the
  * organization accepts; either side may revoke, terminally. */
@@ -91,7 +95,8 @@ export const grantReaches = (snapshot, grant, target) => {
     return false;
 };
 /** The grants an actor could wear at this operation right now: not revoked,
- * actor enabled, and the organization's participation active. */
+ * actor enabled, and the organization's participation active. The return
+ * type says the revocation filter ran: every element is an `ActiveGrant`. */
 export const wearableGrants = (snapshot, organizationId, actorId, operationId) => {
     const actor = snapshot.actors.find((a) => a.organizationId === organizationId && a.actorId === actorId);
     if (actor === undefined || actor.disabled)
@@ -101,14 +106,16 @@ export const wearableGrants = (snapshot, organizationId, actorId, operationId) =
         p.status === "active");
     if (!participating)
         return [];
-    return snapshot.grants.filter((g) => g.operationId === operationId &&
+    return snapshot.grants
+        .filter((g) => g.operationId === operationId &&
         g.organizationId === organizationId &&
-        g.actorId === actorId &&
-        g.revoked !== true);
+        g.actorId === actorId)
+        .filter(isActiveGrant);
 };
 /** The one ranked selection: the primary first, then the deterministic
  * order by (role, target id, grant id). Both `selectWornHat` and `decide`
- * read it, so the rule is written once. */
+ * read it, so the rule is written once. Only active grants enter — the
+ * revocation filter happened upstream in `wearableGrants`. */
 const firstByRank = (grants) => {
     const rank = (g) => `${g.primary === true ? 0 : 1}|${g.role}|${g.target.kind === "team" ? g.target.teamId : g.target.siteId}|${g.grantId}`;
     return [...grants].sort((a, b) => (rank(a) < rank(b) ? -1 : rank(a) > rank(b) ? 1 : 0))[0];

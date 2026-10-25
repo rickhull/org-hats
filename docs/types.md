@@ -64,6 +64,12 @@ The strongest uses replace runtime checks with shape:
 - **`GrantTarget`** is exactly one team or one site. The old two-optional
   command shape could express neither and both; the union cannot. Both
   runtimes lost their duplicate "exactly one target" checks.
+- **`ActiveGrant`** is the revocation filter as a type:
+  `wearableGrants` returns grants whose `revoked` is absent or `false`, and
+  the decision path takes nothing wider — a grant carrying
+  `revoked: true` cannot reach `firstByRank` or the worn-hat selection.
+  `Snapshot.grants` keeps revoked records for audit; the refinement is
+  granted in exactly one place, the `isActiveGrant` predicate.
 - **`TargetRef`** is one shared operation/site/team union, re-exported by
   the model and the access module instead of written twice.
 - **`RoleActions`** is `{found:true,actions} | {found:false}`. An unknown
@@ -157,9 +163,6 @@ boundary and should stay there.
 
 These are current facts, not future promises:
 
-- `wearableGrants` filters revoked grants at runtime but returns
-  `readonly Grant[]`; callers cannot see the filter in the type. An
-  `ActiveGrant` refinement is planned.
 - Session results (`{failure}`) and command results (`{ok:false,failure}`)
   keep different discriminants, by design; session narrowing is
   centralized in `isFailed`, and the command dispatchers' `default` arms

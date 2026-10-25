@@ -4,27 +4,11 @@
 provenance (`IssuerInterfaceVersion` vs the call-surface literal,
 pinned by `tests/types.test.ts`), the `isFailed` session guard, the
 compile-only surface tests, the consumer's exhaustive `FailureKind` map, and
-the shared `Failure` in the Cloudflare DOs. What remains:
+the shared `Failure` in the Cloudflare DOs. The `ActiveGrant` refinement
+(`wearableGrants` returns `readonly ActiveGrant[]`; the decision path takes
+nothing wider) landed the same day. What remains:
 
-## 1. Carry the wearable filter in the type
-
-`wearableGrants` filters out revoked grants at runtime but returns
-`readonly Grant[]`. Downstream callers know only that they hold a grant,
-not that it survived the filter.
-
-- [ ] Add `ActiveGrant = Grant & { readonly revoked?: false }` and an
-      `isActiveGrant` predicate.
-- [ ] Return `readonly ActiveGrant[]` from `wearableGrants`; let
-      `firstByRank`, `selectWornHat`, and `decide` accept the refined type.
-      `readReach` inherits the refinement through `wearableGrants`.
-- [ ] Keep `Snapshot.grants` carrying revoked records for audit; only the
-      decision path sees `ActiveGrant`.
-- [ ] Add a compile-time test that a revoked grant cannot be passed to the
-      refined decision helpers.
-
-No behavior change; the filter moves from a convention into the signature.
-
-## 2. Raise Cloudflare's compiler strictness
+## 1. Raise Cloudflare's compiler strictness
 
 `packages/cloudflare/tsconfig.json` does not enable
 `noUncheckedIndexedAccess` or `exactOptionalPropertyTypes`, although the
@@ -40,7 +24,7 @@ does.
 This is a reliability pass, not a behavior change; it may surface real
 row/property assumptions.
 
-## 3. Numeric time brand, conditionally
+## 2. Numeric time brand, conditionally
 
 Seconds-versus-milliseconds is the one remaining strong mix-up class. It is
 also the one with public ergonomics cost.
@@ -53,7 +37,7 @@ also the one with public ergonomics cost.
 - [ ] Stop if the conversion spreads into public signatures; the brand is
       not worth that ceremony.
 
-## 4. Compiler alignment and erasable syntax
+## 3. Compiler alignment and erasable syntax
 
 The root is on TypeScript 5.7 while the Cloudflare package is on 5.9.
 `erasableSyntaxOnly` (5.8+) would enforce that the `.ts` tests and pilot can
