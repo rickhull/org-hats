@@ -87,7 +87,8 @@ Claude Code through `CLAUDE.md`, which is one line, `@AGENTS.md`.  Content
 placed in `CLAUDE.md` is content no other agent sees; add nothing there.
 
 Repository knowledge does not belong in this file: the model and its
-documentation live in `docs/`, forward-looking plans in `plans/`.
+documentation live in `docs/`, named invariants in `specs/`, and
+forward-looking plans in `plans/`.
 `AGENTS.md` carries directives only.
 
 Each agent enforces the Git policy with its own guard, because no shared

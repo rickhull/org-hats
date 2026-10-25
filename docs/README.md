@@ -3,11 +3,13 @@
 This directory documents the working system. A doc here that describes a
 past state is a bug and is updated in the same commit as the change — the
 migration note is the deliberate exception, because its subject is the
-transition. Forward-looking work is in `plans/`; history is in commit
-messages.
+transition. The named invariants distilled from these docs live in
+[`specs/`](../specs/); forward-looking work is in `plans/`; history is in
+commit messages.
 
-The contracts this repository owns are implemented, so they live here rather
-than in a separate `specs/` stage. Quartermaster's `specs/` holds its
+The contracts this repository owns are implemented, so they are documented
+here as built rather than in a design-stage `specs/` — the specs directory
+here holds invariants, not drafts. Quartermaster's `specs/` holds its
 design-stage consumer contracts; where one disagrees with these docs, the
 public `org-hats` docs are normative for the seam.
 

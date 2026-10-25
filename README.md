@@ -54,12 +54,14 @@ after the suites.
 
 Normative documents:
 
-- [`docs/README.md`](docs/README.md) — the docs index and the docs/plans
-  split.
+- [`docs/README.md`](docs/README.md) — the docs index and the
+  docs/specs/plans split.
 - [`docs/authority_redesign.md`](docs/authority_redesign.md) — the
   architecture; § Authority and § Access point at the shipped spec types.
 - [`docs/envelope.md`](docs/envelope.md) — the v1 access-envelope format
   contract.
+- [`specs/README.md`](specs/README.md) — the named invariants: what must
+  hold, what enforces it, and what follows when it stops holding.
 - [`docs/lexicon.md`](docs/lexicon.md) — the normative vocabulary: the words
   this repository uses, and the ones it rejects.
 - [`docs/migration-v1.md`](docs/migration-v1.md) — the 0.4 → v1 deltas.
