@@ -164,7 +164,10 @@ restored old export is visibly incomplete rather than silently usable.
 The full portable inventory — the `OH-*` cases — runs against the real
 coordinators in workerd (`src/conformance.ts` boots and resets them from
 `CONFORMANCE_WORLD`), alongside the coordinator, ops, exchange, and demo
-suites:
+suites. A deployed runtime reached through a service binding has a separate,
+narrower claim: the documented smoke subset in
+[binding-conformance.md](binding-conformance.md). It is not the full
+inventory.
 
 ```sh
 pnpm --filter org-hats-cloudflare typecheck
