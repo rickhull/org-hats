@@ -19,7 +19,7 @@
 # Options:
 #   --package root|cloudflare   which package to release (default: root)
 #   --dry-run                   print the plan and change nothing
-#   --push                      push the branch and tag to origin
+#   --push                      push the branch and tag to origin, then the GitHub mirror
 #   --no-verify                 skip the gates (the build still runs)
 #   --no-cloudflare             skip the Cloudflare suites on a root release
 #   -h, --help                  this help
@@ -154,7 +154,13 @@ bin/check-version "$tag"
 if $push; then
 	git push origin HEAD
 	git push origin "$tag"
-	printf 'release: pushed branch and %s to origin\n' "$tag"
+	if git remote get-url github >/dev/null 2>&1; then
+		git push github HEAD
+		git push github "$tag"
+		printf 'release: pushed branch and %s to origin and github\n' "$tag"
+	else
+		printf 'release: no github remote; origin pushed, mirror skipped\n' >&2
+	fi
 else
-	printf 'release: push with\n  git push origin HEAD\n  git push origin %s\n' "$tag"
+	printf 'release: push with\n  git push origin HEAD\n  git push origin %s\n  git push github HEAD\n  git push github %s\n' "$tag" "$tag"
 fi

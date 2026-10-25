@@ -11,9 +11,9 @@ to route around.
 working tree, so they proceed only with Rick's approval — ask for specific
 paths and say what each file is.  Never `git add -A` or `git add .`.
 
-Codeberg is canonical (remote `origin`); GitHub is a push mirror.  The
-authority redesign is `main`'s line; the v0.4 surface stays frozen at its
-tags.
+Codeberg is canonical (remote `origin`); GitHub is a release mirror, updated
+by `bin/release --push`, never a second place to work.  The authority redesign
+is `main`'s line; the v0.4 surface stays frozen at its tags.
 
 ## The Quartermaster relay
 

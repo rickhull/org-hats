@@ -6,8 +6,6 @@ realized it is removed or rewritten; the result belongs in `docs/` and in
 commit messages. The v1 delivery plan (`v1.md`) is retired: the line it
 planned is released, adopted, and documented in `docs/`.
 
-- `gh_mirror.md` — restore the GitHub push mirror: catch-up push, PAT
-  rotation, and the sync-on-commit verification.
 - `code_review.md` — whole-tree code review and crystallization, one
   major subdirectory at a time; slice 1 (`src/`) reviewed, findings ride
   the 2.0.0 release.
