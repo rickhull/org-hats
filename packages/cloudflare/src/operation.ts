@@ -1143,14 +1143,20 @@ export class OperationAuthority extends DurableObject<Env> {
 
   private status(): Record<string, unknown> {
     const count = (table: string): number => Number(this.one(`SELECT COUNT(*) AS n FROM ${table}`)?.["n"] ?? 0);
+    const siteCount = count("sites");
+    const operationSlug = this.one("SELECT slug FROM operation LIMIT 1")?.["slug"] ?? null;
+    const sitesWithPath = Number(this.one("SELECT COUNT(*) AS n FROM sites WHERE path IS NOT NULL")?.["n"] ?? 0);
     return {
       schemaVersion: String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0"),
       operationId: this.operationId() ?? null,
-      operationSlug: this.one("SELECT slug FROM operation LIMIT 1")?.["slug"] ?? null,
-      sitesWithPath: Number(this.one("SELECT COUNT(*) AS n FROM sites WHERE path IS NOT NULL")?.["n"] ?? 0),
+      operationSlug,
+      sitesWithPath,
+      // explicit, so a restored old export cannot look complete just because
+      // the counts an operator happened to read were not compared
+      routingFactsComplete: operationSlug !== null && sitesWithPath === siteCount,
       policyId: this.policy()?.id ?? null,
       policyVersion: this.policy()?.version ?? null,
-      sites: count("sites"),
+      sites: siteCount,
       teams: count("teams"),
       grants: count("grants"),
       participations: count("participations"),
@@ -1527,16 +1533,17 @@ export class OperationAuthority extends DurableObject<Env> {
     return value({ restored: true });
   }
 
-  /** Replace the operation's routing facts. A rename is an ops act: the
-   * operation keeps no rename history, so a self-service rename waits until
-   * there is one; the registry's temporary redirect covers the change. */
+  /** Replace the operation's routing facts. This is a **backfill** act, not
+   * a rename: the operation keeps no old-name history, so a registry rebuild
+   * could not reconstruct a name authority no longer holds. Renames stay
+   * ops-only until rename history exists. */
   private setRoutingFacts(input: RoutingFactsInput): Result<{ operationId: string }> {
     const operation = this.one("SELECT operation_id, slug FROM operation LIMIT 1");
     if (operation === undefined) return failure("unavailable", "operation is not bootstrapped");
     if (!isHostnameLabel(input.slug)) {
       return failure("invalid-command", `operation slug "${input.slug}" must be one DNS label and not www`);
     }
-    const siteRows = this.rows("SELECT site_id, aliases_json FROM sites");
+    const siteRows = this.rows("SELECT site_id, path, aliases_json FROM sites");
     const known = new Set(siteRows.map((row) => String(row["site_id"])));
     const provided = new Set<string>();
     const paths = new Set<string>();
@@ -1568,12 +1575,17 @@ export class OperationAuthority extends DurableObject<Env> {
     }
     const at = now();
     const id = rowOperationId(operation);
+    const oldSlug = operation["slug"] === null || operation["slug"] === undefined ? "none" : String(operation["slug"]);
+    const oldPaths = siteRows
+      .map((row) => `${String(row["site_id"])}:${row["path"] === null || row["path"] === undefined ? "none" : String(row["path"])}`)
+      .join(",");
+    const newPaths = input.sites.map((site) => `${site.siteId}:${site.path}`).join(",");
     this.ctx.storage.transactionSync(() => {
       this.ctx.storage.sql.exec("UPDATE operation SET slug = ?, updated_at = ? WHERE operation_id = ?", input.slug, at, id);
       for (const site of input.sites) {
         this.ctx.storage.sql.exec("UPDATE sites SET path = ?, updated_at = ? WHERE site_id = ?", site.path, at, site.siteId);
       }
-      this.audit("routing-facts", `routing facts set for ${id}`, at);
+      this.audit("routing-facts", `routing facts set for ${id}: slug ${oldSlug} -> ${input.slug}; paths ${oldPaths} -> ${newPaths}`, at);
     });
     return value({ operationId: id });
   }

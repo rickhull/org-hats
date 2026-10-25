@@ -128,6 +128,8 @@ describe("OperationAuthority", () => {
     expect(exported.body.value?.schemaVersion).toBe("4");
     expect(exported.body.value?.tables.operation[0]?.["slug"]).toBe("routing-op");
     expect(exported.body.value?.tables.sites[0]?.["path"]).toBe("site");
+    const status = await call<{ routingFactsComplete: boolean }>(current.op, "GET", "/status");
+    expect(status.body.value?.routingFactsComplete).toBe(true);
 
     const updated = await call(current.op, "POST", "/routing-facts", {
       slug: "renamed-op",
@@ -141,6 +143,9 @@ describe("OperationAuthority", () => {
     );
     expect(after.body.value?.operationSlug).toBe("renamed-op");
     expect(after.body.value?.sites[0]?.path).toBe("renamed");
+    const audit = await call<readonly { fact: string }[]>(current.op, "GET", "/audit");
+    expect(audit.body.value?.some((entry) => entry.fact.includes("slug routing-op -> renamed-op"))).toBe(true);
+    expect(audit.body.value?.some((entry) => entry.fact.includes("paths site-test:site -> site-test:renamed"))).toBe(true);
 
     const partial = await call(current.op, "POST", "/routing-facts", {
       slug: "renamed-op",

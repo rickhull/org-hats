@@ -83,8 +83,9 @@ declarations so that cannot regress silently.
   deliberately absent from export; restore clears it and rebuilds by pulling.
 - `cloudflare-v0.3.0` adds operation routing facts: bootstrap requires
   `slug` and `sites[].path`, the export and `/snapshot` carry them, and the
-  typed routing-facts route replaces the full set. The operation schema is 4.
-  This is runtime-only; the portable pin and interface version do not move.
+  typed routing-facts route backfills the full set. It is not a rename route:
+  no old-name history is carried yet. The operation schema is 4. This is
+  runtime-only; the portable pin and interface version do not move.
 - New operator verbs: `POST /reconcile-rosters` on an operation;
   `GET /ops/schema-status` reports `orgActors`, `disabledOrgActors`,
   `rosterSyncedAt`, and `rosterReconcileSeconds`; `GET /snapshot` reports

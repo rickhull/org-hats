@@ -48,11 +48,13 @@ participations and grants can issue on the next request. `GET
 
 The operation row carries a `slug`; each site row carries a canonical `path`.
 Bootstrap requires both, the export includes them, and `/snapshot` and
-`/ops/schema-status` expose them. `POST /ops/operation/routing-facts` replaces
-the full set for a backfill or an ops-only rename. Operation authority
-validates one DNS label per slug, one path segment per site, local path and
-alias uniqueness, and alias/slug collisions; deployment-wide slug uniqueness
-is the registry's check.
+`/ops/schema-status` expose them. `POST /ops/operation/routing-facts` is a
+**backfill** of the full set. It is not a rename: the operation keeps no
+old-name history, so a registry rebuild could not reconstruct a name
+authority no longer holds; renames stay ops-only until a future tag carries
+history. Operation authority validates one DNS label per slug, one path
+segment per site, local path and alias uniqueness, and alias/slug collisions;
+deployment-wide slug uniqueness is the registry's check.
 
 **`AuthorityRuntimeEntrypoint`** (`src/index.ts`) is the Worker consumers
 bind to. Over a `services` binding it exposes the four portable
@@ -122,10 +124,11 @@ public key distribution:
 - `POST /ops/organization/bootstrap`, `POST /ops/operation/bootstrap` —
   typed, idempotent bootstrap
 - `POST /ops/operation/routing-facts` — `{ operationId, slug, sites }`,
-  replacing the operation's complete routing facts (backfill or rename)
+  backfilling the operation's complete routing facts; a rename waits for
+  history and is not this route's job
 - `GET /ops/schema-status?coordinator=organization|operation&id=…` —
   includes the operation's roster-projection counts and freshness, plus
-  `operationSlug` and `sitesWithPath`
+  `operationSlug`, `sitesWithPath`, and `routingFactsComplete`
 - `GET /ops/export?coordinator=…&id=…` — canonical JSON
 - `POST /ops/restore` — `{ coordinator, id, snapshot }`, typed and atomic
 - `GET /ops/verification-keys` — **public**, no token:
@@ -153,7 +156,8 @@ The operation schema is 4. Older operation exports (schema 2 or 3) restore
 into it: columns the older snapshot did not carry read as null, and
 `POST /ops/operation/routing-facts` backfills the complete routing set. The
 schema-2 → accepted-schema drill is a restore plus a typed backfill, not a
-second bootstrap.
+second bootstrap. Until the backfill, `routingFactsComplete` is false, so a
+restored old export is visibly incomplete rather than silently usable.
 
 ## Conformance, tests, and workerd notes
 

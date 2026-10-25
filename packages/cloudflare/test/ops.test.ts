@@ -146,6 +146,7 @@ describe("typed ops routes", () => {
     };
     expect(status.value?.["operationSlug"]).toBeNull();
     expect(status.value?.["sitesWithPath"]).toBe(0);
+    expect(status.value?.["routingFactsComplete"]).toBe(false);
 
     const facts = await jsonPost("/ops/operation/routing-facts", {
       operationId: restoredId,
@@ -160,6 +161,10 @@ describe("typed ops routes", () => {
     };
     expect(backfilled.tables["operation"]?.[0]?.["slug"]).toBe("ops-restored");
     expect(backfilled.tables["sites"]?.[0]?.["path"]).toBe("ops-restored");
+    const complete = await (await ops(`/ops/schema-status?coordinator=operation&id=${restoredId}`)).json() as {
+      value?: Record<string, unknown>;
+    };
+    expect(complete.value?.["routingFactsComplete"]).toBe(true);
   });
 
   it("exposes the verification keys without the ops token", async () => {

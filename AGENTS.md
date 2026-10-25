@@ -19,10 +19,15 @@ is `main`'s line; the v0.4 surface stays frozen at its tags.
 
 Cross-repository work with Quartermaster uses exactly two ignored note files:
 write only `~/git/quartermaster/notes/from-org-hats.md`; read only
-`notes/from-quartermaster.md`.  Do not edit anything else in that repository
-— not source, tests, docs, or its dependency pin.  A change obviously right
-from this side is still a change made without its owner's review; ask in the
-note and let Quartermaster make it.
+`notes/from-quartermaster.md` **in this repository**
+(`~/git/org-hats/notes/from-quartermaster.md`).  The file of that name inside
+`~/git/quartermaster` is not the relay and is stale; do not read it.  Do not
+edit anything else in that repository — not source, tests, docs, or its
+dependency pin.  A change obviously right from this side is still a change
+made without its owner's review; ask in the note and let Quartermaster make
+it.  Keep the outbound note at or below 25 KB, retaining the most recent
+sections; compact the oldest completed sections before appending when it
+would exceed the cap.  Quartermaster keeps the inbound note to the same cap.
 
 Check the tail of `notes/from-quartermaster.md` twice every turn: at the
 start, before planning work, and again before handing off — a reply can

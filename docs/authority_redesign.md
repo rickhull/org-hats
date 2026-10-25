@@ -320,9 +320,11 @@ input: the registry is their projection. Operation authority validates one
 DNS label for the slug, one path segment per site, unique paths within the
 operation, and alias labels that collide with neither the slug nor another
 site. Deployment-wide slug uniqueness and the applied routing projection stay
-registry checks because operation authority has no global directory. A
-rename is an operator act; the operation keeps no rename history yet, so a
-self-service rename waits for one.
+registry checks because operation authority has no global directory. The
+typed routing-facts route is a backfill, not a rename: the operation keeps no
+old-name history, so a registry rebuild cannot reconstruct a name authority no
+longer holds. Renames, and any self-service surface, wait for a future tag
+that carries that history.
 
 Removing an actor from one operation does not remove the actor from their
 organization or another operation.

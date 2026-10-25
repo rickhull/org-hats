@@ -144,9 +144,10 @@ routing projection stay registry checks because authority has no global
 directory.
 
 *Held by:* the operation schema's `slug` and `path` columns and canonical
-export; `POST /ops/operation/routing-facts` as a full-set replace; the
+export; `POST /ops/operation/routing-facts` as a full-set backfill; the
 registry bootstrap's projection validation; the routing cases in
 `tests/model.test.ts`, `tests/twins.test.ts`, and the Cloudflare coordinator
-suite.
+suite. Rename history is not carried yet, so a rename stays ops-only and the
+route is not a rename act.
 *If it breaks:* a hand-maintained routing manifest becomes authority, and a
 rename can leave the registry serving an address authority no longer names.
