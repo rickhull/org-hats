@@ -84,7 +84,9 @@ id. A host passes ids it read from its own records without importing a
 constructor.
 
 *Held by:* the `AssertPlainId` compile-time assertions in `src/contract.ts`
-and `tests/consumer-surface.ts`, which compiles against `dist/`; `bin/check`
+and `tests/consumer-surface.ts`, which compiles against `dist/`; the
+compile-only surface assertions in `tests/types.test.ts` pin the same ids
+and the closed unions from the tests side. `bin/check`
 runs the consumer fence on every change.
 *If it breaks:* branding leaks into the installable surface, hosts need
 constructors for ordinary ids, and the compile-time brand begins to move

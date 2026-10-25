@@ -768,7 +768,9 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
     const differentInterface: SignedAccessEnvelope = {
       ...issued.envelope,
       // interface 1 was the previous call surface; this runtime declares 2.
-      claims: { ...issued.envelope.claims, interfaceVersion: 1 as never },
+      // The claims field is provenance (`IssuerInterfaceVersion`), so a
+      // historical literal needs no cast.
+      claims: { ...issued.envelope.claims, interfaceVersion: 1 },
     };
     expectFailure(await verify(differentInterface, world.keys, { now }), "invalid-signature", "interface version is not a version gate");
   }),

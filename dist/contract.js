@@ -31,6 +31,13 @@ export const AUTHORITY_INTERFACE_VERSION = 2;
  * change. */
 export const ACCESS_ENVELOPE_VERSION = 1;
 export const ACCESS_ENVELOPE_FORMAT = "org-hats.access";
+/** Narrow a session result — `AccessIssue | Failed`, `Verified | Failed`,
+ * `AuthorityContext | Failed` — to its failure arm. The session surface has
+ * no `ok` discriminant; property presence is the discriminator, and this
+ * names it once instead of every caller spelling the `in` check. Command
+ * results keep their `ok` discriminant and do not use this. Narrowing a
+ * typed union is all this does — it parses nothing. */
+export const isFailed = (result) => "failure" in result;
 const isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 export const canonicalJson = (value) => {
     if (isRecord(value)) {

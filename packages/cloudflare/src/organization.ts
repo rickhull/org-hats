@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import {
   canonicalJson,
+  type Failure,
   type FailureKind,
   type JsonValue,
 } from "org-hats/authority";
@@ -20,11 +21,6 @@ import {
 const SCHEMA_VERSION = "1";
 
 type Row = Record<string, string | number | null>;
-
-type Failure = {
-  readonly kind: FailureKind;
-  readonly detail?: string;
-};
 
 type Result<T> =
   | { readonly ok: true; readonly value: T }

@@ -31,7 +31,7 @@ import {
   CONFORMANCE_PRINCIPALS,
   CONFORMANCE_WORLD,
 } from "../src/conformance.ts";
-import { actorId, operationId, organizationId, siteId, teamId, type OrganizationId } from "../src/contract.ts";
+import { actorId, isFailed, operationId, organizationId, siteId, teamId, type OrganizationId } from "../src/contract.ts";
 import { mulberry32, pick } from "./helpers.ts";
 
 const OP = operationId("op-9f2e6ad4");
@@ -282,7 +282,7 @@ const issue = async (
     operationId,
     evidence: entry.evidence,
   });
-  if ("failure" in result) throw new Error(`issuance for ${entry.label}: ${result.failure.kind}`);
+  if (isFailed(result)) throw new Error(`issuance for ${entry.label}: ${result.failure.kind}`);
   return result;
 };
 

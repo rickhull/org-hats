@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { AUTHORITY_INTERFACE_VERSION } from "org-hats/authority";
+import { AUTHORITY_INTERFACE_VERSION, isFailed } from "org-hats/authority";
 import { CONFORMANCE_PRINCIPALS } from "org-hats/conformance";
 import { describe, expect, it } from "vitest";
 import { createCloudflareConformanceWorld } from "../src/conformance";
@@ -12,13 +12,13 @@ describe("context presentation", () => {
       operationId: "op-9f2e6ad4",
       evidence: CONFORMANCE_PRINCIPALS.dana.evidence,
     });
-    if ("failure" in issued) throw new Error(`issuance failed: ${issued.failure.kind}`);
+    if (isFailed(issued)) throw new Error(`issuance failed: ${issued.failure.kind}`);
 
     const context = await world.runtime.context({
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
       envelope: issued.envelope,
     });
-    if ("failure" in context) throw new Error(`context failed: ${context.failure.kind}`);
+    if (isFailed(context)) throw new Error(`context failed: ${context.failure.kind}`);
 
     expect(context.actor.displayName).toBe("Dana Okafor");
     expect(context.organizationDisplayName).toBe("Harbor Logistics");

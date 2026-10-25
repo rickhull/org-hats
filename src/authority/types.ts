@@ -196,6 +196,20 @@ type _HatSummaryTargetIsPlain = Assert<
 >;
 type _ContextIsPlain = Assert<AcceptsPlainString<AuthorityContext["operationId"]>>;
 
+// Only the claims' provenance field is widened (`IssuerInterfaceVersion` in
+// src/contract.ts); every call still speaks the *current* interface literal.
+// Exactness, not assignability — `number` would satisfy an assignability
+// check and silently widen every call.
+type IsExact<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+  ? true
+  : false;
+type _CallsSpeakTheCurrentInterface = Assert<
+  IsExact<AccessFromEvidenceInput["interfaceVersion"], AuthorityInterfaceVersion>
+>;
+type _CommandsSpeakTheCurrentInterface = Assert<
+  IsExact<AuthorityCommand["interfaceVersion"], AuthorityInterfaceVersion>
+>;
+
 export interface CommandReceipt {
   readonly idempotencyKey: IdempotencyKey;
   /** `false` means the idempotency key claimed an earlier result: the

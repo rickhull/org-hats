@@ -2,6 +2,7 @@ import { WorkerEntrypoint } from "cloudflare:workers";
 import {
   AUTHORITY_INTERFACE_VERSION,
   canonicalJson,
+  isFailed,
   type AccessFromEvidenceInput,
   type AccessIssue,
   type AuthorityCommand,
@@ -231,7 +232,7 @@ export default {
           authTime: Math.floor(Date.now() / 1000),
         },
       });
-      if ("failure" in issued) return Response.json({ ok: false, failure: issued.failure }, { status: 401 });
+      if (isFailed(issued)) return Response.json({ ok: false, failure: issued.failure }, { status: 401 });
       return Response.json({ ok: true, envelope: issued.envelope, refresh: issued.refresh });
     }
 
@@ -244,7 +245,7 @@ export default {
         expectedOperationId: DEMO_OPERATION,
         expectedSiteId: DEMO_WEST,
       });
-      if ("failure" in result) return Response.json({ ok: false, failure: result.failure }, { status: 401 });
+      if (isFailed(result)) return Response.json({ ok: false, failure: result.failure }, { status: 401 });
       const access = result.access;
       return Response.json({
         ok: true,

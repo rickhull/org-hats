@@ -6,7 +6,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { AUTHORITY_INTERFACE_VERSION } from "../src/contract.ts";
+import { AUTHORITY_INTERFACE_VERSION, isFailed } from "../src/contract.ts";
 import { createInMemoryAuthority } from "../src/authority/engine.ts";
 import { fixedClock, webCryptoSigner } from "../src/authority/internal.ts";
 import { ed25519VerifyKey, verify } from "../src/access/verify.ts";
@@ -34,7 +34,7 @@ test("evidence to neutral access, end to end", async () => {
     operationId: OP,
     evidence: { provider: "test-idp", subject: "dana" },
   });
-  assert.ok(!("failure" in issue));
+  assert.ok(!isFailed(issue));
 
   // 2. key distribution: verifiers receive the public key first
   const material = await engine.verificationKey();

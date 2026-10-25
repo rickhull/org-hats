@@ -29,6 +29,7 @@ export type {
   Failed,
   Failure,
   FailureKind,
+  IssuerInterfaceVersion,
   JsonValue,
   OperationId,
   OrganizationId,
@@ -47,5 +48,6 @@ export {
   base64UrlDecode,
   base64UrlEncode,
   canonicalJson,
+  isFailed,
   utf8,
 } from "../contract.ts";

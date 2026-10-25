@@ -1,7 +1,7 @@
 // Shared helpers for the generative suites: the deterministic mulberry32
 // PRNG and a pick over its stream. Same seed, same world, in every suite.
 
-import type { Failed, Failure, JsonValue, Unbranded } from "../src/contract.ts";
+import { isFailed, type Failed, type Failure, type JsonValue, type Unbranded } from "../src/contract.ts";
 import type { PolicyBundle } from "../src/policy.ts";
 import type { Snapshot } from "../src/model.ts";
 
@@ -45,6 +45,6 @@ export const failureOf = (value: unknown): Failure => {
 
 /** A successful result, preserving the caller's concrete type. */
 export const successOf = <T extends object>(value: T | Failed): T => {
-  if ("failure" in value) throw new Error(`expected success, got ${value.failure.kind}`);
+  if (isFailed(value)) throw new Error(`expected success, got ${value.failure.kind}`);
   return value;
 };

@@ -17,6 +17,7 @@ import type {
   AccessEnvelopeClaimsV1,
   AuthorityCommand,
   AuthorityContext,
+  FailureKind,
   PrincipalEvidence,
 } from "../dist/authority/index.js";
 import type { NeutralAccess, TargetRef, VerifyContext } from "../dist/access/index.js";
@@ -82,3 +83,18 @@ export const readContext = (context: AuthorityContext): string[] => [
     hat.target.kind === "team" ? hat.target.teamId : hat.target.siteId,
   ),
 ];
+
+/** The host owns the product response to every failure kind. `satisfies`
+ * checks the map covers the closed taxonomy without widening it, so adding
+ * a kind fails this build until every kind has a sentence here. */
+export const productResponse = {
+  unavailable: "The operation directory is unreachable — try again shortly.",
+  unauthenticated: "Sign in to continue.",
+  "not-admitted": "Your organization is not part of this operation.",
+  expired: "Your session has expired — sign in again.",
+  "wrong-interface-version": "This client is out of date — reload.",
+  "wrong-binding": "This session belongs to another operation or site.",
+  "invalid-signature": "Your session could not be verified — sign in again.",
+  "invalid-command": "That request was not understood.",
+  denied: "You do not have permission to do that.",
+} satisfies Record<FailureKind, string>;

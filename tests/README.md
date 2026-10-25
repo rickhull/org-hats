@@ -39,6 +39,9 @@ runtime.
 - `twins.test.ts` — the structural properties of the synthetic twins.
 - `engine.test.ts` — issuance, refresh, participation, idempotency, disable.
 - `access.test.ts` — the verifier and the golden envelope vectors.
+- `types.test.ts` — compile-only surface assertions: plain ids, closed
+  unions, version literals, claims provenance. Nothing runs; the aliases
+  fail `tsconfig.tests.json` in `bin/check`.
 - `keyset.test.ts` — verification-key set parsing, serialization, rotation.
 - `vertical.test.ts` — evidence → issuance → key distribution → verification.
 - `scenarios.test.ts` — the twin scenarios end-to-end.

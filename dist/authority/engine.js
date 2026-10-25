@@ -12,7 +12,7 @@
 // Determinism: the clock and signer are injected; a fixed clock plus a
 // fresh signer gives reproducible behavior (ids, failure kinds, receipts)
 // without pinning signature bytes.
-import { canonicalJson, ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, AUTHORITY_INTERFACE_VERSION, actorId, operationId, organizationId, siteId, teamId, } from "../contract.js";
+import { canonicalJson, ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, AUTHORITY_INTERFACE_VERSION, actorId, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";
 import { applyParticipationEvent, readReach, wearableGrants, } from "../model.js";
 import { actionsOf } from "../policy.js";
 import { counter, sha256Hex, systemClock, webCryptoSigner } from "./internal.js";
@@ -434,7 +434,7 @@ export const createInMemoryAuthority = async (config = {}) => {
             if (link === undefined)
                 return failed({ kind: "unauthenticated", detail: "no principal link for this evidence" });
             const result = await issue(op, link.v.organizationId, link.v.actorId, factsOf(input.evidence));
-            if ("failure" in result)
+            if (isFailed(result))
                 return failed(result.failure);
             return result;
         },
@@ -462,7 +462,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                     ...(record.amr !== undefined ? { amr: [...record.amr] } : {}),
                     ...(record.authTime !== undefined ? { authTime: record.authTime } : {}),
                 });
-            if ("failure" in result)
+            if (isFailed(result))
                 return failed(result.failure);
             return result;
         },
@@ -812,8 +812,16 @@ export const createInMemoryAuthority = async (config = {}) => {
                     org.audit.push({ at: clock.now(), by: `${org.organizationId}/${principalOrFailure.actorId}`, fact: `actor ${inputCommand.actorId} disabled` });
                     return ok(inputCommand.idempotencyKey, true);
                 }
-                default:
+                default: {
+                    // The exhaustiveness witness: this arm is `never` when every
+                    // command kind has a case, so adding one fails the build here
+                    // instead of silently routing to invalid-command. The failure —
+                    // not a throw — stays: a caller that bypasses the types (an
+                    // untyped host, a structurally stale version) still gets the
+                    // closed taxonomy, never an exception.
+                    inputCommand;
                     return fail("invalid-command", "unknown command kind");
+                }
             }
         },
     };

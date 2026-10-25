@@ -111,8 +111,10 @@ reading claims. The claims' `interfaceVersion` is issuer provenance, not a
 readability gate; see [`specs/envelope.md`](../specs/envelope.md) E8.
 
 A parsed envelope may therefore carry a historical interface value even
-though the current call surface speaks `2`. The field is data, not the
-static call type.
+though the current call surface speaks `2`. The distinction is named now:
+the claims field is `IssuerInterfaceVersion` (`number`), every call keeps
+`AuthorityInterfaceVersion`, and `tests/types.test.ts` pins both exactly —
+widening the provenance field must never widen the call surface with it.
 
 ## Compiler fences and checked tests
 
@@ -125,6 +127,9 @@ The compiler is used as a boundary enforcer, not only as a build step:
 - `tsconfig.tests.json` typechecks `src`, `tests`, and `examples` in
   `bin/check`, so a fixture can no longer drift from a public type and fail
   only at runtime.
+- `tests/types.test.ts` is compile-only: exactness assertions pin the
+  plain ids, the closed unions, the version literals, and the claims'
+  provenance field, from the same side the suites see.
 - `packages/cloudflare/tsconfig.json` typechecks the reference runtime with
   the Worker types and includes its `test/` directory.
 
@@ -152,20 +157,18 @@ boundary and should stay there.
 
 These are current facts, not future promises:
 
-- `AccessEnvelopeClaimsV1.interfaceVersion` is typed as the current
-  interface literal, while the verifier accepts historical provenance; see
-  `plans/type_leverage.md` item 1.
 - `wearableGrants` filters revoked grants at runtime but returns
   `readonly Grant[]`; callers cannot see the filter in the type. An
   `ActiveGrant` refinement is planned.
 - Session results (`{failure}`) and command results (`{ok:false,failure}`)
-  use different discriminants. The asymmetry is workable, but result guards
-  are not centralized.
+  keep different discriminants, by design; session narrowing is
+  centralized in `isFailed`, and the command dispatchers' `default` arms
+  fail closed with `invalid-command` while an inline `satisfies never`
+  witness keeps them exhaustive — a structurally wrong command over the
+  wire gets the closed taxonomy, never a thrown exception.
 - The Cloudflare package does not yet enable
   `noUncheckedIndexedAccess` or `exactOptionalPropertyTypes`, although it
   reads SQLite rows and optional columns.
-- `packages/cloudflare` defines a local `Failure` shape alongside the shared
-  `FailureKind`; the local copy can drift.
 - The root package does not re-export the id aliases, and `NeutralAccess`
   lacks some accessors hosts need for the projection; those are tracked in
   `plans/code_review.md` R3.

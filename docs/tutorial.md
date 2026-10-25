@@ -19,6 +19,14 @@ here is to connect the concepts to concrete facts.
 [disable](#case-6-disable-a-lost-message-and-the-liveness-gate) ·
 [Cloudflare](#the-same-rules-in-cloudflare)
 
+Every section closes with two short readings. The **counterpoint** is the
+objection a new reader has — this is more machinery than the question seems
+to need. The **rationale** is the property that makes the machinery
+necessary. The rationale is not a claim that the shape is finished; a
+counterpoint with no answer is a bug worth filing. When a word looks heavier
+than it needs to be — hat, worn, grant, reach — [`lexicon.md`](lexicon.md) is
+normative: each term names a distinction the code may not blur.
+
 ## The world we will use
 
 The tutorial uses three twins:
@@ -44,6 +52,22 @@ The same actor does not carry a global role. Dana has one identity, one
 organization, and two operation-local hats. Charles's site grant and
 Duncan's team grant show the two shapes of reach, including the crossed
 secondment.
+
+### Counterpoint
+
+Three operations, a dozen fixed ids, and four people, before a single
+authority question is asked. Why not one operation, one site, and one admin,
+and let the reader generalize?
+
+### Rationale
+
+The shapes this model exists to separate only show up in contrast. Dana in
+two operations separates a person's identity from the hat they wear; a site
+grant beside a crossed team grant separates `mayAct` reach from configuration
+reach; the Airlift's other Berlin airfields make a grant's reach visibly
+bounded by place. With one fixture each claim would be true by accident. The
+ids are fixed because the snippets, the tests, and the pilot must name the
+same world — a generated world has nothing to check against.
 
 ## Set up one world
 
@@ -137,6 +161,24 @@ const accessFor = async (
 };
 ```
 
+### Counterpoint
+
+An engine, four principal links, a signing key, an admin map, and two
+helpers — all before asking whether Dana may review a shift. Where is the
+simple lookup this was supposed to be?
+
+### Rationale
+
+The four links are the whole identity boundary: evidence resolves to exactly
+one organization actor, and no provider claim mints a second one. The engine
+is there because the tutorial needs changes, sessions, and an outbox, not a
+table read, and it implements the same `AuthorityRuntime` as the Cloudflare
+package, so one story covers both. The key is distributed before issuance
+because verification is offline; a verifier that called the authority to
+check a signature would not be portable. The `orgAdmins` mapping is there
+because the disable case needs an administrator who is not a coordinator.
+Every piece here is used by a later case; scenery would not earn a line.
+
 ## Case 1: one operation, one hat
 
 Issue for Dana at the Professional Operation:
@@ -206,6 +248,22 @@ const context = await engine.runtime.context({
 `context` is where display names, the operation's sites, and the wearable
 hats belong. It is a presentation read, not an authority decision.
 
+### Counterpoint
+
+Four calls — an issue, a verify, a context read, and an artifact you are told
+not to read — to answer one yes-or-no question. And a coordinator who may
+resolve a review but not observe her own team. Why so many parts?
+
+### Rationale
+
+The calls answer four different questions: issuance is an authority act,
+verification is "may this holder act", `context` supplies presentation, and
+the envelope is what travels. Splitting them is what lets a service decide
+from a signed artifact without the authority database, and lets a display
+name change without touching the decision. `observe` is absent because a role
+enumerates the actions it carries; that closed answer is the point. Adding a
+capability is a policy edit at the authority, never an assumption in a host.
+
 ## Case 2: the same actor, another operation
 
 Issue for Dana at Riverbend Fest:
@@ -252,6 +310,21 @@ readable organization; the Festival's `all-participating` gives her the
 whole operation's read board. The verifier compares the ids; it does not recompute
 either policy.
 
+### Counterpoint
+
+Same actor, same organization — and a different hat, a different read board,
+and a different policy. Is this not just a second admin flag on one person?
+
+### Rationale
+
+There is no global role to inherit from, by construction: the hat is
+operation-local, and the operation's policy owns what the read board is.
+Professional's `granted-teams` gives Dana one readable organization;
+Riverbend's `all-participating` gives her all participants. Same person,
+same organization, different policy. The verifier compares the ids it was
+handed and does not recompute either. A role that followed the person
+between operations would restore exactly the question the model replaced.
+
 ## Case 3: a site grant and a crossed team grant
 
 The Berlin Airlift twin adds the coalition shape. Issue for Charles
@@ -288,6 +361,23 @@ without being able to dispatch over the whole site.
 The three Berlin airfields are separate sites because admission and reach are
 per airfield. The coalition read board is `all-participating`; the verifier
 receives the four organization ids and does not reconstruct the coalition.
+
+### Counterpoint
+
+Charles may dispatch another organization's team; Duncan may configure a site
+where he may dispatch only one of its teams; and two grants at one site reach
+different targets. Are these special cases?
+
+### Rationale
+
+Two reaches, applied separately. `mayAct` follows the grant's target: a site
+grant reaches every team at that site, a team grant reaches only its team.
+Configuration follows the site a grant sits at — the site itself, or the
+site its team is anchored to — when the role carries `configure`, because
+setup is site-shaped: a seconded officer can configure the place their shift
+works without dispatch reach over the other teams there. The airfields are
+separate sites for the same reason: admission and reach are per site, and one
+site with three aliases would let a Tempelhof grant reach Gatow.
 
 ## Case 4: commands, denial, and idempotency
 
@@ -337,6 +427,21 @@ retry returned the original result instead of applying the act twice. A
 denied command does not poison its key; a successful command claims it with
 the payload hash.
 
+### Counterpoint
+
+A command object with an idempotency key, a payload hash, and a receipt, to
+select a hat the actor already wears. Why does one mutation need a protocol?
+
+### Rationale
+
+Commands cross a runtime boundary and can be retried — a restarted caller, a
+resent message, a resumed request. The key stands for the caller's intent; it
+is claimed only on success and commits with the mutation, so a retry returns
+the original receipt rather than acting twice, while a denial leaves the key
+free for a corrected attempt. The failure is a value because "denied" is an
+ordinary authority answer, not an exception, and a receipt is what makes
+at-least-once delivery safe.
+
 ## Case 5: refresh rotation
 
 A session outlives one envelope. Refresh the Festival issue:
@@ -373,6 +478,20 @@ const replay = await engine.runtime.refresh({
 The new envelope moves `iat`; authentication facts, when the evidence carries
 them, are preserved through the chain. The refresh outcome is explicit, so the
 host never has to infer whether the session kept, rotated, or lost its handle.
+
+### Counterpoint
+
+Refresh rotates the handle, the old handle dies after one use, and yet the
+old envelope keeps verifying until it expires. Which of these is the session?
+
+### Rationale
+
+All three, with different jobs. The handle is the live session, so one use
+bounds replay. The envelope is an offline-verifiable artifact already in
+someone's hands; the authority cannot take it back, so `exp` is what limits
+it, and calling it revoked would promise something the verifier cannot keep.
+The outcome is explicit — kept, rotated, revoked — so the host never has to
+infer which happened.
 
 ## Case 6: disable, a lost message, and the liveness gate
 
@@ -476,6 +595,24 @@ In the Cloudflare runtime the projection is a real `org_actors` table;
 [`cloudflare.md`](cloudflare.md) and
 [`binding-conformance.md`](binding-conformance.md).
 
+### Counterpoint
+
+One disable produces an outbox entry, a failed delivery, a stale projection,
+a live-organization read, and a second refresh that fails differently. And
+Dana's envelope still verifies after she is disabled. Why is disable not one
+write?
+
+### Rationale
+
+The organization owns the actor fact; the operation owns its local copy, and
+a copy can be stale. "One writer for each fact" means a lost message must not
+become indefinite authority, so refresh reads the owner — read-only and
+fail-closed, the named exception to no cross-coordinator reads on the write
+path — while the projection still validates local commands. An
+already-issued envelope cannot be recalled, so its `exp` is the blast radius;
+the gate makes sure no session outlives it. The stale projection is not a
+wart to paper over. It is why the gate exists.
+
 ## The same rules in Cloudflare
 
 The in-memory engine is a reference implementation of the portable
@@ -506,6 +643,22 @@ claim — the smoke subset in
 [`binding-conformance.md`](binding-conformance.md). Do not call the smoke
 subset the full inventory.
 
+### Counterpoint
+
+A second runtime, two coordinators, a service binding, and a test subset
+declared separately from the main inventory. Is this one system or two?
+
+### Rationale
+
+One contract, two implementations: the in-memory engine and the Cloudflare
+package both implement `AuthorityRuntime`, so the deployed runtime cannot
+grow its own rules without failing the portable tests. The coordinators split
+state where the single writer is: the organization owns actors and their
+lifecycle, the operation owns sites, teams, grants, participation, policy,
+and refresh. The smoke subset is named separately because a deployed binding
+proves that subset, not the full `OH-*` inventory; conflating the two claims
+is how a test claim becomes fiction.
+
 ## Where to run it
 
 - `node examples/pilot.ts` — the complete Case 1 setup, plus the expiry
@@ -515,6 +668,16 @@ subset the full inventory.
 - `pnpm check:cloudflare` — the Cloudflare typecheck and workerd suites,
   including the full inventory and the lost-disable roster case.
 
-The tutorial's snippets use the actual fixture ids but omit repeated setup
-and some error narrowing. The pilot and the tests are the executable
-authority for the values shown here.
+### Counterpoint
+
+After all that, the snippets still do not run as written — setup is elided,
+some errors are narrowed by hand. Why is the tutorial not executable?
+
+### Rationale
+
+Because the executable authority is the pilot and the suite, and a document
+that duplicated them would drift from them. A tutorial that imported them
+would show internals instead of the seam. The snippets keep the fixture ids
+and the outcomes, so what you read can be checked against what runs; only the
+repeated setup and the error handling are left out. When the text and a test
+disagree, the test is right, and the text is a bug.

@@ -21,7 +21,7 @@ import { createInMemoryAuthority } from "../src/authority/engine.ts";
 import { fixedClock, webCryptoSigner } from "../src/authority/internal.ts";
 import { verify } from "../src/access/verify.ts";
 import { ed25519VerifyKey } from "../src/access/verify.ts";
-import { actorId, operationId, organizationId, siteId, teamId } from "../src/contract.ts";
+import { actorId, isFailed, operationId, organizationId, siteId, teamId } from "../src/contract.ts";
 import { failureOf, successOf } from "./helpers.ts";
 
 const MERIDIAN = operationId("op-9f2e6ad4");
@@ -202,7 +202,7 @@ test("suspension cuts both ways: the guild's own people lose fresh access, live 
     now: live.envelope.claims.iat + 1,
     expectedOperationId: FESTIVAL_OP,
   });
-  assert.ok(!("failure" in stillLive), "the live envelope survives suspension to expiry");
+  assert.ok(!isFailed(stillLive), "the live envelope survives suspension to expiry");
 
   assert.equal(live.refresh.kind, "rotated");
   const dead = failureOf(await engine.runtime.refresh({

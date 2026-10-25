@@ -100,6 +100,12 @@ export type AssertPlainId<T extends true> = T;
  * gates. */
 export declare const AUTHORITY_INTERFACE_VERSION: 2;
 export type AuthorityInterfaceVersion = typeof AUTHORITY_INTERFACE_VERSION;
+/** The interface version as envelope claims record it: which runtime
+ * interface issued them. Provenance, not a gate — `verify` never refuses a
+ * live envelope over it, so the field is `number` rather than the
+ * call-surface literal: a parsed envelope may carry a historical value
+ * after the interface moves. Calls keep `AuthorityInterfaceVersion`. */
+export type IssuerInterfaceVersion = number;
 /** The envelope and claims format version. This, with the format marker and
  * the envelope's own `v`, is what `verify` gates reading on. It moves only
  * when the meaning of the claims changes, never for a command-surface
@@ -118,6 +124,13 @@ export interface Failure {
 export interface Failed {
     readonly failure: Failure;
 }
+/** Narrow a session result — `AccessIssue | Failed`, `Verified | Failed`,
+ * `AuthorityContext | Failed` — to its failure arm. The session surface has
+ * no `ok` discriminant; property presence is the discriminator, and this
+ * names it once instead of every caller spelling the `in` check. Command
+ * results keep their `ok` discriminant and do not use this. Narrowing a
+ * typed union is all this does — it parses nothing. */
+export declare const isFailed: <S extends object>(result: S | Failed) => result is Failed;
 /** A site the envelope admits, by permanent id and the aliases the operation
  * authority has made current. Aliases are routing decoration; ids resolve. */
 export interface SiteBinding {
@@ -135,7 +148,7 @@ export interface SiteBinding {
  */
 export interface AccessEnvelopeClaimsV1 {
     readonly v: typeof ACCESS_ENVELOPE_VERSION;
-    readonly interfaceVersion: AuthorityInterfaceVersion;
+    readonly interfaceVersion: IssuerInterfaceVersion;
     readonly operationId: Unbranded<OperationId>;
     readonly actor: {
         readonly organizationId: Unbranded<OrganizationId>;

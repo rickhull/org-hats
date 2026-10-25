@@ -13,6 +13,7 @@ import {
   AUTHORITY_INTERFACE_VERSION,
   DANA_OKAFOR,
   HARBOR_LOGISTICS,
+  isFailed,
   PROFESSIONAL_OPERATION,
   createInMemoryAuthority,
 } from "../src/authority/index.ts";
@@ -47,7 +48,7 @@ const issued = await engine.runtime.accessFromEvidence({
   operationId: OPERATION,
   evidence: { provider: "pilot-idp", subject: "dana" },
 });
-if ("failure" in issued) throw new Error(`issuance failed: ${issued.failure.kind}`);
+if (isFailed(issued)) throw new Error(`issuance failed: ${issued.failure.kind}`);
 const { envelope, refresh } = issued;
 
 // 3. Key distribution: verifiers receive the public key before issuance.
@@ -61,7 +62,7 @@ const verified = await verify(envelope, keys, {
   expectedOperationId: OPERATION,
   expectedSiteId: WEST,
 });
-if ("failure" in verified) throw new Error(`verification failed: ${verified.failure.kind}`);
+if (isFailed(verified)) throw new Error(`verification failed: ${verified.failure.kind}`);
 const { access } = verified;
 
 assert(access.mayAct("review", { kind: "team", teamId: REACHED_TEAM }), "the worn hat reaches the team");
@@ -84,7 +85,7 @@ const expired = await verify(envelope, keys, {
   now: envelope.claims.exp,
   expectedOperationId: OPERATION,
 });
-if (!("failure" in expired)) throw new Error("expected the bounded expiry denial");
+if (!isFailed(expired)) throw new Error("expected the bounded expiry denial");
 assert(expired.failure.kind === "expired", `expected expired, got ${expired.failure.kind}`);
 console.log(`at exp: ${expired.failure.kind}`);
 console.log("pilot passed");

@@ -13,6 +13,7 @@ import {
   type AccessEnvelopeClaimsV1,
   type ActorId,
   type FailureKind,
+  type Failure,
   type GrantTarget,
   type HatSummary,
   type JsonValue,
@@ -67,8 +68,6 @@ const SCHEMA_VERSION = "4";
 const ROSTER_RECONCILE_SECONDS = 15 * 60;
 
 type Row = Record<string, string | number | null>;
-
-type Failure = { readonly kind: FailureKind; readonly detail?: string };
 
 type Result<T> =
   | { readonly ok: true; readonly value: T }

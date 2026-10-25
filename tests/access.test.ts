@@ -10,6 +10,7 @@ import {
   ACCESS_ENVELOPE_FORMAT,
   AUTHORITY_INTERFACE_VERSION,
   canonicalJson,
+  isFailed,
   type AccessEnvelopeClaimsV1,
   type SignedAccessEnvelope,
 } from "../src/contract.ts";
@@ -46,7 +47,17 @@ test("vector: the canonical serialization is byte-exact", () => {
 
 test("vector: the committed signature verifies with the committed public key", async () => {
   const result = await verify(envelopeOf(vectors.claims), keys, { now: vectors.claims.iat + 1 });
-  assert.ok(!("failure" in result), "expected success");
+  assert.ok(!isFailed(result), "expected success");
+});
+
+test("vector: the claims were issued by an older interface and still verify", async () => {
+  // The committed vector claims carry a historical `interfaceVersion`: the
+  // fixture predates interface 2. That they verify is the contract —
+  // provenance is not a gate — and that they load into the claims type with
+  // no cast is the type-layer claim: the field is `IssuerInterfaceVersion`,
+  // not the current call-surface literal.
+  assert.ok(vectors.claims.interfaceVersion !== AUTHORITY_INTERFACE_VERSION);
+  assert.ok(!isFailed(await verify(envelopeOf(vectors.claims), keys, { now: vectors.claims.iat + 1 })));
 });
 
 test("vector: a forged signature fails closed", async () => {
@@ -70,7 +81,7 @@ test("an unknown key id cannot verify", async () => {
 
 test("expiry: the envelope dies at exp, verified one second before", async () => {
   const at = vectors.claims.exp - 1;
-  assert.ok(!("failure" in (await verify(envelopeOf(vectors.claims), keys, { now: at }))));
+  assert.ok(!isFailed(await verify(envelopeOf(vectors.claims), keys, { now: at })));
   const dead = failureOf(await verify(envelopeOf(vectors.claims), keys, { now: vectors.claims.exp }));
   assert.equal(dead.kind, "expired");
 });
@@ -132,8 +143,10 @@ test("the issuing interface version is provenance, not a gate on reading", async
   const signer = await webCryptoSigner("key-provenance");
   const signerKey = await ed25519VerifyKey("key-provenance", await signer.publicKey());
   // Deliberately not the current interface, and derived from it so the test
-  // cannot become a no-op if the constant ever moves back.
-  const differentInterface = (AUTHORITY_INTERFACE_VERSION + 1) as never;
+  // cannot become a no-op if the constant ever moves back. The claims field
+  // is provenance (`IssuerInterfaceVersion`), so the historical literal
+  // needs no cast — that is the type telling the truth this test asserts.
+  const differentInterface = AUTHORITY_INTERFACE_VERSION + 1;
   const claims = { ...vectors.claims, interfaceVersion: differentInterface };
   const envelope: SignedAccessEnvelope = {
     format: ACCESS_ENVELOPE_FORMAT,
@@ -159,7 +172,7 @@ test("wrong-binding: another operation, or a site the envelope is not admitted t
     expectedOperationId: vectors.claims.operationId,
     expectedSiteId: "site-b8d620fa",
   });
-  assert.ok(!("failure" in rightSite));
+  assert.ok(!isFailed(rightSite));
 });
 
 test("key rotation: two keys live during rollout, then the old retires", async () => {
@@ -177,15 +190,15 @@ test("key rotation: two keys live during rollout, then the old retires", async (
     keyId: newSigner.keyId,
     signature: await newSigner.sign(canonicalJson(asJson(claims))),
   };
-  assert.ok(!("failure" in (await verify(oldEnvelope, both, { now }))));
-  assert.ok(!("failure" in (await verify(newEnvelope, both, { now }))));
+  assert.ok(!isFailed(await verify(oldEnvelope, both, { now })));
+  assert.ok(!isFailed(await verify(newEnvelope, both, { now })));
 
   // retirement: the old key is removed; only its envelopes stop verifying
   const newOnly = new Map<string, VerifyKey>([[newKey.keyId, newKey]]);
   const retired = failureOf(await verify(oldEnvelope, newOnly, { now }));
   assert.equal(retired.kind, "invalid-signature");
   assert.match(retired.detail ?? "", /unknown key id/);
-  assert.ok(!("failure" in (await verify(newEnvelope, newOnly, { now }))));
+  assert.ok(!isFailed(await verify(newEnvelope, newOnly, { now })));
 });
 
 test("neutral access: a host maps product facts onto neutral targets", async () => {

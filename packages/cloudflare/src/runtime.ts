@@ -3,6 +3,7 @@ import {
   ACCESS_ENVELOPE_VERSION,
   AUTHORITY_INTERFACE_VERSION,
   canonicalJson,
+  isFailed,
   type AccessEnvelopeClaimsV1,
   type AccessFromEvidenceInput,
   type AccessIssue,
@@ -311,7 +312,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
           ...(operationId === undefined ? {} : { expectedOperationId: operationId }),
         },
       );
-      if ("failure" in result) return failed(result.failure);
+      if (isFailed(result)) return failed(result.failure);
       const claims = result.claims;
       return {
         organizationId: claims.actor.organizationId,
@@ -323,7 +324,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     }
     const preferred = command.kind === "disable-actor" ? command.organizationId : undefined;
     const resolved = await resolve(command.authorization.evidence, preferred);
-    if ("failure" in resolved) return resolved;
+    if (isFailed(resolved)) return resolved;
     return {
       organizationId: resolved.organizationId,
       actorId: resolved.actorId,
@@ -346,7 +347,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     }
     await drain(input.operationId);
     const resolved = await resolve(input.evidence);
-    if ("failure" in resolved) return resolved;
+    if (isFailed(resolved)) return resolved;
     if (resolved.disabled) return failed({ kind: "not-admitted", detail: "actor disabled" });
     const issued = await call<{
       claims: AccessEnvelopeClaimsV1;
@@ -377,7 +378,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
   const context = async (input: ContextRequest): Promise<AuthorityContext | Failed> => {
     if (input.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) return failed({ kind: "wrong-interface-version" });
     const verified = await verify(input.envelope, keys, { now: now() });
-    if ("failure" in verified) return failed(verified.failure);
+    if (isFailed(verified)) return failed(verified.failure);
     const claims = verified.claims;
     const actor = await call<{ actorId: string; displayName?: string; disabled: boolean }>(
       organization(claims.actor.organizationId),
@@ -435,7 +436,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
       return { ok: false, failure: { kind: "wrong-interface-version" } };
     }
     const authorized = await authorize(input);
-    if ("failure" in authorized) return { ok: false, failure: authorized.failure };
+    if (isFailed(authorized)) return { ok: false, failure: authorized.failure };
     const operationId = "operationId" in input ? input.operationId : undefined;
     await drain(operationId, authorized.organizationId);
     const key = input.idempotencyKey;
@@ -524,8 +525,16 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
           byActorId: authorized.actorId,
         });
         break;
-      default:
+      default: {
+        // The exhaustiveness witness: this arm is `never` when every command
+        // kind has a case, so adding one fails the build here instead of
+        // silently routing to invalid-command. The failure — not a throw —
+        // stays: the service binding can deliver a structurally different
+        // command from a caller whose types disagree, and that caller gets
+        // the closed taxonomy, never an exception.
+        input satisfies never;
         return deny({ kind: "invalid-command", detail: "unknown command kind" });
+      }
     }
     await drain(operationId, authorized.organizationId);
     return result;

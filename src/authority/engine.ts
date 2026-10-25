@@ -34,6 +34,7 @@ import {
   ACCESS_ENVELOPE_VERSION,
   AUTHORITY_INTERFACE_VERSION,
   actorId,
+  isFailed,
   operationId,
   organizationId,
   siteId,
@@ -653,7 +654,7 @@ export const createInMemoryAuthority = async (
         .find(({ k }) => k === `${input.evidence.provider}:${input.evidence.subject}`);
       if (link === undefined) return failed({ kind: "unauthenticated", detail: "no principal link for this evidence" });
       const result = await issue(op, link.v.organizationId, link.v.actorId, factsOf(input.evidence));
-      if ("failure" in result) return failed(result.failure);
+      if (isFailed(result)) return failed(result.failure);
       return result;
     },
 
@@ -681,7 +682,7 @@ export const createInMemoryAuthority = async (
               ...(record.authTime !== undefined ? { authTime: record.authTime } : {}),
             },
       );
-      if ("failure" in result) return failed(result.failure);
+      if (isFailed(result)) return failed(result.failure);
       return result;
     },
 
@@ -997,8 +998,16 @@ export const createInMemoryAuthority = async (
           org.audit.push({ at: clock.now(), by: `${org.organizationId}/${principalOrFailure.actorId}`, fact: `actor ${inputCommand.actorId} disabled` });
           return ok(inputCommand.idempotencyKey, true);
         }
-        default:
+        default: {
+          // The exhaustiveness witness: this arm is `never` when every
+          // command kind has a case, so adding one fails the build here
+          // instead of silently routing to invalid-command. The failure —
+          // not a throw — stays: a caller that bypasses the types (an
+          // untyped host, a structurally stale version) still gets the
+          // closed taxonomy, never an exception.
+          inputCommand satisfies never;
           return fail("invalid-command", "unknown command kind");
+        }
       }
     },
   };

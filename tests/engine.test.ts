@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { actorId, canonicalJson, operationId, organizationId, siteId, teamId } from "../src/contract.ts";
+import { actorId, canonicalJson, isFailed, operationId, organizationId, siteId, teamId } from "../src/contract.ts";
 import type { TwinFixture } from "../src/authority/twins.ts";
 import {
   DANA_OKAFOR,
@@ -95,7 +95,7 @@ const cmd = (body: CommandBody, authorization: AuthorityCommand["authorization"]
 test("issuance: evidence resolves the actor, computes reach, and signs", async () => {
   const { engine, signer } = await setup();
   const issue = await engine.runtime.accessFromEvidence(evidence(DANA));
-  assert.ok(!("failure" in issue));
+  assert.ok(!isFailed(issue));
   const { envelope, refresh } = issue;
   assert.equal(refresh.kind, "rotated");
   assert.equal(envelope.keyId, "key-test");
@@ -120,13 +120,13 @@ test("issuance failures: unknown evidence, actor without admission", async () =>
 test("refresh: rotation with explicit outcomes; a superseded handle is dead", async () => {
   const { engine } = await setup();
   const first = await engine.runtime.accessFromEvidence(evidence(DANA));
-  assert.ok(!("failure" in first));
+  assert.ok(!isFailed(first));
   assert.equal(first.refresh.kind, "rotated");
   if (first.refresh.kind !== "rotated") return;
   const second = await engine.runtime.refresh({
     interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: first.refresh.handle,
   });
-  assert.ok(!("failure" in second));
+  assert.ok(!isFailed(second));
   assert.equal(second.refresh.kind, "rotated");
   const replay = await engine.runtime.refresh({
     interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: first.refresh.handle,
@@ -138,7 +138,7 @@ test("refresh: rotation with explicit outcomes; a superseded handle is dead", as
 test("the envelope lifetime is configuration, not a constant", async () => {
   const { engine } = await setup(0, 60);
   const issue = await engine.runtime.accessFromEvidence(evidence(DANA));
-  assert.ok(!("failure" in issue));
+  assert.ok(!isFailed(issue));
   assert.equal(issue.envelope.claims.exp - issue.envelope.claims.iat, 60);
 });
 
@@ -146,26 +146,26 @@ test("amr and auth_time: copied from evidence, preserved through refresh, surfac
   const { engine, signer } = await setup();
   const authenticated: PrincipalEvidence = { ...DANA, amr: ["hwk", "otp"], authTime: 1_699_999_000 };
   const first = await engine.runtime.accessFromEvidence(evidence(authenticated));
-  assert.ok(!("failure" in first));
+  assert.ok(!isFailed(first));
   assert.deepEqual(first.envelope.claims.amr, ["hwk", "otp"]);
   assert.equal(first.envelope.claims.auth_time, 1_699_999_000);
   assert.notEqual(first.envelope.claims.auth_time, first.envelope.claims.iat);
   // evidence without authentication facts issues claims without them
   const bare = await engine.runtime.accessFromEvidence(evidence(DANA));
-  assert.ok(!("failure" in bare));
+  assert.ok(!isFailed(bare));
   assert.equal("amr" in bare.envelope.claims, false);
   assert.equal("auth_time" in bare.envelope.claims, false);
   if (first.refresh.kind !== "rotated") return;
   const second = await engine.runtime.refresh({
     interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: first.refresh.handle,
   });
-  assert.ok(!("failure" in second));
+  assert.ok(!isFailed(second));
   assert.deepEqual(second.envelope.claims.amr, ["hwk", "otp"], "refresh preserves the methods");
   assert.equal(second.envelope.claims.auth_time, 1_699_999_000, "refresh preserves the authentication time");
   const context = await engine.runtime.context({
     interfaceVersion: AUTHORITY_INTERFACE_VERSION, envelope: second.envelope,
   });
-  assert.ok(!("failure" in context));
+  assert.ok(!isFailed(context));
   assert.deepEqual(context.amr, ["hwk", "otp"]);
   assert.equal(context.authTime, 1_699_999_000);
   // the methods are signed facts: tampering them breaks the signature
@@ -177,7 +177,7 @@ test("the bounded window: a revoked grant kills refresh, not the live envelope",
   const { engine } = await setup();
   const danaIssue = await engine.runtime.accessFromEvidence(evidence(DANA));
   const lenIssue = await engine.runtime.accessFromEvidence(evidence(LEN));
-  assert.ok(!("failure" in danaIssue) && !("failure" in lenIssue));
+  assert.ok(!isFailed(danaIssue) && !isFailed(lenIssue));
   const revoke = await engine.runtime.command(cmd(
     { kind: "revoke-grant", operationId: OP, grantId: "g-mer-3" },
     { kind: "access-envelope", envelope: lenIssue.envelope },
@@ -186,7 +186,7 @@ test("the bounded window: a revoked grant kills refresh, not the live envelope",
   assert.ok(revoke.ok);
   // the envelope still verifies until expiry — the window is bounded, not zero
   const ctx = await engine.runtime.context({ interfaceVersion: AUTHORITY_INTERFACE_VERSION, envelope: danaIssue.envelope });
-  assert.ok(!("failure" in ctx));
+  assert.ok(!isFailed(ctx));
   // but the refresh handle died with the grant
   if (danaIssue.refresh.kind !== "rotated") return;
   const dead = await engine.runtime.refresh({
@@ -199,7 +199,7 @@ test("the bounded window: a revoked grant kills refresh, not the live envelope",
 test("disable-actor: issuance stops immediately; the outbox revokes refresh records", async () => {
   const { engine } = await setup();
   const danaIssue = await engine.runtime.accessFromEvidence(evidence(DANA));
-  assert.ok(!("failure" in danaIssue));
+  assert.ok(!isFailed(danaIssue));
   // Dana administers Harbor
   const disable = await engine.runtime.command(cmd(
     { kind: "disable-actor", organizationId: HARBOR_LOGISTICS, actorId: DANA_OKAFOR },
@@ -225,7 +225,7 @@ test("participation: an acceptance delivered after a revoke does not resurrect i
   // the visible partial state the design calls for.
   const { engine } = await setup();
   const len = await engine.runtime.accessFromEvidence(evidence(LEN));
-  assert.ok(!("failure" in len));
+  assert.ok(!isFailed(len));
 
   const invite = await engine.runtime.command(cmd(
     { kind: "participation-invite", operationId: OP, organizationId: "org-invitee" },
@@ -271,7 +271,7 @@ test("participation: an acceptance delivered after a revoke does not resurrect i
 test("participation: revoking twice is a safe retry; revoking a non-participant is denied", async () => {
   const { engine } = await setup();
   const len = await engine.runtime.accessFromEvidence(evidence(LEN));
-  assert.ok(!("failure" in len));
+  assert.ok(!isFailed(len));
   const revokeCmd = (key: string, organizationId: string) => cmd(
     { kind: "participation-revoke", operationId: OP, organizationId, by: "operation" },
     { kind: "access-envelope", envelope: len.envelope },
@@ -304,7 +304,7 @@ test("participation: revoking twice is a safe retry; revoking a non-participant 
 test("participation: invite → accept → active, with a visible partial state and retry", async () => {
   const { engine } = await setup(1); // the first outbox delivery fails
   const len = await engine.runtime.accessFromEvidence(evidence(LEN));
-  assert.ok(!("failure" in len));
+  assert.ok(!isFailed(len));
 
   const invite = await engine.runtime.command(cmd(
     { kind: "participation-invite", operationId: OP, organizationId: "org-invitee" },
@@ -355,7 +355,7 @@ test("participation: invite → accept → active, with a visible partial state 
 test("idempotency: retries claim their result; misuse and denials do not poison", async () => {
   const { engine } = await setup();
   const len = await engine.runtime.accessFromEvidence(evidence(LEN));
-  assert.ok(!("failure" in len));
+  assert.ok(!isFailed(len));
 
   const grantBody = {
     kind: "grant-hat", operationId: OP, organizationId: "org-2b7c41de",
@@ -385,7 +385,7 @@ test("idempotency: retries claim their result; misuse and denials do not poison"
 test("authorization: administration is policy, not a hardcoded role", async () => {
   const { engine } = await setup();
   const dana = await engine.runtime.accessFromEvidence(evidence(DANA));
-  assert.ok(!("failure" in dana));
+  assert.ok(!isFailed(dana));
   // Dana (coordinator, not an administrator of Meridian) cannot grant hats
   const denied = await engine.runtime.command(cmd(
     { kind: "grant-hat", operationId: OP, organizationId: HARBOR_LOGISTICS, actorId: DANA_OKAFOR, role: "field", target: { kind: "team", teamId: "team-2e8c64b9" } },
@@ -452,7 +452,7 @@ test("authorization: an undeclared admin role grants nothing by default", async 
     operationId: TITLED_OP,
     evidence: { provider: "test-idp", subject: "titled" },
   });
-  assert.ok(!("failure" in issued));
+  assert.ok(!isFailed(issued));
   assert.equal(issued.envelope.claims.hat.role, "admin");
 
   const attempt = await engine.runtime.command(cmd(
@@ -467,7 +467,7 @@ test("authorization: an undeclared admin role grants nothing by default", async 
 test("request-access and admit: asking is not being admitted", async () => {
   const { engine } = await setup();
   const len = await engine.runtime.accessFromEvidence(evidence(LEN));
-  assert.ok(!("failure" in len));
+  assert.ok(!isFailed(len));
   const newcomer: PrincipalEvidence = { provider: "test-idp", subject: "newcomer" };
   // no principal link: the request itself is unauthenticated — links are explicit
   const orphan = await engine.runtime.command(cmd(
@@ -486,7 +486,7 @@ test("request-access and admit: asking is not being admitted", async () => {
   ));
   assert.ok(request.ok, request.ok ? "" : request.failure.kind);
   const beforeAdmit = await engine.runtime.accessFromEvidence(evidence(INVITEE_ADMIN));
-  assert.ok("failure" in beforeAdmit);
+  assert.ok(isFailed(beforeAdmit));
   assert.equal(failureOf(beforeAdmit).kind, "not-admitted", "asking did not admit");
 
   // admission is a separate, administrator act
@@ -501,7 +501,7 @@ test("request-access and admit: asking is not being admitted", async () => {
 test("select-hat: an actor selects their own hat; a stranger cannot", async () => {
   const { engine } = await setup();
   const marco = await engine.runtime.accessFromEvidence(evidence(MARCO));
-  assert.ok(!("failure" in marco));
+  assert.ok(!isFailed(marco));
   const self = await engine.runtime.command(cmd(
     { kind: "select-hat", operationId: OP, grantId: "g-mer-2" },
     { kind: "fresh-evidence", evidence: MARCO, operationId: OP },
