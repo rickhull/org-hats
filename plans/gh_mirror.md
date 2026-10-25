@@ -40,6 +40,12 @@ plan is realized it is removed, and the standing rules in
 
 ## Notes
 
+- **`v0.4.3` is a historical mis-tag.** It points at `8d2551d` ("docs update
+  / cleanup"), whose `package.json` is `0.4.2`; `v0.4.4` is the commit that
+  fixes release metadata. The tag is immutable and already published on
+  Codeberg. The pre-push hook skips it explicitly so a mirror catch-up can
+  validate every other tag; `bin/check-version v0.4.3` still fails it by
+  design.
 - If a fresh token still stalls the mirror, next suspect is the
   "A rewrite needs both hosts" rule: the Codeberg-side force-push of
   `main` (2026-10-24, `c78822a → 6e7c5f0`) predates the mirror working at

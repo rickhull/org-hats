@@ -20,6 +20,11 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 		*) continue ;; # a deletion has an all-zero local sha
 	esac
 	case $remote_ref in
+		# v0.4.3 tags a commit whose package.json is still 0.4.2. It
+		# predates the guard, is immutable, and is already published on
+		# the canonical host; skipping it here keeps the guard meaningful
+		# for every other tag. plans/gh_mirror.md records the anomaly.
+		refs/tags/v0.4.3) continue ;;
 		refs/tags/v[0-9]*|refs/tags/cloudflare-v[0-9]*)
 			bin/check-version "${remote_ref#refs/tags/}" || fail=1
 			;;
