@@ -137,7 +137,9 @@ The compiler is used as a boundary enforcer, not only as a build step:
   plain ids, the closed unions, the version literals, and the claims'
   provenance field, from the same side the suites see.
 - `packages/cloudflare/tsconfig.json` typechecks the reference runtime with
-  the Worker types and includes its `test/` directory.
+  the Worker types, includes its `test/` directory, and carries the same
+  strictness flags as the portable package (`noUncheckedIndexedAccess`,
+  `exactOptionalPropertyTypes`) plus `noImplicitOverride`.
 
 ## Runtime boundaries
 
@@ -169,9 +171,6 @@ These are current facts, not future promises:
   fail closed with `invalid-command` while an inline `satisfies never`
   witness keeps them exhaustive — a structurally wrong command over the
   wire gets the closed taxonomy, never a thrown exception.
-- The Cloudflare package does not yet enable
-  `noUncheckedIndexedAccess` or `exactOptionalPropertyTypes`, although it
-  reads SQLite rows and optional columns.
 - The root package does not re-export the id aliases, and `NeutralAccess`
   lacks some accessors hosts need for the projection; those are tracked in
   `plans/code_review.md` R3.

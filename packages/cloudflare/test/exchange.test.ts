@@ -63,15 +63,16 @@ const serve = (
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const method = (init?.method ?? "GET").toUpperCase();
+    const recordedBody =
+      init?.body instanceof URLSearchParams
+        ? init.body.toString()
+        : typeof init?.body === "string"
+          ? init.body
+          : undefined;
     requests.push({
       method,
       url,
-      body:
-        init?.body instanceof URLSearchParams
-          ? init.body.toString()
-          : typeof init?.body === "string"
-            ? init.body
-            : undefined,
+      ...(recordedBody !== undefined ? { body: recordedBody } : {}),
     });
     for (const route of queues) {
       if (route.method !== method || route.url !== url) continue;

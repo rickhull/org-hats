@@ -6,25 +6,12 @@ pinned by `tests/types.test.ts`), the `isFailed` session guard, the
 compile-only surface tests, the consumer's exhaustive `FailureKind` map, and
 the shared `Failure` in the Cloudflare DOs. The `ActiveGrant` refinement
 (`wearableGrants` returns `readonly ActiveGrant[]`; the decision path takes
-nothing wider) landed the same day. What remains:
+nothing wider) and the Cloudflare strictness pass (`noUncheckedIndexedAccess`,
+`exactOptionalPropertyTypes`, `noImplicitOverride` — one optional-property
+fix and four `override` modifiers, no row assumptions surfaced) landed the
+same day. What remains:
 
-## 1. Raise Cloudflare's compiler strictness
-
-`packages/cloudflare/tsconfig.json` does not enable
-`noUncheckedIndexedAccess` or `exactOptionalPropertyTypes`, although the
-runtime reads SQLite rows and optional columns. The portable package already
-does.
-
-- [ ] Add both flags; fix the resulting row/optional-property errors
-      deliberately.
-- [ ] Consider `noImplicitOverride` at the same time; leave module resolution
-      and emit alone.
-- [ ] Run `pnpm check:cloudflare` and the full `pnpm verify`.
-
-This is a reliability pass, not a behavior change; it may surface real
-row/property assumptions.
-
-## 2. Numeric time brand, conditionally
+## 1. Numeric time brand, conditionally
 
 Seconds-versus-milliseconds is the one remaining strong mix-up class. It is
 also the one with public ergonomics cost.
@@ -37,7 +24,7 @@ also the one with public ergonomics cost.
 - [ ] Stop if the conversion spreads into public signatures; the brand is
       not worth that ceremony.
 
-## 3. Compiler alignment and erasable syntax
+## 2. Compiler alignment and erasable syntax
 
 The root is on TypeScript 5.7 while the Cloudflare package is on 5.9.
 `erasableSyntaxOnly` (5.8+) would enforce that the `.ts` tests and pilot can

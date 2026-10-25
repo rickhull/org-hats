@@ -10,10 +10,11 @@ planned is released, adopted, and documented in `docs/`.
   major subdirectory at a time. Slice 1 (`src/`) is reconciled against the
   released 2.0 line; the fixed R1/R2/R3 items are checked, and the remaining
   R1/R2/R3 findings plus R4/R5 are live.
-- `type_leverage.md` — remaining type-layer follow-ups: Cloudflare
-  compiler parity and the conditional numeric time brand. Provenance
-  honesty, `isFailed`, the compile-only surface tests, the shared Cloudflare
-  `Failure`, and the `ActiveGrant` refinement landed 2026-10-25.
+- `type_leverage.md` — remaining type-layer follow-ups: the conditional
+  numeric time brand and TypeScript version alignment with
+  `erasableSyntaxOnly`. Provenance honesty, `isFailed`, the compile-only
+  surface tests, the shared Cloudflare `Failure`, the `ActiveGrant`
+  refinement, and Cloudflare compiler parity landed 2026-10-25.
 - `test_suite_review.md` — the test-suite fanout: fragility and dependency
   findings, the rings, and the remaining coverage gaps in priority order.
   The typecheck gate is landed; the coverage slice follows.

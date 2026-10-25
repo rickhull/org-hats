@@ -631,11 +631,11 @@ export class OrganizationAuthority extends DurableObject<Env> {
     return value({ restored: true });
   }
 
-  async alarm(): Promise<void> {
+  override async alarm(): Promise<void> {
     await this.drain();
   }
 
-  async fetch(request: Request): Promise<Response> {
+  override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const json = (body: unknown, status = 200): Response =>
       Response.json(body, { status });

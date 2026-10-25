@@ -1627,13 +1627,13 @@ export class OperationAuthority extends DurableObject<Env> {
     return value({ operationId: id });
   }
 
-  async alarm(): Promise<void> {
+  override async alarm(): Promise<void> {
     // `drain` reconciles behind the cadence guard, so the retry alarm
     // doubles as the projection's backstop.
     await this.drain();
   }
 
-  async fetch(request: Request): Promise<Response> {
+  override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const json = (body: unknown, status = 200): Response => Response.json(body, { status });
     const readBody = async (): Promise<Record<string, unknown>> => asRecord(await request.json());
