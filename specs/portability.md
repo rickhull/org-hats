@@ -74,3 +74,46 @@ signature means.
 re-recorded acceptance at each move.
 *If it breaks:* a moved or floating pin silently redefines the seam under
 every consumer at once.
+
+### P7 — Brands stay behind the public surface
+
+The five domain ids are branded internally, but every consumer-facing
+command, claim, neutral-access result, and context takes or returns plain
+strings for those ids. Evidence names a provider and subject, not a domain
+id. A host passes ids it read from its own records without importing a
+constructor.
+
+*Held by:* the `AssertPlainId` compile-time assertions in `src/contract.ts`
+and `tests/consumer-surface.ts`, which compiles against `dist/`; `bin/check`
+runs the consumer fence on every change.
+*If it breaks:* branding leaks into the installable surface, hosts need
+constructors for ordinary ids, and the compile-time brand begins to move
+what should be a wire-compatible value.
+
+### P8 — The suites and examples typecheck
+
+The root tests and the pilot compile under `tsconfig.tests.json`; a fixture
+that sends a shape the interface no longer accepts fails the gate rather
+than failing at runtime.
+
+*Held by:* `tsconfig.tests.json`, the `typecheck:tests` script, and the
+typecheck step in `bin/check`; pre-push, CI, and `pnpm verify` all run that
+gate.
+*If it breaks:* the compiler is silent about the test inputs, and an
+interface break reaches the runtime as a fixture failure after the fact.
+
+### P9 — Untrusted data is parsed before it wears a domain type
+
+Every untrusted wire, storage, policy, or provider value passes a named
+parser or verifier before it enters a branded domain position. The
+envelope's version/signature gate is its parse; key sets, policy bundles,
+SQLite rows, HTTP command bodies, and provider evidence have their own
+decoders. Test fixtures are trusted design data, converted once and checked
+by the suite and `invariantProblems`.
+
+*Held by:* `verify`'s format/version/signature gate; `parseVerifyKeySet`;
+`validatePolicyBundle` at the Cloudflare bootstrap and in tests; the
+Cloudflare `row.ts` decoders and ops body decoders; the fixture boundary in
+`tests/helpers.ts` plus `invariantProblems`.
+*If it breaks:* a brand becomes an assertion about data nobody checked, and
+the type layer starts lying about storage, wire, or provider input.

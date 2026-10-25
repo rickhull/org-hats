@@ -215,6 +215,8 @@ copied forward; the earlier 1.x package line is historical. See
 
 - [`docs/tutorial.md`](docs/tutorial.md) — the longer, concrete walkthrough.
 - [`docs/README.md`](docs/README.md) — the docs index.
+- [`docs/types.md`](docs/types.md) — the type layer: brands, unions, compiler
+  fences, and runtime boundaries.
 - [`docs/lexicon.md`](docs/lexicon.md) — the normative words.
 - [`docs/authority_redesign.md`](docs/authority_redesign.md) — architecture,
   state ownership, and the identity boundary.

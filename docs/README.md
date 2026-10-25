@@ -18,6 +18,8 @@ public `org-hats` docs are normative for the seam.
 - [`authority_redesign.md`](authority_redesign.md) — the architecture:
   modules, state ownership, the identity boundary, verification strategy, and
   packaging.
+- [`types.md`](types.md) — the type layer as built: brands, unions,
+  compiler fences, and the boundaries where runtime validation takes over.
 - [`envelope.md`](envelope.md) — the signed access-envelope format: claims,
   canonical encoding, signature transport, version and key compatibility.
 - [`cloudflare.md`](cloudflare.md) — the Cloudflare reference runtime as
