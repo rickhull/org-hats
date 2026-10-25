@@ -190,4 +190,45 @@ describe("OrganizationAuthority", () => {
     const trail = await audit(stub);
     expect(trail.body.value?.some((entry) => entry.fact.includes("participation in op-revoke revoked"))).toBe(true);
   });
+
+  it("refuses a principal link that would make one identity two actors", async () => {
+    const stub = organization("org-links");
+    const first = await call(stub, "POST", "/bootstrap", {
+      organizationId: "org/links",
+      actors: [
+        { actorId: "actor-admin", displayName: "Nia Fields" },
+        { actorId: "actor-member", displayName: "Sam Whitfield" },
+      ],
+      principalLinks: [{ provider: "idp", subject: "admin", actorId: "actor-admin" }],
+      orgAdmins: ["actor-admin"],
+    });
+    expect(first.body.ok).toBe(true);
+
+    // re-linking the same subject to a different actor is a configuration
+    // error, not a silent first-wins or last-wins
+    const conflict = await call(stub, "POST", "/bootstrap", {
+      organizationId: "org/links",
+      actors: [{ actorId: "actor-admin" }, { actorId: "actor-member" }],
+      principalLinks: [{ provider: "idp", subject: "admin", actorId: "actor-member" }],
+      orgAdmins: [],
+    });
+    expect(conflict.body.ok).toBe(false);
+    expect(conflict.body.failure?.kind).toBe("invalid-command");
+    expect(conflict.body.failure?.detail).toMatch(/already resolves/);
+    const stillAdmin = await call<{ actorId: string }>(
+      stub,
+      "GET",
+      "/resolve?provider=idp&subject=admin",
+    );
+    expect(stillAdmin.body.value?.actorId).toBe("actor-admin");
+
+    // a link naming an actor nobody knows is refused, not stored dead
+    const unknown = await call(stub, "POST", "/bootstrap", {
+      organizationId: "org/links",
+      principalLinks: [{ provider: "idp", subject: "ghost", actorId: "actor-nobody" }],
+      orgAdmins: [],
+    });
+    expect(unknown.body.ok).toBe(false);
+    expect(unknown.body.failure?.kind).toBe("invalid-command");
+  });
 });

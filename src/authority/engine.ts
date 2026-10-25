@@ -280,7 +280,19 @@ export const createInMemoryAuthority = async (
     if (org === undefined || !org.actors.some((a) => a.actorId === link.actorId)) {
       throw new Error(`principal link names an unknown actor: ${link.organizationId}/${link.actorId}`);
     }
-    org.principalLinks.set(`${link.provider}:${link.subject}`, {
+    // one identity is never two actors: a (provider, subject) may re-link
+    // its own actor, never a different one
+    const key = `${link.provider}:${link.subject}`;
+    const existing = org.principalLinks.get(key);
+    if (
+      existing !== undefined &&
+      (existing.organizationId !== link.organizationId || existing.actorId !== link.actorId)
+    ) {
+      throw new Error(
+        `principal link ${key} already resolves to ${existing.organizationId}/${existing.actorId}, not ${link.organizationId}/${link.actorId}`,
+      );
+    }
+    org.principalLinks.set(key, {
       organizationId: link.organizationId,
       actorId: link.actorId,
     });

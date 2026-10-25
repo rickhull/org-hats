@@ -113,7 +113,8 @@ A principal link resolves one `(organizationId, actorId)`; no provider
 claim links two actors, and equal mail-shaped subjects never merge them.
 
 *Held by:* no provider claim links actors — evidence carries identifying
-and authentication facts only; links are explicit bootstrap material; the
-twins keep actors organization-scoped.
+and authentication facts only; links are explicit bootstrap material, and a
+conflicting re-link is refused at both bootstrap layers (`scenarios.test.ts`
+pins it); the twins keep actors organization-scoped.
 *If it breaks:* a platform-global person record appears by the back door,
 and removing an actor from one operation starts affecting another.

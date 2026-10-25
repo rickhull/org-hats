@@ -242,6 +242,32 @@ export class OrganizationAuthority extends DurableObject<Env> {
   private bootstrap(input: BootstrapInput): Result<{ organizationId: string }> {
     const at = now();
     return this.ctx.storage.transactionSync(() => {
+      // one identity is never two actors: a (provider, subject) may re-link
+      // its own actor, never a different one, and a link must name a known
+      // actor. Checked before any mutation so a refusal commits nothing.
+      const payloadActorIds = new Set(input.actors.map((actor) => actor.actorId));
+      const claimed = new Map<string, string>();
+      for (const link of input.principalLinks) {
+        const key = `${link.provider}:${link.subject}`;
+        const row = this.one(
+          "SELECT actor_id FROM principal_links WHERE provider = ? AND subject = ?",
+          link.provider,
+          link.subject,
+        );
+        const stored = row === undefined ? undefined : String(row["actor_id"]);
+        const already = stored ?? claimed.get(key);
+        if (already !== undefined && already !== link.actorId) {
+          return failure(
+            "invalid-command",
+            `principal link ${key} already resolves to actor ${already}, not ${link.actorId}`,
+          );
+        }
+        const known = payloadActorIds.has(link.actorId) || this.actor(link.actorId) !== undefined;
+        if (!known) {
+          return failure("invalid-command", `principal link ${key} names the unknown actor ${link.actorId}`);
+        }
+        claimed.set(key, link.actorId);
+      }
       const existing = this.one(
         "SELECT 1 AS present FROM organization WHERE organization_id = ?",
         input.organizationId,

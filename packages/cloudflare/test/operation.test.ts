@@ -275,4 +275,58 @@ describe("OperationAuthority", () => {
     const audit = await call<readonly { fact: string }[]>(current.org, "GET", "/audit");
     expect(audit.body.value?.some((entry) => entry.fact.includes("revoked by operation"))).toBe(true);
   });
+
+  it("survives a failover: state restored from export keeps refresh handles alive", async () => {
+    const current = world("failover");
+    await bootstrapOrganization(current);
+    // active participation without the invite dance: this drill is about
+    // state recovery, not the workflow
+    await call(current.op, "POST", "/bootstrap", {
+      operationId: current.opId,
+      displayName: "Test Operation",
+      policy: {
+        format: 1,
+        id: "policy-test",
+        version: "1",
+        actions: ["observe"],
+        roles: [{ title: "field", actions: ["observe"] }],
+        readPolicy: { organizations: "granted-teams" },
+      },
+      sites: [{ siteId: SITE, aliases: [] }],
+      teams: [{ teamId: TEAM, siteId: SITE, organizationId: current.orgId }],
+      grants: [
+        {
+          grantId: "g-field",
+          organizationId: current.orgId,
+          actorId: MEMBER,
+          role: "field",
+          teamId: TEAM,
+          primary: true,
+        },
+      ],
+      participations: [{ organizationId: current.orgId, status: "active" }],
+    });
+
+    const issued = await call<{ claims: unknown; refresh: { kind: string; handle?: string } }>(
+      current.op,
+      "POST",
+      "/issue",
+      { organizationId: current.orgId, actorId: MEMBER },
+    );
+    expect(issued.body.ok).toBe(true);
+    const handle = issued.body.value?.refresh.kind === "rotated" ? issued.body.value.refresh.handle : undefined;
+    expect(handle).toBeDefined();
+
+    const exported = await call<Record<string, unknown>>(current.op, "GET", "/export");
+    expect(exported.body.ok).toBe(true);
+    await call(current.op, "POST", "/reset");
+    const restored = await call(current.op, "POST", "/restore", exported.body.value);
+    expect(restored.body.ok).toBe(true);
+
+    // the handle issued before the wipe still refreshes against restored
+    // state — recovery did not strand the session
+    const refreshed = await call<{ refresh: { kind: string } }>(current.op, "POST", "/refresh", { handle });
+    expect(refreshed.body.ok).toBe(true);
+    expect(refreshed.body.value?.refresh.kind).toBe("rotated");
+  });
 });
