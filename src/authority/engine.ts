@@ -123,9 +123,8 @@ interface OrgState {
   readonly organizationId: OrganizationId;
   readonly displayName?: string;
   actors: { organizationId: OrganizationId; actorId: ActorId; displayName?: string; disabled?: boolean }[];
-  principalLinks: Map<string, { organizationId: OrganizationId; actorId: ActorId }>;
   /** Org-side invitations received from operations, by invitation id. */
-  invitations: Map<string, { operationId: OperationId; status: "pending" | "accepted" | "declined" }>;
+  invitations: Map<string, { operationId: OperationId; status: "pending" | "accepted" }>;
   audit: AuditEvent[];
   claims: Map<IdempotencyKey, Claim>;
 }
@@ -170,7 +169,7 @@ interface OpState {
   grants: Grant[];
   participations: Participation[];
   /** Op-side invitation records, by invitation id. */
-  invitations: Map<string, { organizationId: OrganizationId; status: "invited" | "accepted" | "active" }>;
+  invitations: Map<string, { organizationId: OrganizationId; status: "invited" | "accepted" }>;
   refreshRecords: RefreshRecord[];
   accessRequests: { requestId: string; organizationId: OrganizationId; actorId: ActorId; note?: string }[];
   audit: AuditEvent[];
@@ -179,7 +178,6 @@ interface OpState {
 
 interface OutboxMessage {
   readonly id: string;
-  readonly to: "org" | "op";
   readonly target: string;
   readonly kind: "invitation" | "acceptance" | "actor-disabled";
   readonly invitationId?: string;
@@ -202,6 +200,9 @@ export interface InMemoryAuthorityHandle {
   pendingOutbox(): number;
   /** Assemble the operation's current view as a model Snapshot. */
   snapshotOf(operationId: OperationId): Snapshot | undefined;
+  /** The operation's pending access requests, copied — the administrator's
+   * `admit` queue, each with the requester's note when one was sent. */
+  accessRequestsOf(operationId: OperationId): readonly { requestId: string; organizationId: OrganizationId; actorId: ActorId; note?: string }[];
   /** The organization's invitation inbox, by invitation id. */
   invitationsOf(organizationId: OrganizationId): ReadonlyMap<string, { operationId: OperationId; status: string }>;
 }
@@ -213,6 +214,11 @@ const fail = (kind: Failure["kind"], detail?: string): { ok: false; failure: Fai
   ok: false,
   failure: { kind, ...(detail !== undefined ? { detail } : {}) },
 });
+
+/** The principal-link key: the (provider, subject) pair encoded as JSON, so
+ * no split of the two strings can collide with another — ":" concatenation
+ * made `"a:b"/"c"` and `"a"/"b:c"` the same link. */
+const principalKey = (provider: string, subject: string): string => JSON.stringify([provider, subject]);
 const ok = (idempotencyKey: string, applied: boolean): CommandResult => ({
   ok: true,
   receipt: { idempotencyKey, applied },
@@ -252,6 +258,11 @@ export const createInMemoryAuthority = async (
 
   const orgs = new Map<OrganizationId, OrgState>();
   const ops = new Map<OperationId, OpState>();
+  /** Verified-principal links, one engine-wide map keyed by the encoded
+   * (provider, subject) pair: "a:b"/"c" and "a"/"b:c" are different links,
+   * and one identity is never two actors — the guard must hold across
+   * organizations, not just within one. */
+  const principalLinks = new Map<string, { organizationId: OrganizationId; actorId: ActorId }>();
   const outbox: OutboxMessage[] = [];
   const delivered = new Set<string>();
   const nextId = counter();
@@ -283,7 +294,6 @@ export const createInMemoryAuthority = async (
           organizationId: organization.organizationId,
           ...(organization.displayName !== undefined ? { displayName: organization.displayName } : {}),
           actors: [],
-          principalLinks: new Map(),
           invitations: new Map(),
           audit: [{ at: clock.now(), by: "bootstrap", fact: `organization ${organization.organizationId} created` }],
           claims: new Map(),
@@ -307,9 +317,10 @@ export const createInMemoryAuthority = async (
       throw new Error(`principal link names an unknown actor: ${link.organizationId}/${link.actorId}`);
     }
     // one identity is never two actors: a (provider, subject) may re-link
-    // its own actor, never a different one
-    const key = `${link.provider}:${link.subject}`;
-    const existing = org.principalLinks.get(key);
+    // its own actor, never a different one — engine-wide, across
+    // organizations
+    const key = principalKey(link.provider, link.subject);
+    const existing = principalLinks.get(key);
     if (
       existing !== undefined &&
       (existing.organizationId !== link.organizationId || existing.actorId !== link.actorId)
@@ -318,7 +329,7 @@ export const createInMemoryAuthority = async (
         `principal link ${key} already resolves to ${existing.organizationId}/${existing.actorId}, not ${link.organizationId}/${link.actorId}`,
       );
     }
-    org.principalLinks.set(key, {
+    principalLinks.set(key, {
       organizationId: link.organizationId,
       actorId: link.actorId,
     });
@@ -327,19 +338,22 @@ export const createInMemoryAuthority = async (
   const snapshotOf = (operationId: OperationId): Snapshot | undefined => {
     const op = ops.get(operationId);
     if (op === undefined) return undefined;
+    // Every list is copied: the snapshot is a caller's to hold and mutate,
+    // and a shared array would make engine state the caller's to corrupt.
+    // `readonly` on the type says the same thing; this is the runtime half.
     return {
-      organizations: allOrganizations,
-      actors: allActors,
+      organizations: [...allOrganizations],
+      actors: [...allActors],
       operations: [...ops.values()].map((o) => ({
         operationId: o.operationId,
         ...(o.displayName !== undefined ? { displayName: o.displayName } : {}),
         ...(o.slug !== undefined ? { slug: o.slug } : {}),
         ...(o.bounded !== undefined ? { bounded: o.bounded } : {}),
       })),
-      sites: op.sites,
-      teams: op.teams,
-      grants: op.grants,
-      participations: op.participations,
+      sites: [...op.sites],
+      teams: [...op.teams],
+      grants: [...op.grants],
+      participations: [...op.participations],
     };
   };
 
@@ -450,19 +464,17 @@ export const createInMemoryAuthority = async (
 
   const resolvePrincipal = async (authorization: AuthorityCommand["authorization"], boundTo?: OperationId): Promise<Principal | Failure> => {
     if (authorization.kind === "fresh-evidence") {
-      const link = [...orgs.values()]
-        .flatMap((o) => [...o.principalLinks.entries()].map(([k, v]) => ({ k, v })))
-        .find(({ k }) => k === `${authorization.evidence.provider}:${authorization.evidence.subject}`);
+      const link = principalLinks.get(principalKey(authorization.evidence.provider, authorization.evidence.subject));
       if (link === undefined) return { kind: "unauthenticated", detail: "no principal link for this evidence" };
-      const org = orgs.get(link.v.organizationId);
-      const actor = org?.actors.find((a) => a.actorId === link.v.actorId);
+      const org = orgs.get(link.organizationId);
+      const actor = org?.actors.find((a) => a.actorId === link.actorId);
       if (org === undefined || actor === undefined) return { kind: "unauthenticated" };
       if (actor.disabled) return { kind: "not-admitted", detail: "actor disabled" };
       return {
-        organizationId: link.v.organizationId,
-        actorId: link.v.actorId,
+        organizationId: link.organizationId,
+        actorId: link.actorId,
         adminOfOperation: false,
-        adminOfOrganization: (orgAdmins[link.v.organizationId] ?? []).includes(link.v.actorId),
+        adminOfOrganization: (orgAdmins[link.organizationId] ?? []).includes(link.actorId),
       };
     }
     const claims = authorization.envelope.claims;
@@ -644,27 +656,28 @@ export const createInMemoryAuthority = async (
   // --- the runtime ----------------------------------------------------------------------
 
   const runtime: AuthorityRuntime = {
+    // The version gate precedes the drain in every method: a call the
+    // runtime refuses must not even deliver pending coordinator messages —
+    // a rejected caller causes no side effects, and delivery is one.
     async accessFromEvidence(input: AccessFromEvidenceInput): Promise<AccessIssue | Failed> {
-      await deliverPending();
       const versionFail = checkVersion(input.interfaceVersion);
       if (versionFail !== undefined) return failed(versionFail);
+      await deliverPending();
       // the seam: the request carries plain strings, `op.operationId` is
       // the domain id from here down
       const op = ops.get(operationId(input.operationId));
       if (op === undefined) return failed({ kind: "wrong-binding", detail: "unknown operation" });
-      const link = [...orgs.values()]
-        .flatMap((o) => [...o.principalLinks.entries()].map(([k, v]) => ({ k, v })))
-        .find(({ k }) => k === `${input.evidence.provider}:${input.evidence.subject}`);
+      const link = principalLinks.get(principalKey(input.evidence.provider, input.evidence.subject));
       if (link === undefined) return failed({ kind: "unauthenticated", detail: "no principal link for this evidence" });
-      const result = await issue(op, link.v.organizationId, link.v.actorId, factsOf(input.evidence));
+      const result = await issue(op, link.organizationId, link.actorId, factsOf(input.evidence));
       if (isFailed(result)) return failed(result.failure);
       return result;
     },
 
     async refresh(input: RefreshInput): Promise<AccessIssue | Failed> {
-      await deliverPending();
       const versionFail = checkVersion(input.interfaceVersion);
       if (versionFail !== undefined) return failed(versionFail);
+      await deliverPending();
       const op = ops.get(operationId(input.operationId));
       if (op === undefined) return failed({ kind: "wrong-binding", detail: "unknown operation" });
       const hash = await sha256Hex(input.handle);
@@ -672,6 +685,11 @@ export const createInMemoryAuthority = async (
       if (record === undefined) return failed({ kind: "unauthenticated", detail: "unknown refresh handle" });
       if (record.revoked) return failed({ kind: "unauthenticated", detail: "refresh handle revoked" });
       if (record.superseded) return failed({ kind: "unauthenticated", detail: "refresh handle superseded" });
+      // Supersede before issue, deliberately: the handle was consumed by
+      // this attempt, and if issuance then fails — the actor disabled, the
+      // participation revoked — the old handle must not survive to be
+      // refreshed again. One attempt, one handle; fail closed rather than
+      // risk two live handles.
       record.superseded = true;
       // the authentication event, not the envelope, survives the chain
       const result = await issue(
@@ -690,9 +708,9 @@ export const createInMemoryAuthority = async (
     },
 
     async context(input: ContextRequest): Promise<AuthorityContext | Failed> {
-      await deliverPending();
       const versionFail = checkVersion(input.interfaceVersion);
       if (versionFail !== undefined) return failed(versionFail);
+      await deliverPending();
       const { envelope } = input;
       if (envelope.format !== ACCESS_ENVELOPE_FORMAT) return failed({ kind: "invalid-signature" });
       if (!(await signer.verify(canonicalJson(envelope.claims as unknown as JsonValue), envelope.signature))) {
@@ -753,9 +771,9 @@ export const createInMemoryAuthority = async (
     },
 
     async command(inputCommand: AuthorityCommand): Promise<CommandResult> {
-      await deliverPending();
       const versionFail = checkVersion(inputCommand.interfaceVersion);
       if (versionFail !== undefined) return fail(versionFail.kind);
+      await deliverPending();
 
       // request-access needs no administrator: the evidence is the request
       if (inputCommand.kind === "request-access") {
@@ -763,14 +781,21 @@ export const createInMemoryAuthority = async (
         if (op === undefined) return fail("wrong-binding", "unknown operation");
         const replay = checkClaim(op.claims, inputCommand);
         if (replay !== undefined) return replay;
-        const link = [...orgs.values()]
-          .flatMap((o) => [...o.principalLinks.entries()].map(([k, v]) => ({ k, v })))
-          .find(({ k }) => k === `${inputCommand.evidence.provider}:${inputCommand.evidence.subject}`);
+        const link = principalLinks.get(principalKey(inputCommand.evidence.provider, inputCommand.evidence.subject));
         if (link === undefined) return fail("unauthenticated", "no principal link for this evidence");
         commitClaim(op.claims, inputCommand);
         const requestId = `ar-${nextId()}`;
-        op.accessRequests.push({ requestId, organizationId: link.v.organizationId, actorId: link.v.actorId });
-        op.audit.push({ at: clock.now(), by: `${link.v.organizationId}/${link.v.actorId}`, fact: `access request ${requestId}` });
+        op.accessRequests.push({
+          requestId,
+          organizationId: link.organizationId,
+          actorId: link.actorId,
+          ...(inputCommand.note !== undefined ? { note: inputCommand.note } : {}),
+        });
+        op.audit.push({
+          at: clock.now(),
+          by: `${link.organizationId}/${link.actorId}`,
+          fact: `access request ${requestId}${inputCommand.note !== undefined ? `: ${inputCommand.note}` : ""}`,
+        });
         return ok(inputCommand.idempotencyKey, true);
       }
 
@@ -807,7 +832,7 @@ export const createInMemoryAuthority = async (
           op.invitations.set(invitationId, { organizationId: invitee, status: "invited" });
           op.participations = [...invited.participations];
           outbox.push({
-            id: `ob-${nextId()}`, to: "org", target: invitee,
+            id: `ob-${nextId()}`, target: invitee,
             kind: "invitation", invitationId, operationId: op.operationId,
             organizationId: invitee,
           });
@@ -832,7 +857,7 @@ export const createInMemoryAuthority = async (
           const op = ops.get(invitation.operationId);
           if (op !== undefined) {
             outbox.push({
-              id: `ob-${nextId()}`, to: "op", target: invitation.operationId,
+              id: `ob-${nextId()}`, target: invitation.operationId,
               kind: "acceptance", invitationId,
               operationId: invitation.operationId, organizationId: org.organizationId,
             });
@@ -994,7 +1019,7 @@ export const createInMemoryAuthority = async (
           actor.disabled = true;
           for (const op of ops.values()) {
             outbox.push({
-              id: `ob-${nextId()}`, to: "op", target: op.operationId, operationId: op.operationId,
+              id: `ob-${nextId()}`, target: op.operationId, operationId: op.operationId,
               kind: "actor-disabled", organizationId: org.organizationId, actorId: actorId(inputCommand.actorId),
             });
           }
@@ -1031,5 +1056,7 @@ export const createInMemoryAuthority = async (
           ([invitationId, invitation]) => [invitationId, { operationId: invitation.operationId, status: invitation.status }],
         ),
       ),
+    accessRequestsOf: (operationId) =>
+      (ops.get(operationId)?.accessRequests ?? []).map((request) => ({ ...request })),
   };
 };

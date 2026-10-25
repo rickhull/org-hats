@@ -94,6 +94,11 @@ authority interface issued them and is never compared with the verifier's,
 so a command-vocabulary break cannot strand a live envelope. A change to
 what the claims mean moves the envelope version instead.
 
+The failure taxonomy is one closed list shared by the session and command
+surfaces (`src/contract.ts`): a `FailureKind` means the same thing wherever
+it appears, and adding one is an interface-version change for both
+surfaces at once — never a verifier-only or issuer-only addition.
+
 *Held by:* `verify`'s gate on the format and both `v` fields and its
 deliberate non-check of `interfaceVersion`; `OH-ACCESS-04`; the provenance
 vector.

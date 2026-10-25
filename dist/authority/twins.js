@@ -1,20 +1,25 @@
 // The synthetic structural twins — public conformance data. They carry the
-// structural
-// properties of the reference consumer's two design tests without any of its
-// names: a persistent multi-site professional operation, and a time-bounded,
-// multi-venue festival burst. One organization and one of its actors
-// participate in both, which is the structural shape of "the same
-// organization actor, different operation-local hats". The third twin is
-// public history instead — the 1948–49 Berlin Airlift, for the coalition
-// shape the first two do not carry: a host-nation workforce inside a
-// multi-airfield operation, secondment across organizations, and a
-// coalition-wide read board under a bounded operation.
+// structural properties of the reference consumer's two design tests
+// without any of its names: a persistent multi-site professional
+// operation, and a time-bounded, multi-venue festival burst. One
+// organization and one of its actors participate in both, which is the
+// structural shape of "the same organization actor, different
+// operation-local hats". The third twin is public history instead — the
+// 1948–49 Berlin Airlift, for the coalition shape the first two do not
+// carry: a host-nation workforce inside a multi-airfield operation,
+// secondment across organizations, and a coalition-wide read board under a
+// bounded operation.
 //
 // A twin is a complete `Snapshot` plus the policy bundle in force, and it
 // must pass `invariantProblems` unchanged — the fixtures are data, and the
 // invariants judge them like any other state. Invented people and
 // organizations only.
-import { actorId, organizationId } from "../contract.js";
+import { actorId, operationId, organizationId } from "../contract.js";
+/** The professional operation's id — the twin's own constant, so consumers
+ * (the conformance inventory) import it rather than re-declaring the
+ * literal. The festival's op id stays local to its consumers; `FESTIVAL`
+ * already names the twin itself. */
+export const MERIDIAN = operationId("op-9f2e6ad4");
 /** A twin written as plain data, then branded once on the way in.
  *
  * The ids here are hand-written literals whose whole purpose is to show the

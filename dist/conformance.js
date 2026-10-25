@@ -8,15 +8,19 @@
 // inventory runs against another runtime by supplying a different
 // ConformanceWorld factory (the Cloudflare adapter in M6).
 //
+// The inventory world is the two consumer-design twins plus the invitee
+// fixture below; the Berlin Airlift twin is deliberately excluded — it is
+// public-history data for the coalition shape, exercised by the portable
+// suites, not part of the runtime inventory's world.
+//
 // The ids are a fresh scheme (`OH-*`), not the frozen v0.4 `OH-QM-*` ids.
 import { AUTHORITY_INTERFACE_VERSION, actorId, operationId, organizationId, siteId, teamId, } from "./contract.js";
 import { createInMemoryAuthority } from "./authority/engine.js";
-import { DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION, } from "./authority/twins.js";
+import { DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, MERIDIAN, PROFESSIONAL_OPERATION, } from "./authority/twins.js";
 import { decide, grantReaches, invariantProblems, readReach } from "./model.js";
 import { ed25519VerifyKey, verify, } from "./access/verify.js";
 // --- the world ---------------------------------------------------------------------
 const IDP = "conformance-idp";
-const MERIDIAN = operationId("op-9f2e6ad4");
 const FESTIVAL_OP = operationId("op-61a8e3f2");
 const HOME_OP = operationId("op-conformance-home");
 const NORTH_ORG = organizationId("org-2b7c41de");
@@ -62,7 +66,7 @@ export const CONFORMANCE_PRINCIPALS = {
 /** An organization that exists but does not participate in Meridian — the
  * invite target. It is conformance data, not a customer fixture. */
 export const CONFORMANCE_INVITEE = {
-    name: "professional",
+    name: "invitee",
     policy: PROFESSIONAL_OPERATION.policy,
     snapshot: {
         operations: [{ operationId: HOME_OP, displayName: "Conformance Home", slug: "conformance-home" }],

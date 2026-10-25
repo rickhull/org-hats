@@ -1,10 +1,15 @@
 import type { Snapshot } from "../model.js";
 import type { PolicyBundle } from "../policy.js";
 export interface TwinFixture {
-    readonly name: "professional" | "festival" | "airlift";
+    readonly name: "professional" | "festival" | "airlift" | "invitee";
     readonly snapshot: Snapshot;
     readonly policy: PolicyBundle;
 }
+/** The professional operation's id — the twin's own constant, so consumers
+ * (the conformance inventory) import it rather than re-declaring the
+ * literal. The festival's op id stays local to its consumers; `FESTIVAL`
+ * already names the twin itself. */
+export declare const MERIDIAN: import("../contract.js").OperationId;
 /** The organization that also joins the festival, and the actor who works
  * both — the cross-operation pair the conformance scenarios exercise. */
 export declare const HARBOR_LOGISTICS: import("../contract.js").OrganizationId;

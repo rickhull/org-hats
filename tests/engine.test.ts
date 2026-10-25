@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 
 import { actorId, canonicalJson, isFailed, operationId, organizationId, siteId, teamId } from "../src/contract.ts";
 import type { TwinFixture } from "../src/authority/twins.ts";
+import type { Grant, Organization } from "../src/model.ts";
 import {
   DANA_OKAFOR,
   FESTIVAL,
@@ -37,7 +38,7 @@ const INVITEE_ADMIN = { provider: "test-idp", subject: "inv-admin" } as const;
 /** A third, tiny fixture: an organization that exists but does not
  * participate in Meridian — the invite target. */
 const invitee: TwinFixture = {
-  name: "professional",
+  name: "invitee",
   policy: PROFESSIONAL_OPERATION.policy,
   snapshot: fixtureSnapshot({
     operations: [{ operationId: "op-dummy", displayName: "Dummy Home Op" }],
@@ -266,6 +267,96 @@ test("participation: an acceptance delivered after a revoke does not resurrect i
   );
   const after = await engine.runtime.accessFromEvidence(evidence(INVITEE_ADMIN));
   assert.equal(failureOf(after).kind, "not-admitted", "no issuance against a revoked participation");
+});
+
+test("a wrong-version call mutates nothing — not even the outbox drain", async () => {
+  // The version gate is the first thing every call settles. A caller the
+  // runtime refuses must cause no side effects, and delivery of pending
+  // coordinator messages is a side effect: a stale client's rejected call
+  // must not advance settlement state it has no right to touch.
+  const { engine } = await setup();
+  const len = await engine.runtime.accessFromEvidence(evidence(LEN));
+  assert.ok(!isFailed(len));
+
+  const invite = await engine.runtime.command(cmd(
+    { kind: "participation-invite", operationId: OP, organizationId: "org-invitee" },
+    { kind: "access-envelope", envelope: len.envelope },
+    "gate-drain-invite",
+  ));
+  assert.ok(invite.ok);
+  // the invitation is en route: delivered to nobody yet, still pending
+  assert.equal(engine.invitationsOf(INVITEE_ORG).size, 0);
+  assert.equal(engine.pendingOutbox(), 1);
+
+  const stale = await engine.runtime.context({
+    interfaceVersion: 99 as never,
+    envelope: len.envelope,
+  });
+  assert.equal(failureOf(stale).kind, "wrong-interface-version");
+
+  // the rejected call delivered nothing; the invitation is still pending
+  assert.equal(engine.invitationsOf(INVITEE_ORG).size, 0, "a refused call must not deliver");
+  assert.equal(engine.pendingOutbox(), 1, "the message stays pending");
+
+  // and a valid call delivers it — deferred by the gate, not dropped
+  await engine.drainOutbox();
+  assert.equal(engine.invitationsOf(INVITEE_ORG).size, 1);
+});
+
+test("principal link keys cannot collide across provider/subject splits", async () => {
+  // "a:b"/"c" and "a"/"b:c" concatenated with ":" are the same string. The
+  // link key must encode the pair, not concatenate it — otherwise bootstrap
+  // refuses one of two legitimate links, or worse, one evidence resolves
+  // to the other's actor.
+  const clock = fixedClock(1_700_000_000);
+  const engine = await createInMemoryAuthority({
+    clock,
+    signer: await webCryptoSigner("key-collision"),
+    fixtures: [PROFESSIONAL_OPERATION],
+    principalLinks: [
+      { provider: "idp:x", subject: "y", organizationId: LEN_ORG, actorId: LEN_ID },
+      { provider: "idp", subject: "x:y", organizationId: MARCO_ORG, actorId: MARCO_ID },
+    ],
+  });
+  const len = await engine.runtime.accessFromEvidence(evidence({ provider: "idp:x", subject: "y" }));
+  assert.ok(!isFailed(len), "the first link issues");
+  const marco = await engine.runtime.accessFromEvidence(evidence({ provider: "idp", subject: "x:y" }));
+  assert.ok(!isFailed(marco), "the second link issues");
+  assert.equal(len.envelope.claims.actor.actorId, LEN_ID);
+  assert.equal(marco.envelope.claims.actor.actorId, MARCO_ID);
+});
+
+test("snapshotOf hands out a copy: mutating the snapshot cannot corrupt the engine", async () => {
+  // The type says `readonly`, but a shared array is a runtime fact, not a
+  // type fact — a caller that mutates what it was handed (or holds it while
+  // the engine keeps writing) must not reach engine state.
+  const { engine } = await setup();
+  const before = engine.snapshotOf(OP);
+  assert.ok(before !== undefined);
+  const grantsBefore = before.grants.length;
+  const orgsBefore = before.organizations.length;
+  (before.grants as Grant[]).push({ ...before.grants[0]!, grantId: "g-forged" });
+  (before.organizations as Organization[]).push(before.organizations[0]!);
+  const after = engine.snapshotOf(OP);
+  assert.equal(after?.grants.length, grantsBefore, "the grant list is engine-owned");
+  assert.equal(after?.organizations.length, orgsBefore, "the organization list is engine-owned");
+});
+
+test("request-access keeps its note for the administrator who admits", async () => {
+  // The note is the requester's one sentence to the administrator; asking
+  // without it must not silently discard it. `admit` consumes the queue,
+  // so the record — note included — is what the administrator reads.
+  const { engine } = await setup();
+  const asked = await engine.runtime.command(cmd(
+    { kind: "request-access", operationId: OP, evidence: INVITEE_ADMIN, note: "booth power hookup" },
+    { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
+    "note-keep-ask",
+  ));
+  assert.ok(asked.ok);
+  const requests = engine.accessRequestsOf(OP);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0]?.note, "booth power hookup");
+  assert.equal(requests[0]?.actorId, INVITEE_ACTOR);
 });
 
 test("participation: revoking twice is a safe retry; revoking a non-participant is denied", async () => {

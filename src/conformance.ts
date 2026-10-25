@@ -8,6 +8,11 @@
 // inventory runs against another runtime by supplying a different
 // ConformanceWorld factory (the Cloudflare adapter in M6).
 //
+// The inventory world is the two consumer-design twins plus the invitee
+// fixture below; the Berlin Airlift twin is deliberately excluded — it is
+// public-history data for the coalition shape, exercised by the portable
+// suites, not part of the runtime inventory's world.
+//
 // The ids are a fresh scheme (`OH-*`), not the frozen v0.4 `OH-QM-*` ids.
 
 import {
@@ -18,6 +23,8 @@ import {
   siteId,
   teamId,
   type ActorId,
+  type Failed,
+  type Failure,
   type FailureKind,
   type OperationId,
   type OrganizationId,
@@ -39,6 +46,7 @@ import {
   FESTIVAL,
   FESTIVAL_BOOTH_COUNT,
   HARBOR_LOGISTICS,
+  MERIDIAN,
   PROFESSIONAL_OPERATION,
   type TwinFixture,
 } from "./authority/twins.ts";
@@ -55,7 +63,6 @@ import {
 
 const IDP = "conformance-idp";
 
-const MERIDIAN = operationId("op-9f2e6ad4");
 const FESTIVAL_OP = operationId("op-61a8e3f2");
 const HOME_OP = operationId("op-conformance-home");
 const NORTH_ORG = organizationId("org-2b7c41de");
@@ -116,7 +123,7 @@ export const CONFORMANCE_PRINCIPALS = {
 /** An organization that exists but does not participate in Meridian — the
  * invite target. It is conformance data, not a customer fixture. */
 export const CONFORMANCE_INVITEE: TwinFixture = {
-  name: "professional",
+  name: "invitee",
   policy: PROFESSIONAL_OPERATION.policy,
   snapshot: {
     operations: [{ operationId: HOME_OP, displayName: "Conformance Home", slug: "conformance-home" }],
@@ -198,9 +205,9 @@ const deepEqual = (actual: unknown, expected: unknown, message: string): void =>
   if (left !== right) throw new Error(`${message}: expected ${right}, got ${left}`);
 };
 
-const failureOf = (result: unknown): { readonly kind: FailureKind; readonly detail?: string } | undefined => {
+const failureOf = (result: unknown): Failure | undefined => {
   if (typeof result !== "object" || result === null || !("failure" in result)) return undefined;
-  return (result as { readonly failure: { readonly kind: FailureKind; readonly detail?: string } }).failure;
+  return (result as Failed).failure;
 };
 
 const expectFailure = (result: unknown, kind: FailureKind, message: string): void => {

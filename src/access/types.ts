@@ -22,6 +22,12 @@ import type {
 
 export type { TargetRef } from "../contract.ts";
 
+// The `operation` arm names the whole undertaking, and reach never extends
+// that far: `mayAct` refuses an operation target outright, because the
+// model's rule is that a grant reaches a team or a site — nothing reaches
+// an entire operation. The arm exists so a host can *name* the operation
+// (a page about it), not so a hat can act over all of it.
+
 /** What a verified envelope yields: binding facts plus predicates. Callers
  * never see raw claims and never rebuild reach, fallback, or worn-hat rules. */
 export interface NeutralAccess {

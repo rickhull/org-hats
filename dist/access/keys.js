@@ -53,7 +53,10 @@ export const serializeVerifyKeySet = (input) => canonicalJson({
 });
 /** Fail closed on malformed JSON, unknown format/version, duplicate ids, and
  * an empty set. A set that verifies nothing looks like a credential problem
- * and is really a deployment problem. */
+ * and is really a deployment problem. Unknown *fields* are deliberately
+ * ignored: a key set is operator-distributed configuration, and a
+ * forward-compatible addition must not brick live verifiers — `format` and
+ * `v` carry compatibility, not field-by-field knowledge. */
 export const parseVerifyKeySet = (text) => {
     let parsed;
     try {

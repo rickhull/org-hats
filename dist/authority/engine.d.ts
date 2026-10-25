@@ -49,6 +49,14 @@ export interface InMemoryAuthorityHandle {
     pendingOutbox(): number;
     /** Assemble the operation's current view as a model Snapshot. */
     snapshotOf(operationId: OperationId): Snapshot | undefined;
+    /** The operation's pending access requests, copied — the administrator's
+     * `admit` queue, each with the requester's note when one was sent. */
+    accessRequestsOf(operationId: OperationId): readonly {
+        requestId: string;
+        organizationId: OrganizationId;
+        actorId: ActorId;
+        note?: string;
+    }[];
     /** The organization's invitation inbox, by invitation id. */
     invitationsOf(organizationId: OrganizationId): ReadonlyMap<string, {
         operationId: OperationId;

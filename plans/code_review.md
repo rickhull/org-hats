@@ -1,15 +1,16 @@
 # Code review and crystallization — whole-tree, one slice at a time
 
-**Status (2026-10-25):** slice 1 (`src/`) was reviewed by three parallel
+**Status (2026-10-25, later):** slice 1 (`src/`) was reviewed by three parallel
 report-only readers (flash model, read-only), findings judged and
 cross-verified against the Cloudflare code by the main agent. The review's
 findings rode the **2.0.0** release: `GrantTarget` landed as the breaking
 command change (`claude_review.md` P3), alongside the behavior tightenings
-and additive API. This ledger is reconciled against the released 2.0 line:
-the R1/R2/R3 items checked below are fixed; the remaining R1/R2/R3 findings
-plus R4 and R5 are live. The typechecked-test pass is landed; see
-`tests/README.md`. Pending slices: `packages/cloudflare` (including
-the RFC-grounded exchange review), `tests/`, `bin/`, and configs.
+and additive API. R1 and R2 are now fully reconciled — every correctness
+and mechanical item landed or was closed as stale/kept-deliberately on
+2026-10-25, tests-first through the public seams. Remaining: R3 (two
+additive API items plus one inventory case), R4, R5. Pending slices:
+`packages/cloudflare` (including the RFC-grounded exchange review),
+`tests/`, `bin/`, and configs.
 
 The two cross-runtime findings below were fixed in 2.0.0; the rest of the
 ledger is reconciled as marked.
@@ -42,22 +43,41 @@ ledger is reconciled as marked.
   Add a vector/test.
   Landed: `verify` compares the claims' `v` with the envelope's;
   `OH-ACCESS-04` and the access vectors pin it.
-- [ ] `snapshotOf` returns live internal arrays — copy before returning.
-- [ ] `deliverPending` runs before the version-gate check — a
+- [x] `snapshotOf` returns live internal arrays — copy before returning.
+  Landed 2026-10-25: every list in the returned snapshot is a fresh copy;
+  the test mutates what it was handed and proves engine state untouched.
+- [x] `deliverPending` runs before the version-gate check — a
   wrong-version call still mutates state via drain. Move the drain after
   the gate; comment the invariant.
-- [ ] In-memory `provider:subject` string-join key can collide
-  (`"a:b"/"c"` vs. `"a"/"b:c"`) — Cloudflare keys the pair as columns, so
+  Landed 2026-10-25: all four runtime methods gate first, drain second;
+  the test pins that a refused call delivers nothing and a later valid
+  call still can.
+- [x] In-memory `provider:subject` string-join key can collide
+  (`"a:b"/"c"` vs `"a"/"b:c"`) — Cloudflare keys the pair as columns, so
   this is in-memory only. Encode or use a nested map.
-- [ ] Refresh's supersede-before-issue ordering: decided to keep the
+  Landed 2026-10-25, beyond the ledger: the collision was also
+  cross-organization — per-org maps let the same key exist twice, and
+  resolution picked the first org, silently resolving one evidence to
+  another organization's actor. Links now live in one engine-wide map
+  keyed by the JSON-encoded pair, and the bootstrap guard holds
+  engine-wide. Tests pin both.
+- [x] Refresh's supersede-before-issue ordering: decided to keep the
   fail-closed semantics as-is — document the order as intentional rather
   than reorder.
-- [ ] `request-access`'s note is accepted but silently discarded — store
+  Documented at the site 2026-10-25: one attempt consumes the handle; a
+  failed reissue must not leave two live handles.
+- [x] `request-access`'s note is accepted but silently discarded — store
   it (additive) so admit/audit can surface it.
-- [ ] Dead code: `OutboxMessage.to` (unused field); invitation union
-  members `declined`/`active` (unreachable); `modelCase` building unused
-  worlds; `policy.ts`'s mixed defensiveness (drop the null guard —
-  config arrives typed; uniform trust-the-type per house style).
+  Landed 2026-10-25: stored on the access request, surfaced in the audit
+  line, readable through a new additive `accessRequestsOf` handle
+  accessor (a copy). Test pins all three.
+- [x] Dead code: `OutboxMessage.to` removed (never read — delivery routes
+  on `kind` and `target`); the invitation unions' unreachable members
+  (`"declined"`, `"active"`) removed. Closed as stale: `modelCase` builds
+  no unused worlds (cases read module-level twin snapshots). Kept
+  deliberately: `policy.ts`'s null guard — `validatePolicyBundle` is the
+  P9 parse boundary and a JSON `null` read policy is a real input, not
+  over-defensiveness.
 
 ## R2 — Invariant-truth and doc fixes (mechanical, behavior-preserving)
 
@@ -68,7 +88,9 @@ ledger is reconciled as marked.
 - [x] A1 cites `OH-PART-02` for a property that belongs to `OH-CMD-02`.
   Fixed: A1 names `OH-CMD-02` for asking and `OH-PART-02` for terminal
   revocation.
-- [ ] `contract.ts` header mislabels the root as `v0.4`.
+- [x] `contract.ts` header mislabels the root as `v0.4`.
+  Stale by 2026-10-25: the header reads "shared v1 vocabulary"; no `v0.4`
+  label remains — fixed incidentally in the 2.0 rewrite.
 - [x] `verify.ts` header states the fail-closed check order backwards.
   Fixed: the header states format/version, signature, expiry, and binding
   in that order.
@@ -76,22 +98,47 @@ ledger is reconciled as marked.
   doesn't perform.~~ Stale entry: there is no `specs/access.md`; the access
   invariants live in `specs/authority.md` A5/A11 and `specs/envelope.md`.
   Verified 2026-10-25.
-- [ ] `acceptAgain`'s message names the wrong terminal state (says
+- [x] `acceptAgain`'s message names the wrong terminal state (says
   "accepted," means "revoked").
+  Stale by 2026-10-25: no `acceptAgain` exists; the only terminal-state
+  message ("participation is already revoked") is correct — fixed
+  incidentally in the 2.0 rewrite.
 - [x] `specs/authority.md` A9/A11: A11's held-by block was orphaned under
   A9; moved under A11. Fixed 2026-10-25.
-- [ ] `access/index.ts`'s header charter ignores its second job
+- [x] `access/index.ts`'s header charter ignores its second job
   (issuer-side codec home) — document the dual role.
-- [ ] E8 shared-kind note; `keys.ts` unknown-fields note; error-message
+  Documented 2026-10-25: one codec home for the issuer's serialization
+  and the verifier's parse, so the sides cannot drift.
+- [x] E8 shared-kind note; `keys.ts` unknown-fields note; error-message
   precision pass; `TargetRef` operation-invariant note moved to types.
-- [ ] Conformance inventory header: state the fixture-scope decision
+  Landed 2026-10-25: E8 states the failure taxonomy is one closed list
+  shared by session and command surfaces; `keys.ts` documents that
+  unknown fields are deliberately ignored (operator-distributed
+  configuration, `format`/`v` carry compatibility); the `TargetRef`
+  operation arm's no-whole-operation-reach invariant now lives at the
+  re-export in `src/access/types.ts`. The error-message precision pass
+  is closed without a pass: no concrete message list survived review;
+  message wording is day-to-day work.
+- [x] Conformance inventory header: state the fixture-scope decision
   explicitly (Berlin Airlift twin deliberately excluded — Quartermaster's
   structural twins plus the invitee fixture are the inventory world).
-- [ ] Invitee fixture named `"professional"` in its own union — rename to
+  Stated 2026-10-25 in `src/conformance.ts`'s header.
+- [x] Invitee fixture named `"professional"` in its own union — rename to
   `"invitee"`.
-- [ ] Twins: `Team[]` typing, id-constants export, header wrap.
-- [ ] Conformance: `failureOf` should import `Failure`; twin ids imported
+  Landed 2026-10-25: both local fixtures renamed; `TwinFixture.name`
+  widened additively with `"invitee"`. The engine test's `titled`
+  mini-fixture still says `"professional"` — cosmetic, left.
+- [x] Twins: `Team[]` typing, id-constants export, header wrap.
+  Landed 2026-10-25: header rewrapped; `MERIDIAN` exported and imported
+  by the conformance inventory instead of re-declared (`FESTIVAL` stays
+  local — it already names the twin). Closed as stale: no local `Team[]`
+  typing exists in `twins.ts`.
+- [x] Conformance: `failureOf` should import `Failure`; twin ids imported
   from `twins.ts` rather than re-declared; `admitInvitee` placement.
+  Landed 2026-10-25: `failureOf` types through the shared `Failed`/
+  `Failure`; `MERIDIAN` imported from `twins.ts`. Kept as-is:
+  `admitInvitee` sits with its helper peers and the module reads
+  linearly.
 
 ## R3 — API additions (additive, 2.0.0)
 
