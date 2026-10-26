@@ -7,7 +7,8 @@
 #   - run the Cloudflare workerd suites in a separate job
 #   - a cloudflare-v* tag also passes the deployable-artifact gate
 #
-# Because CI lives on the mirror, a broken mirror stops CI too — watch the sync.
+# Codeberg CI (.forgejo/workflows/check.yml) is the per-push gate; this is the
+# release-time backstop, and the only ring where the workerd suites run in CI.
 name: check
 
 on:
@@ -24,10 +25,12 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Pinned, not `ubuntu-latest`: this workflow runs only when a release is
+    # pushed, so a runner-image migration must not land under a release.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -35,7 +38,7 @@ jobs:
         with:
           version: 11.21.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
@@ -55,10 +58,10 @@ jobs:
   # The Cloudflare reference runtime is a separate 0.x package. Its tests run
   # in the real workerd runtime; the portable `check` job never invokes it.
   cloudflare:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -66,7 +69,7 @@ jobs:
         with:
           version: 11.21.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
@@ -82,6 +85,17 @@ jobs:
 
       - name: Typecheck and workerd integration tests
         run: pnpm check:cloudflare
+
+      # actions/checkout force-writes the peeled commit into refs/tags/<tag>
+      # (`fetch --no-tags origin +<sha>:refs/tags/<tag>`), leaving a lightweight
+      # ref where the annotated object was. The gate reads the tag object and
+      # never touches the network, so the ref is restored here instead.
+      - name: Restore the annotated tag object
+        if: startsWith(github.ref, 'refs/tags/cloudflare-v')
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}"
+          test "$(git cat-file -t "${tag}")" = tag
 
       - name: Cloudflare artifact gate
         if: startsWith(github.ref, 'refs/tags/cloudflare-v')

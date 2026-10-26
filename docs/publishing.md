@@ -41,10 +41,10 @@ git ls-remote --heads origin main
 git ls-remote --heads github main
 ```
 
-A Forgejo push mirror may still be configured on Codeberg. Treat it as an
-optional convenience, not the mechanism: when its PAT expires it stops
-silently, and a stalled mirror stops GitHub CI with it. The release push is
-the supported path.
+No Forgejo push mirror is configured on Codeberg, and none should be. The
+release push is the only path to GitHub: a periodic mirror would push every
+branch commit, which is the posture this section rejects, and it fails
+silently once its token expires or loses a scope. Do not add one back.
 
 Keep these true:
 
@@ -82,7 +82,19 @@ release rings.
 GitHub Actions remains the **release-mirror backstop**: it runs only when
 `bin/release --push` updates GitHub. It installs the workspace, runs
 `bin/check-dist` and `bin/check`, and runs the workerd suites in a separate
-job; a tag push also runs `bin/check-version`.
+job; a tag push also runs `bin/check-version`. Its runner is pinned
+(`ubuntu-24.04`) rather than `ubuntu-latest`, because a workflow that runs
+only at release time must not meet a new runner image under a release.
+
+Its distinct contribution is the workerd suites on a clean machine: `pnpm
+verify` already runs every gate locally, but only through the nix-ld loader,
+so CI is the one execution of the deployable artifact outside it.
+
+A `cloudflare-v*` tag job restores the tag ref before the artifact gate reads
+it. The checkout action force-writes the peeled commit into `refs/tags/<tag>`,
+so the annotated object the gate requires is absent until it is re-fetched;
+`bin/check-artifact` never touches the network, so the workflow repairs the
+ref and the gate stays offline.
 
 The live gate for a working checkout is still the local pre-push hook and
 `pnpm verify`; CI is the remote evidence.
