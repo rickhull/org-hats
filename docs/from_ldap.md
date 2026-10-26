@@ -100,14 +100,14 @@ git clone https://codeberg.org/rickhull/org-hats.git
 cd org-hats
 pnpm install
 node examples/pilot.ts
+node examples/own-world.ts
 pnpm test
 ```
 
-The pilot shows issuance, verification, neutral facts, and expiry. The next
-step — a non-twin world with your own organization, site, team, and grant —
-is planned in `plans/personas.md`; today the own-world shape is a hand-written
-fixture or the Cloudflare bootstrap JSON. The consumer pin is in
-[`publishing.md`](publishing.md).
+The pilot shows issuance, verification, neutral facts, and expiry.
+`own-world.ts` is the next step: a world of your own — organization, sites,
+teams, grants, and policy — defined with `defineWorld`, booted, switched, and
+verified. The consumer pin is in [`publishing.md`](publishing.md).
 
 ## When not to use it
 

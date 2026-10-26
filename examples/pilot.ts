@@ -1,5 +1,5 @@
-// The consumer pilot's starting path: bootstrap a twin, resolve verified
-// evidence to an organization actor, issue a signed envelope, distribute the
+// The consumer pilot's starting path: bootstrap the Professional Operation
+// example world, resolve verified evidence to an organization actor, issue a signed envelope, distribute the
 // verification key, verify locally, call neutral predicates, and watch the
 // bounded expiry close the same envelope.
 //
@@ -28,7 +28,7 @@ const assert: (condition: unknown, message: string) => asserts condition = (cond
   if (!condition) throw new Error(message);
 };
 
-// 1. Bootstrap: the operation's twin and the verified-principal link.
+// 1. Bootstrap: the example world's snapshot and the verified-principal link.
 const engine = await createInMemoryAuthority({
   fixtures: [PROFESSIONAL_OPERATION],
   principalLinks: [

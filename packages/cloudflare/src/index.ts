@@ -80,7 +80,7 @@ const demoPage = `<!doctype html>
 <h1>org-hats demo</h1>
 <p class="note">Dev evidence only. No identity provider, no external service. The envelope is
 signed by the authority runtime and verified by <code>org-hats/access</code>.</p>
-<button onclick="bootstrap()">Bootstrap twin</button>
+<button onclick="bootstrap()">Bootstrap demo world</button>
 <button onclick="login()">Sign in as Dana Okafor</button>
 <button onclick="check()">Check access</button>
 <pre id="out">Ready.</pre>

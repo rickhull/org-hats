@@ -1,9 +1,9 @@
 # Tutorial: one actor, several hats
 
-*The longer companion to the README walkthrough. It uses the synthetic twins
-and the in-memory engine, with the actual fixture ids and the decisions they
-produce. The README is the map; this is the walk. All fixtures are synthetic
-design data.*
+*The longer companion to the README walkthrough. It uses the built-in
+example worlds and the in-memory engine, with the actual fixture ids and the
+decisions they produce. The README is the map; this is the walk. All fixtures
+are synthetic design data.*
 
 One rule runs through every case:
 
@@ -42,9 +42,9 @@ normative: each term names a distinction the code may not blur.
 
 ## The world we will use
 
-The three twins are chosen for the shapes they add: an ordinary team grant,
-the same actor in a second hat under a different policy, and a coalition that
-puts a crossed team grant beside a site grant.
+The three example worlds are chosen for the shapes they add: an ordinary team
+grant, the same actor in a second hat under a different policy, and a
+coalition that puts a crossed team grant beside a site grant.
 
 - **Professional Operation** (`op-9f2e6ad4`) — persistent, multi-site.
   Dana (`actor-8d3b77c1`, Harbor Logistics `org-4c1f9a2e`) holds
@@ -267,7 +267,7 @@ if (pro.mayAct("observe", { kind: "team", teamId: "team-2e8c64b9" })) {
 
 `readableTeamIds` is not the expanded team list; it carries only exceptional
 team grants whose organization is outside the readable organization set. The
-shipped twins produce an empty list.
+shipped examples produce an empty list.
 
 `NeutralAccess` exposes the booleans; the model's `decide` also carries a
 reason (`no-capability`, `out-of-reach`, `not-admitted`, `policy-inconsistent`)
@@ -377,7 +377,7 @@ between operations would restore exactly the question the model replaced.
 
 ## Case 3: a site grant and a crossed team grant
 
-The Berlin Airlift twin adds the coalition shape. Issue for Charles
+The Berlin Airlift example adds the coalition shape. Issue for Charles
 (Vittles, duty officer over the Tempelhof site) and Duncan (Plane Fare, duty
 officer over a Ground Handling team):
 

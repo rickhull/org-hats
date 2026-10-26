@@ -177,10 +177,12 @@ delivery. It makes partial states visible instead of pretending a distributed
 transaction exists.
 _Avoid_: queue (when you mean the durable outbox fact)
 
-**Twin** — A synthetic, public fixture operation — the Professional
-Operation or the Festival — used as executable specification. A twin carries
+**Twin** — A built-in synthetic example world, exported in `TWINS`: the
+Professional Operation, the Festival, or the Berlin Airlift. A twin is a
+public fixture operation used as executable specification; it carries
 structural properties, never customer data.
-_Avoid_: fixture (when you mean the designed twin), demo data
+_Avoid_: twin in first-contact copy; say "example world" or "built-in
+fixture" there
 
 **Conformance inventory** — The executable cases in
 `org-hats/conformance` that specify portable behaviour through the public

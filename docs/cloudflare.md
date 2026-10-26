@@ -237,7 +237,7 @@ Two platform notes, both load-bearing:
 pnpm --filter org-hats-cloudflare demo
 ```
 
-A self-contained page: bootstrap a twin, sign in with fixed dev evidence
+A self-contained page: bootstrap the demo world, sign in with fixed dev evidence
 (no identity provider, no external service, no production secret), and
 check access — a real signed envelope issued through the authority
 runtime and verified through `org-hats/access`, with neutral facts and

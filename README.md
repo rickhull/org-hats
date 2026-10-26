@@ -55,7 +55,7 @@ complete story: verified evidence becomes one organization actor; issuance
 returns a signed envelope and a refresh handle; the verifier answers locally;
 the same envelope fails at `exp`. All fixtures are synthetic design data.
 
-`node examples/own-world.ts` starts from a world that is not a twin: your
+`node examples/own-world.ts` starts from a world of your own: your
 organization, sites, teams, grants, and policy bundle enter through
 `defineWorld`, which validates them before the engine boots. The example then
 switches hats for real — `select-hat` to a second grant, refresh, verify the
@@ -195,7 +195,7 @@ already-issued envelope is bounded by `exp`; that is the blast radius.
   `invariantProblems`. Data and pure functions; no I/O, storage, clock, or
   Cloudflare.
 - **`org-hats/authority`** — the four-call `AuthorityRuntime`, the in-memory
-  engine, and the synthetic twins.
+  engine, and the synthetic example worlds.
 - **`org-hats/access`** — verification only: `verify` turns a signed envelope
   into neutral access; `VerifyKeySet` is the rotation unit.
 - **`org-hats/conformance`** — the executable `OH-*` inventory, run through

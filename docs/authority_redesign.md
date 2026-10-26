@@ -434,8 +434,8 @@ stand-in retirement are tracked in their own plans. Quartermaster's
 consumer adopts the runtime binding, so it never grows a second envelope
 implementation. The review items that preceded the release are settled in
 the shipped contract: `supervisedTeamIds` is absent, the read policy is an axis
-structure, `PrincipalEvidence.email` is absent, and the twins use `reviewer`
-rather than a people-management title.
+structure, `PrincipalEvidence.email` is absent, and the built-in example
+worlds use `reviewer` rather than a people-management title.
 
 Ordinary established requests should use a short-lived signed access
 projection and reach one reporting object. Login, refresh, authority changes,
@@ -590,12 +590,12 @@ the same cases by supplying its own world factory.
 
 Consumers bootstrapping tests should use `CONFORMANCE_WORLD` and
 `createInMemoryConformanceWorld()` from `org-hats/conformance`: the authority
-subpath carries the types and the twins' data, not the principal-link or
-org-admin bootstrap. The conformance world returns a built verifier map,
+subpath carries the types and the example worlds' data, not the principal-link
+or org-admin bootstrap. The conformance world returns a built verifier map,
 which is right for exercising verification; use `verificationKey()` material
 when the test is key-configuration parsing.
 
-A host that is not exercising a twin defines its own fixture with
+A host that is not exercising a built-in example defines its own fixture with
 `defineWorld` from `org-hats/authority`. It converts hand-written,
 plain-string-id data once and refuses an incoherent world — a policy problem,
 an invariant violation, or a fixture carrying other than exactly one
@@ -638,7 +638,8 @@ introduces.
 | Migration and expansion | Remaining authority flows and any approved existing-operation imports move to the new seam | Per-operation reconciliation passes and the old path has no writers for migrated facts |
 | Second-consumer decision | Whether compatibility and adapter machinery become real | Recorded only when a second external consumer or adapter author exists; until then the version boundary stands |
 
-The public conformance inventory uses synthetic structural twins of
+The public conformance inventory uses synthetic structural example worlds —
+called twins in the code (`src/authority/twins.ts`) — shaped like
 Quartermaster's two concrete design tests: a persistent multi-site
 professional operation and a time-bounded, multi-venue festival burst. A
 third twin is public history instead — the 1948–49 Berlin Airlift —

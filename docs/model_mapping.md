@@ -133,7 +133,7 @@ macaroons/Biscuit without attenuation.
 - Versioning: the call interface and the envelope semantics move for different
   reasons; the claims' interface version is provenance, not a readability gate.
 - Executable evidence: named invariants, a public conformance inventory, and
-  synthetic structural twins.
+  synthetic structural fixtures.
 
 These are engineering claims with tests and prose invariants. They are not a
 mechanized proof.

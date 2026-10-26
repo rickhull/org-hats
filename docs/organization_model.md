@@ -23,8 +23,9 @@ which reach is computed. Neither half names a product verb.
 
 The executable form is the portable source: `src/model.ts` and
 `src/policy.ts` for the pure model, `src/authority/` for the runtime that
-owns participation, admission, grants, and issuance, and the synthetic twins
-in `src/authority/twins.ts` for the structural cases. Where this document and
+owns participation, admission, grants, and issuance, and the synthetic
+example fixtures in `src/authority/twins.ts` for the structural cases. Where
+this document and
 the types disagree, the types and
 [authority_redesign.md](authority_redesign.md) win. This is a phase-1
 toehold: the detailed entity and rule sections return by re-specification

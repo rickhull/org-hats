@@ -1,4 +1,4 @@
-// A world that is not a twin: your organization, your site, your team, your
+// A world of your own: your organization, your site, your team, your
 // grants. Define it once, boot it, issue, verify, decide locally — then
 // switch hats for real and refresh the session onto the new capacity.
 //
