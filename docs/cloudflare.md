@@ -146,7 +146,7 @@ reference deployment is live at `cloudflare-v0.4.0`; the host's ops
 porcelain owns the deploy verbs. A deployed tag can lag `main`; the tag is
 the deployment unit.
 
-The artifact gate is `bin/check-deploy`; the host-neutral runbook —
+The artifact gate is `bin/check-artifact`; the host-neutral runbook —
 preflight, candidate, canary, rollback, acceptance, and the deployment
 witness — is [deploy_runbook.md](deploy_runbook.md).
 

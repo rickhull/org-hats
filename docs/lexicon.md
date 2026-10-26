@@ -198,6 +198,47 @@ fixture" there
 interface. It is not an adapter SPI and not a product test suite.
 _Avoid_: harness (when you mean the inventory), integration suite
 
+## Delivery
+
+The release/deploy split is shared vocabulary with Quartermaster; the
+words below are normative here, and a consumer adopting them adopts the
+split, not this repository's machinery. Each producer owns its own release
+tooling — `bin/` here, `qm` there — and org-hats is not responsible for any
+consumer's releases or release machinery.
+
+- **Delivery** — the umbrella: the five loops of design, implement,
+  release, deploy, monitor. A producer faces release; an operator faces
+  deploy.
+- **Release** — the producer-facing, portable half: making a revision
+  immutable and addressable. Here a release is an annotated tag (`vX.Y.Z`,
+  `cloudflare-vX.Y.Z`) matching its manifest, cut by `bin/release` from a
+  clean, gated `main`.
+- **Revision** — a commit that could be released. `bin/check-version`
+  names the tag families a revision carries.
+- **Gate** — the checks a revision passes to be releasable: `pnpm check`
+  locally, `pnpm verify` as the full local gate.
+- **Candidate** — a revision nominated for release but not yet tagged.
+- **Tag** — the release act itself: annotated, version-matched, pushed to
+  the canonical host and the mirror. Upstream ends at the tag.
+- **Release record** — where a release is recorded: the tag message, the
+  manifest version, and the gate-cache marker for the tagged commit.
+- **Milestone / cadence** — the ritual's rhythm: release when a coherent
+  set of changes is gated, not on a timer.
+
+The deploy half is recorded so its absence here is explicit, not
+accidental. These are the deploying host's words; this repository's part
+ends at the annotated tag:
+
+- **Deploy** — the operator-facing, local act of running a release in one
+  environment. Not an org-hats act; `deploy_runbook.md` records the
+  host-neutral shape of the deploy that follows a `cloudflare-v*` tag, as a
+  consumer contract.
+- **Include / cutback / provision / bootstrap / publish / ship** — the
+  deploying host's deploy mechanics and their records. None is an org-hats
+  concept or command.
+- **Deployment record** — the operator's evidence of what runs where. The
+  release record is ours; the deployment record is theirs.
+
 ## Terms to avoid
 
 These words name concepts this repository does not have, or invite an

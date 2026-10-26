@@ -141,8 +141,11 @@ activates it, and verifies it. The shape is in
 Upstream does not ship a deploy porcelain: the Cloudflare account, Worker,
 secrets, traffic, and service binding belong to the deploying host. The
 reference deployment is live at `cloudflare-v0.4.0`; the host's ops
-porcelain owns `candidate` / `release` / `configure` / `smoke`, with the
-registry projection as its follow-on. State restore and the routing-facts
+porcelain owns `candidate` / `release` / `configure` / `smoke` — provisional
+names pending the host's own verb mapping; in the shared lexicon
+([lexicon.md](lexicon.md) § Delivery) the live verb is *deploy*, and that
+verb is not this repository's. The registry projection is the porcelain's
+follow-on. State restore and the routing-facts
 backfill are acceptance acts, not deploy steps.
 
 ## Release ritual
@@ -162,7 +165,7 @@ From a clean `main`:
    `origin`, and the same to `github` when that remote exists. `--dry-run`
    previews; `--no-cloudflare` skips the workspace suites on a root release.
    **Never tag by hand.**  A Cloudflare release also runs
-   `bin/check-deploy` before the commit and tag; the host-neutral sequence is
+   `bin/check-artifact` before the commit and tag; the host-neutral sequence is
    in [`deploy_runbook.md`](deploy_runbook.md).
 
    Docs that name the artifacts move with the window: the README version table

@@ -142,7 +142,7 @@ fi
 # it does not deploy.
 if [ "$package" = cloudflare ] && $verify; then
 	printf '\n== deploy artifact ==\n'
-	"$(dirname "$0")/check-deploy" --root "$PWD"
+	"$(dirname "$0")/check-artifact" --root "$PWD"
 fi
 
 # A root release commits the rebuilt dist/. A Cloudflare release must not

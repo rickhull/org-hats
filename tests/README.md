@@ -23,10 +23,10 @@ the next pre-push does not repeat the portable gate.
 - **Ring 3 — full.** `pnpm verify` (ring 2 plus ring 1; records the local
   gate cache for a clean commit) and `bin/release --push` for a release. CI
   on the GitHub release mirror is the release-time backstop, not the live
-  gate. A Cloudflare tag also passes `bin/check-deploy`.
+  gate. A Cloudflare tag also passes `bin/check-artifact`.
 
 `pnpm test:tools` runs the release-guard suites alone
-(`release-tools.test.ts`, `gate-cache.test.ts`, `deploy-check.test.ts`); they
+(`release-tools.test.ts`, `gate-cache.test.ts`, `artifact-check.test.ts`); they
 need only Node and git. Use it alone for a fast loop; ring 1 runs them too.
 
 Pre-push and the Codeberg per-push CI run the portable gate. The workerd
@@ -86,7 +86,7 @@ public types fails the gate instead of failing at runtime.
   repositories, both tag families.
 - `gate-cache.test.ts` — the local per-commit gate marker, and its
   invalidation by dirt, a new commit, or a changed toolchain.
-- `deploy-check.test.ts` — the Cloudflare deployable-artifact gate: the
+- `artifact-check.test.ts` — the Cloudflare artifact gate: the
   production config, the annotated tag, and the version match.
 
 The inventory ships as `org-hats/conformance`; `tests/conformance.test.ts` is

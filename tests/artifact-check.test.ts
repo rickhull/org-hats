@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const script = fileURLToPath(new URL("../bin/check-deploy", import.meta.url));
+const script = fileURLToPath(new URL("../bin/check-artifact", import.meta.url));
 
 const testEnv = {
   ...process.env,

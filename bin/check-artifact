@@ -18,7 +18,7 @@ const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const WORKER_NAME = "reporting-stream-authority";
 
 const fail = (message) => {
-  console.error(`check-deploy: ${message}`);
+  console.error(`check-artifact: ${message}`);
   process.exit(1);
 };
 
@@ -48,7 +48,7 @@ const parseJsonc = (text, path) =>
   JSON.parse(text.replace(/^\s*\/\/.*$/gm, ""));
 
 const usage = () => {
-  console.log(`usage: bin/check-deploy [cloudflare-vX.Y.Z] [--root <path>] [--no-build]
+  console.log(`usage: bin/check-artifact [cloudflare-vX.Y.Z] [--root <path>] [--no-build]
 
 With no tag, validates the working tree; bin/release calls it after the
 manifest bump. With a tag, validates the annotated tag, its package manifest,
@@ -129,7 +129,7 @@ let built = false;
 if (build) {
   const head = git(root, ["rev-parse", "HEAD"]).stdout.trim();
   if (tag !== undefined && head !== commit) {
-    console.log(`check-deploy: ${tag} differs from HEAD; skipping the bundle build`);
+    console.log(`check-artifact: ${tag} differs from HEAD; skipping the bundle build`);
   } else {
     const outdir = mkdtempSync(join(tmpdir(), "org-hats-deploy-"));
     try {
@@ -162,7 +162,7 @@ if (build) {
 const label = tag === undefined
   ? `working tree (version ${manifest.version})`
   : `${tag} -> ${commit.slice(0, 12)} (version ${manifest.version})`;
-console.log(`check-deploy: ${label}`);
-console.log(`check-deploy: ${config.name}, no routes, workers_dev false`);
-if (built) console.log("check-deploy: bundle ok");
-console.log("check-deploy: ok");
+console.log(`check-artifact: ${label}`);
+console.log(`check-artifact: ${config.name}, no routes, workers_dev false`);
+if (built) console.log("check-artifact: bundle ok");
+console.log("check-artifact: ok");

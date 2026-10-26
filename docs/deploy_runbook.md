@@ -1,9 +1,10 @@
 # Deploy runbook — a `cloudflare-v*` tag
 
 *Upstream ends at the annotated tag. This runbook is the host-neutral shape of
-the deploy that follows; the deploying host owns the Cloudflare account,
-versions, traffic, secrets, and service binding. No secret value belongs in
-this repository or in a relay note.*
+the deploy that follows — the consumer deployment contract, explicitly not an
+upstream act (see [lexicon.md](lexicon.md) § Delivery). The deploying host
+owns the Cloudflare account, versions, traffic, secrets, and service binding.
+No secret value belongs in this repository or in a relay note.*
 
 ## Preflight
 
@@ -11,10 +12,10 @@ this repository or in a relay note.*
 
    ```sh
    bin/check-version cloudflare-vX.Y.Z
-   bin/check-deploy cloudflare-vX.Y.Z
+   bin/check-artifact cloudflare-vX.Y.Z
    ```
 
-   `check-deploy` requires an annotated tag that peels to a full commit, a
+   `check-artifact` requires an annotated tag that peels to a full commit, a
    manifest version matching the tag, a production config naming
    `reporting-stream-authority` with no routes and `workers_dev: false`, a
    present `main`, and — when the checkout is the tag — a successful
