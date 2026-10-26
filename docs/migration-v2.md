@@ -103,8 +103,10 @@ declarations so that cannot regress silently.
 - `cloudflare-v0.4.0` adds typed organization ops routes for principal
   links: list the organization's links and bind a verified `(provider,
   subject)` to an existing actor. The worker refuses a subject already linked
-  in another directory organization. Operation schema 4, interface 2, and
-  envelope 1 do not move. This tag is the live deployment.
+  in another directory organization. The reference host wires them as
+  `qm ops authority link list` and `link bind`. Operation schema 4, interface
+  2, and envelope 1 do not move. This tag is the live deployment; the v0.4.0
+  binding smoke passed with a fresh fixture and the host recorded acceptance.
 - New operator verbs: `POST /reconcile-rosters` on an operation;
   `GET /ops/schema-status` reports `orgActors`, `disabledOrgActors`,
   `rosterSyncedAt`, and `rosterReconcileSeconds`; `GET /snapshot` reports

@@ -196,6 +196,10 @@ public key distribution:
   `{ signingKeyId, keySet }` where `keySet` is the serialized
   `VerifyKeySet`
 
+The reference host exposes the principal-link routes through its porcelain as
+`qm ops authority link list` and `qm ops authority link bind`; the porcelain
+passes through and relies on the authority's one-link and ambiguity refusals.
+
 No `/ops/*` route is publicly routed in production. The one-time bootstrap
 act runs through any authorized caller with the ops token —
 `wrangler dev --remote` is the minimal transport; a private ops Worker
