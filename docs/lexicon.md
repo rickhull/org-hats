@@ -200,26 +200,40 @@ _Avoid_: harness (when you mean the inventory), integration suite
 
 ## Delivery
 
-The release/deploy split is shared vocabulary with Quartermaster; the
-words below are normative here, and a consumer adopting them adopts the
-split, not this repository's machinery. Each producer owns its own release
-tooling — `bin/` here, `qm` there — and org-hats is not responsible for any
-consumer's releases or release machinery.
+The release/deploy split is shared vocabulary with Quartermaster, refined
+together as the artifact model; the words below are normative here, and a
+consumer adopting them adopts the model, not this repository's machinery.
+Each producer owns its own release tooling — `bin/` here, `qm` there — and
+org-hats is not responsible for any consumer's releases or release
+machinery.
 
 - **Delivery** — the umbrella: the five loops of design, implement,
   release, deploy, monitor. A producer faces release; an operator faces
-  deploy.
-- **Release** — the producer-facing, portable half: making a revision
-  immutable and addressable. Here a release is an annotated tag (`vX.Y.Z`,
-  `cloudflare-vX.Y.Z`) matching its manifest, cut by `bin/release` from a
-  clean, gated `main`.
+  deploy. The chain across the two repos: our source → tag + publish → a
+  published artifact → their adoption → their tag + publish → their
+  artifact → their deploy.
+- **Artifact** — the immutable output of a release: a package, a runtime
+  bundle, a Worker Version. Both producers make artifacts.
+- **Release** (noun) — an artifact made immutable and addressable: the
+  annotated tag, the artifact it names, and the release record. Here the
+  tag families are `vX.Y.Z` and `cloudflare-vX.Y.Z`, cut by `bin/release`
+  from a clean, gated `main`.
 - **Revision** — a commit that could be released. `bin/check-version`
   names the tag families a revision carries.
 - **Gate** — the checks a revision passes to be releasable: `pnpm check`
   locally, `pnpm verify` as the full local gate.
-- **Candidate** — a revision nominated for release but not yet tagged.
-- **Tag** — the release act itself: annotated, version-matched, pushed to
-  the canonical host and the mirror. Upstream ends at the tag.
+- **Candidate** — a *release candidate*: a revision nominated for release
+  but not yet tagged. Downstream, a *released version* is a published
+  artifact awaiting its deployer; the two words name different things.
+- **Tag** — the release act that names the revision: annotated,
+  version-matched, pushed to the canonical host and the mirror. Upstream
+  ends at the tag.
+- **Publish** (verb) — make a release artifact available to its
+  subscriber; producer-side for every producer. org-hats publishes to the
+  forge and the mirror, whose audience happens to be the public;
+  Quartermaster publishes to its own Cloudflare runtime. Publish is not
+  "make public" — the subscriber, not the world, defines it — and it is
+  never deploy-side.
 - **Release record** — where a release is recorded: the tag message, the
   manifest version, and the gate-cache marker for the tagged commit.
 - **Milestone / cadence** — the ritual's rhythm: release when a coherent
@@ -227,15 +241,17 @@ consumer's releases or release machinery.
 
 The deploy half is recorded so its absence here is explicit, not
 accidental. These are the deploying host's words; this repository's part
-ends at the annotated tag:
+ends at the published artifact:
 
-- **Deploy** — the operator-facing, local act of running a release in one
-  environment. Not an org-hats act; `deploy_runbook.md` records the
+- **Adopt** — consume an upstream release artifact into implementation;
+  the consumer's loop between implement and deploy.
+- **Deploy** — activate a published artifact in a runtime the operator
+  controls. Not an org-hats act; `deploy_runbook.md` records the
   host-neutral shape of the deploy that follows a `cloudflare-v*` tag, as a
   consumer contract.
-- **Include / cutback / provision / bootstrap / publish / ship** — the
-  deploying host's deploy mechanics and their records. None is an org-hats
-  concept or command.
+- **Include / cutback / provision / bootstrap / ship** — the deploying
+  host's deploy mechanics and their records. None is an org-hats concept
+  or command.
 - **Deployment record** — the operator's evidence of what runs where. The
   release record is ours; the deployment record is theirs.
 

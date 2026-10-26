@@ -133,7 +133,10 @@ Cloudflare tag.
 ## Deployment is not publishing
 
 A `cloudflare-v*` tag is the upstream release act; deploying it is the
-consuming host's act. The host verifies the tag and the production
+consuming host's act. Publication is to subscribers
+([lexicon.md](lexicon.md) § Delivery): org-hats publishes to the forge and
+the mirror, whose audience happens to be the public. The host verifies the
+tag and the production
 configuration at that commit, snapshots state, uploads a Worker Version,
 activates it, and verifies it. The shape is in
 [cloudflare.md](cloudflare.md#deployment-contract).
