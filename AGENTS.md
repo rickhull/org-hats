@@ -3,9 +3,13 @@
 ## Git policy
 
 Rick makes every commit and every push.  `git commit`, `push`, `reset`,
-`checkout`, `switch`, `merge`, `rebase`, `stash`, `tag`, `cherry-pick`,
-`revert`, and `clean` are off limits; a denial is an answer, not an obstacle
-to route around.
+`checkout`, `switch`, `merge`, `rebase`, `stash`, `cherry-pick`, `revert`,
+and `clean` are off limits; a denial is an answer, not an obstacle to route
+around.  Tags are the exception: agents may and should create them with
+`git tag` — annotated, named by a release family (`vX.Y.Z` from
+`package.json`, `cloudflare-vX.Y.Z` from `packages/cloudflare/package.json`),
+then verified with `bin/check-version <tag>`.  Do not move, force, or delete
+a tag; pushing a tag is a push, and stays Rick's.
 
 `git add`, `git rm`, `git mv`, and `git restore` change the index or the
 working tree, so they proceed only with Rick's approval — ask for specific

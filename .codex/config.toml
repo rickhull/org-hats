@@ -3,14 +3,15 @@
 # Mirrors .claude/settings.json (Claude Code) and .pi/extensions/git-guard.ts
 # (pi): a PreToolUse hook denies the git operations that AGENTS.md reserves
 # for Rick (commit, push, and history-changing commands) with a reason the
-# model sees. The "ask" tier for git add/rm/mv/restore is deliberately left
+# model sees. Tags are the exception: agents create them with `git tag`
+# (AGENTS.md, "Git policy"). The "ask" tier for git add/rm/mv/restore is deliberately left
 # to Codex's native approval flow: Codex PreToolUse hooks cannot return an
 # "ask" decision, only deny-with-reason or allow-with-edited-input. Note the
 # consequence: under Codex, git restore is only as gated as Codex's own
 # approval setting, not by this hook.
 #
 # Keep the deny list in lockstep with AGENTS.md ("Git policy") and
-# .claude/settings.json (permissions). Last aligned 2026-10-24.
+# .claude/settings.json (permissions). Last aligned 2026-10-26.
 #
 # This is a project-local layer: Codex loads it only for this trusted
 # repository, so it cannot affect work in another checkout. The hook command

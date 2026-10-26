@@ -7,7 +7,7 @@
 # approval flow.
 
 # --- deny list: git operations that only Rick performs (AGENTS.md) ----------
-DENY='commit reset push checkout switch merge rebase stash tag cherry-pick revert clean'
+DENY='commit reset push checkout switch merge rebase stash cherry-pick revert clean'
 
 # --- parse: every shell command segment -----------------------------------
 # jq decodes JSON correctly. Python's standard-library shlex distinguishes
@@ -22,7 +22,7 @@ import sys
 
 DENY = {
     "commit", "reset", "push", "checkout", "switch", "merge", "rebase",
-    "stash", "tag", "cherry-pick", "revert", "clean",
+    "stash", "cherry-pick", "revert", "clean",
 }
 VALUE_OPTIONS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
 OPERATORS = {";", "&&", "||", "|", "&", "(", ")"}
@@ -74,7 +74,7 @@ PY
 for op in $DENY; do
   if [ "$subcommand" = "$op" ]; then
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}' \
-      "git $op is denied by repository policy: Rick makes every commit, push, and history-changing operation (AGENTS.md)."
+      "git $op is denied by repository policy: Rick makes every commit and push; tags are created with git tag (AGENTS.md)."
     exit 0
   fi
 done

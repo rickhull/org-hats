@@ -15,7 +15,6 @@
       "Bash(git merge*)",
       "Bash(git rebase*)",
       "Bash(git stash*)",
-      "Bash(git tag*)",
       "Bash(git cherry-pick*)",
       "Bash(git revert*)",
       "Bash(git clean*)"

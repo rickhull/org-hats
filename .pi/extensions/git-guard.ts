@@ -5,17 +5,17 @@
  * Code, for pi, which has no settings-file equivalent: a `tool_call` hook
  * inspects every `bash` command and classifies git invocations.
  *
- *   deny  — git commit/reset/push/checkout/switch/merge/rebase/stash/tag/
+ *   deny  — git commit/reset/push/checkout/switch/merge/rebase/stash/
  *           cherry-pick/revert/clean: blocked outright, with the reason
- *           returned to the model. Rick makes every commit and every push
- *           (AGENTS.md, "Git policy").
+ *           returned to the model. Rick makes every commit and every push;
+ *           tags are created with `git tag` (AGENTS.md, "Git policy").
  *   ask   — git add/rm/mv/restore: prompt the human at the terminal for the
  *           exact command. Declined unless approved. Without a UI (headless
  *           sessions) the safe answer is "no": nobody present means nobody
  *           judged this path.
  *
  * Keep DENY and ASK in lockstep with AGENTS.md ("Git policy") and
- * .claude/settings.json (permissions). Both were last aligned 2026-10-24.
+ * .claude/settings.json (permissions). Both were last aligned 2026-10-26.
  *
  * Scope note: the parser takes the first non-flag word after `git` as the
  * subcommand. That covers the forms this repository's agent uses, running
@@ -36,7 +36,6 @@ const DENY = [
   "merge",
   "rebase",
   "stash",
-  "tag",
   "cherry-pick",
   "revert",
   "clean",
@@ -76,7 +75,7 @@ export default function (pi: ExtensionAPI) {
         block: true,
         reason:
           `git ${denied} is denied by repository policy: Rick makes every ` +
-          `commit, push, and history-changing operation (AGENTS.md).`,
+          `commit and push; tags are created with git tag (AGENTS.md).`,
       };
     }
 
