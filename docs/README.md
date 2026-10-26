@@ -54,6 +54,9 @@ public `org-hats` docs are normative for the seam.
 
 ## Tutorial
 
+- [`walkthrough.md`](walkthrough.md) — the layperson's first read: the
+  same story as the tutorial in plain English, every term glossed, each
+  section closed by the three personas from `personas.md`.
 - [`tutorial.md`](tutorial.md) — a longer, concrete walkthrough through the
   synthetic example worlds: one actor in two operations, the decisions each
   hat produces, commands and denial, refresh rotation, a lost disable message,
