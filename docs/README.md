@@ -30,6 +30,8 @@ public `org-hats` docs are normative for the seam.
   contract, ops routes, and the state lifecycle.
 - [`binding-conformance.md`](binding-conformance.md) — the documented
   service-binding smoke subset and what it does not claim.
+- [`inventory.md`](inventory.md) — the story index: every conformance case
+  bound to the document that tells it, enforced by `tests/docs.test.ts`.
 - [`deploy_runbook.md`](deploy_runbook.md) — the host-neutral deploy,
   canary, acceptance, rollback, and witness for a `cloudflare-v*` tag.
 - [`lexicon.md`](lexicon.md) — the normative vocabulary; it wins over loose

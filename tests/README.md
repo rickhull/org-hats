@@ -77,6 +77,9 @@ public types fails the gate instead of failing at runtime.
 - `vertical.test.ts` — evidence → issuance → key distribution → verification.
 - `scenarios.test.ts` — the twin scenarios end-to-end.
 - `conformance.test.ts` — runs the public inventory from `src/conformance.ts`.
+- `docs.test.ts` — the documentation fence: links resolve, every cited
+  case id ships, every case has an inventory row with its title verbatim,
+  and every twin id cited in the story docs exists in a fixture.
 - `generative.test.ts` — 100 seeded states, duplicate commands, partial
   failure and outbox replay.
 - `release-tools.test.ts` — the release-tag guard against throwaway
