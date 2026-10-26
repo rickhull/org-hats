@@ -1,8 +1,8 @@
 # Migrating from org-hats v2 to v3
 
-**Status:** the next major, `3.0.0`, crosses this break; `2.2.0` is the last
-2.x release. The envelope format does not move. This note records the deltas
-a consumer crosses. The architecture itself is unchanged — see
+**Status:** `3.0.0` crosses this break; `2.2.0` is the last 2.x release. The
+envelope format does not move. This note records the deltas a consumer
+crosses and how to cross them. The architecture itself is unchanged — see
 [authority_redesign.md](authority_redesign.md).
 
 ## 2.x → 3.0
@@ -40,6 +40,36 @@ never on the claims' `interfaceVersion`, which is issuer provenance. A
 session drops because the call vocabulary changed. The claim field name is
 unchanged.
 
+## Cutover
+
+The version gate is strict equality in both directions
+(`src/authority/engine.ts:250`): a 2.x caller sending `interfaceVersion: 2`
+is refused by a v3 authority, and a 3.x caller sending `interfaceVersion: 3`
+is refused by a live v2 authority. Neither side can move first by
+tolerating the other's version; there is no compatibility window upstream.
+This is why the cutover happens at the binding, not inside a single
+deployment.
+
+Cross the break with blue/green at the service binding:
+
+1. Stand the v3 authority up as a second Worker, alongside the live v2
+   deployment. Both run; neither caller population is touched yet.
+2. Flip the host's service binding to the v3 Worker together with the
+   caller changes from the checklist below, in one change. Before the
+   flip, callers send `interfaceVersion: 2` to the v2 Worker; after, they
+   send `interfaceVersion: 3` to the v3 Worker. There is no step where a
+   3.x caller reaches a v2 authority or a 2.x caller reaches the v3
+   authority.
+3. Roll back by flipping the binding back to the v2 Worker, reverting the
+   caller changes in the same motion.
+
+Already-issued envelopes keep verifying across the flip: `ACCESS_ENVELOPE_VERSION`
+stays 1, and verification never gates on the claims' `interfaceVersion` (see
+[specs/envelope.md](../specs/envelope.md) E8). A 2.x-issued envelope keeps
+verifying on the v3 Worker, so a session in flight at the moment of the flip
+is not dropped — only new commands and calls need the new interface
+version.
+
 ## Consumer checklist
 
 - Send `interfaceVersion: 3`.
@@ -47,6 +77,6 @@ unchanged.
 - Replace `NeutralAccess.memberTeamIds()` with `teamReach()`.
 - Leave envelope verification and the `memberTeamIds` claim alone.
 
-The Cloudflare package follows its own `0.x` cadence; the first release
-after this break carries interface 3. Its operation schema and envelope
-format do not move.
+The Cloudflare package follows its own `0.x` cadence; `cloudflare-v0.6.0`
+is the first release carrying interface 3. Its operation schema and
+envelope format do not move.

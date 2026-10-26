@@ -90,7 +90,7 @@ There is no registry publication; pin a release tag. A verifier needs only
 the `access` subpath and the key set the issuer distributes:
 
 ```sh
-pnpm add "git+https://codeberg.org/rickhull/org-hats.git#v2.1.0"
+pnpm add "git+https://codeberg.org/rickhull/org-hats.git#v3.0.0"
 ```
 
 ```ts
@@ -256,7 +256,7 @@ full inventory.
 
 | What | Version |
 | --- | --- |
-| `org-hats` | 2.1.0 |
+| `org-hats` | 3.0.0 |
 | Authority interface | 3 |
 | Access envelope | 1 |
 | Cloudflare runtime | separate `0.x` on `cloudflare-v*` tags; operation schema 4 |

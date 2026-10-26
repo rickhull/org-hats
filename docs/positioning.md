@@ -89,7 +89,7 @@ policy; a directory remains the identity source.
   actor or a grant. `docs/authority_redesign.md` § Identity boundary;
   `specs/authority.md`.
 - **Interface version and envelope version move for different reasons.**
-  `specs/envelope.md` E8; `docs/migration-v2.md`.
+  `specs/envelope.md` E8; `docs/migration-v2.md`; `docs/migration-v3.md`.
 - **Executable invariants and a public conformance inventory.**
   `src/conformance.ts`; `tests/`; `docs/binding-conformance.md`.
 - **Deployment is the host's act; upstream ends at the published release.**
@@ -133,8 +133,8 @@ policy; a directory remains the identity source.
 - **Production runtime:** Cloudflare only. The in-memory engine is the
   reference and test adapter, not a durable store.
 - **Identity:** OIDC authorization-code + PKCE exchange; no LDAP, SAML, SCIM,
-  or client-credentials flow. The live `cloudflare-v0.4.0` deployment verifies
-  ES256 and RS256.
+  or client-credentials flow. The live deployment, the consuming host's
+  `cloudflare-v0.5.0`, verifies ES256 and RS256.
 - **Envelope:** Ed25519 over canonical JSON, not JWT/JWKS; downstream services
   need `org-hats/access` and the key set.
 - **Distribution:** git tags only; no registry publication.

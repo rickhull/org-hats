@@ -37,7 +37,8 @@ acceptance. `cloudflare-v0.4.0` is the rollback target.*
 ## Claim
 
 Through the service binding, with the interface version the deployed tag
-carries (`2` for the live `cloudflare-v0.5.0`; `3` for the next release):
+carries (`2` for the live `cloudflare-v0.5.0`; `3` for `cloudflare-v0.6.0`,
+once the host deploys and accepts it):
 
 1. `accessFromEvidence` for the linked evidence returns a signed envelope and
    a refresh handle.
