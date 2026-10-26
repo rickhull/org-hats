@@ -138,8 +138,8 @@ then, position it as a reference architecture, not a foundational model.
    justification for the custom canonicalization.
 5. A NIST/XACML/ABAC/ReBAC/OIDC mapping appendix.
 
-**P2 — release and operations:** QM acceptance confirmation and, if wanted,
-`cloudflare-v0.3.2` with the post-v0.3.1 fixes, followed by a fresh host
+**P2 — release and operations:** QM acceptance confirmation and the next
+`cloudflare-v*` release (the post-v0.3.1 fixes), followed by a fresh host
 deploy and smoke.
 
 **P3 — test-suite coverage:** the P1 items in `plans/test_suite_review.md`,
@@ -179,7 +179,7 @@ test depth. Success signals are qualitative and specific:
   temporal validity, immediate revocation, full audit, or "secure by default".
 - Do not claim a hat bounds all authority while read/config/member reach are
   unions; fix the model or state the exception.
-- Keep the distinction between the released `cloudflare-v0.3.1` and `main`
+- Keep the distinction between the live `cloudflare-v*` tag and `main`
   visible when discussing the exchange (RS256) and any post-tag fixes.
 
 ## Open decisions

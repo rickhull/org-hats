@@ -23,8 +23,10 @@ There are three different units of authority in the current code:
 
 They are each defensible. Together they make "one hat at a time" ambiguous:
 the envelope carries one action hat, but read/config/member authority comes
-from grants the actor is not wearing. The twins mostly give each actor one
-grant, so the conformance inventory does not expose the difference.
+from grants the actor is not wearing. Most fixtures give each actor one
+grant, so the conformance inventory does not pin the difference;
+`examples/own-world.ts` now holds two grants for one actor and shows the
+split, but no suite asserts it.
 
 ## P0 — choose the unit of authority
 

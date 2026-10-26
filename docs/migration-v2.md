@@ -1,9 +1,10 @@
 # Migrating from org-hats v1 to v2
 
 **Status:** `2.0.0` crosses this break; `1.2.0` is the last 1.x release and
-stays a valid pin until the consumer moves. This note records the deltas a
-consumer crosses. The architecture itself is unchanged — see
-[authority_redesign.md](authority_redesign.md).
+stays a valid pin until the consumer moves. `2.1.0` is additive: no consumer
+action is required, and the interface and envelope versions do not move. This
+note records the deltas a consumer crosses. The architecture itself is
+unchanged — see [authority_redesign.md](authority_redesign.md).
 
 ## 1.2 → 2.0
 
@@ -105,6 +106,37 @@ declarations so that cannot regress silently.
 - The provider-callback exchange posts to the discovery document's
   `token_endpoint`, not the authorization endpoint. `cloudflare-v0.1.0` is
   not safe for real-provider login; take the next `cloudflare-v*` tag.
+
+## 2.0 → 2.1 (additive)
+
+`2.1.0` adds public surface and model facts; it changes no command, claim, or
+envelope meaning. Interface version 2 and envelope version 1 stay put.
+
+- A host's own world enters through `defineWorld` (with `WorldFixture` and
+  `WorldDefinition`) from `org-hats/authority`. It converts hand-written,
+  plain-string-id data once and refuses an invalid policy bundle, an invariant
+  violation, or a fixture carrying other than exactly one operation.
+- `assembleAccessClaims` is exported from `org-hats/authority` for hosts that
+  need the issuer's claim shape outside the engine.
+- `NeutralAccess` gains `memberTeamIds()`, `authenticatedWith()`,
+  `authenticatedAt()`, and `actor()`. They expose claims the envelope already
+  carried; no claim changed.
+- `isFailed` is exported from `org-hats/access` alongside `verify`.
+- `IssuerInterfaceVersion` names the claims' provenance field as `number`;
+  calls still speak the current interface literal (a compile-time exactness
+  check pins that).
+- The model carries operation routing facts — `slug` and each site's
+  `path` — with invariant checks and the one-namespace rule. These are
+  operation-authority facts; the registry projects them (A12 in
+  [`specs/authority.md`](../specs/authority.md)). The `cloudflare-v0.3.x`
+  tags already serve them.
+- `parseVerifyKeySet` ignores unknown fields by design: an operator-
+  distributed set may grow a field without bricking live verifiers; `format`
+  and `v` carry compatibility.
+
+A consumer that wants the new exports moves its pin to `v2.1.0`. One that
+does not stays on `v2.0.0`; envelopes cross the pin in both directions
+because the format did not move.
 
 ## Consumer checklist
 

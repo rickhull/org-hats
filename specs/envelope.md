@@ -54,7 +54,8 @@ trusted, or a valid envelope dies for a reason it cannot name.
 Verification keys travel as one canonical `VerifyKeySet`; rotation is two
 live keys — install the next set everywhere before the issuer switches,
 retire the old key after its last envelope expires. An empty set, a
-duplicate id, or a wrong algorithm fails closed at parse.
+duplicate id, or a wrong algorithm fails closed at parse; unknown fields are
+ignored, so an additive field cannot brick live verifiers.
 
 *Held by:* `parseVerifyKeySet`'s closed failures; the rotation and
 retirement vector; `/ops/verification-keys` returns exactly the set.

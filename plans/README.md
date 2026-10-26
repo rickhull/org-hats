@@ -15,10 +15,9 @@ planned is released, adopted, and documented in `docs/`.
 - `test_suite_review.md` — the test-suite fanout: fragility and dependency
   findings, the rings, and the remaining coverage gaps in priority order.
   The typecheck gate is landed; the coverage slice follows.
-- `v2_release.md` — Quartermaster acceptance of the released 2.0 / 0.3 line:
-  the deploy, binding smoke, and schema/routing drill have passed; the
-  acceptance record and the registry/DNS/tenant follow-on remain. The
-  post-v0.3.1 R5 fixes need a new `cloudflare-v0.3.2` release decision.
+- `v2_release.md` — the root `v2.1.0` release and Cloudflare
+  `cloudflare-v0.3.2`: the additive surface, the R5 fixes, QM acceptance,
+  the fresh-fixture deploy, and the live-tag doc moves.
 
 Retired plans are removed; their results live in `docs/` and the commit
 history. Completed work is not kept here.

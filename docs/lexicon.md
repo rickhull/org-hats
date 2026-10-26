@@ -177,6 +177,12 @@ delivery. It makes partial states visible instead of pretending a distributed
 transaction exists.
 _Avoid_: queue (when you mean the durable outbox fact)
 
+**Example world** — The outward name for a fixture operation a runtime boots
+from: one snapshot plus the policy bundle in force. The built-in ones are the
+twins; a host's own enters through `defineWorld`. Use this term in
+first-contact copy and README material.
+_Avoid_: demo data, sample app
+
 **Twin** — A built-in synthetic example world, exported in `TWINS`: the
 Professional Operation, the Festival, or the Berlin Airlift. A twin is a
 public fixture operation used as executable specification; it carries

@@ -23,7 +23,7 @@ The model is portable. An in-memory engine runs it in tests and examples; the
 Cloudflare package is the reference deployment. Both expose the same four
 calls: `accessFromEvidence`, `refresh`, `context`, and `command`.
 
-## Run the pilot
+## Run the examples
 
 Node 24+ and pnpm:
 
@@ -33,8 +33,8 @@ node examples/pilot.ts
 node examples/own-world.ts
 ```
 
-It prints one actor, one operation, one worn hat, two local decisions, and a
-closed expiry:
+The pilot prints one actor, one operation, one worn hat, two local decisions,
+and a closed expiry:
 
 ```text
 actor: org-4c1f9a2e/actor-8d3b77c1
@@ -66,7 +66,7 @@ The [`tutorial`](docs/tutorial.md) continues this world through commands,
 refresh, a lost disable, and a crossed grant.
 
 `pnpm verify` is the full gate: dist freshness, the compiler fences, the
-portable suites, the test and example typecheck, the pilot, the release
+portable suites, the test and example typecheck, both examples, the release
 metadata check, and the Cloudflare workerd suite. It runs locally and needs
 no Cloudflare account. `pnpm test` runs only the portable suites;
 `pnpm check:cloudflare` runs only the reference runtime.
@@ -195,7 +195,8 @@ already-issued envelope is bounded by `exp`; that is the blast radius.
   `invariantProblems`. Data and pure functions; no I/O, storage, clock, or
   Cloudflare.
 - **`org-hats/authority`** — the four-call `AuthorityRuntime`, the in-memory
-  engine, and the synthetic example worlds.
+  engine, the fixture boundary (`defineWorld`), and the synthetic example
+  worlds.
 - **`org-hats/access`** — verification only: `verify` turns a signed envelope
   into neutral access; `VerifyKeySet` is the rotation unit.
 - **`org-hats/conformance`** — the executable `OH-*` inventory, run through
@@ -218,7 +219,7 @@ full inventory.
 
 | What | Version |
 | --- | --- |
-| `org-hats` | 2.0.0 |
+| `org-hats` | 2.1.0 |
 | Authority interface | 2 |
 | Access envelope | 1 |
 | Cloudflare runtime | separate `0.x` on `cloudflare-v*` tags; operation schema 4 |
@@ -229,7 +230,9 @@ moves the envelope. An envelope records its issuing interface as provenance,
 but verification reads the envelope's own version pair — so the line can be
 at interface 2 while still reading format-1 envelopes. The 2.0 break changed
 `grant-hat` to one `GrantTarget` (team or site); see
-[`docs/migration-v2.md`](docs/migration-v2.md).
+[`docs/migration-v2.md`](docs/migration-v2.md). `2.1.0` is additive — the
+fixture boundary, the claims assembler, and neutral-access accessors — and
+leaves both versions where they are.
 
 Distribution is git tags only; no registry publication. Codeberg is
 canonical; GitHub is a release mirror. The v0.4 surface lives at its tags and

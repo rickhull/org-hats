@@ -2,7 +2,7 @@
 
 The suites are the executable specification. Run one suite with
 `node --test tests/<file>.test.ts`, all of them with `pnpm test`; `pnpm check`
-adds the compiler fence, the Cloudflare-import guard, the pilot, and the
+adds the compiler fence, the Cloudflare-import guard, both examples, and the
 release-metadata guard. `pnpm verify` is the full local gate: `bin/check-dist`
 (build and freshness), `pnpm check`, then the Cloudflare workerd suites.
 
@@ -13,7 +13,7 @@ release-metadata guard. `pnpm verify` is the full local gate: `bin/check-dist`
   for one workerd suite. Use while iterating; this is where a change's own
   evidence should come from.
 - **Ring 1 — portable.** `pnpm check` (fences, test/example typecheck,
-  portable suites, pilot, tag audit).
+  portable suites, both examples, tag audit).
 - **Ring 2 — workspace.** `pnpm check-dist && pnpm check:cloudflare` when
   `src/`, `dist/`, `package.json`, or `packages/cloudflare/` changes.
   `check-dist` cleans and rebuilds `dist/`; run it before the workerd suites
@@ -37,6 +37,8 @@ runtime.
 - `policy.test.ts` — policy-bundle validation, including read-policy axes.
 - `readreach.test.ts` — read reach under both policies and generated states.
 - `twins.test.ts` — the structural properties of the synthetic twins.
+- `world.test.ts` — the `defineWorld` boundary: a coherent own world, each
+  refusal branch, and every twin revalidated.
 - `engine.test.ts` — issuance, refresh, participation, idempotency, disable.
 - `claims.test.ts` — the shared claims assembler: hat, reach, configuration,
   lifetime, and authentication facts, including the absent cases.

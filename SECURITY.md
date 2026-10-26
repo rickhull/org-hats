@@ -63,7 +63,9 @@ deploying operator owns those; report there as appropriate.
 The invariants a report may rely on:
 
 - envelopes are Ed25519-signed over canonical JSON, versioned, and bounded by
-  `iat`/`exp`; an unrecognized format or interface version fails closed;
+  `iat`/`exp`; an unrecognized envelope format or version fails closed, and a
+  call with an unrecognized interface version is refused before its body is
+  interpreted;
 - verification checks the format, the signature, expiry, and the caller's
   operation/site binding, in that order of trust;
 - the authority engine owns signing, idempotency, audit, and refresh

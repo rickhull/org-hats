@@ -80,8 +80,8 @@ two operations separates a person's identity from the hat they wear; a site
 grant beside a crossed team grant separates `mayAct` reach from configuration
 reach; the Airlift's other Berlin airfields make a grant's reach visibly
 bounded by place. With one fixture each claim would be true by accident. The
-ids are fixed because the snippets, the tests, and the pilot must name the
-same world — a generated world has nothing to check against.
+ids are fixed because the snippets, the tests, and the examples must name
+the same world — a generated world has nothing to check against.
 
 ## Set up one world
 
@@ -507,6 +507,11 @@ retry returned the original result instead of applying the act twice. A
 denied command does not poison its key; a successful command claims it with
 the payload hash.
 
+For a real switch — one actor holding two grants, `select-hat` to the second,
+and the refreshed envelope carrying the new capacity — run
+`node examples/own-world.ts`. The case here stays deliberately uninteresting
+so the retry behavior is the only thing to watch.
+
 ### Counterpoint
 
 A command object with an idempotency key, a payload hash, and a receipt, to
@@ -752,6 +757,8 @@ inventory; conflating the two claims is how a test claim becomes fiction.
 
 - `node examples/pilot.ts` — the complete Case 1 setup, plus the expiry
   denial. It is the shortest runnable version.
+- `node examples/own-world.ts` — a world of your own, the `select-hat` →
+  refresh switch, and the HTTP failure mapping.
 - `pnpm test` — the portable model, authority, access, conformance, and
   scenario suites.
 - `pnpm check:cloudflare` — the Cloudflare typecheck and workerd suites,
@@ -770,7 +777,7 @@ some errors are narrowed by hand. Why is the tutorial not executable?
 
 ### Rationale
 
-The executable authority is the pilot and the suite; a document that
+The executable authority is the examples and the suite; a document that
 duplicated them would drift from them. A tutorial that imported them would
 show internals instead of the seam. The snippets keep the fixture ids and the
 outcomes, so what you read can be checked against what runs; only the repeated

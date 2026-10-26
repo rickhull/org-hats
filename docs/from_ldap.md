@@ -123,8 +123,9 @@ verified. The consumer pin is in [`publishing.md`](publishing.md).
 ## Current limits for an AD shop
 
 - No LDAP, SAML, or SCIM connector; OIDC only.
-- The live `cloudflare-v0.3.1` verifies ES256, not RS256; `main` carries the
-  correction. Check the provider's signing algorithm before a pilot.
+- The live `cloudflare-v0.3.1` verifies ES256, not RS256; the next
+  `cloudflare-v*` tag carries the correction. Check the provider's signing
+  algorithm before a pilot.
 - One hat per envelope, and read/config/member reach are currently unions over
   wearable grants; the model review is in `plans/model_coherence.md`.
 - The envelope is not a JWT; every downstream service needs the verifier and

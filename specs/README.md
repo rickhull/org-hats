@@ -34,7 +34,8 @@ The split, one line each:
 - [`envelope.md`](envelope.md) — the projection: canonical bytes, one
   algorithm, additive growth, closed verification, key rotation.
 - [`portability.md`](portability.md) — the fence, the one reference
-  runtime, the public-repository and release posture.
+  runtime, the world-fixture boundary, and the public-repository and
+  release posture.
 
 Quartermaster's `specs/` is a different genre — design-stage consumer
 contracts for unbuilt product surface. Neither directory mirrors the other;

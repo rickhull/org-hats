@@ -137,7 +137,7 @@ The compiler is used as a boundary enforcer, not only as a build step:
 - `tsconfig.authority.json` compiles `src/` with `types: []`; `bin/check`
   also rejects any Cloudflare import under `src/`. `erasableSyntaxOnly`
   keeps every source erasable, so Node's type stripping runs the `.ts`
-  suites and the pilot directly; the root and the Cloudflare package are
+  suites and both examples directly; the root and the Cloudflare package are
   aligned on TypeScript 5.9.
 - `tsconfig.json` builds the published declarations; `tsconfig.consumer.json`
   compiles the consumer surface against `dist/`.

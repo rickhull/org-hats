@@ -52,23 +52,26 @@ reference runtime stops being a reference.
 
 ### P5 — No real people in a public repository
 
-The design tests are the synthetic twins (Professional Operation,
-Festival); real rosters, customer names, and key material live with the
-consumer or the operator.
+The design tests are the synthetic example worlds (Professional Operation,
+Festival, Berlin Airlift); real rosters, customer names, and key material
+live with the consumer or the operator. A host's own world enters through
+`defineWorld` and is not committed here with real data.
 
-*Held by:* the twins are the only fixtures — Professional Operation,
-Festival, and the Berlin Airlift twin (public history, invented people);
-both relay notes are written as publishable; `SECURITY.md` exists before
+*Held by:* the committed fixtures are synthetic — the three twins, the
+conformance invitee, the own-world example, and the test-local worlds; the
+fixture boundary (`defineWorld`) is the entry for a host's own world; both
+relay notes are written as publishable; `SECURITY.md` exists before
 production data.
-*If it breaks:* it is an incident, not a bug — exposure cannot be
-un-pushed from a public mirror.
+*If it breaks:* it is an incident, not a bug — exposure cannot be un-pushed
+from a public mirror.
 
 ### P6 — Releases are immutable tags, and the manifest is the single pin
 
-Distribution is by git tag only; `bin/release` takes the tag from
-`package.json`, so manifest and tag cannot disagree; consumers pin tags,
-never ranges, because a pin that moves under a verifier changes what a
-signature means.
+Distribution is by git tag only; `bin/release` takes the tag from the
+selected package's manifest (root `package.json` or the Cloudflare
+manifest), so manifest and tag cannot disagree; consumers pin tags, never
+ranges, because a pin that moves under a verifier changes what a signature
+means.
 
 *Held by:* the release script's single source of truth; the consumer's
 re-recorded acceptance at each move.
@@ -94,13 +97,13 @@ what should be a wire-compatible value.
 
 ### P8 — The suites and examples typecheck
 
-The root tests and the pilot compile under `tsconfig.tests.json`; a fixture
-that sends a shape the interface no longer accepts fails the gate rather
-than failing at runtime.
+The root tests and both examples compile under `tsconfig.tests.json`; a
+fixture that sends a shape the interface no longer accepts fails the gate
+rather than failing at runtime.
 
 *Held by:* `tsconfig.tests.json`, the `typecheck:tests` script, and the
-typecheck step in `bin/check`; pre-push, CI, and `pnpm verify` all run that
-gate.
+typecheck and run steps in `bin/check`; pre-push, CI, and `pnpm verify` all
+run that gate.
 *If it breaks:* the compiler is silent about the test inputs, and an
 interface break reaches the runtime as a fixture failure after the fact.
 
@@ -111,11 +114,28 @@ parser or verifier before it enters a branded domain position. The
 envelope's version/signature gate is its parse; key sets, policy bundles,
 SQLite rows, HTTP command bodies, and provider evidence have their own
 decoders. Test fixtures are trusted design data, converted once and checked
-by the suite and `invariantProblems`.
+by the suite and `invariantProblems`; a host's own world is validated by
+`defineWorld` at that boundary.
 
 *Held by:* `verify`'s format/version/signature gate; `parseVerifyKeySet`;
 `validatePolicyBundle` at the Cloudflare bootstrap and in tests; the
 Cloudflare `row.ts` decoders and ops body decoders; the fixture boundary in
-`tests/helpers.ts` plus `invariantProblems`.
+`tests/helpers.ts` plus `invariantProblems`; `defineWorld` and
+`tests/world.test.ts` for host worlds.
 *If it breaks:* a brand becomes an assertion about data nobody checked, and
 the type layer starts lying about storage, wire, or provider input.
+
+### P10 — A host's world has a validating entry
+
+`defineWorld` is the public validating entry for a host's own world. It
+converts plain-id data once and refuses an invalid policy bundle, an
+invariant violation, or a fixture carrying other than exactly one
+operation. The built-in example worlds pass the same checks.
+
+*Held by:* `defineWorld` in `src/authority/world.ts`; `tests/world.test.ts`
+(pins one refusal per rule and revalidates every twin); both examples run in
+`bin/check`; `docs/authority_redesign.md` § Verification strategy names the
+boundary.
+*If it breaks:* the first own-world fixture reaches a runtime as an
+incoherent state, fixture mistakes surface as boot-time surprises instead of
+a named error, and adoption depends on reading the engine.

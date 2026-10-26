@@ -55,10 +55,8 @@ Codeberg and then force-push the GitHub mirror; GitHub follows only when
 told.
 - **Codeberg is the truth.** GitHub holds no authority, only a copy.
 
-**Current status (2026-10-25):** GitHub carries the release pushes through
-`v2.0.0` and `cloudflare-v0.3.1`. Future updates happen when
-`bin/release --push` cuts a release; branch commits after the last release
-wait for the next one.
+**Current status:** GitHub carries every `bin/release --push`; branch commits
+after the last release wait for the next one.
 
 **Historical anomaly:** `v0.4.3` points at `8d2551d` ("docs update /
 cleanup"), whose `package.json` is `0.4.2`; `v0.4.4` is the commit that fixes
@@ -126,6 +124,12 @@ A consumer pins one of:
 
 Replace `vX.Y.Z` with the release tag. `v0.4.4` remains the last frozen v0.4 pin; the latest tag is the pin target — no plan tracks it. The Cloudflare package releases on its own cadence as `cloudflare-vX.Y.Z`; the same guard validates it against `packages/cloudflare/package.json`. Prefer the Codeberg pin: the mirror's lag then never affects the consumer. The `github:` shorthand resolves only GitHub; a consumer whose CI is already GitHub-native may pin the mirror.
 
+Pick the bump from the surface: `minor` for an additive public export or model
+fact, `patch` for a fix within the released surface, and `major` when the
+authority interface breaks. The Cloudflare package follows its own 0.x
+cadence and ships its fixes as patches; a root release does not move a
+Cloudflare tag.
+
 ## Deployment is not publishing
 
 A `cloudflare-v*` tag is the upstream release act; deploying it is the
@@ -158,6 +162,14 @@ From a clean `main`:
    `origin`, and the same to `github` when that remote exists. `--dry-run`
    previews; `--no-cloudflare` skips the workspace suites on a root release.
    **Never tag by hand.**
+
+   Docs that name the artifacts move with the window: the README version table
+   and the additive note in `migration-v2.md` move before the root tag; the
+   live `cloudflare-v*` references in `cloudflare.md`,
+   `binding-conformance.md`, the deployment paragraph in this file,
+   `positioning.md`, `from_ldap.md`, and the "next tag" line in
+   `migration-v2.md` move after the host deploy, because they describe what is
+   running.
 2. If the release was cut without `--push`, send it to both hosts:
    ```sh
    git push origin HEAD
