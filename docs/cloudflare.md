@@ -133,6 +133,10 @@ Two Wrangler configs, two purposes:
   comma-separated evidence-resolution directory; there is no global
   registry.
 
+An operation carries no identity-provider configuration or reference to one.
+The host chooses the provider, and the runtime resolves the sealed
+registration from the organization directory by issuer and client id.
+
 ## Deployment contract
 
 Upstream's release act ends at an immutable `cloudflare-v*` tag and its
@@ -175,6 +179,11 @@ public key distribution:
 
 - `POST /ops/organization/bootstrap`, `POST /ops/operation/bootstrap` —
   typed, idempotent bootstrap
+- `GET /ops/organization/principal-links?organizationId=…` — list the
+  organization's `(provider, subject, actorId)` principal links
+- `POST /ops/organization/principal-link` — bind a verified provider subject
+  to an existing actor; the worker refuses a subject already linked in
+  another organization in the evidence directory
 - `POST /ops/operation/routing-facts` — `{ operationId, slug, sites }`,
   backfilling the operation's complete routing facts; a rename waits for
   history and is not this route's job

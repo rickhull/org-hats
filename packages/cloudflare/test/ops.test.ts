@@ -1,7 +1,9 @@
-import { SELF } from "cloudflare:test";
+import { SELF, env } from "cloudflare:test";
 import { ed25519VerifyKey, parseVerifyKeySet } from "org-hats/access";
 import { describe, expect, it } from "vitest";
 import { organizationBootstrap } from "./helpers";
+import { bindPrincipalLink } from "../src/index";
+import type { Env } from "../src/env";
 
 const OPS = { authorization: "Bearer test-ops-token" };
 const ORG = "org-ops";
@@ -165,6 +167,75 @@ describe("typed ops routes", () => {
       value?: Record<string, unknown>;
     };
     expect(complete.value?.["routingFactsComplete"]).toBe(true);
+  });
+
+  it("lists and binds principal links, refusing a conflicting actor", async () => {
+    const organizationId = "org-ops-links";
+    expect((await jsonPost("/ops/organization/bootstrap", orgBootstrap(organizationId))).status).toBe(200);
+
+    const listed = await (await ops(`/ops/organization/principal-links?organizationId=${organizationId}`)).json() as {
+      value?: { links: { provider: string; subject: string; actorId: string }[] };
+    };
+    expect(listed.value?.links).toHaveLength(2);
+
+    const bind = await jsonPost("/ops/organization/principal-link", {
+      organizationId,
+      provider: "idp",
+      subject: "new-subject",
+      actorId: "actor-member",
+    });
+    expect(bind.status).toBe(200);
+    expect((await bind.json() as { value?: { applied: boolean } }).value?.applied).toBe(true);
+
+    const again = await jsonPost("/ops/organization/principal-link", {
+      organizationId,
+      provider: "idp",
+      subject: "new-subject",
+      actorId: "actor-member",
+    });
+    expect(again.status).toBe(200);
+    expect((await again.json() as { value?: { applied: boolean } }).value?.applied).toBe(false);
+
+    const after = await (await ops(`/ops/organization/principal-links?organizationId=${organizationId}`)).json() as {
+      value?: { links: { subject: string; actorId: string }[] };
+    };
+    expect(after.value?.links).toHaveLength(3);
+    expect(after.value?.links.some((link) => link.subject === "new-subject" && link.actorId === "actor-member")).toBe(true);
+
+    const conflict = await jsonPost("/ops/organization/principal-link", {
+      organizationId,
+      provider: "idp",
+      subject: "new-subject",
+      actorId: "actor-admin",
+    });
+    expect(conflict.status).toBe(400);
+    expect((await conflict.json() as { failure?: { kind: string } }).failure?.kind).toBe("invalid-command");
+
+    const unknown = await jsonPost("/ops/organization/principal-link", {
+      organizationId,
+      provider: "idp",
+      subject: "ghost-subject",
+      actorId: "actor-nobody",
+    });
+    expect(unknown.status).toBe(400);
+    expect((await unknown.json() as { failure?: { kind: string } }).failure?.kind).toBe("invalid-command");
+  });
+
+  it("refuses a bind when the directory already resolves the subject elsewhere", async () => {
+    const target = "org-ops-links-target";
+    const other = "org-ops-links-other";
+    expect((await jsonPost("/ops/organization/bootstrap", {
+      ...orgBootstrap(target),
+      principalLinks: [],
+    })).status).toBe(200);
+    expect((await jsonPost("/ops/organization/bootstrap", orgBootstrap(other))).status).toBe(200);
+
+    const result = await bindPrincipalLink(
+      { ...env, AUTHORITY_ORGANIZATION_IDS: `${target},${other}` } as Env,
+      { organizationId: target, provider: "idp", subject: "admin", actorId: "actor-member" },
+    );
+    expect(result.status).toBe(400);
+    expect((result.body as { failure?: { kind: string } }).failure?.kind).toBe("invalid-command");
   });
 
   it("exposes the verification keys without the ops token", async () => {

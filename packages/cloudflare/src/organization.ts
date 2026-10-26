@@ -382,6 +382,71 @@ export class OrganizationAuthority extends DurableObject<Env> {
     });
   }
 
+  private principalLinks(): readonly {
+    readonly provider: string;
+    readonly subject: string;
+    readonly actorId: string;
+    readonly createdAt: number;
+  }[] {
+    return this.rows(
+      "SELECT provider, subject, actor_id, created_at FROM principal_links ORDER BY provider, subject",
+    ).map((row) => ({
+      provider: String(row["provider"]),
+      subject: String(row["subject"]),
+      actorId: String(row["actor_id"]),
+      createdAt: Number(row["created_at"]),
+    }));
+  }
+
+  /** Bind a verified provider subject to an existing actor. The bind is
+   * idempotent for the same actor and refuses a different one; the worker's
+   * ops route checks the rest of the directory before this runs, so a subject
+   * cannot be introduced ambiguously. */
+  private linkPrincipal(input: {
+    readonly provider: string;
+    readonly subject: string;
+    readonly actorId: string;
+  }): Result<{ applied: boolean }> {
+    if (this.organizationId() === undefined) return failure("unavailable", "organization is not bootstrapped");
+    if (input.provider.length === 0 || input.subject.length === 0 || input.actorId.length === 0) {
+      return failure("invalid-command", "provider, subject, and actorId are required");
+    }
+    if (this.actor(input.actorId) === undefined) {
+      return failure("invalid-command", `principal link names the unknown actor ${input.actorId}`);
+    }
+    const at = now();
+    return this.ctx.storage.transactionSync(() => {
+      const existing = this.one(
+        "SELECT actor_id FROM principal_links WHERE provider = ? AND subject = ?",
+        input.provider,
+        input.subject,
+      );
+      if (existing !== undefined) {
+        const linked = String(existing["actor_id"]);
+        if (linked !== input.actorId) {
+          return failure(
+            "invalid-command",
+            `principal link ${input.provider}:${input.subject} already resolves to actor ${linked}`,
+          );
+        }
+        return value({ applied: false });
+      }
+      this.ctx.storage.sql.exec(
+        "INSERT INTO principal_links (provider, subject, actor_id, created_at) VALUES (?, ?, ?, ?)",
+        input.provider,
+        input.subject,
+        input.actorId,
+        at,
+      );
+      this.audit(
+        "principal-link",
+        `principal ${input.provider}:${input.subject} linked to actor ${input.actorId}`,
+        at,
+      );
+      return value({ applied: true });
+    });
+  }
+
   private invite(invitationId: string, operationId: string): Result<{ invitationId: string }> {
     if (this.organizationId() === undefined) return failure("unavailable", "organization is not bootstrapped");
     const at = now();
@@ -674,6 +739,20 @@ export class OrganizationAuthority extends DurableObject<Env> {
           asString(url.searchParams.get("provider"), "provider"),
           asString(url.searchParams.get("subject"), "subject"),
         ));
+      }
+
+      if (request.method === "GET" && url.pathname === "/principal-links") {
+        return json(value({ links: this.principalLinks() }));
+      }
+
+      if (request.method === "POST" && url.pathname === "/principal-link") {
+        const body = await readBody();
+        const result = this.linkPrincipal({
+          provider: asString(body["provider"], "provider"),
+          subject: asString(body["subject"], "subject"),
+          actorId: asString(body["actorId"], "actorId"),
+        });
+        return json(result, result.ok ? 200 : result.failure.kind === "unavailable" ? 503 : 400);
       }
 
       if (request.method === "POST" && url.pathname === "/invite") {

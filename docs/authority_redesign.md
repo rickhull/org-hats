@@ -277,6 +277,13 @@ effect of disabling that actor. It does not implement a browser redirect,
 parse an arbitrary provider response, or require a particular identity
 protocol.
 
+Principal links enter through explicit bootstrap or the typed organization
+ops surface (list links, bind a subject to an existing actor). One
+`(provider, subject)` resolves to one actor; a bind that would make it two is
+refused, and a cross-organization ambiguity fails `unavailable` until an
+operator resolves it. The authority does not keep a store of unlinked claims;
+a host that audits a first refused login keeps that claim in its own audit.
+
 An identity adapter verifies external evidence and supplies a typed, validated
 principal to authority. Two arrangements are supported, and the portable
 interface is the same either way: a host may verify evidence itself and
@@ -303,6 +310,24 @@ when they suffice is host step-up policy, never an authority rule.
 Authentication never creates participation or a hat implicitly. The grant is
 the operation's operative admission; access requests and granting remain
 explicit, idempotent, and auditable authority commands.
+
+### Boundary decisions
+
+- **Leading organization is host data.** The operation is the authority
+  scope, not an organization's possession. Operation authority carries no
+  leading-organization field in this line; a host keeps that designation in
+  its own tenant/operation record. If it ever enters the model it is an
+  optional annotation: the organization must be an active participant, and
+  it grants no authority, reach, or implicit control over sites.
+- **Identity configuration stays with organization authority.** An operation
+  carries no reference to an organization's sealed provider registration. The
+  host chooses the provider; the runtime resolves the sealed configuration
+  from the organization directory by issuer and client id.
+- **Principal links are typed organization ops.** List and bind are
+  organization-authority surfaces, not portable `AuthorityRuntime` commands.
+  One subject resolves to one actor; conflicting binds are refused, and
+  cross-organization ambiguity fails closed. Unlinked claims live in the
+  host's audit, not in authority state.
 
 ## State ownership
 

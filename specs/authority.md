@@ -113,12 +113,20 @@ unmovable.
 A principal link resolves one `(organizationId, actorId)`; no provider
 claim links two actors, and equal mail-shaped subjects never merge them.
 
+Links enter through explicit bootstrap or the typed organization-authority
+ops surface. A bind that would resolve the subject to a different actor is
+refused, and a cross-organization ambiguity fails `unavailable` until an
+operator resolves it. The authority stores no unlinked claims; a refused
+first login is the host's audit material.
+
 *Held by:* no provider claim links actors — evidence carries identifying
-and authentication facts only; links are explicit bootstrap material, and a
-conflicting re-link is refused at both bootstrap layers (`scenarios.test.ts`
-pins it); the Cloudflare runtime's directory refuses a `(provider, subject)`
-found in more than one organization (`packages/cloudflare/test/runtime.test.ts`);
-the twins keep actors organization-scoped.
+and authentication facts only; `linkPrincipal` and bootstrap check the
+existing link and actor before mutating; the worker checks the rest of the
+evidence directory before a bind (`packages/cloudflare/src/index.ts`);
+`tests/ops.test.ts` and `organization.test.ts` pin the conflicts; the
+Cloudflare runtime's directory refuses a `(provider, subject)` found in more
+than one organization (`packages/cloudflare/test/runtime.test.ts`); the
+twins keep actors organization-scoped.
 *If it breaks:* a platform-global person record appears by the back door,
 and removing an actor from one operation starts affecting another.
 

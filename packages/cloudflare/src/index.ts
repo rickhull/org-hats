@@ -34,11 +34,14 @@ export { OperationAuthority } from "./operation";
 const keysFor = async (env: Env, signer: CloudflareSigner): Promise<ReadonlyMap<string, VerifyKey>> =>
   verificationKeys(env, signer);
 
-const runtime = async (env: Env): Promise<AuthorityRuntime> => {
-  const organizationIds = (env.AUTHORITY_ORGANIZATION_IDS ?? "")
+const organizationDirectory = (env: Env): readonly string[] =>
+  (env.AUTHORITY_ORGANIZATION_IDS ?? "")
     .split(",")
     .map((id) => id.trim())
     .filter((id) => id.length > 0);
+
+const runtime = async (env: Env): Promise<AuthorityRuntime> => {
+  const organizationIds = organizationDirectory(env);
   const signer = await signerFor(env);
   return createCloudflareRuntime({
     env,
@@ -143,6 +146,80 @@ const relay = async (stub: DurableObjectStub, path: string, body?: unknown): Pro
   });
 };
 
+const organizationStub = (env: Env, organizationId: string): DurableObjectStub =>
+  env.ORGANIZATION.get(env.ORGANIZATION.idFromName(organizationId));
+
+export interface PrincipalLinkInput {
+  readonly organizationId: string;
+  readonly provider: string;
+  readonly subject: string;
+  readonly actorId: string;
+}
+
+const resolveAt = async (
+  env: Env,
+  organizationId: string,
+  provider: string,
+  subject: string,
+): Promise<{ readonly ok: boolean; readonly failure?: { readonly kind: string } }> => {
+  try {
+    const response = await relay(
+      organizationStub(env, organizationId),
+      `/resolve?provider=${encodeURIComponent(provider)}&subject=${encodeURIComponent(subject)}`,
+    );
+    return await response.json() as { ok: boolean; failure?: { kind: string } };
+  } catch {
+    return { ok: false, failure: { kind: "unavailable" } };
+  }
+};
+
+/** Bind a principal link through the directory. One identity is never two
+ * actors: if another directory organization already resolves the subject, the
+ * bind is refused; if an organization cannot answer, it fails closed. */
+export const bindPrincipalLink = async (
+  env: Env,
+  input: PrincipalLinkInput,
+): Promise<{ readonly status: number; readonly body: unknown }> => {
+  if (
+    input.organizationId.length === 0 ||
+    input.provider.length === 0 ||
+    input.subject.length === 0 ||
+    input.actorId.length === 0
+  ) {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        failure: { kind: "invalid-command", detail: "organizationId, provider, subject, and actorId are required" },
+      },
+    };
+  }
+  for (const organizationId of organizationDirectory(env)) {
+    if (organizationId === input.organizationId) continue;
+    const resolved = await resolveAt(env, organizationId, input.provider, input.subject);
+    if (resolved.ok) {
+      return {
+        status: 400,
+        body: {
+          ok: false,
+          failure: {
+            kind: "invalid-command",
+            detail: `the principal link is already present in organization ${organizationId}`,
+          },
+        },
+      };
+    }
+    if (resolved.failure?.kind !== "unauthenticated") {
+      return {
+        status: 503,
+        body: { ok: false, failure: resolved.failure ?? { kind: "unavailable" } },
+      };
+    }
+  }
+  const response = await relay(organizationStub(env, input.organizationId), "/principal-link", input);
+  return { status: response.status, body: await response.json() };
+};
+
 /** A minimal fetch surface for the harness and the typed ops routes. */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -165,6 +242,31 @@ export default {
           const body = await request.json() as { organizationId?: string };
           if (typeof body.organizationId !== "string") throw new Error("organizationId is required");
           return relay(env.ORGANIZATION.get(env.ORGANIZATION.idFromName(body.organizationId)), "/bootstrap", body);
+        }
+        if (request.method === "GET" && url.pathname === "/ops/organization/principal-links") {
+          const organizationId = url.searchParams.get("organizationId");
+          if (organizationId === null || organizationId.length === 0) {
+            throw new Error("organizationId is required");
+          }
+          return relay(organizationStub(env, organizationId), "/principal-links");
+        }
+        if (request.method === "POST" && url.pathname === "/ops/organization/principal-link") {
+          const body = await request.json() as Partial<PrincipalLinkInput>;
+          if (
+            typeof body.organizationId !== "string" ||
+            typeof body.provider !== "string" ||
+            typeof body.subject !== "string" ||
+            typeof body.actorId !== "string"
+          ) {
+            throw new Error("organizationId, provider, subject, and actorId are required");
+          }
+          const result = await bindPrincipalLink(env, {
+            organizationId: body.organizationId,
+            provider: body.provider,
+            subject: body.subject,
+            actorId: body.actorId,
+          });
+          return Response.json(result.body, { status: result.status });
         }
         if (request.method === "POST" && url.pathname === "/ops/operation/bootstrap") {
           const body = await request.json() as { operationId?: string };
