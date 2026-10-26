@@ -1,6 +1,6 @@
 # Publishing
 
-*Where `org-hats` is published, how it mirrors, how a release is cut, and the rules that keep it publishable.*
+*Where `org-hats` is published, how it mirrors, how a release is cut, and the rules that keep it publishable to its subscribers.*
 
 ## Canonical and mirror
 
@@ -132,13 +132,13 @@ Cloudflare tag.
 
 ## Deployment is the host's act
 
-A `cloudflare-v*` tag is the upstream release act; deploying it is the
-consuming host's act. Publication is to subscribers
-([lexicon.md](lexicon.md) § Delivery): org-hats publishes to the forge and
-the mirror, whose audience happens to be the public. The host verifies the
-tag and the production
-configuration at that commit, snapshots state, uploads a Worker Version,
-activates it, and verifies it. The shape is in
+Cutting and publishing an immutable `cloudflare-v*` tag is the upstream
+release act; deploying it is the consuming host's act. Publication is to
+subscribers ([lexicon.md](lexicon.md) § Delivery): org-hats publishes to
+the forge and the mirror, whose audience happens to be the public. The
+host verifies the tag and the production configuration at that commit,
+snapshots state, uploads a Worker Version, activates it, and verifies it.
+The shape is in
 [cloudflare.md](cloudflare.md#the-hosts-deployment-contract).
 
 Upstream provides no deploy porcelain: the Cloudflare account, Worker,
@@ -167,7 +167,10 @@ From a clean `main`:
    manifest cannot disagree. `--push` then sends the branch and tag to
    `origin`, and the same to `github` when that remote exists. `--dry-run`
    previews; `--no-cloudflare` skips the workspace suites on a root release.
-   **Never tag by hand.**  A Cloudflare release also runs
+   **Tag only through `bin/release`** — it keeps the tag and the manifest
+   equal by construction; a hand-made tag (the agent exception in
+   `AGENTS.md`) must still pass `bin/check-version <tag>` before it is
+   pushed.  A Cloudflare release also runs
    `bin/check-artifact` before the commit and tag; the host-neutral sequence is
    in [`deploy_runbook.md`](deploy_runbook.md).
 

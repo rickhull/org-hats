@@ -1,10 +1,11 @@
 # Deploy runbook — a `cloudflare-v*` tag
 
-*Upstream ends at the annotated tag. This runbook is the host-neutral shape of
-the deploy that follows — the consumer deployment contract, explicitly not an
-upstream act (see [lexicon.md](lexicon.md) § Delivery). The deploying host
-owns the Cloudflare account, versions, traffic, secrets, and service binding.
-No secret value belongs in this repository or in a relay note.*
+*Upstream ends at the annotated tag and its publication. This runbook is the
+host-neutral shape of the deploy that follows — the consumer deployment
+contract, explicitly not an upstream act (see [lexicon.md](lexicon.md) §
+Delivery). The deploying host owns the Cloudflare account, versions, traffic,
+secrets, and service binding. No secret value belongs in this repository or in
+a relay note.*
 
 ## Preflight
 

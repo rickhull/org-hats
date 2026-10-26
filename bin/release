@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
-# Cut a release: bump a manifest, verify, rebuild dist/, commit, and tag.
+# Cut a release: bump the manifest, run the gates, build the artifact
+# (dist/), commit, and tag; `--push` publishes the branch and tag to
+# origin and the mirror.
 #
 #   bin/release patch                 # root: vX.Y.Z from package.json
 #   bin/release minor
@@ -137,11 +139,11 @@ if ! $verify; then
 	pnpm build
 fi
 
-# The deployable artifact gate runs on the bumped working tree, before the
-# commit and tag. It validates the production config and bundles the Worker;
-# it does not deploy.
+# The artifact gate runs on the bumped working tree, before the commit and
+# tag. It validates the production config and bundles the Worker; it does not
+# deploy.
 if [ "$package" = cloudflare ] && $verify; then
-	printf '\n== deploy artifact ==\n'
+	printf '\n== artifact gate ==\n'
 	"$(dirname "$0")/check-artifact" --root "$PWD"
 fi
 

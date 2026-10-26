@@ -92,7 +92,7 @@ policy; a directory remains the identity source.
   `specs/envelope.md` E8; `docs/migration-v2.md`.
 - **Executable invariants and a public conformance inventory.**
   `src/conformance.ts`; `tests/`; `docs/binding-conformance.md`.
-- **Deployment is the host's act; the release act ends at the tag.**
+- **Deployment is the host's act; upstream ends at the published release.**
   `docs/cloudflare.md` § Deployment contract; `docs/publishing.md`.
 
 ## What not to claim

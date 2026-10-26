@@ -83,6 +83,6 @@ jobs:
       - name: Typecheck and workerd integration tests
         run: pnpm check:cloudflare
 
-      - name: Cloudflare deploy artifact
+      - name: Cloudflare artifact gate
         if: startsWith(github.ref, 'refs/tags/cloudflare-v')
-        run: bin/check-deploy "${GITHUB_REF#refs/tags/}"
+        run: bin/check-artifact "${GITHUB_REF#refs/tags/}"

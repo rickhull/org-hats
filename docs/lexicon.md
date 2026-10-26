@@ -225,9 +225,9 @@ machinery.
 - **Candidate** — a *release candidate*: a revision nominated for release
   but not yet tagged. Downstream, a *released version* is a published
   artifact awaiting its deployer; the two words name different things.
-- **Tag** — the release act that names the revision: annotated,
-  version-matched, pushed to the canonical host and the mirror. Upstream
-  ends at the tag.
+- **Tag** — the release act that names the revision: annotated and
+  version-matched. Publication pushes it to the canonical host and the
+  mirror; upstream ends at the published release.
 - **Publish** (verb) — make a release artifact available to its
   subscriber; producer-side for every producer. org-hats publishes to the
   forge and the mirror, whose audience happens to be the public;

@@ -40,9 +40,9 @@ jobs:
       - name: Check (fence, suites, example)
         run: bin/check
 
-      - name: Cloudflare deploy configuration
-        run: bin/check-deploy --no-build
+      - name: Cloudflare artifact gate (configuration)
+        run: bin/check-artifact --no-build
 
-      - name: Cloudflare deploy artifact
+      - name: Cloudflare artifact gate
         if: startsWith(github.ref, 'refs/tags/cloudflare-v')
-        run: bin/check-deploy "${GITHUB_REF#refs/tags/}" --no-build
+        run: bin/check-artifact "${GITHUB_REF#refs/tags/}" --no-build
