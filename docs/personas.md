@@ -31,7 +31,7 @@ verification with a bounded window.
 
 **What loses them:** someone else’s world as the only example; jargon without
 a gloss; no consumer install line; no LDAP, SCIM, SAML, group-grant, nesting,
-or deny story; a tutorial that never shows a real hat switch.
+or deny story.
 
 **Show them:** the README first screen, `examples/pilot.ts`,
 `examples/own-world.ts`, and [`from_ldap.md`](from_ldap.md).

@@ -168,9 +168,9 @@ The type layer stops at these seams; each has a named parser or verifier:
 | Principal evidence | `PrincipalEvidence` | the identity adapter verifies the provider assertion |
 
 `canonicalJson` is a boundary too: its `JsonValue` type is the serializer's
-contract, not a proof that an object is JSON-safe. The existing
-`asJson`/`as unknown as JsonValue` assertions are centralized at that
-boundary and should stay there.
+contract, not a proof that an object is JSON-safe. The `asJson` conversion
+from `src/contract.ts` is that boundary's one name — the sign and verify
+seams call it, tests re-export it, and no other cast to `JsonValue` exists.
 
 ## Known limits
 

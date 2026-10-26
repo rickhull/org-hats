@@ -509,15 +509,74 @@ retry returned the original result instead of applying the act twice. A
 denied command does not poison its key; a successful command claims it with
 the payload hash.
 
-For a real switch — one actor holding two grants, `select-hat` to the second,
-and the refreshed envelope carrying the new capacity — run
-`node examples/own-world.ts`. The case here stays deliberately uninteresting
-so the retry behavior is the only thing to watch.
+For a real switch, stay at the festival: Dana administers it, so she can
+grant her own second hat — a steward shift at a tasting booth, deliberately
+not primary:
+
+```ts
+const grant = await engine.runtime.command({
+  interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+  idempotencyKey: "tutorial-real-switch-grant",
+  authorization: { kind: "access-envelope", envelope: danaFest.envelope },
+  kind: "grant-hat",
+  operationId: "op-61a8e3f2",
+  organizationId: HARBOR_LOGISTICS,
+  actorId: DANA_OKAFOR,
+  role: "steward",
+  target: { kind: "team", teamId: "team-booth-001" },
+});
+if (!grant.ok) throw new Error(grant.failure.kind);
+```
+
+A grant change revokes the affected refresh records in the same commit, so
+the session continues by issuing again — and the new envelope's context
+picks up both wearable hats:
+
+```ts
+const danaSwitch = await issueFor("dana", "op-61a8e3f2");
+const switchContext = await engine.runtime.context({
+  interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+  envelope: danaSwitch.envelope,
+});
+if (isFailed(switchContext)) throw new Error(switchContext.failure.kind);
+// switchContext.selectedHat?.role === "admin" — the steward hat is not primary
+const steward = switchContext.wearableHats.find((hat) => hat.role === "steward");
+if (steward === undefined) throw new Error("the granted hat is listed");
+
+const selected = await engine.runtime.command({
+  interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+  idempotencyKey: "tutorial-real-switch-select",
+  authorization: { kind: "access-envelope", envelope: danaSwitch.envelope },
+  kind: "select-hat",
+  operationId: "op-61a8e3f2",
+  grantId: steward.grantId,
+});
+if (!selected.ok) throw new Error(selected.failure.kind);
+
+if (danaSwitch.refresh.kind !== "rotated") throw new Error("expected a handle");
+const switched = await engine.runtime.refresh({
+  interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+  operationId: "op-61a8e3f2",
+  handle: danaSwitch.refresh.handle,
+});
+if (isFailed(switched)) throw new Error(switched.failure.kind);
+// switched.envelope.claims.hat.role === "steward"
+// switched.envelope.claims.hat.teamIds === ["team-booth-001"]
+```
+
+The `grantId` each summary carries is the addressing `select-hat` takes
+(`v2.2.0`; `OH-AUTH-07` pins the round trip), so a host renders the menu
+from `context` and addresses the choice without joining anything. The admin
+hat is not lost — it is unworn, and a later `select-hat` back to its
+`grantId` returns to it. `node examples/own-world.ts` builds the same
+switch in a world of your own.
 
 ### Counterpoint
 
 A command object with an idempotency key, a payload hash, and a receipt, to
-select a hat the actor already wears. Why does one mutation need a protocol?
+select a hat the actor already wears — and then a grant, a context read, a
+selection by grant id, and a refresh, to switch hats for real. Why does one
+mutation need a protocol?
 
 ### Rationale
 
