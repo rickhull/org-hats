@@ -164,6 +164,12 @@ git tag -a "$tag" -m "$tag"
 # Post-tag check: the guard that would have caught a tag on the wrong commit.
 bin/check-version "$tag"
 
+# The gates ran on this tree before the commit. Record the clean tagged commit
+# for the pre-push hook so a --push does not repeat check-dist and check.
+if $verify && [ -z "$(git status --porcelain)" ]; then
+	"$(dirname "$0")/gate-cache" record "$(git rev-parse HEAD)" >/dev/null 2>&1 || true
+fi
+
 if $push; then
 	git push origin HEAD
 	git push origin "$tag"

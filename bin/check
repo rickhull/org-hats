@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
-# The module check: the portable fence, the cloudflare-import guard, the
-# tests/examples typecheck, the v1 suites, then the release-metadata guard.
-# A failure anywhere fails the run.
+# The module check: the release-metadata guard, the portable fence, the
+# cloudflare-import guard, the tests/examples typecheck, and the suites. A
+# failure anywhere fails the run.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -10,6 +10,10 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
+echo "== release metadata: a version tag matches package.json =="
+"$(dirname "$0")/check-version"
+
+echo
 echo "== fence: all of src compiles without node or cloudflare types =="
 if [ -x node_modules/.bin/tsc ]; then
   node_modules/.bin/tsc -p tsconfig.authority.json
@@ -62,10 +66,6 @@ echo
 echo "== portable examples =="
 node examples/pilot.ts
 node examples/own-world.ts
-
-echo
-echo "== release metadata: a version tag matches package.json =="
-"$(dirname "$0")/check-version"
 
 echo
 echo "all checks passed"

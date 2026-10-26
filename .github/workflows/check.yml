@@ -43,8 +43,8 @@ jobs:
       - name: Release metadata (a release tag matches its manifest)
         run: bin/check-version
 
-      - name: Install dev dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install root dependencies
+        run: pnpm install --frozen-lockfile --filter org-hats
 
       - name: dist/ is committed and in sync with src/
         run: bin/check-dist

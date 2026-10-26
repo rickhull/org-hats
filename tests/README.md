@@ -3,8 +3,10 @@
 The suites are the executable specification. Run one suite with
 `node --test tests/<file>.test.ts`, all of them with `pnpm test`; `pnpm check`
 adds the compiler fence, the Cloudflare-import guard, both examples, and the
-release-metadata guard. `pnpm verify` is the full local gate: `bin/check-dist`
-(build and freshness), `pnpm check`, then the Cloudflare workerd suites.
+release-metadata guard. `pnpm verify` is the full local gate (`bin/verify`):
+`bin/check-dist` (build and freshness), `pnpm check`, then the Cloudflare
+workerd suites. A clean commit that passes records the local gate cache, so
+the next pre-push does not repeat the portable gate.
 
 ## Rings
 
@@ -18,19 +20,27 @@ release-metadata guard. `pnpm verify` is the full local gate: `bin/check-dist`
   `src/`, `dist/`, `package.json`, or `packages/cloudflare/` changes.
   `check-dist` cleans and rebuilds `dist/`; run it before the workerd suites
   and never concurrently with `pnpm check` in the same checkout.
-- **Ring 3 — full.** `pnpm verify` (ring 2 plus ring 1) and
-  `bin/release --push` for a release. CI on the GitHub release mirror is the
-  release-time backstop, not the live gate.
+- **Ring 3 — full.** `pnpm verify` (ring 2 plus ring 1; records the local
+  gate cache for a clean commit) and `bin/release --push` for a release. CI
+  on the GitHub release mirror is the release-time backstop, not the live
+  gate. A Cloudflare tag also passes `bin/check-deploy`.
 
 `pnpm test:tools` runs the release-guard suites alone
-(`release-tools.test.ts`, `gate-cache.test.ts`); they need only Node and git
-and are part of ring 1.
+(`release-tools.test.ts`, `gate-cache.test.ts`, `deploy-check.test.ts`); they
+need only Node and git. Use it alone for a fast loop; ring 1 runs them too.
+
+Pre-push and the Codeberg per-push CI run the portable gate. The workerd
+suite runs in ring 2, `pnpm verify`, `bin/release`, and the GitHub mirror job;
+it is not part of per-push Codeberg CI.
 
 The root suites and `examples/` are typechecked by `tsconfig.tests.json` as
-part of `bin/check`; `pnpm typecheck:tests` is the targeted command.
-`pnpm typecheck` remains the build-config check over `src/`. A fixture that
-drifts from the public types now fails the gate instead of failing at
-runtime.
+part of `bin/check`; the consumer surface is the separate
+`tsconfig.consumer.json` fence against `dist/`. `pnpm typecheck:tests` is the
+targeted command.
+`pnpm typecheck` is a fast standalone check of the build config. It is a
+subset of what `tsconfig.tests.json` and `bin/check-dist` already compile, so
+it is a convenience, not an additional gate. A fixture that drifts from the
+public types fails the gate instead of failing at runtime.
 
 - `contract.test.ts` — canonical JSON, byte codecs, version constants.
 - `model.test.ts` — decisions, worn-hat selection, participation transitions.
@@ -52,7 +62,6 @@ runtime.
 - `conformance.test.ts` — runs the public inventory from `src/conformance.ts`.
 - `generative.test.ts` — 100 seeded states, duplicate commands, partial
   failure and outbox replay.
-- `v1.test.ts` — the portable modules load inside the fence.
 - `release-tools.test.ts` — the release-tag guard against throwaway
   repositories, both tag families.
 - `gate-cache.test.ts` — the local per-commit gate marker, and its

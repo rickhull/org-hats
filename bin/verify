@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+# The full local gate, plus the local pre-push cache.
+#
+# It runs the same order as CI: build and verify dist/, run the portable
+# gate, then the Cloudflare/workerd suite. A clean checkout that passes is
+# recorded in .git/org-hats-gates so a following push does not repeat the portable
+# gate in the pre-push hook. The marker is local convenience, never a release
+# authority.
+set -eu
+cd "$(dirname "$0")/.."
+
+bin/check-dist
+bin/check
+pnpm check:cloudflare
+
+if [ -z "$(git status --porcelain)" ]; then
+	bin/gate-cache record "$(git rev-parse HEAD)" >/dev/null 2>&1 || true
+fi
