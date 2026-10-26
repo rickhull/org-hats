@@ -4,3 +4,5 @@ notes/
 .wrangler/
 .dev.vars
 .envrc.local
+.direnv/
+result

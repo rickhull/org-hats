@@ -95,15 +95,19 @@ The local Pi mesh is an interrupt channel, not a second relay.  Follow
 
 ## Tooling
 
-- Node + pnpm come from nixpkgs (thinkpad flake, `nixos/devbox.nix`).
-  Never install pnpm through corepack or npm.
+- The project flake (`flake.nix`) provides Node 24, pnpm 11, `git`, `rg`,
+  and `fj` 0.7+; `.envrc` enters it with `use flake`.  Run `direnv allow`
+  once per clone.  Never install pnpm through corepack or npm.
+- CI still uses the workflow's pinned pnpm and Node; the flake is the local
+  development shell, not a second release path.  `flake.lock` is tracked and
+  updated deliberately with the change that needs it.
 - Use `rg`, not `grep`.
-- No project flake: a routine tool belongs in the thinkpad devbox; an
-  occasional one comes from `nix shell nixpkgs#<pkg>`.  When the Cloudflare
-  package arrives (M6), its pnpm-installed foreign binaries (workerd,
-  esbuild) run through the system nix-ld loader — extend
-  `programs.nix-ld.libraries` in the thinkpad flake if one fails to exec;
-  do not add a per-project FHS wrapper.
+- Keep the flake minimal.  A routine tool belongs in the thinkpad devbox or
+  the project flake when contributors need it; an occasional tool comes from
+  `nix shell nixpkgs#<pkg>`.  When the Cloudflare package arrives (M6), its
+  pnpm-installed foreign binaries (workerd, esbuild) run through the system
+  nix-ld loader — extend `programs.nix-ld.libraries` in the thinkpad flake if
+  one fails to exec; do not add a per-project FHS wrapper.
 
 ## Checks before handing work back
 
