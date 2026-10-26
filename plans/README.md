@@ -1,6 +1,12 @@
 # Plans — what's next
 
-There are no active plans. The adoption hook is landed; the model posture is
+One active plan:
+
+- [`lexicon_misuse.md`](lexicon_misuse.md) — remaining lexicon-use
+  violations, in priority order. The open register is
+  [`docs/lexicon_use_concerns.md`](../docs/lexicon_use_concerns.md).
+
+The adoption hook is landed; the model posture is
 recorded in [`docs/authority_redesign.md`](../docs/authority_redesign.md)
 § Access and [`specs/authority.md`](../specs/authority.md) A14/A15; the
 reference runtime is deployed and accepted; and the test review is closed.

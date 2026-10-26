@@ -33,8 +33,9 @@ These were fixed in the same change that added this page:
 
 ### `memberTeamIds`
 
-- Where: `src/access/types.ts:48-50`; the access tests; `README.md` and the
-  docs use “member reach”.
+- Where: `src/access/types.ts:50`; `src/contract.ts:260`;
+  `tests/fixtures/envelope-vectors.json`; the access and claims tests;
+  `README.md` and the docs use “member reach”.
 - Why: *member* is not the actor or target word; the comment already says
   this is historical and not a directory membership list.
 - Cost: public neutral-access method and envelope field.
@@ -80,7 +81,7 @@ These were fixed in the same change that added this page:
 
 ### “team-audience axis”
 
-- Where: `docs/lexicon.md` Read policy; `docs/authority_redesign.md:500,732-733`.
+- Where: `docs/lexicon.md` Read policy; `docs/authority_redesign.md:499,731-732`.
 - Why: Read reach avoids *audience* when it means the computed result; the
   axis is a policy structure, not the result.
 - Recommendation: keep as a design term, or rename to “team-read axis”
