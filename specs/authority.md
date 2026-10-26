@@ -25,7 +25,7 @@ is a retryable workflow with visible partial states, never a transaction.
 
 *Held by:* the two-coordinator design; outboxes with visible pending state
 and alarms in both runtimes; the export/restore drill per coordinator.
-*If it breaks:* dual writes appear, customer-managed state gets silently
+*If it breaks:* dual writes appear, organization and operation state gets silently
 overwritten by platform configuration, and reconciliation loses its
 per-fact owner to appeal to.
 
@@ -116,7 +116,7 @@ claim links two actors, and equal mail-shaped subjects never merge them.
 Links enter through explicit bootstrap or the typed organization-authority
 ops surface. A bind that would resolve the subject to a different actor is
 refused, and a cross-organization ambiguity fails `unavailable` until an
-operator resolves it. The authority stores no unlinked claims; a refused
+operator resolves it. The authority stores no unlinked evidence; a refused
 first login is the host's audit material.
 
 *Held by:* no provider claim links actors — evidence carries identifying

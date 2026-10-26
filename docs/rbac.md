@@ -19,7 +19,7 @@ authority is operation-scoped, and exactly one hat is worn for an act. Role
 hierarchy and declarative separation-of-duty constraints are deliberately
 outside the model, not half-built.
 
-The permission layer is not a port surface. A host maps its product facts
+The host's permission layer is not a port surface. A host maps its product facts
 onto the neutral targets an access envelope names; it does not add objects to
 this model. See [authority_redesign.md](authority_redesign.md) § Access and
 [lexicon.md](lexicon.md) for the words. This is a phase-1 toehold; the

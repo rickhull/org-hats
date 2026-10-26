@@ -32,12 +32,12 @@ decoration. That is the right lesson for cross-organization, multi-site work.
 | **Principal link** | External-subject mapping | An explicit `(provider, subject) → actor` link created at bootstrap. There is no DN and no directory sync; equal mail-shaped subjects never merge actors. |
 | **Grant** | User-role assignment / ACE | One actor, one role, one target (team or site). It is not a permission and not an ACL: the permission is the pair `(action, target)`. There is no group principal and no `AGDLP`. |
 | **Role** | Role / permission set | Flat action set. No role hierarchy, dominance, nested roles, prerequisites, or constraints. |
-| **Hat** | Active role / PAM role activation | The assignment exercised by this envelope. One action hat per envelope; unlike a Kerberos ticket or PAC, the envelope carries a selected capacity, not every group. |
+| **Hat** | Active role / PAM role activation | The grant worn for this envelope. One action hat per envelope; unlike a Kerberos ticket or PAC, the envelope carries a selected capacity, not every group. |
 | **Participation** | Cross-org relationship / membership | A two-party lifecycle: invite → accept → activate → revoke. It belongs to the organization–operation relationship, not to the actor's group list. |
 | **Admission** | Enrollment in an application | The intent is separate from participation and grant; the grant is the operative admission, and access requests are a reviewed queue. See `authority_redesign.md` § Access. |
 | **Evidence** | Bind / token authentication result | A typed assertion (`provider`, `subject`, optional `amr`/`auth_time`). It creates no actor, participation, or grant. Authentication is not authority. |
 | **Envelope** | Kerberos ticket / PAC / JWT-ish projection | Signed with Ed25519 over canonical JSON; verified locally. It is not a JWT, not a Kerberos ticket, and not a PAC. Downstream services use `org-hats/access`, not standard JWT middleware. |
-| **Verifier** | Resource service / PEP | Checks signature, expiry, and binding, then compares signed ids. It never rebuilds the organization's rules or queries the directory. |
+| **Verifier** | Resource service / PEP | Checks signature, expiry, and binding, then compares signed ids. It never rebuilds the operation's policy or queries the directory. |
 | **Read reach** | Group-derived visibility | Computed at issuance from the policy (`granted-teams` or `all-participating`), not from the selected role's action list. Under `all-participating`, any hat gets the operation-wide read set. |
 | **Refresh handle** | TGT / refresh token | Opaque, hashed at rest, rotated on use, superseded before reissue; refresh re-resolves the actor at the organization. |
 | **`memberTeamIds`** | Group membership list | Despite the name, it is the team ids the wearable grants reach, not a directory membership list. |
@@ -50,11 +50,11 @@ decoration. That is the right lesson for cross-organization, multi-site work.
   `grant-hat` names one actor. At directory scale that is a provisioning
   project, not an `AGDLP` pattern.
 - **OUs and inheritance.** Operations are flat; there is no parent/child
-  scope, no inherited ACL, and no delegation tree.
+  hierarchy, no inherited ACL, and no delegation tree.
 - **Deny ACEs and negative permissions.** Grants are positive; exceptions are
   enumerated. There is no explicit deny.
 - **Separation of duty and constraints.** Not in the model; the envelope
-  carries one selected hat, not the full assignment set.
+  carries one selected hat, not the full grant set.
 - **DN as identity.** Ids are permanent and flat; there is no DN, search
   base, subtree filter, or LDAP browser view.
 - **Bind as authorization.** A successful bind or evidence resolution admits
@@ -84,7 +84,7 @@ decoration. That is the right lesson for cross-organization, multi-site work.
 Then answer the obvious comparisons:
 
 - **Why not Keycloak/Entra?** They are identity and coarse roles. This is the
-  operation/site/team scope and the offline signed decision; use them together.
+  operation/site/team structure and the offline signed decision; use them together.
 - **Why not OPA/Casbin?** They evaluate policy over an input. This owns the
   organization/site/team state and the session envelope. OPA can still evaluate
   host policy.

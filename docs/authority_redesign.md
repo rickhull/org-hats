@@ -101,8 +101,8 @@ non-Cloudflare adapters without promising equal tooling or operational support.
 ### One writer for each fact
 
 Each mutable fact has one authoritative owner. Repository manifests may create
-bootstrap state, but ordinary deployment does not overwrite customer-managed
-state. Reporting data does not become authority data, and authority data does
+bootstrap state, but ordinary deployment does not overwrite organization and
+operation state. Reporting data does not become authority data, and authority data does
 not move into Quartermaster's reporting objects.
 
 ### The interface is the test surface
@@ -282,15 +282,15 @@ Principal links enter through explicit bootstrap or the typed organization
 ops surface (list links, bind a subject to an existing actor). One
 `(provider, subject)` resolves to one actor; a bind that would make it two is
 refused, and a cross-organization ambiguity fails `unavailable` until an
-operator resolves it. The authority does not keep a store of unlinked claims;
-a host that audits a first refused login keeps that claim in its own audit.
+operator resolves it. The authority does not keep a store of unlinked evidence;
+a host that audits a first refused login keeps that evidence in its own audit.
 
 An identity adapter verifies external evidence and supplies a typed, validated
 principal to authority. Two arrangements are supported, and the portable
 interface is the same either way: a host may verify evidence itself and
-submit typed principal claims, or the identity adapter may run inside the
+submit typed principal evidence, or the identity adapter may run inside the
 authority runtime where provider secrets are sealed. In the reference
-deployment the provider code exchange executes inside the authority runtime
+runtime the provider code exchange executes inside the authority runtime
 — organization authority owns sealed identity-provider configuration — so
 what crosses the runtime seam during a browser login is provider exchange
 material handled by runtime surface, not by the portable interface. The
@@ -317,7 +317,7 @@ explicit, idempotent, and auditable authority commands.
 - **Leading organization is host data.** The operation is the authority
   scope, not an organization's possession. Operation authority carries no
   leading-organization field in this line; a host keeps that designation in
-  its own tenant/operation record. If it ever enters the model it is an
+  its own product record. If it ever enters the model it is an
   optional annotation: the organization must be an active participant, and
   it grants no authority, reach, or implicit control over sites.
 - **Identity configuration stays with organization authority.** An operation
@@ -327,12 +327,12 @@ explicit, idempotent, and auditable authority commands.
 - **Principal links are typed organization ops.** List and bind are
   organization-authority surfaces, not portable `AuthorityRuntime` commands.
   One subject resolves to one actor; conflicting binds are refused, and
-  cross-organization ambiguity fails closed. Unlinked claims live in the
+  cross-organization ambiguity fails closed. Unlinked evidence lives in the
   host's audit, not in authority state.
 
 ## State ownership
 
-The reference Cloudflare deployment uses two authority coordinators.
+The reference Cloudflare runtime uses two authority coordinators.
 
 ### Organization authority
 
@@ -491,9 +491,8 @@ The generic modules define how a valid policy bundle is represented and
 applied. Quartermaster supplies Reporting.Stream's versioned bundle: actions,
 role titles, role-to-action mappings, and relevant read or reach policy. An
 authenticated operations command distributes a validated bundle to an operation,
-which records the active version. Customer administrators manage assignments
-under that policy; arbitrary customer-defined roles or policy rules are not an
-initial capability.
+which records the active version. Administrators declared by that policy manage
+grants; arbitrary roles or policy rules are not in the initial surface.
 
 The read policy is a structure of independent axes, one per dimension of
 reach — not a scalar enum. v1 defines the organization axis
@@ -502,7 +501,7 @@ property of the same structure: it changes neither the bundle format nor the
 meaning of the organization axis, and unknown axes fail closed until the
 runtime implements them.
 
-The distinction between platform and customer configuration is explicit:
+The distinction between platform and deployed configuration is explicit:
 
 | Configuration | Owner after onboarding |
 | --- | --- |
@@ -511,22 +510,22 @@ The distinction between platform and customer configuration is explicit:
 | Deployed authority runtime | deploying operator: pinned version, instances, bindings, routes, jurisdiction, release cadence |
 | Deployment topology and migrations | deploying operator, using runtime-package tooling |
 | Bootstrap intent | deploying consumer's protected input, applied once or explicitly reapplied |
-| Customer-edited organizations, teams, hats, and labels | owning authority state |
+| Edited organizations, teams, hats, and labels | owning authority state |
 | Real rosters and principal links | organization authority state |
 | Secrets and signing keys | deploying operator's secret management or sealed runtime state |
 | Verification-key rollout | deploying operator: distribute verify keys first, activate at the issuer second, retain the old key until its last envelope expires |
 
 Bootstrap is a typed, idempotent command with a manifest identifier, version,
 and content hash. Reapplying platform configuration never silently restores a
-customer-renamed label or revoked grant. Production secrets, customer names,
+renamed label or revoked grant. Production secrets, customer names,
 and real-person rosters do not enter this public repository; real bootstrap
 material stays in the deploying consumer's protected, untracked input and
 becomes state owned by the appropriate authority object after provisioning.
 
 In this document, source ownership and deployed-state ownership are distinct.
 The `org-hats` repository owns the rules and interfaces. A particular
-organization- or operation-authority instance owns the mutable customer facts
-committed under those rules.
+organization- or operation-authority instance owns the mutable organization and
+operation facts committed under those rules.
 
 ## Portability contract
 
@@ -634,7 +633,7 @@ the same cases by supplying its own world factory.
 Consumers bootstrapping tests should use `CONFORMANCE_WORLD` and
 `createInMemoryConformanceWorld()` from `org-hats/conformance`: the authority
 subpath carries the types and the example worlds' data, not the principal-link
-or org-admin bootstrap. The conformance world returns a built verifier map,
+or organization-administration bootstrap. The conformance world returns a built verifier map,
 which is right for exercising verification; use `verificationKey()` material
 when the test is key-configuration parsing.
 
@@ -684,14 +683,14 @@ introduces.
 The public conformance inventory uses synthetic structural example worlds —
 called twins in the code (`src/authority/twins.ts`) — shaped like
 Quartermaster's two concrete design tests: a persistent multi-site
-professional operation and a time-bounded, multi-venue festival burst. A
+professional operation and a time-bounded, multi-site festival burst. A
 third twin is public history instead — the 1948–49 Berlin Airlift —
 carrying the coalition shape the first two do not: a host-nation ground
 workforce across several airfields of one operation, secondment as a
 crossed grant, and a coalition-wide read board. The
 twins carry the structural properties — multi-organization participation,
 site independence, short-lived teams, enrollment bursts — that prevent design
-for an imaginary generic customer. The real operations, their names, and
+for an imaginary generic operation. The real operations, their names, and
 their detailed fixtures remain in Quartermaster's private repository and load
 through the same public interfaces.
 
@@ -702,12 +701,12 @@ This design does not require or introduce:
 - Cloudflare as a prerequisite for using the generic library;
 - a platform-global person record or automatic linking by email address;
 - a general policy language, negative grants, or arbitrary role inheritance;
-- one deployment, binding, or Worker per customer organization or site;
+- one deployment, binding, or Worker per organization or site;
 - raw SQL, generic `exec`, or repository access across the authority seam;
 - synchronous transactions across organization and operation state owners;
 - immediate revocation for every ordinary reporting request;
-- a global transactional customer database;
-- Git reconciliation as a second writer of customer-managed facts; or
+- a global transactional database spanning organizations;
+- Git reconciliation as a second writer of organization and operation facts; or
 - speculative adapters for runtimes without a real consumer; and
 - a published adapter SPI or adapter compatibility matrix before a second
   committed runtime implementation exists.
@@ -728,7 +727,7 @@ open:
   authority or fresh authentication — the engine defaults to 900 seconds,
   configurable; the consumer's security review owns the number; and
 - a read-only hat: `validatePolicyBundle` rejects a role with zero
-  actions, so an auditor (read reach, no act capability) has no natural
+  actions, so an auditor (read reach, no action-bearing hat) has no natural
   carrier in v1. It arrives with the team-audience axis — the consumer's
   read-audience requirement — not by weakening bundle validation ahead of
   the consumer that needs it.

@@ -48,7 +48,7 @@ Against Core RBAC:
 - users → actors (organization-scoped);
 - roles → flat action sets;
 - permissions → `(action, target)` pairs, not materialized;
-- sessions → envelopes with one active role;
+- sessions → envelopes with one active hat;
 - user-role assignment → a grant with a target;
 - role hierarchy (RBAC1) → absent;
 - constraints and separation of duty (RBAC2) → absent;
@@ -57,7 +57,7 @@ Against Core RBAC:
   configuration, not a modeled hierarchy.
 
 The single-active-role restriction is a restriction on RBAC sessions, not a
-new RBAC variant. The object-scoped assignment is closest to TMAC/GRBAC and
+new RBAC variant. The grant over one target is closest to TMAC/GRBAC and
 parameterized-role models, but the repository does not claim those lineages.
 
 The one genuine addition to standard RBAC is the **organization/operation
@@ -150,7 +150,7 @@ mechanized proof.
 - Immediate revocation of already-issued decisions.
 - Compliance-grade audit, a formal threat model, or "secure by default".
 - A complete authorization decision for constrained policies: the envelope
-  carries one action hat, not the full assignment set.
+  carries one action hat, not the full grant set.
 
 ## Citable-model work
 

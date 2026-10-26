@@ -6,8 +6,8 @@ recorded in [`docs/authority_redesign.md`](../docs/authority_redesign.md)
 reference runtime is deployed and accepted; and the test review is closed.
 
 Durable decisions live in `docs/` and `specs/`. The next consumer handoff —
-after the tenant binds authority and the provider decision — belongs to the
-host.
+after the consumer's authority binding and the provider decision — belongs to
+the host.
 
 Retired plans are removed; their results live in `docs/` and the commit
 history. Completed work is not kept here.

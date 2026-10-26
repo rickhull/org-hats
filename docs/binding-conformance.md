@@ -73,9 +73,10 @@ verifier built from the distributed key set:
    handle and assert `unauthenticated`.
 4. Call `context` with the replacement envelope. Assert the operation, at
    least one admitted site, and the wearable/selected hat.
-5. Send a command the fixture's policy refuses, authorized by a non-admin or
-   an unrelated grant. Assert `ok: false` with a closed failure — `denied` for
-   a valid command the policy refuses.
+5. Send a command the fixture's policy refuses, authorized by an actor
+   the policy does not admit to that action, or by an unrelated grant. Assert
+   `ok: false` with a closed failure — `denied` for a valid command the policy
+   refuses.
 6. Verify the replacement envelope with another operation's id and assert
    `wrong-binding`. Verify it with `now` at or after `exp` and assert
    `expired`.

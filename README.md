@@ -3,7 +3,7 @@
 *Portable organizational authority: who may act, in what capacity, over which
 target, in which operation.*
 
-"Can this user act?" is easy when one application, one role, and one database
+"Can this person act?" is easy when one application, one role, and one database
 answer it. It stops being easy when one organization works in several
 operations with different sites, teams, and policy; when the same person
 wears a different hat in each; and when the decision has to reach another
@@ -20,7 +20,7 @@ Riverbend Fest the same Dana is an `admin` over Park Gate. One identity, two
 operation-local hats.
 
 The model is portable. An in-memory engine runs it in tests and examples; the
-Cloudflare package is the reference deployment. Both expose the same four
+Cloudflare package is the reference runtime. Both expose the same four
 calls: `accessFromEvidence`, `refresh`, `context`, and `command`.
 
 > **Before you adopt it.** It is the organizational half of authorization,
@@ -33,7 +33,7 @@ calls: `accessFromEvidence`, `refresh`, `context`, and `command`.
 > Production is the Cloudflare reference runtime; the in-memory engine is
 > for tests and examples. The envelope is not a JWT: every downstream
 > service needs `org-hats/access` and the distributed key set. If one
-> application and one role per user is the whole problem, a role column is
+> application and one role per person is the whole problem, a role column is
 > simpler.
 
 ## Run the examples
@@ -155,7 +155,7 @@ Four consequences do most of the work:
 
 **What it is not:** this is the organizational half of authorization.
 Product objects and verbs, role hierarchy, and what the UI shows belong to
-the host. If one application and one role per user is the whole problem, a
+the host. If one application and one role per person is the whole problem, a
 role column is simpler.
 
 ## The four calls
@@ -238,7 +238,7 @@ already-issued envelope is bounded by `exp`; that is the blast radius.
   into neutral access; `VerifyKeySet` is the rotation unit.
 - **`org-hats/conformance`** — the executable `OH-*` inventory, run through
   the public interface only.
-- **`org-hats-cloudflare`** — the reference deployment: two SQLite-backed
+- **`org-hats-cloudflare`** — the reference runtime: two SQLite-backed
   coordinators, the service binding and provider-callback exchange, key
   rotation, ops routes, bootstrap, export and restore.
 

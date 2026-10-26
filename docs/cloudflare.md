@@ -70,7 +70,7 @@ bind to. Over a `services` binding it exposes the four portable
 `command` — plus one runtime-only method:
 
 **`evidenceFromProviderCode`** — the provider-callback exchange, the
-identity-adapter surface for OIDC logins. The tenant's callback supplies
+identity-adapter surface for OIDC logins. The host's callback supplies
 exactly what it holds (`operationId`, `issuer`, `clientId`, `redirectUri`,
 `code`, `codeVerifier`, `expectedNonce`); the runtime resolves the sealed
 provider configuration (JSON `{ issuer, clientId, clientSecret? }`,

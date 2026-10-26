@@ -54,7 +54,7 @@ Not "is Dana an admin," but "is Dana wearing a hat that may do *this*,
 | **site** | A physical place an operation runs: a yard, a gate, an airfield. |
 | **team** | A working group at one site: Dana's yard crew. |
 | **actor** | A person within one organization. Dana is an actor of her employer. |
-| **grant** | One assignment, in full: this actor, this role, this one target. Written down and auditable. |
+| **grant** | The fact that this actor holds this role over this one target, written down and auditable. |
 | **hat** | A grant worn for a session. You wear exactly one action hat at a time. |
 | **reach** | What a grant's target covers. A team grant covers that team; a site grant covers every team at that site. |
 | **envelope** | The signed, short-lived badge the authority issues for a session — see §4. |
@@ -67,7 +67,7 @@ never the same as *doing*.
 > actually point at," and "hat" with "which row is active in this session,"
 > and you already know this model.
 >
-> **The academic says:** assignment is factorized — role × scope — which is
+> **The academic says:** the grant is factorized — role × target — which is
 > the interesting structural choice here; hierarchy and inheritance are
 > deliberately absent.
 >
@@ -214,8 +214,8 @@ inside a live one.
 > names, sites, the hat list with the ids to act on. I don't join anything
 > against the directory to draw the menu.
 >
-> **The academic says:** one active capacity per session, selected by the
-> subject, addressed by assignment id — the activation is explicit, not
+> **The academic says:** one active hat per session, selected by the
+> subject, addressed by grant id — the activation is explicit, not
 > ambient.
 >
 > **The onlooker says:** it's a profile switcher, like the account
@@ -240,7 +240,7 @@ Three properties make them unexciting, which is the point:
 - **Asking is not being let in.** Someone new who wants in files an access
   request with a note; it sits in a queue until an administrator — a
   person — admits them. The request is a question, never a stored
-  permission.
+  grant.
 
 > **The practitioner says:** idempotency keys and value-shaped failures —
 > this is the request/retry hygiene I keep having to build by hand, in one

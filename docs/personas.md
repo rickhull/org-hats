@@ -8,9 +8,9 @@ audience guidance, not a roadmap.*
 ## The one-sentence position
 
 > A portable authority core for organizations that work across many
-> operations and sites: one identity, one active capacity per session,
-> target-scoped role assignments, and locally verifiable signed access with a
-> bounded revocation window.
+> operations and sites: one identity, one active hat per session, grants over
+> one target, and locally verifiable signed access with a bounded revocation
+> window.
 
 ## 1. The practitioner — AD/LDAP, sysadmin, developer
 
@@ -42,9 +42,9 @@ or deny story.
 ReBAC/Zanzibar, capability systems, delegation/revocation, and audit.
 
 **What earns respect:** the organization/operation split with explicit
-participation; factorized assignment (flat role × target scope with site
-membership); issuer-computed read reach and a verifier that never rebuilds
-policy; the interface-version vs envelope-version split; named invariants with
+participation; factorized grants (one role over one target: a team, or a
+site and its teams); issuer-computed read reach and a verifier that never
+rebuilds policy; the interface-version vs envelope-version split; named invariants with
 “held by” evidence; the executable conformance inventory; the synthetic
 examples; migration discipline; the bounded revocation window.
 

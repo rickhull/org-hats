@@ -8,11 +8,11 @@
 
 `org-hats` is a portable authority core for organizations that work across
 many operations, sites, and teams. It keeps organization identity and
-operation-local authority as separate state, assigns a role to one actor over
-one team or site, selects the active capacity for a session, and issues a
+operation-local authority as separate state, grants a role to one actor over
+one team or site, selects the active hat for a session, and issues a
 short-lived signed access envelope. A verifier checks the signature, expiry,
-and binding and compares signed ids; it never rebuilds the organization's
-rules. Revocation is bounded by the envelope lifetime, with refresh
+and binding and compares signed ids; it never rebuilds the operation's
+policy. Revocation is bounded by the envelope lifetime, with refresh
 re-resolving the actor at the organization. The in-memory engine is the
 reference; the Cloudflare runtime is the production reference.
 
@@ -23,9 +23,9 @@ projection**, wrapped in a multi-organization participation lifecycle — not as
 a new RBAC variant, not as ABAC, not as Zanzibar/ReBAC, and not as a policy
 engine. The full mapping is in [`model_mapping.md`](model_mapping.md).
 
-- Roles are flat action sets; grants are target-scoped assignments.
+- Roles are flat action sets; a grant pairs one role with one target.
 - A site grant reaches the site and its teams; there is no role hierarchy,
-  nested scope inheritance, deny, or separation of duty.
+  nested inheritance, deny, or separation of duty.
 - Organization authority owns actors, principal links, and disabled status;
   operation authority owns grants, participation, policy, and issuance.
 - The access verifier is a policy enforcement point with a cached, signed
@@ -46,7 +46,7 @@ engine. The full mapping is in [`model_mapping.md`](model_mapping.md).
 
 ## When not to use it
 
-- One application and one role per user: a role column is simpler.
+- One application and one role per person: a role column is simpler.
 - You need role hierarchy, separation of duty, delegation, temporal
   validity, obligations, or a general attribute policy.
 - You need immediate revocation for already-issued decisions.
@@ -69,7 +69,7 @@ engine. The full mapping is in [`model_mapping.md`](model_mapping.md).
 | Casbin | Policy rules | Policy store | In-process `enforce` | Policy update | Model-dependent | Casbin model | Embedded application policy |
 | OPA | Policy over input JSON | Policy bundles | In-process/agent query | Bundle update | Policy-dependent | Rego | General policy decisions |
 | Zanzibar / OpenFGA / SpiceDB | Relationship tuples | Relation graph | Check/expand API | Tuple deletion | Graph-native | Relation language | Relationship-heavy sharing |
-| `org-hats` | Target-scoped assignment + signed projection | Organization and operation authority | Yes: signature, expiry, binding, signed ids | Grant/session rules + envelope lifetime | Yes: operations, sites, teams | Flat role → action sets | Multi-org / multi-site operations with offline verification |
+| `org-hats` | Grant over one target + signed projection | Organization and operation authority | Yes: signature, expiry, binding, signed ids | Grant/session rules + envelope lifetime | Yes: operations, sites, teams | Flat role → action sets | Multi-org / multi-site operations with offline verification |
 
 The table is a fit guide, not a scorecard. Several of these compose with
 `org-hats`: an OIDC provider supplies evidence; OPA could evaluate host
@@ -84,7 +84,7 @@ policy; a directory remains the identity source.
   `src/model.ts`; `specs/authority.md`; the conformance inventory.
 - **Issuer-computed reach, verifier-side comparison, no policy rebuild.**
   `src/access/verify.ts`; `specs/authority.md` A5; `specs/envelope.md`.
-- **Authentication, participation, assignment, and activation are separate
+- **Authentication, participation, granting, and activation are separate
   concepts.** The grant is the operative admission; evidence never creates an
   actor or a grant. `docs/authority_redesign.md` § Identity boundary;
   `specs/authority.md`.
@@ -121,8 +121,8 @@ policy; a directory remains the identity source.
 | --- | --- | --- |
 | `operation` | Authorization domain / undertaking | Confusing it with an RBAC operation (an action on an object) |
 | `action` | The verb a role carries | "Permission" without naming the target |
-| `grant` | A target-scoped user-role assignment | OAuth grant, SQL `GRANT`, or "the authorization itself" |
-| `hat` | The active assignment for this envelope | "Wearing several hats" — the model selects one action hat |
+| `grant` | A role held by an actor over one target | OAuth grant, SQL `GRANT`, or "the authorization itself" |
+| `hat` | The grant worn for this envelope | "Wearing several hats" — the model selects one action hat |
 | `principal` (evidence) | The external subject before linking | Using "principal" for the linked actor |
 | `admission` | The grant is the operative acceptance; access requests are a queue | Claiming a stored admission relation is enforced |
 | `bounded` | A label on a time-boxed operation | A schedule that closes the operation |

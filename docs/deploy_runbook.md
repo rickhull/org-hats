@@ -65,7 +65,7 @@ form.
   directory without moving code.
 - State restore and routing-facts backfill belong to a schema change or a
   recovery drill, never to a routine deploy.
-- Record the acceptance before a tenant session depends on the new version.
+- Record the acceptance before a host session depends on the new version.
 - If the smoke fails, stop and report; roll back rather than amend the
   acceptance.
 

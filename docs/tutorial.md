@@ -51,7 +51,7 @@ coalition that puts a crossed team grant beside a site grant.
   `coordinator` over Yard crew (`team-2e8c64b9`) at West Yard
   (`site-b8d620fa`), grant `g-mer-3`. Read policy `granted-teams`
   (`policy-meridian`).
-- **Riverbend Fest** (`op-61a8e3f2`) — bounded, multi-venue. Dana again,
+- **Riverbend Fest** (`op-61a8e3f2`) — bounded, multi-site. Dana again,
   `admin` over Park Gate (`site-a9e05c41`), grant `g-fest-4`. Read policy
   `all-participating` (`policy-riverbend`).
 - **Berlin Airlift** (`op-4b8d2e67`) — bounded, multi-airfield coalition.
@@ -181,7 +181,7 @@ const accessFor = async (
 
 ### Counterpoint
 
-An engine, four principal links, a signing key, an admin map, and two
+An engine, four principal links, a signing key, an `orgAdmins` map, and two
 helpers — all before asking whether Dana may review a shift. Where is the
 simple lookup this was supposed to be?
 

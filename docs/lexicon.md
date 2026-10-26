@@ -67,7 +67,7 @@ _Avoid_: permission, capability, privilege
 bundle — not an entity, and not a person.
 _Avoid_: position, job title
 
-**Grant** — An operation-local assignment of a role to an actor over one
+**Grant** — The operation-local fact that an actor holds a role over one
 target: a team, or a site and its teams. A grant is held; it is not the hat
 currently worn.
 _Avoid_: assignment, membership (when you mean a grant)
@@ -249,9 +249,10 @@ ends at the published artifact:
   controls. Not an org-hats act; `deploy_runbook.md` records the
   host-neutral shape of the deploy that follows a `cloudflare-v*` tag, as a
   consumer contract.
-- **Include / cutback / provision / bootstrap / ship** — the deploying
-  host's deploy mechanics and their records. None is an org-hats concept
-  or command.
+- **Include / cutback / provision / ship** — the deploying host's deploy
+  mechanics and their records. None is an org-hats concept or command. The
+  authority ops route `bootstrap` seeds declared state and is ours; the
+  host's *deployment bootstrap* is a different act.
 - **Deployment record** — the operator's evidence of what runs where. The
   release record is ours; the deployment record is theirs.
 

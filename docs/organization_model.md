@@ -22,7 +22,7 @@ action vocabulary, the roles that carry actions, and the read policy under
 which reach is computed. Neither half names a product verb.
 
 An operation is not owned by an organization. A host that needs a leading
-organization keeps that designation in its own operation or tenant record;
+organization keeps that designation in its own product record;
 the authority model carries no leading-organization field.
 
 The executable form is the portable source: `src/model.ts` and
