@@ -178,7 +178,7 @@ test("the suspended guild's booth stays readable through a crossed grant, as an 
     now: after.envelope.claims.iat + 1,
     expectedOperationId: FESTIVAL_OP,
   }));
-  // read reach narrows; act capability at the booth does not
+  // read reach narrows; the action hat at the booth does not
   assert.equal(verified.access.mayAct("flag", { kind: "team", teamId: BOOTH_001 }), true);
 });
 

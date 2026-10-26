@@ -120,7 +120,7 @@ organization ── participation ── operation
   revocable by either side).
 - **Operation** — the scope authority is exercised in: its own sites, teams,
   policy version, and grants. A **site** is a place where work happens; a
-  **team** is an organization's group anchored to exactly one site.
+  **team** is an organization-fielded unit anchored to exactly one site.
 - **Actor** — `(organizationId, actorId)`, scoped to one organization. The
   same person in two organizations is two actors; equal email addresses
   never merge them.

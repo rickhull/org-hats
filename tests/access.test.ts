@@ -235,7 +235,7 @@ test("neutral access: a host maps product facts onto neutral targets", async () 
   assert.deepEqual(access.readableTeamIds(), []);
   assert.equal(access.mayConfigure("site-b8d620fa"), false);
   assert.equal(access.expiresAt(), vectors.claims.exp);
-  // membership, authentication facts, and the holder — all without reading
+  // member reach, authentication facts, and the holder — all without reading
   // raw claims
   assert.deepEqual(access.memberTeamIds(), ["team-2e8c64b9"]);
   assert.deepEqual(access.authenticatedWith(), ["pwd"]);

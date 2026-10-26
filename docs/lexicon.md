@@ -46,7 +46,7 @@ _Avoid_: signup, registration, enrollment
 authority command, never an issuance input, and it does not create a grant.
 _Avoid_: login request, token request
 
-**Team** — An organization-fielded group anchored to exactly one site. A
+**Team** — An organization-fielded unit anchored to exactly one site. A
 team is not a role and not a roster record.
 _Avoid_: group, squad, department
 
@@ -144,7 +144,7 @@ _Avoid_: server session (for authority state)
 module verifies one. Neither role is a product entity.
 _Avoid_: auth server, token service
 
-**Binding** — The operation, and optionally the site, an envelope is scoped
+**Binding** — The operation, and optionally the site, an envelope is bound
 to. A verifier checks the caller's expected binding.
 _Avoid_: scope, tenant
 

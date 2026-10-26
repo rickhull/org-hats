@@ -1,7 +1,7 @@
 // The synthetic structural twins — public conformance data. They carry the
 // structural properties of the reference consumer's two design tests
 // without any of its names: a persistent multi-site professional
-// operation, and a time-bounded, multi-venue festival burst. One
+// operation, and a time-bounded, multi-site festival burst. One
 // organization and one of its actors participate in both, which is the
 // structural shape of "the same organization actor, different
 // operation-local hats". The third twin is public history instead — the
@@ -122,7 +122,7 @@ export const PROFESSIONAL_OPERATION = twin({
 });
 // --- the festival ---------------------------------------------------------------
 //
-// Time-bounded, multi-venue, a short-lived team burst: one hundred fifty
+// Time-bounded, multi-site, a short-lived team burst: one hundred fifty
 // tasting booths generated deterministically, plus the standing crews at the
 // gate. Read reach is festival-wide under the active policy — the twin that
 // exercises `all-participating`.

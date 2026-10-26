@@ -1,5 +1,5 @@
 // The v1 organization model — the smallest reusable statement of who may
-// act, in what capacity, over which group, and where.
+// act, with which hat, over which team or site, and where.
 //
 // The v0.4 model lives on `main` at its tags; nothing here copies it. What
 // survives is the rule, not the shape:

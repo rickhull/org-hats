@@ -8,25 +8,25 @@
 //   1. the input is what the callback already holds — explicit, no handle;
 //   2. the helper returns evidence; issuance stays `accessFromProviderEvidence`;
 //   3. the caller passes the expected nonce; the runtime verifies it;
-//   4. discovery and JWKS live here, with the secret, not in the tenant.
+//   4. discovery and JWKS live here, with the secret, not in the host.
 
 import { AUTHORITY_INTERFACE_VERSION, type PrincipalEvidence, type Failure } from "org-hats/authority";
 import { base64UrlDecode, utf8 } from "org-hats/access";
 
-/** What the tenant's callback already holds when it calls. Nothing here is
+/** What the host's callback already holds when it calls. Nothing here is
  * derivable from a handle, and nothing here is a secret. */
 export interface EvidenceFromProviderCodeInput {
   readonly interfaceVersion: typeof AUTHORITY_INTERFACE_VERSION;
   readonly operationId: string;
-  /** The issuer identifier, exactly as the tenant configured it. */
+  /** The issuer identifier, exactly as the host configured it. */
   readonly issuer: string;
   readonly clientId: string;
   readonly redirectUri: string;
   /** The authorization code from the callback query. */
   readonly code: string;
-  /** The PKCE verifier the tenant generated before the redirect. */
+  /** The PKCE verifier the host generated before the redirect. */
   readonly codeVerifier: string;
-  /** The nonce the tenant expects; the runtime verifies the token against it. */
+  /** The nonce the host expects; the runtime verifies the token against it. */
   readonly expectedNonce: string;
 }
 
@@ -330,7 +330,7 @@ export const exchangeCodeForEvidence = async (
       return failed({ kind: "invalid-command", detail: `${field} must be a non-empty string` });
     }
   }
-  // RFC 7636 §4.1: 43-128 unreserved characters. The tenant creates the
+  // RFC 7636 §4.1: 43-128 unreserved characters. The host creates the
   // verifier; the runtime refuses a malformed one before a round trip.
   if (!/^[A-Za-z0-9\-._~]{43,128}$/.test(input.codeVerifier)) {
     return failed({ kind: "invalid-command", detail: "codeVerifier must be 43-128 unreserved characters" });

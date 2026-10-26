@@ -55,7 +55,7 @@ const failureOf = (value: AccessEnvelopeClaimsV1 | Failure): Failure => {
   return value;
 };
 
-test("claims: the wearable hat, membership, reach, and lifetime in one shape", () => {
+test("claims: the actor, wearable hat, reach, and lifetime in one shape", () => {
   const claims = claimsFor(DANA_OKAFOR, HARBOR_LOGISTICS);
   assert.ok(!("kind" in claims));
   assert.equal(claims.v, 1);
