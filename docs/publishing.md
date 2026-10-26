@@ -161,7 +161,9 @@ From a clean `main`:
    manifest cannot disagree. `--push` then sends the branch and tag to
    `origin`, and the same to `github` when that remote exists. `--dry-run`
    previews; `--no-cloudflare` skips the workspace suites on a root release.
-   **Never tag by hand.**
+   **Never tag by hand.**  A Cloudflare release also runs
+   `bin/check-deploy` before the commit and tag; the host-neutral sequence is
+   in [`deploy_runbook.md`](deploy_runbook.md).
 
    Docs that name the artifacts move with the window: the README version table
    and the additive note in `migration-v2.md` move before the root tag; the

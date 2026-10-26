@@ -57,6 +57,8 @@ runtime.
   repositories, both tag families.
 - `gate-cache.test.ts` — the local per-commit gate marker, and its
   invalidation by dirt, a new commit, or a changed toolchain.
+- `deploy-check.test.ts` — the Cloudflare deployable-artifact gate: the
+  production config, the annotated tag, and the version match.
 
 The inventory ships as `org-hats/conformance`; `tests/conformance.test.ts` is
 only its in-memory runner. A case that cannot be expressed through the public

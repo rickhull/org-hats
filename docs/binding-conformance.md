@@ -7,8 +7,10 @@ remains the workerd suite against the real coordinators
 binding and entrypoint preserve the public runtime behaviour for a dedicated,
 pre-bootstrapped operation without resetting it.*
 
-*The reference deployment is live at `cloudflare-v0.3.2`; this subset is the
-claim to rerun there.*
+*The reference deployment is live at `cloudflare-v0.3.2`; the subset passed
+all six groups there on 2026-10-26 at configuration version
+`d16df1878b51dde301af039faff57c184f7ca8d7-config-cc10fca1ad2a`, and the host
+has recorded the acceptance.*
 
 ## Preconditions
 

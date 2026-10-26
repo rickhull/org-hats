@@ -30,6 +30,8 @@ public `org-hats` docs are normative for the seam.
   contract, ops routes, and the state lifecycle.
 - [`binding-conformance.md`](binding-conformance.md) — the documented
   service-binding smoke subset and what it does not claim.
+- [`deploy_runbook.md`](deploy_runbook.md) — the host-neutral deploy,
+  canary, acceptance, rollback, and witness for a `cloudflare-v*` tag.
 - [`lexicon.md`](lexicon.md) — the normative vocabulary; it wins over loose
   usage elsewhere.
 - [`migration-v1.md`](migration-v1.md) — the 0.4 → v1 crossing, including

@@ -5,6 +5,7 @@
 #   - build dist/ from src/, and fail if the committed dist/ is stale
 #   - run the neutrality fence, the suites, and the example (bin/check)
 #   - run the Cloudflare workerd suites in a separate job
+#   - a cloudflare-v* tag also passes the deployable-artifact gate
 #
 # Because CI lives on the mirror, a broken mirror stops CI too — watch the sync.
 name: check
@@ -81,3 +82,7 @@ jobs:
 
       - name: Typecheck and workerd integration tests
         run: pnpm check:cloudflare
+
+      - name: Cloudflare deploy artifact
+        if: startsWith(github.ref, 'refs/tags/cloudflare-v')
+        run: bin/check-deploy "${GITHUB_REF#refs/tags/}"

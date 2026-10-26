@@ -137,6 +137,14 @@ if ! $verify; then
 	pnpm build
 fi
 
+# The deployable artifact gate runs on the bumped working tree, before the
+# commit and tag. It validates the production config and bundles the Worker;
+# it does not deploy.
+if [ "$package" = cloudflare ] && $verify; then
+	printf '\n== deploy artifact ==\n'
+	"$(dirname "$0")/check-deploy" --root "$PWD"
+fi
+
 # A root release commits the rebuilt dist/. A Cloudflare release must not
 # change it: that would be a root source change smuggled into this tag.
 if [ "$package" = cloudflare ] && [ -n "$(git status --porcelain -- dist)" ]; then

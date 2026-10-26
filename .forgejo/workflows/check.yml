@@ -39,3 +39,7 @@ jobs:
 
       - name: Check (fence, suites, example)
         run: bin/check
+
+      - name: Cloudflare deploy artifact
+        if: startsWith(github.ref, 'refs/tags/cloudflare-v')
+        run: bin/check-deploy "${GITHUB_REF#refs/tags/}" --no-build
