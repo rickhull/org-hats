@@ -7,10 +7,12 @@ remains the workerd suite against the real coordinators
 binding and entrypoint preserve the public runtime behaviour for a dedicated,
 pre-bootstrapped operation without resetting it.*
 
-*The reference deployment is live at `cloudflare-v0.3.2`; the subset passed
-all six groups there on 2026-10-26 at configuration version
-`d16df1878b51dde301af039faff57c184f7ca8d7-config-cc10fca1ad2a`, and the host
-has recorded the acceptance.*
+*The reference deployment is live at `cloudflare-v0.4.0` (configuration
+`c22a252efdcb391d796503c760b90a1a20392381-config-5ad6c5e46589`). The subset
+passed all six groups on `cloudflare-v0.3.2` on 2026-10-26, and the host
+recorded that acceptance. `cloudflare-v0.4.0` adds the typed principal-link
+ops routes without changing the runtime methods; rerun this subset on v0.4.0
+for a fresh acceptance.*
 
 ## Preconditions
 

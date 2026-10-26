@@ -142,7 +142,7 @@ registration from the organization directory by issuer and client id.
 Upstream's release act ends at an immutable `cloudflare-v*` tag and its
 push. Deploying that tag — the host's Cloudflare account, Worker Versions,
 secrets, traffic, and service binding — is the consuming host's act. The
-reference deployment is live at `cloudflare-v0.3.2`; the host's ops
+reference deployment is live at `cloudflare-v0.4.0`; the host's ops
 porcelain owns the deploy verbs. A deployed tag can lag `main`; the tag is
 the deployment unit.
 

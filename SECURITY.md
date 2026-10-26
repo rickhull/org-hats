@@ -9,7 +9,8 @@ GitHub repository is a push-only mirror.*
 | Version | Supported |
 | --- | --- |
 | `v2.x` (from `v2.0.0`) | current release line; fixes land as a new tag |
-| `cloudflare-v0.3.x` | current Cloudflare runtime line; separate cadence |
+| `cloudflare-v0.4.x` | current Cloudflare runtime line; separate cadence |
+| `cloudflare-v0.3.x` | previous line; fixes land in the current line |
 | `v1.x` (from `v1.0.0`) | frozen at its tags; no fixes |
 | `v0.4.x` | frozen at its tags; no fixes |
 

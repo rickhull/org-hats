@@ -98,15 +98,20 @@ declarations so that cannot regress silently.
   carries the corrected exchange and the RFC 8414/7515/7519/7636
   tightenings: discovery issuer/HTTPS validation, `crit` rejection,
   P-256-only ES256, a valid DER conversion, `iat`/`nbf`/`azp`, optional-claim
-  type checks, and the PKCE verifier grammar. `cloudflare-v0.3.2` is the live
-  deployment.
+  type checks, and the PKCE verifier grammar. `cloudflare-v0.3.2` was the
+  accepted deployment before v0.4.0.
+- `cloudflare-v0.4.0` adds typed organization ops routes for principal
+  links: list the organization's links and bind a verified `(provider,
+  subject)` to an existing actor. The worker refuses a subject already linked
+  in another directory organization. Operation schema 4, interface 2, and
+  envelope 1 do not move. This tag is the live deployment.
 - New operator verbs: `POST /reconcile-rosters` on an operation;
   `GET /ops/schema-status` reports `orgActors`, `disabledOrgActors`,
   `rosterSyncedAt`, and `rosterReconcileSeconds`; `GET /snapshot` reports
   `orgActors`.
 - The provider-callback exchange posts to the discovery document's
   `token_endpoint`, not the authorization endpoint. `cloudflare-v0.1.0` is
-  not safe for real-provider login; take `cloudflare-v0.3.2`.
+  not safe for real-provider login; take `cloudflare-v0.4.0`.
 
 ## 2.0 → 2.1 (additive)
 
@@ -130,7 +135,7 @@ envelope meaning. Interface version 2 and envelope version 1 stay put.
   `path` — with invariant checks and the one-namespace rule. These are
   operation-authority facts; the registry projects them (A12 in
   [`specs/authority.md`](../specs/authority.md)). The `cloudflare-v0.3.x`
-  tags already serve them.
+  and later tags already serve them.
 - `parseVerifyKeySet` ignores unknown fields by design: an operator-
   distributed set may grow a field without bricking live verifiers; `format`
   and `v` carry compatibility.
