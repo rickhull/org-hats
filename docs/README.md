@@ -18,6 +18,8 @@ public `org-hats` docs are normative for the seam.
 - [`authority_redesign.md`](authority_redesign.md) — the architecture:
   modules, state ownership, the identity boundary, verification strategy, and
   packaging.
+- [`positioning.md`](positioning.md) — what the system is and is not, the
+  comparison table, claims and non-claims, and the vocabulary to use.
 - [`types.md`](types.md) — the type layer as built: brands, unions,
   compiler fences, and the boundaries where runtime validation takes over.
 - [`envelope.md`](envelope.md) — the signed access-envelope format: claims,
@@ -37,6 +39,14 @@ public `org-hats` docs are normative for the seam.
   1 keeps reading across it.
 - [`publishing.md`](publishing.md) — canonical host, mirror, CI, the
   release ritual, and why deployment is the consuming host's act.
+
+## Audience guides
+
+- [`from_ldap.md`](from_ldap.md) — the Active Directory/LDAP practitioner's
+  map: what transfers, what does not, and why ids beat DNs.
+- [`model_mapping.md`](model_mapping.md) — the access-control literature
+  mapping: scoped RBAC0, PDP/PEP/PIP, ABAC/ReBAC/capability non-claims, and
+  the path to a citable model.
 
 ## Tutorial
 

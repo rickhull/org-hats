@@ -11,8 +11,8 @@ service without shipping the authority database with it.
 
 org-hats answers one question, precisely:
 
-> **may act = the worn role carries the action × the grant reaches the
-> target**
+> **may act = the active hat's role carries the action × that grant
+> reaches the target**
 
 Dana is a coordinator over the Yard crew at West Yard. She may `review` and
 `resolve` there, may not `observe`, and has no reach at East Hall. In

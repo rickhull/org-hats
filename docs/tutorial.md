@@ -8,7 +8,7 @@ design data.*
 One rule runs through every case:
 
 ```text
-may act = the worn role carries the action × the grant reaches the target
+may act = the active hat's role carries the action × that grant reaches the target
 ```
 
 The rest of the model — organizations, participation, admission, envelopes,

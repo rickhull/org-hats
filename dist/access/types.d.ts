@@ -15,8 +15,9 @@ export interface NeutralAccess {
     readableTeamIds(): readonly Unbranded<TeamId>[];
     /** Site-configuration reach. */
     mayConfigure(siteId: Unbranded<SiteId>): boolean;
-    /** The teams the actor belongs to by membership, not by grant — what a
-     * site-local view lists without a grant query. */
+    /** The teams the actor's wearable grants reach — what a site-local view
+     * lists without a grant query. The name is historical; this is not a
+     * directory membership list. */
     memberTeamIds(): readonly Unbranded<TeamId>[];
     /** How the session's principal authenticated (RFC 8176 `amr`), as the
      * issuing evidence stated and the issuer preserved; empty when that

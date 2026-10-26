@@ -4,9 +4,9 @@
 // The in-memory engine and the Cloudflare operation coordinator each own
 // their preconditions (does the actor exist, is it disabled, is the
 // operation bootstrapped) but neither owns the claim shape: the hat, its
-// action list, membership, routing sites, read reach, configuration reach,
-// the lifetime, and the preserved authentication facts are computed here from
-// a model snapshot and the active bundle. Two copies drifted once; one
+// action list, the teams the wearable grants reach, routing sites, read
+// reach, configuration reach, the lifetime, and the preserved authentication
+// facts are computed here from a model snapshot and the active bundle. Two copies drifted once; one
 // function cannot.
 //
 // Pure: the caller supplies the issued-at instant, the lifetime, and the
