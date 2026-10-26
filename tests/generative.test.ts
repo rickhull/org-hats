@@ -31,7 +31,7 @@ import {
   CONFORMANCE_WORLD,
 } from "../src/conformance.ts";
 import { actorId, isFailed, operationId, organizationId, siteId, teamId, type OrganizationId } from "../src/contract.ts";
-import { mulberry32, pick } from "./helpers.ts";
+import { mulberry32, okOf, pick, type CommandBody } from "./helpers.ts";
 
 const OP = operationId("op-9f2e6ad4");
 const INVITEE_ORG = organizationId("org-invitee");
@@ -315,12 +315,6 @@ test("generated states: read reach matches the policy axis and the reached teams
 
 // --- workflow resilience ------------------------------------------------------------
 
-type CommandBody = AuthorityCommand extends infer Command
-  ? Command extends AuthorityCommand
-    ? Omit<Command, "interfaceVersion" | "idempotencyKey" | "authorization">
-    : never
-  : never;
-
 const setup = async (transportFailures = 0) =>
   createInMemoryAuthority({
     ...CONFORMANCE_WORLD,
@@ -353,7 +347,7 @@ const command = (
     idempotencyKey: key,
     authorization,
     ...body,
-  } as AuthorityCommand);
+  });
 
 const envelopeAuth = (envelope: SignedAccessEnvelope): AuthorityCommand["authorization"] => ({
   kind: "access-envelope",
@@ -505,7 +499,7 @@ test("partial workflow failure: retries converge, replays are no-ops, and state 
     admin,
     "partial-invite",
   );
-  assert.ok(invite.ok);
+  okOf(invite);
   assert.equal(engine.pendingOutbox(), 1);
   // the acceptance cannot exist before its invitation arrives; the attempt
   // consumes one transport failure and leaves the invitation pending
@@ -532,7 +526,7 @@ test("partial workflow failure: retries converge, replays are no-ops, and state 
     freshAuth(CONFORMANCE_PRINCIPALS.inviteeAdmin),
     "partial-accept",
   );
-  assert.ok(accept.ok);
+  okOf(accept);
   assert.equal(engine.pendingOutbox(), 1);
   // the acceptance ack is pending: the operation still records invited
   assert.equal(engine.snapshotOf(OP)?.participations.find((p) => p.organizationId === INVITEE_ORG)?.status, "invited");

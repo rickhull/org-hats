@@ -1,9 +1,10 @@
 // Shared helpers for the generative suites: the deterministic mulberry32
 // PRNG and a pick over its stream. Same seed, same world, in every suite.
 
-import { isFailed, type Failed, type Failure, type JsonValue, type Unbranded } from "../src/contract.ts";
+import { isFailed, type Failed, type Failure, type JsonValue, type RefreshHandle, type RefreshHandleOutcome, type Unbranded } from "../src/contract.ts";
 import type { PolicyBundle } from "../src/policy.ts";
 import type { Snapshot } from "../src/model.ts";
+import type { AuthorityCommandBody, CommandResult } from "../src/authority/types.ts";
 
 export const mulberry32 = (seed: number) => () => {
   seed |= 0;
@@ -47,4 +48,22 @@ export const failureOf = (value: unknown): Failure => {
 export const successOf = <T extends object>(value: T | Failed): T => {
   if (isFailed(value)) throw new Error(`expected success, got ${value.failure.kind}`);
   return value;
+};
+
+/** A command body without the shell every call shares: the public union of
+ * all command variants, so a suite builds commands against the same type the
+ * runtime validates. */
+export type CommandBody = AuthorityCommandBody;
+
+/** A successful command, naming its failure kind when it is not. */
+export const okOf = (result: CommandResult): Extract<CommandResult, { ok: true }> => {
+  if (!result.ok) throw new Error(`expected command success, got ${result.failure.kind}`);
+  return result;
+};
+
+/** A rotated refresh handle; any other outcome fails the test and names
+ * itself, so a changed outcome cannot skip the assertions that follow. */
+export const handleOf = (outcome: RefreshHandleOutcome): RefreshHandle => {
+  if (outcome.kind !== "rotated") throw new Error(`expected a rotated refresh handle, got ${outcome.kind}`);
+  return outcome.handle;
 };

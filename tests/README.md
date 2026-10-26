@@ -33,6 +33,23 @@ Pre-push and the Codeberg per-push CI run the portable gate. The workerd
 suite runs in ring 2, `pnpm verify`, `bin/release`, and the GitHub mirror job;
 it is not part of per-push Codeberg CI.
 
+## Smoke
+
+`pnpm test:smoke` (`pnpm typecheck && pnpm test`, about five seconds) is the
+quick cross-domain lane: the compiler surface of `src/` plus every portable
+domain — contract, model, policy, engine, claims, verification, keys, the
+vertical path, the scenarios, and the conformance inventory — in one
+`node --test` process.
+
+The portable suite is already smoke-sized: all of it runs in ~2.5 s, and a
+single file costs ~0.3 s of Node startup, so a subset saves pennies while
+dropping a domain — run it whole or not at all. The workerd side is the
+opposite trade: the vitest harness floor is ~4–5 s and marginal files are
+cheap (all eleven files run in ~13 s; the conformance file alone, which
+runs the full public inventory through the deployed coordinators, in
+~12 s), so a workerd subset buys almost nothing. Either skip ring 2 or run
+it whole.
+
 The root suites and `examples/` are typechecked by `tsconfig.tests.json` as
 part of `bin/check`; the consumer surface is the separate
 `tsconfig.consumer.json` fence against `dist/`. `pnpm typecheck:tests` is the

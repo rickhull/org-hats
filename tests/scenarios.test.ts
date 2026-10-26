@@ -15,14 +15,13 @@ import {
   HARBOR_LOGISTICS,
   PROFESSIONAL_OPERATION,
 } from "../src/authority/twins.ts";
-import type { PrincipalEvidence } from "../src/authority/types.ts";
-import { AUTHORITY_INTERFACE_VERSION } from "../src/authority/types.ts";
+import { AUTHORITY_INTERFACE_VERSION, type AuthorityCommand, type PrincipalEvidence } from "../src/authority/types.ts";
 import { createInMemoryAuthority } from "../src/authority/engine.ts";
 import { fixedClock, webCryptoSigner } from "../src/authority/internal.ts";
 import { verify } from "../src/access/verify.ts";
 import { ed25519VerifyKey } from "../src/access/verify.ts";
 import { actorId, isFailed, operationId, organizationId, siteId, teamId } from "../src/contract.ts";
-import { failureOf, successOf } from "./helpers.ts";
+import { failureOf, okOf, successOf, type CommandBody } from "./helpers.ts";
 
 const MERIDIAN = operationId("op-9f2e6ad4");
 const FESTIVAL_OP = operationId("op-61a8e3f2");
@@ -102,10 +101,10 @@ const issue = async (
   return successOf(result);
 };
 
-const command = async (
+const command = (
   engine: Awaited<ReturnType<typeof createInMemoryAuthority>>["runtime"],
-  body: Record<string, unknown>,
-  authorization: Record<string, unknown>,
+  body: CommandBody,
+  authorization: AuthorityCommand["authorization"],
   key: string,
 ) =>
   engine.command({
@@ -113,7 +112,7 @@ const command = async (
     idempotencyKey: key,
     authorization,
     ...body,
-  } as Parameters<typeof engine.command>[0]);
+  });
 
 test("the embedded specialist reads the organization that owns the team, not their employer's alone", async () => {
   const { engine, keys } = await setup();
@@ -127,7 +126,7 @@ test("the embedded specialist reads the organization that owns the team, not the
     { kind: "access-envelope", envelope: len.envelope },
     "scenarios-embed-1",
   );
-  assert.ok(grant.ok);
+  okOf(grant);
 
   const after = await issue(engine.runtime, MARCO, MERIDIAN);
   // read reach follows the target: the Harbor-owned team makes Harbor
@@ -157,7 +156,7 @@ test("the suspended guild's booth stays readable through a crossed grant, as an 
     { kind: "access-envelope", envelope: admin.envelope },
     "scenarios-cross-1",
   );
-  assert.ok(cross.ok);
+  okOf(cross);
 
   const revoke = await command(
     engine.runtime,
@@ -165,7 +164,7 @@ test("the suspended guild's booth stays readable through a crossed grant, as an 
     { kind: "access-envelope", envelope: admin.envelope },
     "scenarios-revoke-ciders",
   );
-  assert.ok(revoke.ok);
+  okOf(revoke);
 
   const after = await issue(engine.runtime, DANA, FESTIVAL_OP);
   // the guild is suspended, so its organization leaves the readable set —
@@ -193,7 +192,7 @@ test("suspension cuts both ways: the guild's own people lose fresh access, live 
     { kind: "access-envelope", envelope: admin.envelope },
     "scenarios-cut-revoke",
   );
-  assert.ok(revoke.ok);
+  okOf(revoke);
 
   const refused = failureOf(await engine.runtime.accessFromEvidence(evidence(IRIS, FESTIVAL_OP)));
   assert.equal(refused.kind, "not-admitted");
@@ -224,7 +223,7 @@ test("the departing administrator: administration survives to expiry, fresh proo
     { kind: "fresh-evidence", evidence: DANA, operationId: MERIDIAN },
     "scenarios-self-disable",
   );
-  assert.ok(self.ok);
+  okOf(self);
 
   // her live envelope still administers: the bounded window applies to
   // administration exactly as it does to every other authority fact
@@ -234,7 +233,7 @@ test("the departing administrator: administration survives to expiry, fresh proo
     { kind: "access-envelope", envelope: dana.envelope },
     "scenarios-disable-sam",
   );
-  assert.ok(viaEnvelope.ok);
+  okOf(viaEnvelope);
 
   // fresh proof is refused, and the refresh handle died with her
   const viaEvidence = await command(
@@ -267,7 +266,7 @@ test("the shift change: the worn hat turns over at the next issuance, never mid-
     { kind: "access-envelope", envelope: len.envelope },
     "scenarios-shift-grant",
   );
-  assert.ok(grant.ok);
+  okOf(grant);
 
   // the envelope already in the field still wears the old hat
   const stillOld = successOf(await verify(before.envelope, keys, {
@@ -361,7 +360,7 @@ test("the host nation stands down, the lift continues: the board shrinks, the se
     { kind: "access-envelope", envelope: whitfield.envelope },
     "scenarios-ghs-stands-down",
   );
-  assert.ok(revoke.ok);
+  okOf(revoke);
 
   // the ground handlers lose fresh access; the wing does not
   const refused = failureOf(await engine.runtime.accessFromEvidence(evidence(FALK, AIRLIFT_OP)));

@@ -18,7 +18,7 @@ import type { AuthorityCommand, PrincipalEvidence } from "../src/authority/types
 import { AUTHORITY_INTERFACE_VERSION } from "../src/authority/types.ts";
 import { createInMemoryAuthority } from "../src/authority/engine.ts";
 import { fixedClock, webCryptoSigner } from "../src/authority/internal.ts";
-import { asJson, failureOf, fixtureSnapshot, successOf } from "./helpers.ts";
+import { asJson, failureOf, fixtureSnapshot, successOf, handleOf, okOf, type CommandBody } from "./helpers.ts";
 
 const OP = operationId("op-9f2e6ad4"); // Meridian
 const LEN_ORG = organizationId("org-a53e90f7");
@@ -79,13 +79,6 @@ const evidence = (subject: PrincipalEvidence, operationId: string = OP) => ({
   evidence: subject,
 });
 
-type CommandBody = {
-  [K in AuthorityCommand["kind"]]: Omit<
-    Extract<AuthorityCommand, { kind: K }>,
-    "interfaceVersion" | "idempotencyKey" | "authorization"
-  >;
-}[AuthorityCommand["kind"]];
-
 const cmd = (body: CommandBody, authorization: AuthorityCommand["authorization"], key: string): AuthorityCommand => ({
   interfaceVersion: AUTHORITY_INTERFACE_VERSION,
   idempotencyKey: key,
@@ -122,15 +115,14 @@ test("refresh: rotation with explicit outcomes; a superseded handle is dead", as
   const { engine } = await setup();
   const first = await engine.runtime.accessFromEvidence(evidence(DANA));
   assert.ok(!isFailed(first));
-  assert.equal(first.refresh.kind, "rotated");
-  if (first.refresh.kind !== "rotated") return;
+  const handle = handleOf(first.refresh);
   const second = await engine.runtime.refresh({
-    interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: first.refresh.handle,
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle,
   });
   assert.ok(!isFailed(second));
   assert.equal(second.refresh.kind, "rotated");
   const replay = await engine.runtime.refresh({
-    interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: first.refresh.handle,
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle,
   });
   assert.equal(failureOf(replay).kind, "unauthenticated");
   assert.match(failureOf(replay).detail ?? "", /superseded/);
@@ -156,9 +148,8 @@ test("amr and auth_time: copied from evidence, preserved through refresh, surfac
   assert.ok(!isFailed(bare));
   assert.equal("amr" in bare.envelope.claims, false);
   assert.equal("auth_time" in bare.envelope.claims, false);
-  if (first.refresh.kind !== "rotated") return;
   const second = await engine.runtime.refresh({
-    interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: first.refresh.handle,
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: handleOf(first.refresh),
   });
   assert.ok(!isFailed(second));
   assert.deepEqual(second.envelope.claims.amr, ["hwk", "otp"], "refresh preserves the methods");
@@ -184,14 +175,13 @@ test("the bounded window: a revoked grant kills refresh, not the live envelope",
     { kind: "access-envelope", envelope: lenIssue.envelope },
     "revoke-dana-1",
   ));
-  assert.ok(revoke.ok);
+  okOf(revoke);
   // the envelope still verifies until expiry — the window is bounded, not zero
   const ctx = await engine.runtime.context({ interfaceVersion: AUTHORITY_INTERFACE_VERSION, envelope: danaIssue.envelope });
   assert.ok(!isFailed(ctx));
   // but the refresh handle died with the grant
-  if (danaIssue.refresh.kind !== "rotated") return;
   const dead = await engine.runtime.refresh({
-    interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: danaIssue.refresh.handle,
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: handleOf(danaIssue.refresh),
   });
   assert.equal(failureOf(dead).kind, "unauthenticated");
   assert.match(failureOf(dead).detail ?? "", /revoked/);
@@ -207,12 +197,11 @@ test("disable-actor: issuance stops immediately; the outbox revokes refresh reco
     { kind: "fresh-evidence", evidence: DANA, operationId: OP },
     "disable-dana",
   ));
-  assert.ok(disable.ok);
+  okOf(disable);
   const blocked = await engine.runtime.accessFromEvidence(evidence(DANA));
   assert.equal(failureOf(blocked).kind, "not-admitted");
-  if (danaIssue.refresh.kind !== "rotated") return;
   const dead = await engine.runtime.refresh({
-    interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: danaIssue.refresh.handle,
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: handleOf(danaIssue.refresh),
   });
   assert.equal(failureOf(dead).kind, "unauthenticated");
 });
@@ -233,7 +222,7 @@ test("participation: an acceptance delivered after a revoke does not resurrect i
     { kind: "access-envelope", envelope: len.envelope },
     "revoke-race-invite",
   ));
-  assert.ok(invite.ok);
+  okOf(invite);
   await engine.drainOutbox();
   assert.equal(engine.invitationsOf(INVITEE_ORG).size, 1);
 
@@ -242,7 +231,7 @@ test("participation: an acceptance delivered after a revoke does not resurrect i
     { kind: "access-envelope", envelope: len.envelope },
     "revoke-race-revoke",
   ));
-  assert.ok(revoke.ok);
+  okOf(revoke);
   assert.equal(
     engine.snapshotOf(OP)?.participations.find((p) => p.organizationId === "org-invitee")?.status,
     "revoked",
@@ -254,7 +243,7 @@ test("participation: an acceptance delivered after a revoke does not resurrect i
     { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
     "revoke-race-accept",
   ));
-  assert.ok(accept.ok);
+  okOf(accept);
   assert.equal(engine.pendingOutbox(), 1);
 
   // delivery applies nothing: `transitionParticipation` refuses `accept`
@@ -283,7 +272,7 @@ test("a wrong-version call mutates nothing — not even the outbox drain", async
     { kind: "access-envelope", envelope: len.envelope },
     "gate-drain-invite",
   ));
-  assert.ok(invite.ok);
+  okOf(invite);
   // the invitation is en route: delivered to nobody yet, still pending
   assert.equal(engine.invitationsOf(INVITEE_ORG).size, 0);
   assert.equal(engine.pendingOutbox(), 1);
@@ -352,7 +341,7 @@ test("request-access keeps its note for the administrator who admits", async () 
     { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
     "note-keep-ask",
   ));
-  assert.ok(asked.ok);
+  okOf(asked);
   const requests = engine.accessRequestsOf(OP);
   assert.equal(requests.length, 1);
   assert.equal(requests[0]?.note, "booth power hookup");
@@ -374,9 +363,9 @@ test("participation: revoking twice is a safe retry; revoking a non-participant 
     { kind: "access-envelope", envelope: len.envelope },
     "twice-invite",
   ));
-  assert.ok(invite.ok);
+  okOf(invite);
 
-  assert.ok((await engine.runtime.command(revokeCmd("twice-1", "org-invitee"))).ok);
+  okOf(await engine.runtime.command(revokeCmd("twice-1", "org-invitee")));
   // a second revoke under a fresh key is not a replay, and must still read
   // as success: the state the caller asked for is the state that holds
   const again = await engine.runtime.command(revokeCmd("twice-2", "org-invitee"));
@@ -402,7 +391,7 @@ test("participation: invite → accept → active, with a visible partial state 
     { kind: "access-envelope", envelope: len.envelope },
     "invite-1",
   ));
-  assert.ok(invite.ok);
+  okOf(invite);
   // the delivery failed: the op says invited, the org has nothing yet
   assert.equal(engine.pendingOutbox(), 1);
   const before = engine.snapshotOf(OP);
@@ -422,7 +411,7 @@ test("participation: invite → accept → active, with a visible partial state 
     { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
     "accept-1",
   ));
-  assert.ok(accept.ok);
+  okOf(accept);
   // the acceptance ack crosses the outbox; the operation records active
   await engine.drainOutbox();
   const after = engine.snapshotOf(OP);
@@ -575,7 +564,7 @@ test("request-access and admit: asking is not being admitted", async () => {
     { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
     "req-invitee",
   ));
-  assert.ok(request.ok, request.ok ? "" : request.failure.kind);
+  okOf(request);
   const beforeAdmit = await engine.runtime.accessFromEvidence(evidence(INVITEE_ADMIN));
   assert.ok(isFailed(beforeAdmit));
   assert.equal(failureOf(beforeAdmit).kind, "not-admitted", "asking did not admit");
@@ -586,7 +575,7 @@ test("request-access and admit: asking is not being admitted", async () => {
     { kind: "access-envelope", envelope: len.envelope },
     "admit-invitee",
   ));
-  assert.ok(admitted.ok, admitted.ok ? "" : admitted.failure.kind);
+  okOf(admitted);
 });
 
 test("select-hat: an actor selects their own hat; a stranger cannot", async () => {
@@ -598,7 +587,7 @@ test("select-hat: an actor selects their own hat; a stranger cannot", async () =
     { kind: "fresh-evidence", evidence: MARCO, operationId: OP },
     "marco-select",
   ));
-  assert.ok(self.ok);
+  okOf(self);
   const stranger = await engine.runtime.command(cmd(
     { kind: "select-hat", operationId: OP, grantId: "g-mer-3" },
     { kind: "fresh-evidence", evidence: MARCO, operationId: OP },
@@ -663,7 +652,7 @@ test("select-hat: a revoked or non-wearable grant cannot be selected", async () 
     auth,
     "select-active",
   ));
-  assert.ok(active.ok);
+  okOf(active);
 });
 
 test("command and context use the envelope version gate, not just the signature", async () => {
