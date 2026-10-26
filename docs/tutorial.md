@@ -772,7 +772,8 @@ is not a wart to paper over. It is why the gate exists.
 ## The same rules in Cloudflare
 
 The in-memory engine is a reference implementation of the portable
-`AuthorityRuntime`; the Cloudflare package is the reference deployment. It
+`AuthorityRuntime`; the Cloudflare package is the reference runtime, and
+deploying it is the host's act. It
 does not grow a second set of authority rules. It provides:
 
 - `OrganizationAuthority`, which owns the organization, actors, principal

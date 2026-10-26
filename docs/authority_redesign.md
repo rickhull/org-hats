@@ -32,7 +32,8 @@ The governing posture is:
 
 > Portable semantics, Cloudflare paved road.
 
-Cloudflare is the reference deployment and receives first-class tooling. It is
+The Cloudflare package is the reference runtime and receives first-class
+tooling. It is
 not part of the organizational model and is not required by the portable
 interfaces.
 
@@ -489,7 +490,7 @@ authority may call authority directly.
 The generic modules define how a valid policy bundle is represented and
 applied. Quartermaster supplies Reporting.Stream's versioned bundle: actions,
 role titles, role-to-action mappings, and relevant read or reach policy. An
-authenticated operations command publishes a validated bundle to an operation,
+authenticated operations command distributes a validated bundle to an operation,
 which records the active version. Customer administrators manage assignments
 under that policy; arbitrary customer-defined roles or policy rules are not an
 initial capability.
@@ -541,7 +542,7 @@ provide the guarantees required by the authority engine:
 - versioned schema migration and canonical export/restore; and
 - bounded, observable retry behavior.
 
-An in-memory adapter should ship for fast tests and examples. Additional
+An in-memory adapter should be provided for fast tests and examples. Additional
 production adapters should be added only when a real consumer needs them.
 One hypothetical adapter is not a reason to introduce another public seam.
 The honest positioning is "portable semantics, one reference runtime": a
@@ -556,7 +557,8 @@ This repository must carry a security-reporting and coordinated-disclosure
 policy before it protects production data, and consumers pin reviewed commits
 rather than floating ranges.
 
-This repository ships source, release artifacts, and deployment templates. It
+This repository provides source and release artifacts, including the
+production configuration an artifact must carry. It
 does not deploy anything: every running authority instance, its pinned
 version, bindings, secrets, jurisdiction, rollout, recovery, and
 verification-key rotation belong to the deploying operator.

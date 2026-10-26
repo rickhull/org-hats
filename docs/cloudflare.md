@@ -137,14 +137,14 @@ An operation carries no identity-provider configuration or reference to one.
 The host chooses the provider, and the runtime resolves the sealed
 registration from the organization directory by issuer and client id.
 
-## Deployment contract
+## The host's deployment contract
 
 Upstream's release act ends at an immutable `cloudflare-v*` tag and its
-push. Deploying that tag — the host's Cloudflare account, Worker Versions,
-secrets, traffic, and service binding — is the consuming host's act. The
-reference deployment is live at `cloudflare-v0.4.0`; the host's ops
-porcelain owns the deploy verbs. A deployed tag can lag `main`; the tag is
-the deployment unit.
+publication. Deploying that tag — the host's Cloudflare account, Worker
+Versions, secrets, traffic, and service binding — is the consuming host's
+act. The live deployment is the consuming host's `cloudflare-v0.5.0`; the
+host's ops porcelain owns the deploy verbs. A deployed tag can lag `main`;
+the tag is the deployment unit.
 
 The artifact gate is `bin/check-artifact`; the host-neutral runbook —
 preflight, candidate, canary, rollback, acceptance, and the deployment

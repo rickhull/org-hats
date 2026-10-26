@@ -130,7 +130,7 @@ authority interface breaks. The Cloudflare package follows its own 0.x
 cadence and ships its fixes as patches; a root release does not move a
 Cloudflare tag.
 
-## Deployment is not publishing
+## Deployment is the host's act
 
 A `cloudflare-v*` tag is the upstream release act; deploying it is the
 consuming host's act. Publication is to subscribers
@@ -139,11 +139,11 @@ the mirror, whose audience happens to be the public. The host verifies the
 tag and the production
 configuration at that commit, snapshots state, uploads a Worker Version,
 activates it, and verifies it. The shape is in
-[cloudflare.md](cloudflare.md#deployment-contract).
+[cloudflare.md](cloudflare.md#the-hosts-deployment-contract).
 
-Upstream does not ship a deploy porcelain: the Cloudflare account, Worker,
+Upstream provides no deploy porcelain: the Cloudflare account, Worker,
 secrets, traffic, and service binding belong to the deploying host. The
-reference deployment is live at `cloudflare-v0.4.0`; the host's ops
+live deployment is the consuming host's `cloudflare-v0.5.0`; the host's ops
 porcelain owns `candidate` / `release` / `configure` / `smoke` — provisional
 names pending the host's own verb mapping; in the shared lexicon
 ([lexicon.md](lexicon.md) § Delivery) the live verb is *deploy*, and that

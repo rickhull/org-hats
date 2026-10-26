@@ -7,11 +7,14 @@ remains the workerd suite against the real coordinators
 binding and entrypoint preserve the public runtime behaviour for a dedicated,
 pre-bootstrapped operation without resetting it.*
 
-*The reference deployment is live at `cloudflare-v0.4.0` (configuration
-`c22a252efdcb391d796503c760b90a1a20392381-config-5ad6c5e46589`). The subset
-passed all six groups on v0.4.0 with fresh fixture
-`org-authority-smoke-20261026b` on 2026-10-26, and the host recorded the
-acceptance. `cloudflare-v0.3.2` is the rollback target.*
+*The reference runtime is deployed by the consuming host. The live
+deployment is `cloudflare-v0.5.0` (configuration
+`e7b4529…-config-627ee8a6f000`), accepted on 2026-10-26 with fresh fixture
+`org-authority-smoke-20261026c`; the subset had passed all six groups on
+`cloudflare-v0.4.0` (configuration
+`c22a252efdcb391d796503c760b90a1a20392381-config-5ad6c5e46589`, fixture
+`org-authority-smoke-20261026b`) the same day, and the host recorded each
+acceptance. `cloudflare-v0.4.0` is the rollback target.*
 
 ## Preconditions
 

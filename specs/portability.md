@@ -28,7 +28,7 @@ loses its cheapest enforcement.
 
 ### P3 — Portable semantics, one reference runtime
 
-Cloudflare is the reference deployment with first-class tooling, not a
+The Cloudflare package is the reference runtime with first-class tooling, not a
 requirement; a second runtime adapter appears only when a real consumer
 commits to it, and no adapter SPI or pairing matrix is published ahead of
 that.
@@ -60,7 +60,7 @@ live with the consumer or the operator. A host's own world enters through
 *Held by:* the committed fixtures are synthetic — the three twins, the
 conformance invitee, the own-world example, and the test-local worlds; the
 fixture boundary (`defineWorld`) is the entry for a host's own world; both
-relay notes are written as publishable; `SECURITY.md` exists before
+relay notes are written as if public; `SECURITY.md` exists before
 production data.
 *If it breaks:* it is an incident, not a bug — exposure cannot be un-pushed
 from a public mirror.
