@@ -21,37 +21,60 @@ is `main`'s line; the v0.4 surface stays frozen at its tags.
 
 ## The Quartermaster relay
 
-Cross-repository work with Quartermaster uses exactly two ignored note files:
-write only `~/git/quartermaster/notes/from-org-hats.md`; read only
-`notes/from-quartermaster.md` **in this repository**
-(`~/git/org-hats/notes/from-quartermaster.md`).  The file of that name inside
-`~/git/quartermaster` is not the relay and is stale; do not read it.  Do not
-edit anything else in that repository — not source, tests, docs, or its
-dependency pin.  A change obviously right from this side is still a change
-made without its owner's review; ask in the note and let Quartermaster make
-it.  Keep the outbound note at or below 25 KB, retaining the most recent
-sections; compact the oldest completed sections before appending when it
-would exceed the cap.  Quartermaster keeps the inbound note to the same cap.
+Cross-repository work with Quartermaster uses writer-owned outboxes.  We
+write `notes/to-quartermaster.md` **in this repository**; Quartermaster
+writes `notes/to-org-hats.md` **in its repository**.  Never write in the
+other repository; the one mirrored cutover entry is the last write there, and
+that clone is read-only after it.  Our inbox is
+`~/git/quartermaster/notes/to-org-hats.md`.  `notes/to-org-hats.md` must not
+exist in this repository, and `notes/to-quartermaster.md` must not exist in
+Quartermaster's; either is the wrong relay.  This assumes both clones are on
+one machine; a cross-PC relay needs the agent mesh or a shared path.  The old
+`notes/from-quartermaster.md` here and `notes/from-org-hats.md` there are
+read-only history after the cutover; do not read the stale
+`notes/from-quartermaster.md` inside quartermaster.  Do not edit anything
+else in that repository — not source, tests, docs, or its dependency pin.  A
+change obviously right from this side is still a change made without its
+owner's review; ask in the note and let Quartermaster make it.
 
-Check the tail of `notes/from-quartermaster.md` twice every turn: at the
-start, before planning work, and again before handing off — a reply can
-land mid-turn.  A new section is incorporated or answered, never left
-unread in a handoff; if the work it needs does not fit this turn, say so
-in the handoff.
+Quartermaster's detailed protocol is `~/git/quartermaster/specs/notes_relay.md`;
+this section is the directive.
 
-Append dated sections, newest last, or clear a finished thread.  Read before
-appending: a wiped note is a different conversation.  Nothing binding lives
-only in a note; contracts move into `docs/` or `plans/` here, and into
-Quartermaster's `docs/`, `specs/`, or `plans/` there.  Assume both notes are
-publishable: `notes/` is gitignored, but a gitignore is one `git add -f` from
-not applying.  No customer names, roster material, secrets, or key material.
+Every entry is prepended, newest first, and begins with
+`## <ISO-8601> — <subject>`, then the body; keep a `Coordination:` line when
+coordination matters.  The first line of the file is always the newest
+entry's timestamp and subject; no static title sits above it.  Entries are
+separated by a blank line; the body ends at the next `## ` heading.  Read the
+first entry in `~/git/quartermaster/notes/to-org-hats.md` at the start of
+every turn and again before handing off — a reply can land mid-turn.  Read
+newer entries from the top until the last timestamp already seen.  A new
+entry is incorporated or answered, never left unread in a handoff; if the
+work it needs does not fit this turn, say so in the handoff.
+
+Read the inbox again before prepending, and read your own outbox's first line
+first; do not write from a stale copy.  Prepend atomically (write a temp file,
+then rename) so a reader never sees a half-written entry.  Keep the outbox at
+or below 850 lines (roughly 40 KB); the line count is the rule and the byte
+figure is an approximation.  When prepending would exceed the cap, discard
+the oldest half by line count, to at most 425 lines, snapped to an entry
+boundary so no entry is split; if the newest entry alone exceeds 425 lines,
+keep it whole and let the cap yield to it.  The old `from-*` files keep
+whatever size they reached; the cap applies to the `to-*` outboxes.
+Quartermaster keeps its own outbox to the same cap.
+
+Nothing binding lives only in a note; contracts move into `docs/` or `plans/`
+here, and into Quartermaster's `docs/`, `specs/`, or `plans/` there.  Assume
+both notes are publishable: `notes/` is gitignored, but a gitignore is one
+`git add -f` from not applying.  No customer names, roster material, secrets,
+or key material.
 
 ## The agent mesh
 
 The local Pi mesh is an interrupt channel, not a second relay.  Follow
 [`docs/agent_mesh.md`](docs/agent_mesh.md).
 
-- Write the relay note first; a mesh send is only a wake that points at it.
+- Write the relay outbox entry first; a mesh send is only a wake that points
+  at it.
 - Default mode is gate: process a received message within bounds, report to
   Rick with a recommendation and the decision needed, then stop.  A gate turn
   may leave a note that restates recorded facts; it does not commit the
@@ -65,7 +88,8 @@ The local Pi mesh is an interrupt channel, not a second relay.  Follow
   path, a section, and the single action the peer owns.  A timeout is not
   retried; never wake for ACK/FYI, and never while Rick is driving.
 - Rick holds the conch outside a lease and can revoke one at any time.
-- Every new relay section carries a `Coordination:` header.
+- Every new relay entry carries a timestamped heading and a `Coordination:`
+  header.
 - Echo mesh addresses verbatim; do not use the deprecated blocking
   `agent_request`.
 

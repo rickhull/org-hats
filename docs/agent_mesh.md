@@ -3,16 +3,19 @@
 *How the two agents coordinate over the local Pi mesh. The Quartermaster relay
 rules are in [`AGENTS.md`](../AGENTS.md); this document says when a mesh send
 is allowed and how a received message is handled. The relay notes are the
-durable record; the mesh is an interrupt channel.*
+durable record; the mesh is an interrupt channel. Each repository writes its
+own outbox and the peer's clone is read-only; entries are prepended, newest
+first.*
 
 ## Two modes
 
 **Gate is the default.** On a received mesh message:
 
-1. Read the relay note. A wake without a note is not actionable.
+1. Read the first entry of the peer's outbox. A wake without a note is not
+   actionable.
 2. Do bounded processing — inspect state, run checks, diagnose, draft. Do not
-   commit, push, tag, or edit the other repository; the note is the only write
-   there.
+   commit, push, tag, or edit the other repository; it is read-only. The note
+   is a write in this repository's outbox.
 3. Report to Rick as a decision memo: what arrived, what it changes, what was
    verified, the options, the recommendation, and the decision needed.
 4. Stop. Do not wake the peer. A note reply is allowed when it restates what
@@ -96,12 +99,17 @@ agent accepted it. A stale or unaccepted lease falls back to gate.
 
 ## Header and report
 
-Every new relay section carries a header, including replies:
+Every new relay entry begins with a timestamped heading; keep a
+`Coordination:` line when coordination matters:
 
 ```text
+## <ISO-8601> — <subject>
 Coordination: mode=gate; conch=rick; wake=none
 Coordination: mode=lease; conch=<peer>; rounds=1/3; wake=<section>
 ```
+
+Entries are separated by a blank line; the body ends at the next `## `
+heading.
 
 A gate report to Rick:
 
