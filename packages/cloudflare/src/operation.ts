@@ -1436,7 +1436,7 @@ export class OperationAuthority extends DurableObject<Env> {
     // role the bundle dropped makes the context unanswerable, not empty.
     const wearable: HatSummary[] = [];
     for (const row of this.rows(
-      "SELECT role, target_kind, team_id, site_id, is_primary FROM grants WHERE organization_id = ? AND actor_id = ? AND revoked = 0 ORDER BY grant_id",
+      "SELECT role, grant_id, target_kind, team_id, site_id, is_primary FROM grants WHERE organization_id = ? AND actor_id = ? AND revoked = 0 ORDER BY grant_id",
       organizationId,
       actorId,
     )) {
@@ -1452,6 +1452,7 @@ export class OperationAuthority extends DurableObject<Env> {
           ? { kind: "team", teamId: rowText(row, "team_id") }
           : { kind: "site", siteId: rowText(row, "site_id") },
         primary: rowFlag(row, "is_primary"),
+        grantId: rowText(row, "grant_id"),
       });
     }
     return value({

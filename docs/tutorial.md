@@ -287,7 +287,9 @@ if (isFailed(context)) throw new Error(context.failure.kind);
 ```
 
 `context` is where display names, the operation's sites, and the wearable
-hats belong. It is a presentation read, not an authority decision.
+hats belong. Each wearable hat carries the `grantId` the `select-hat`
+command takes, so a host can offer the switch it shows. It is a
+presentation read, not an authority decision.
 
 ### Counterpoint
 

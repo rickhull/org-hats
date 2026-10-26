@@ -469,6 +469,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
               actions: [...claims.hat.actions],
               target: selected.target,
               primary: selected.primary,
+              grantId: selected.grantId,
             },
           }),
       sites: claims.sites,

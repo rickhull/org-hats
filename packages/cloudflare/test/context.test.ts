@@ -26,7 +26,9 @@ describe("context presentation", () => {
     expect(context.participation).toBe("active");
     expect(context.wearableHats).toHaveLength(1);
     expect(context.wearableHats[0]?.role).toBe("coordinator");
+    expect(context.wearableHats[0]?.grantId).toBe("g-mer-3");
     expect(context.selectedHat?.role).toBe("coordinator");
+    expect(context.selectedHat?.grantId).toBe("g-mer-3");
     expect(context.selectedHat?.primary).toBe(true);
     expect(context.sites.map((site) => site.siteId)).toEqual(["site-b8d620fa"]);
   }, 30_000);

@@ -165,6 +165,45 @@ test("amr and auth_time: copied from evidence, preserved through refresh, surfac
   assert.ok(!(await signer.verify(canonicalJson(asJson(forged.claims)), forged.signature)));
 });
 
+test("context: wearable hats carry the grant id select-hat takes", async () => {
+  const { engine } = await setup();
+  const len = await engine.runtime.accessFromEvidence(evidence(LEN));
+  assert.ok(!isFailed(len));
+  const grant = await engine.runtime.command(cmd(
+    { kind: "grant-hat", operationId: OP, organizationId: MARCO_ORG, actorId: MARCO_ID, role: "reviewer", target: { kind: "team", teamId: "team-f5b3a08d" } },
+    { kind: "access-envelope", envelope: len.envelope },
+    "ctx-grantid-grant",
+  ));
+  okOf(grant);
+
+  const marco = await engine.runtime.accessFromEvidence(evidence(MARCO));
+  assert.ok(!isFailed(marco));
+  const context = await engine.runtime.context({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION, envelope: marco.envelope,
+  });
+  assert.ok(!isFailed(context));
+  // two hats after the grant, each addressable, ids unique
+  assert.equal(context.wearableHats.length, 2);
+  const ids = context.wearableHats.map((hat) => hat.grantId);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.ok(ids.includes("g-mer-2"), "the existing grant is listed");
+  const reviewer = context.wearableHats.find((hat) => hat.role === "reviewer");
+  assert.ok(reviewer !== undefined);
+
+  // the round trip a host needs: address the listed hat, wear it next
+  const select = await engine.runtime.command(cmd(
+    { kind: "select-hat", operationId: OP, grantId: reviewer.grantId },
+    { kind: "fresh-evidence", evidence: MARCO, operationId: OP },
+    "ctx-grantid-select",
+  ));
+  okOf(select);
+  const worn = await engine.runtime.refresh({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: handleOf(marco.refresh),
+  });
+  assert.ok(!isFailed(worn));
+  assert.equal(worn.envelope.claims.hat.role, "reviewer", "the next envelope wears the selected hat");
+});
+
 test("the bounded window: a revoked grant kills refresh, not the live envelope", async () => {
   const { engine } = await setup();
   const danaIssue = await engine.runtime.accessFromEvidence(evidence(DANA));

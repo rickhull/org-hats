@@ -424,6 +424,44 @@ export const CONFORMANCE_CASES = [
         assert(!("amr" in plain.envelope.claims), "issuance without methods carries none");
         assert(!("auth_time" in plain.envelope.claims), "issuance without an authentication time carries none");
     }),
+    runtimeCase("OH-AUTH-07", "wearable hats carry the grant id select-hat takes", async (world) => {
+        const admin = await issue(world, CONFORMANCE_PRINCIPALS.len, MERIDIAN);
+        const grant = await command(world, {
+            kind: "grant-hat",
+            operationId: MERIDIAN,
+            organizationId: NORTH_ORG,
+            actorId: MARCO,
+            role: "reviewer",
+            target: { kind: "team", teamId: NORTH_TEAM },
+        }, envelopeAuth(admin.envelope), "auth-07-grant");
+        assert(grant.ok && grant.receipt.applied, "second hat granted");
+        const issued = await issue(world, CONFORMANCE_PRINCIPALS.marco, MERIDIAN);
+        const contextResult = await world.runtime.context({
+            interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+            envelope: issued.envelope,
+        });
+        const contextFailure = failureOf(contextResult);
+        assert(contextFailure === undefined, `context failed: ${contextFailure?.kind ?? ""}`);
+        const context = contextResult;
+        equal(context.wearableHats.length, 2, "two wearable hats after the grant");
+        const ids = context.wearableHats.map((hat) => hat.grantId);
+        equal(new Set(ids).size, ids.length, "the grant ids are unique");
+        assert(ids.includes("g-mer-2"), "the existing grant is listed");
+        const reviewer = context.wearableHats.find((hat) => hat.role === "reviewer");
+        assert(reviewer !== undefined, "the granted hat is listed");
+        // the addressing round-trips: the id the context hands out is the id
+        // the command takes, and the next envelope wears what it selected
+        const select = await command(world, { kind: "select-hat", operationId: MERIDIAN, grantId: reviewer.grantId }, freshAuth(CONFORMANCE_PRINCIPALS.marco, MERIDIAN), "auth-07-select");
+        assert(select.ok && select.receipt.applied, "select-hat accepts the listed grant id");
+        const worn = await world.runtime.refresh({
+            interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+            operationId: MERIDIAN,
+            handle: issued.refresh.kind === "rotated" ? issued.refresh.handle : "",
+        });
+        const wornFailure = failureOf(worn);
+        assert(wornFailure === undefined, `refresh after select failed: ${wornFailure?.kind ?? ""}`);
+        equal(worn.envelope.claims.hat.role, "reviewer", "the next envelope wears the selected hat");
+    }),
     runtimeCase("OH-PART-01", "invite, accept, admit: an invited organization receives a hat", async (world) => {
         await admitInvitee(world);
         const issued = await issue(world, CONFORMANCE_PRINCIPALS.inviteeAdmin, MERIDIAN);

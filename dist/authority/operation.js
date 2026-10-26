@@ -141,6 +141,7 @@ export const createOperationCoordinator = (deps) => {
                 actions: [...role.actions],
                 target: g.target,
                 primary: g.primary === true,
+                grantId: g.grantId,
             });
         }
         return {
@@ -164,6 +165,7 @@ export const createOperationCoordinator = (deps) => {
                         actions: [...envelope.claims.hat.actions],
                         target: selected.target,
                         primary: selected.primary === true,
+                        grantId: selected.grantId,
                     },
                 }),
             sites: [...envelope.claims.sites],

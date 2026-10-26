@@ -52,6 +52,7 @@ type _HatSummaryTeamTargetIsPlain = Expect<
 type _HatSummarySiteTargetIsPlain = Expect<
   Equal<Extract<HatSummary["target"], { kind: "site" }>["siteId"], string>
 >;
+type _HatSummaryGrantIdIsPlain = Expect<Equal<HatSummary["grantId"], string>>;
 type _NeutralAccessOperationIdIsPlain = Expect<Equal<NeutralAccess["operationId"], string>>;
 
 // --- the closed unions stay closed ----------------------------------------------

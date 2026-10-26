@@ -103,7 +103,9 @@ export const readContext = (context: AuthorityContext): string[] => [
   context.operationId,
   context.actor.organizationId,
   context.actor.actorId,
-  // a hat reaches exactly one target, and the union says which
+  // each hat is addressable by the grant id select-hat takes, and reaches
+  // exactly one target; the union says which
+  ...context.wearableHats.map((hat) => hat.grantId),
   ...context.wearableHats.map((hat) =>
     hat.target.kind === "team" ? hat.target.teamId : hat.target.siteId,
   ),

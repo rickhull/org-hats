@@ -28,6 +28,7 @@ const EXPECTED_IDS = [
   "OH-AUTH-04",
   "OH-AUTH-05",
   "OH-AUTH-06",
+  "OH-AUTH-07",
   "OH-PART-01",
   "OH-PART-02",
   "OH-CMD-01",

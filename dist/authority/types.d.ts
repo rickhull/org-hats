@@ -54,6 +54,9 @@ export interface HatSummary {
     /** Where the hat reaches: exactly one team or one site. */
     readonly target: Unbranded<GrantTarget>;
     readonly primary: boolean;
+    /** The grant's id: the addressing `select-hat` takes, so a host can
+     * offer the switch the summary shows. */
+    readonly grantId: string;
 }
 export interface AuthorityContext {
     readonly actor: {
