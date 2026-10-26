@@ -42,6 +42,24 @@ Quartermaster's `docs/`, `specs/`, or `plans/` there.  Assume both notes are
 publishable: `notes/` is gitignored, but a gitignore is one `git add -f` from
 not applying.  No customer names, roster material, secrets, or key material.
 
+## The agent mesh
+
+The local Pi mesh is an interrupt channel, not a second relay.  Follow
+[`docs/agent_mesh.md`](docs/agent_mesh.md).
+
+- Write the relay note first; a mesh send is only a wake that points at it.
+- Default mode is gate: process a received message within bounds, report to
+  Rick with a recommendation and the decision needed, then stop.  No
+  substantive reply or wake in that turn.
+- Coroutine mode requires an explicit lease in the relay note — goal, budget,
+  exit conditions, and both sides' agreement.  The conch alternates; one
+  outstanding wake per direction.
+- Wake only for a named, bounded, blocking next action the peer owns; never
+  for ACK/FYI, and never while Rick is driving.
+- Rick holds the conch outside a lease and can revoke one at any time.
+- Echo mesh addresses verbatim; do not use the deprecated blocking
+  `agent_request`.
+
 ## Tooling
 
 - Node + pnpm come from nixpkgs (thinkpad flake, `nixos/devbox.nix`).

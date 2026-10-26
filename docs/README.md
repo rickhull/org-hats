@@ -67,6 +67,11 @@ by copying the v0.4 tree.
 - [`literature_review.md`](literature_review.md) — the reading method and the
   reference inventory.
 
+## Agent operations
+
+- [`agent_mesh.md`](agent_mesh.md) — notes, wakes, gate/coroutine, and the
+  conch for the local agent mesh; the directive is in `AGENTS.md`.
+
 ## Root
 
 - [`../SECURITY.md`](../SECURITY.md) — vulnerability reporting and
