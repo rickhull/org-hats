@@ -15,33 +15,46 @@ durable record; the mesh is an interrupt channel.*
    there.
 3. Report to Rick as a decision memo: what arrived, what it changes, what was
    verified, the options, the recommendation, and the decision needed.
-4. Stop. Do not send a substantive reply or a wake in that turn. A pure
-   receipt note ("received; Rick reviewing") is allowed only when the peer
-   would otherwise be blocked waiting.
+4. Stop. Do not wake the peer. A note reply is allowed when it restates what
+   the repository already records — an acceptance, a version, a pointer —
+   because the note is the record. A gate turn does **not** commit the
+   project: accepting a runtime, moving a pin, adopting a protocol, or
+   changing a release act is recorded as awaiting Rick with a recommendation.
 
 The note is the message; the wake is only the doorbell. Gate protects Rick's
 turn and prevents an inbound message from turning into an outbound cascade.
 
-**Coroutine is a lease.** It is opened deliberately for a named goal, by Rick
-or with his prior consent:
+**A leased coroutine is explicit.** It is opened deliberately for a named
+goal, by Rick or with his prior consent:
 
-- Record it in the relay note: `mode=coroutine; lease=<id>; goal=…;
-  budget=<rounds>; exits=…; conch=<agent>`.
+- Record the lease in the section header:
+  `Coordination: mode=lease; conch=<peer>; rounds=1/3; wake=<section>`.
+  The section body names the goal and the exits.
 - Both sides accept before either wakes.
+- The round budget defaults to 3. Exits are: goal met, blocked on Rick, out
+  of scope, or budget exhausted.
+- A lease unanswered by the next Rick turn lapses back to gate; the note says
+  so. A conch that cannot lapse is a stall.
 - The conch alternates; one outstanding wake per direction; every wake
   carries `re` and a bounded ask.
 - A side with no action returns the conch with a note, not a wake.
-- Exit on completion, a blocker, the round budget, or any message from Rick.
-  Exit with a final note: `mode=gate`.
+- Any message from Rick returns the thread to gate unless he renews the
+  lease.
 
 Without a live lease, an incoming message is gate.
 
+## One-round handoffs
+
+A single bounded action — run a fresh-fixture smoke, record an acceptance — is
+a **gate wake**, not a lease: one note, one wake, one gate turn that acts and
+returns the conch. A lease is for multi-round exchange.
+
 ## The conch
 
-The human holds the conch outside a coroutine. A wake is a **conch transfer**,
-not a message: the woken agent takes the conch, acts on the bounded ask,
-leaves a note, and either returns the conch with a wake (only if the peer now
-has a blocking action) or ends quietly.
+The human holds the conch outside a lease. A wake is a **conch transfer**, not
+a message: the woken agent takes the conch, acts on the bounded ask, leaves a
+note, and either returns the conch with a wake (only if the peer now has a
+blocking action) or ends quietly.
 
 - The agent with the blocking dependency initiates.
 - If both are waiting, the earlier unresolved note wins; otherwise alternate.
@@ -50,6 +63,11 @@ has a blocking action) or ends quietly.
   gate unless he renews it.
 
 ## Wake rules
+
+A wake is **fire-once and self-contained**: one send per direction, one
+outstanding, naming the note path, the section, and the single action the peer
+owns. A timeout is not retried; the note is the record, and a wake that needs a
+retry was not a wake.
 
 Wake only when all of these hold:
 
@@ -60,9 +78,8 @@ Wake only when all of these hold:
 - the wake body is a one-line pointer to that note.
 
 Never wake for ACK/FYI, a check-in, or a release announcement unless the peer's
-next step depends on it now. Never wake without a note. Keep one outstanding
-wake per direction; a denied or unanswered wake becomes a note and a report to
-Rick, not another wake.
+next step depends on it now. Never wake without a note. A denied wake becomes a
+note and a report to Rick, not another wake.
 
 Echo every mesh address verbatim — never construct, split, or normalize one.
 Broadcast is folder-scoped and does not cross repositories. Do not use the
@@ -71,19 +88,19 @@ deprecated blocking `agent_request`.
 ## Mode resolution
 
 1. Rick's instruction in the session.
-2. A live, accepted coroutine lease in the relay note.
+2. A live, accepted lease in the relay note.
 3. Gate.
 
-A message carrying `lease=<id>` is coroutine only if that lease is recorded
-and this agent accepted it. A stale or unaccepted lease falls back to gate.
+A message carrying a lease is coroutine only if that lease is recorded and this
+agent accepted it. A stale or unaccepted lease falls back to gate.
 
 ## Header and report
 
-At the top of the relay note, or at the start of a thread:
+Every new relay section carries a header, including replies:
 
 ```text
 Coordination: mode=gate; conch=rick; wake=none
-Coordination: mode=coroutine; lease=<id>; goal=<...>; budget=<rounds>; exits=<...>; conch=<agent>
+Coordination: mode=lease; conch=<peer>; rounds=1/3; wake=<section>
 ```
 
 A gate report to Rick:
@@ -100,10 +117,11 @@ Decision needed: <the question>
 
 - Wake without a note: treat it as gate, ask for the note, do not act.
 - Stale or unaccepted lease: gate.
-- Denied or unanswered wake: notes only, then report to Rick.
+- Timeout: no retry; the note is the record.
+- Denied wake: notes only, then report to Rick.
 - Inbound message while Rick is driving: process minimally, report, hand back;
   do not wake the peer.
-- A lease never outlives a message from Rick.
+- A lease lapses when Rick next speaks; it never outlives his turn.
 
 ## Non-goals
 

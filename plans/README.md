@@ -18,9 +18,9 @@ planned is released, adopted, and documented in `docs/`.
 - `v2_release.md` — Cloudflare `cloudflare-v0.3.2` deploy and acceptance:
   the v0.3.1 record is in (ES256, pin stays at v2.0.0); the fresh-fixture
   smoke, the live-tag doc moves, and the v0.3.2 record remain.
-- `mesh_coordination.md` — the gate/coroutine protocol with Quartermaster:
-  the note/wake split, the conch, QM's agreement, and the one-round deploy
-  handoff.
+- `mesh_coordination.md` — the gate/lease protocol with Quartermaster:
+  the four accepted amendments, the conch, and the one-round `v0.3.2`
+  gate-wake handoff that remains.
 
 Retired plans are removed; their results live in `docs/` and the commit
 history. Completed work is not kept here.

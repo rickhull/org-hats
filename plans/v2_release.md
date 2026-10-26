@@ -29,8 +29,10 @@ are posted. `cloudflare-v0.3.0` remains the routing tag.
 - [ ] QM runs the binding smoke with a fresh fixture after the deploy and
       records `v0.3.2` acceptance, before any tenant session depends on it.
       Use the gate handoff in [`docs/agent_mesh.md`](../docs/agent_mesh.md):
-      leave the relay note once the tag is live, send one wake under a
-      one-round lease, then return to gate. No wake before the deploy.
+      leave the relay note once the tag is live, send one gate wake, QM runs
+      the fresh-fixture smoke in one gate turn and records acceptance, then
+      returns the conch. No wake before the deploy. If the smoke fails, QM
+      stops and reports rather than amending the acceptance.
 - [ ] Close this plan, update `plans/README.md`, and post the result in the
       relay.
 

@@ -1,36 +1,43 @@
 # Agent mesh protocol — adoption with Quartermaster
 
-**Status (2026-10-25):** local convention written in
-[`docs/agent_mesh.md`](../docs/agent_mesh.md) and [`AGENTS.md`](../AGENTS.md).
-The proposal is in the relay outbox; QM has not answered it yet. Gate is the
-default; coroutine is an explicit lease.
+**Status (2026-10-25, accepted):** QM's four amendments are accepted and the
+local protocol reflects them. The only remaining use is the `cloudflare-v0.3.2`
+handoff and then closing this plan. Gate is the default; `mode=lease` is the
+header for a multi-round leased coroutine.
 
-## Goal
+## Accepted amendments
 
-Two agents can hand off blocking work without stealing Rick's turn: notes are
-always the record, wakes are deliberate interrupts, and the conch makes the
-initiative explicit whether or not there is a broker-level lock.
+1. **Gate answers questions; it does not commit.** A gate turn may leave a note
+   that restates what the repository already records. Anything that commits the
+   project — accepting a runtime, moving a pin, adopting a protocol, changing a
+   release act — awaits Rick with a recommendation. The rule is no *wake* in a
+   gate turn, not no note.
+2. **Leases carry their exit.** Goal, round budget (default 3), and the exits:
+   goal met, blocked on Rick, out of scope, budget exhausted. A lease
+   unanswered by the next Rick turn lapses to gate and the note says so.
+3. **Wakes are fire-once and self-contained.** One send per direction, one
+   outstanding, naming the note path, the section, and the single action the
+   peer owns. A timeout is not retried; the note is the record.
+4. **Header on every new section**, with the lease budget when one is open:
+   `Coordination: mode=gate; conch=rick; wake=none` or
+   `Coordination: mode=lease; conch=<peer>; rounds=1/3; wake=<section>`.
+
+A single bounded action is a **gate wake**, not a lease; the `v0.3.2`
+fresh-fixture smoke is that shape.
 
 ## Steps
 
-- [x] Write the gate/coroutine protocol and the conch rules.
+- [x] Write the gate/lease protocol, the conch rules, and the header.
 - [x] Add the directive to `AGENTS.md` and the descriptive protocol to
       `docs/agent_mesh.md`.
-- [x] Propose the protocol in the relay note and wake QM once with a pointer.
-      Delivered 2026-10-25; QM has not replied yet.
-- [ ] QM agrees or amends the header and the gate default in the relay note.
-- [ ] Apply it to the `cloudflare-v0.3.2` handoff: when the tag is live, leave
-      the note, send one wake under a one-round lease, QM runs the fresh smoke
-      and records acceptance, then the thread returns to gate.
-- [ ] Record the agreed standing rules in the relay note and close this plan.
-
-## Open questions
-
-- Does QM want a standing lease for any workstream, or gate per message?
-- Does QM accept the `Coordination:` header, or prefer a simpler note-plus-wake
-  convention?
-- What is QM's default when both agents are active? Our side defaults to gate
-  unless a lease is open.
+- [x] Propose the protocol to QM; they agreed with four amendments.
+- [x] Rick accepted the amendments; update the local doc and directive.
+- [x] Leave the confirmation note for QM; no wake.
+- [ ] When `cloudflare-v0.3.2` is live: leave the relay note and send one gate
+      wake naming the fresh-fixture smoke and the acceptance record. QM runs
+      it in one gate turn and hands the conch back to Rick. If the smoke fails,
+      QM stops and reports rather than amending the acceptance.
+- [ ] Close this plan after the handoff and the v0.3.2 acceptance record.
 
 ## Non-goals
 

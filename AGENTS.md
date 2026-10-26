@@ -49,14 +49,19 @@ The local Pi mesh is an interrupt channel, not a second relay.  Follow
 
 - Write the relay note first; a mesh send is only a wake that points at it.
 - Default mode is gate: process a received message within bounds, report to
-  Rick with a recommendation and the decision needed, then stop.  No
-  substantive reply or wake in that turn.
-- Coroutine mode requires an explicit lease in the relay note — goal, budget,
-  exit conditions, and both sides' agreement.  The conch alternates; one
-  outstanding wake per direction.
-- Wake only for a named, bounded, blocking next action the peer owns; never
-  for ACK/FYI, and never while Rick is driving.
+  Rick with a recommendation and the decision needed, then stop.  A gate turn
+  may leave a note that restates recorded facts; it does not commit the
+  project.  No wake in a gate turn.
+- A leased coroutine (`mode=lease`) requires a named goal, a round budget
+  (default 3), exit conditions, and both sides' agreement.  A lease unanswered
+  by the next Rick turn lapses to gate.  The conch alternates; one outstanding
+  wake per direction.
+- A single bounded action is a gate wake, not a lease.
+- Wakes are fire-once and self-contained: one send, one outstanding, a note
+  path, a section, and the single action the peer owns.  A timeout is not
+  retried; never wake for ACK/FYI, and never while Rick is driving.
 - Rick holds the conch outside a lease and can revoke one at any time.
+- Every new relay section carries a `Coordination:` header.
 - Echo mesh addresses verbatim; do not use the deprecated blocking
   `agent_request`.
 
