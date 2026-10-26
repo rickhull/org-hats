@@ -71,6 +71,10 @@ interface ProjectedActor {
   readonly synced_at: number;
 }
 
+/** The snapshot's `orgActors` arrive ordered by `actor_id`: the `actors` table
+ * spec declares that order, so it is behavior to assert, not an accident of
+ * insertion. The assertions below compare ordered rows, which means renaming a
+ * fixture actor can reorder them. */
 const projected = async (current: World): Promise<ProjectedActor[]> => {
   const snapshot = await call<{ orgActors: ProjectedActor[] }>(current.op, "GET", "/snapshot");
   return snapshot.body.value?.orgActors ?? [];

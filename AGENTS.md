@@ -93,6 +93,20 @@ The local Pi mesh is an interrupt channel, not a second relay.  Follow
 - Echo mesh addresses verbatim; do not use the deprecated blocking
   `agent_request`.
 
+## Delegation
+
+Work that splits into three or more weakly-coupled areas, each needing real
+judgment, runs through Quartermaster's `moshpit` skill: one orchestrator
+liaises with Rick, plans, and outsources execution to the cheapest capable
+subagents, retiring each before its context fills.  The layers are `me`,
+`orchestrator`, `specialist`, `helper`.
+
+The skill is `~/git/quartermaster/.agents/skills/moshpit/SKILL.md`; read it
+there.  It is Quartermaster's file: do not edit it, and do not vendor a copy
+here, because two copies of one pattern drift.  This assumes both clones are
+on one machine, as the relay does.  Invoke it deliberately — below three
+areas, or for a mechanical sweep, do the work inline.
+
 ## Tooling
 
 - The project flake (`flake.nix`) provides Node 24, pnpm 11, `git`, `rg`,
