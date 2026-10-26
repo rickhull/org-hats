@@ -15,12 +15,11 @@ planned is released, adopted, and documented in `docs/`.
 - `test_suite_review.md` — the test-suite fanout: fragility and dependency
   findings, the rings, and the remaining coverage gaps in priority order.
   The typecheck gate and the P1 coverage have landed; the P2 slice follows.
-- `v2_release.md` — Cloudflare `cloudflare-v0.3.2` deploy and acceptance:
-  the v0.3.1 record is in (ES256, pin stays at v2.0.0); the fresh-fixture
-  smoke, the live-tag doc moves, and the v0.3.2 record remain.
+- `v2_release.md` — Cloudflare `cloudflare-v0.3.2` at 100% on the reference
+  deployment; the fresh-fixture smoke and the v0.3.2 acceptance record remain.
 - `mesh_coordination.md` — the gate/lease protocol with Quartermaster:
-  the four accepted amendments, the conch, and the one-round `v0.3.2`
-  gate-wake handoff that remains.
+  the four accepted amendments, the conch, and the delivered `v0.3.2`
+  gate-wake handoff, pending QM's smoke.
 
 Retired plans are removed; their results live in `docs/` and the commit
 history. Completed work is not kept here.

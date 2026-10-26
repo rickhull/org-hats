@@ -98,8 +98,8 @@ declarations so that cannot regress silently.
   carries the corrected exchange and the RFC 8414/7515/7519/7636
   tightenings: discovery issuer/HTTPS validation, `crit` rejection,
   P-256-only ES256, a valid DER conversion, `iat`/`nbf`/`azp`, optional-claim
-  type checks, and the PKCE verifier grammar. `cloudflare-v0.3.1` remains the
-  live deployment until the host deploys the new tag.
+  type checks, and the PKCE verifier grammar. `cloudflare-v0.3.2` is the live
+  deployment.
 - New operator verbs: `POST /reconcile-rosters` on an operation;
   `GET /ops/schema-status` reports `orgActors`, `disabledOrgActors`,
   `rosterSyncedAt`, and `rosterReconcileSeconds`; `GET /snapshot` reports

@@ -1,9 +1,9 @@
 # Agent mesh protocol — adoption with Quartermaster
 
-**Status (2026-10-25, accepted):** QM's four amendments are accepted and the
-local protocol reflects them. The only remaining use is the `cloudflare-v0.3.2`
-handoff and then closing this plan. Gate is the default; `mode=lease` is the
-header for a multi-round leased coroutine.
+**Status (2026-10-26):** QM's four amendments are accepted and deployed in the
+local protocol. `cloudflare-v0.3.2` is live at 100%; the relay note and one
+gate wake asked QM for the fresh-fixture smoke and acceptance record. Gate is
+the default; `mode=lease` is the header for a multi-round leased coroutine.
 
 ## Accepted amendments
 
@@ -33,11 +33,12 @@ fresh-fixture smoke is that shape.
 - [x] Propose the protocol to QM; they agreed with four amendments.
 - [x] Rick accepted the amendments; update the local doc and directive.
 - [x] Leave the confirmation note for QM; no wake.
-- [ ] When `cloudflare-v0.3.2` is live: leave the relay note and send one gate
-      wake naming the fresh-fixture smoke and the acceptance record. QM runs
-      it in one gate turn and hands the conch back to Rick. If the smoke fails,
-      QM stops and reports rather than amending the acceptance.
-- [ ] Close this plan after the handoff and the v0.3.2 acceptance record.
+- [x] When `cloudflare-v0.3.2` went live: leave the relay note and send one
+      gate wake naming the fresh-fixture smoke and the acceptance record.
+      Delivered 2026-10-26; waiting on QM's one-turn smoke and acceptance.
+- [ ] Close this plan after QM records the v0.3.2 acceptance. If the smoke
+      fails, QM stops and reports; the rollback is
+      `qm ops authority release cloudflare-v0.3.1 --percentage 100`.
 
 ## Non-goals
 

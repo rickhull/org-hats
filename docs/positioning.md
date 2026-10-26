@@ -131,9 +131,8 @@ policy; a directory remains the identity source.
 - **Production runtime:** Cloudflare only. The in-memory engine is the
   reference and test adapter, not a durable store.
 - **Identity:** OIDC authorization-code + PKCE exchange; no LDAP, SAML, SCIM,
-  or client-credentials flow. The live `cloudflare-v0.3.1` deployment verifies
-  ES256 but not RS256; `cloudflare-v0.3.2` verifies both, pending the host
-  deploy.
+  or client-credentials flow. The live `cloudflare-v0.3.2` deployment verifies
+  ES256 and RS256.
 - **Envelope:** Ed25519 over canonical JSON, not JWT/JWKS; downstream services
   need `org-hats/access` and the key set.
 - **Distribution:** git tags only; no registry publication.

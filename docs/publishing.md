@@ -140,7 +140,7 @@ activates it, and verifies it. The shape is in
 
 Upstream does not ship a deploy porcelain: the Cloudflare account, Worker,
 secrets, traffic, and service binding belong to the deploying host. The
-reference deployment is live at `cloudflare-v0.3.1`; the host's ops
+reference deployment is live at `cloudflare-v0.3.2`; the host's ops
 porcelain owns `candidate` / `release` / `configure` / `smoke`, with the
 registry projection as its follow-on. State restore and the routing-facts
 backfill are acceptance acts, not deploy steps.

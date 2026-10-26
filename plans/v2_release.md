@@ -1,38 +1,27 @@
 # v0.3.2 deploy and the 2.1 acceptance record
 
-**Status (2026-10-25, after QM's reply):** root `v2.1.0` (`dc4355a`) and
-Cloudflare `cloudflare-v0.3.2` (`d16df18`) are released as annotated tags on
-Codeberg and the GitHub mirror; `bin/check-version` matches both manifests.
-`cloudflare-v0.3.1` is still the live deployment
-(`reporting-stream-authority`, 100%) and is **accepted**: QM records the
-acceptance at `abfac31` in its `specs/login.md`, `plans/phase1.md` steps 1-3,
-and `docs/deploy.md`. The six-group binding smoke (including the disabled/
-stale-projection refresh), the schema-2 → schema-4 restore, and the
-routing-facts backfill passed. The consumer login is **ES256** on the only
-path QM exercises; the production provider is unchosen. QM keeps its pin at
-`v2.0.0` — `v2.1.0` is additive and nothing in its current slice needs the new
-surface. The outbound relay note announcing both tags, and the reply to QM,
-are posted. `cloudflare-v0.3.0` remains the routing tag.
+**Status (2026-10-26, deployed):** `cloudflare-v0.3.2` is live at 100% on
+`reporting-stream-authority`: active Worker Version
+`f8a0e2df-6f03-4bb6-95b7-21cac7b8c558`, tag `d16df18`, signing key
+`authority-2026-10` unchanged. The preflight snapshot is
+`~/.local/state/qm/authority/cloudflare-v0.3.2-2026-10-26T01-41-09-257Z-02e4a43c/`;
+both operations report schema 4 and `routingFactsComplete: true`. The live
+verification key set is the same single Ed25519 key. `cloudflare-v0.3.1`
+remains the accepted previous tag and the rollback target.
+
+QM's fresh-fixture binding smoke and the `v0.3.2` acceptance record are the
+only remaining gates. The old smoke fixture is spent: `org-authority-smoke`'s
+actor is disabled. The relay note and the one gate wake are sent; QM owns
+preparing fresh ids, configuring the directory, bootstrapping, and running
+the smoke.
 
 ## Open
 
-- [ ] Rick deploys `cloudflare-v0.3.2` through the host's ops porcelain
-      (`candidate` → `release`) and runs the binding smoke with a fresh
-      fixture. The dedicated smoke actor is disabled; the old fixture cannot
-      be reused.
-- [ ] Move the live-deployment references after the deploy:
-      `docs/cloudflare.md`, `docs/binding-conformance.md`, the deployment
-      paragraph in `docs/publishing.md`, and the "live `cloudflare-v0.3.1`"
-      limits in `docs/positioning.md` and `docs/from_ldap.md`. The login
-      claim changes from "ES256 only, pending the deploy" to the deployed
-      `v0.3.2` verifying both.
-- [ ] QM runs the binding smoke with a fresh fixture after the deploy and
-      records `v0.3.2` acceptance, before any tenant session depends on it.
-      Use the gate handoff in [`docs/agent_mesh.md`](../docs/agent_mesh.md):
-      leave the relay note once the tag is live, send one gate wake, QM runs
-      the fresh-fixture smoke in one gate turn and records acceptance, then
-      returns the conch. No wake before the deploy. If the smoke fails, QM
-      stops and reports rather than amending the acceptance.
+- [ ] QM prepares fresh smoke fixture ids, updates the directory with
+      `configure` if needed, bootstraps the organization and operation, runs
+      `qm ops authority smoke`, and records `v0.3.2` acceptance before any
+      tenant session depends on it. If the smoke fails, stop and report; the
+      rollback is `release cloudflare-v0.3.1 --percentage 100`.
 - [ ] Close this plan, update `plans/README.md`, and post the result in the
       relay.
 
