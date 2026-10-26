@@ -89,3 +89,22 @@ test("malformed JSON, format, version, algorithm, and key material fail closed",
   assert.throws(() => parseVerifyKeySet(JSON.stringify({ format: VERIFY_KEY_SET_FORMAT, v: 1, keys: [{ ...material, publicKey: "not-base64!" }] })), /base64/);
   assert.throws(() => parseVerifyKeySet(JSON.stringify({ format: VERIFY_KEY_SET_FORMAT, v: 1, keys: [{ ...material, publicKey: "AAAA" }] })), /Ed25519 key/);
 });
+
+test("each key-shape failure is named", () => {
+  const wrapped = (key: unknown): string =>
+    JSON.stringify({ format: VERIFY_KEY_SET_FORMAT, v: 1, keys: [key] });
+  assert.throws(
+    () => parseVerifyKeySet(JSON.stringify({ format: VERIFY_KEY_SET_FORMAT, v: 1, keys: {} })),
+    /keys must be an array/,
+  );
+  assert.throws(() => parseVerifyKeySet(wrapped("not an object")), /not an object/);
+  assert.throws(() => parseVerifyKeySet(wrapped([])), /not an object/);
+  assert.throws(
+    () => parseVerifyKeySet(wrapped({ algorithm: "Ed25519", publicKey: material.publicKey })),
+    /no keyId/,
+  );
+  assert.throws(
+    () => parseVerifyKeySet(wrapped({ keyId: "k", algorithm: "Ed25519" })),
+    /no publicKey/,
+  );
+});

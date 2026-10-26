@@ -94,18 +94,19 @@ declarations so that cannot regress silently.
   1 do not move.
 - The exchange in `cloudflare-v0.3.1` verifies ES256, but RS256 does not
   verify (the SHA-256 algorithm parameter is missing), so a deployment of
-  that tag must use ES256 for the provider login. `main` carries the
-  corrected exchange and the RFC 8414/7515/7519/7636 tightenings: discovery
-  issuer/HTTPS validation, `crit` rejection, P-256-only ES256, a valid DER
-  conversion, `iat`/`nbf`/`azp`, optional-claim type checks, and the PKCE
-  verifier grammar. The next `cloudflare-v*` tag is the vehicle for them.
+  that tag must use ES256 for the provider login. `cloudflare-v0.3.2`
+  carries the corrected exchange and the RFC 8414/7515/7519/7636
+  tightenings: discovery issuer/HTTPS validation, `crit` rejection,
+  P-256-only ES256, a valid DER conversion, `iat`/`nbf`/`azp`, optional-claim
+  type checks, and the PKCE verifier grammar. `cloudflare-v0.3.1` remains the
+  live deployment until the host deploys the new tag.
 - New operator verbs: `POST /reconcile-rosters` on an operation;
   `GET /ops/schema-status` reports `orgActors`, `disabledOrgActors`,
   `rosterSyncedAt`, and `rosterReconcileSeconds`; `GET /snapshot` reports
   `orgActors`.
 - The provider-callback exchange posts to the discovery document's
   `token_endpoint`, not the authorization endpoint. `cloudflare-v0.1.0` is
-  not safe for real-provider login; take the next `cloudflare-v*` tag.
+  not safe for real-provider login; take `cloudflare-v0.3.2`.
 
 ## 2.0 → 2.1 (additive)
 

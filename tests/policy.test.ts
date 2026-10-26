@@ -53,3 +53,32 @@ test("a wrong format number is rejected", () => {
   const bundle = uncheckedPolicy({ ...base, format: 2 });
   assert.ok(validatePolicyBundle(bundle).some((p) => p.includes("format")));
 });
+
+test("a role with no actions is rejected", () => {
+  const bundle = {
+    ...base,
+    roles: [...base.roles, { title: "empty", actions: [] }],
+  };
+  assert.ok(validatePolicyBundle(bundle).some((p) => p.includes("carries no action")));
+});
+
+test("an empty role title is rejected", () => {
+  const bundle = {
+    ...base,
+    roles: [...base.roles, { title: "", actions: ["observe"] }],
+  };
+  assert.ok(validatePolicyBundle(bundle).some((p) => p.includes("has no title")));
+});
+
+test("a duplicate role title is rejected", () => {
+  const bundle = {
+    ...base,
+    roles: [...base.roles, { title: base.roles[0]!.title, actions: ["observe"] }],
+  };
+  assert.ok(validatePolicyBundle(bundle).some((p) => p.includes("appears twice")));
+});
+
+test("a missing read policy is rejected", () => {
+  const bundle = uncheckedPolicy({ ...base, readPolicy: undefined });
+  assert.ok(validatePolicyBundle(bundle).some((p) => p.includes("read policy is missing")));
+});

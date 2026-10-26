@@ -203,7 +203,18 @@ describe("OperationAuthority", () => {
       kind: "acceptance",
       invitationId,
     });
+    expect(late.status).toBe(200);
     expect(late.body.ok).toBe(true);
+
+    // A message that cannot be applied is a retry, not a recorded no-op: the
+    // status distinguishes it so an outbox keeps retrying only real failures.
+    const retry = await call(current.op, "POST", "/intake", {
+      messageId: "acceptance-without-invitation",
+      kind: "acceptance",
+    });
+    expect(retry.status).toBe(503);
+    expect(retry.body.ok).toBe(false);
+    expect(retry.body.failure?.kind).toBe("invalid-command");
 
     const snapshot = await call<Record<string, unknown>>(current.op, "GET", "/snapshot");
     const participations = snapshot.body.value?.["participations"] as { organization_id: string; status: string }[];

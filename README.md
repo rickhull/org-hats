@@ -23,6 +23,19 @@ The model is portable. An in-memory engine runs it in tests and examples; the
 Cloudflare package is the reference deployment. Both expose the same four
 calls: `accessFromEvidence`, `refresh`, `context`, and `command`.
 
+> **Before you adopt it.** It is the organizational half of authorization,
+> not an identity provider or a policy engine: no directory sync
+> (LDAP/SAML/SCIM), group grants, nesting, deny, or inheritance. One hat is
+> active per session, while read, configuration, and member reach are
+> currently unions over every wearable grant — the
+> [current limits](docs/positioning.md#current-limits) say where that is
+> going. Admission is documented, but the grant is the operative admission.
+> Production is the Cloudflare reference runtime; the in-memory engine is
+> for tests and examples. The envelope is not a JWT: every downstream
+> service needs `org-hats/access` and the distributed key set. If one
+> application and one role per user is the whole problem, a role column is
+> simpler.
+
 ## Run the examples
 
 Node 24+ and pnpm:
@@ -70,6 +83,27 @@ portable suites, the test and example typecheck, both examples, the release
 metadata check, and the Cloudflare workerd suite. It runs locally and needs
 no Cloudflare account. `pnpm test` runs only the portable suites;
 `pnpm check:cloudflare` runs only the reference runtime.
+
+## Use it in a service
+
+There is no registry publication; pin a release tag. A verifier needs only
+the `access` subpath and the key set the issuer distributes:
+
+```sh
+pnpm add "git+https://codeberg.org/rickhull/org-hats.git#v2.1.0"
+```
+
+```ts
+import { isFailed, verify } from "org-hats/access";
+```
+
+The issuer imports `org-hats/authority` and calls the runtime; the verifier
+imports `org-hats/access` and never reads authority rows. The
+[issue-and-verify](#issue-and-verify) walkthrough shows the call, and
+[`docs/publishing.md`](docs/publishing.md) lists the Codeberg and GitHub pin
+forms. Cloudflare hosts bind the runtime through
+`AuthorityRuntimeEntrypoint` and use `org-hats-cloudflare`; see
+[`docs/cloudflare.md`](docs/cloudflare.md).
 
 ## The model on one screen
 

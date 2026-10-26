@@ -19,7 +19,6 @@ import {
   invariantProblems,
   readReach,
   selectWornHat,
-  wearableGrants,
   type Grant,
   type Snapshot,
   type TargetRef,
@@ -180,6 +179,39 @@ test("generated states: invariants hold and every decision is internally consist
               ["not-admitted", "no-capability", "out-of-reach"].includes(decision.reason),
               `seed ${seed}: closed denial vocabulary`,
             );
+            // The eligibility predicate is independent of `wearableGrants`:
+            // it reads the raw actor, participation, and grant records. A
+            // deleted disabled or active-participation gate then shows up as
+            // the wrong denial reason instead of passing on vocabulary alone.
+            const actorRecord = snapshot.actors.find(
+              (candidate) =>
+                candidate.organizationId === actor.organizationId &&
+                candidate.actorId === actor.actorId,
+            );
+            const activeParticipation = snapshot.participations.some(
+              (participation) =>
+                participation.organizationId === actor.organizationId &&
+                participation.operationId === operation.operationId &&
+                participation.status === "active",
+            );
+            const activeGrant = snapshot.grants.some(
+              (grant) =>
+                grant.organizationId === actor.organizationId &&
+                grant.actorId === actor.actorId &&
+                grant.operationId === operation.operationId &&
+                grant.revoked !== true,
+            );
+            const eligible =
+              actorRecord !== undefined &&
+              actorRecord.disabled !== true &&
+              activeParticipation &&
+              activeGrant;
+            const who = `${actor.organizationId}/${actor.actorId}`;
+            if (eligible) {
+              assert.notEqual(decision.reason, "not-admitted", `seed ${seed}: eligible ${who} is not denied admission`);
+            } else {
+              assert.equal(decision.reason, "not-admitted", `seed ${seed}: ineligible ${who} is not-admitted`);
+            }
           }
         }
       }
@@ -208,12 +240,36 @@ test("generated states: read reach matches the policy axis and the reached teams
         `seed ${seed}: no duplicate readable organizations`,
       );
 
+      const actorRecord = snapshot.actors.find(
+        (candidate) =>
+          candidate.organizationId === actor.organizationId &&
+          candidate.actorId === actor.actorId,
+      );
+      const activeParticipation = snapshot.participations.some(
+        (participation) =>
+          participation.organizationId === actor.organizationId &&
+          participation.operationId === operation.operationId &&
+          participation.status === "active",
+      );
       const reached = new Set<string>();
-      for (const grant of wearableGrants(snapshot, actor.organizationId, actor.actorId, operation.operationId)) {
-        if (grant.target.kind === "team") reached.add(grant.target.teamId);
-        else {
-          for (const team of snapshot.teams) {
-            if (team.siteId === grant.target.siteId) reached.add(team.teamId);
+      if (actorRecord !== undefined && actorRecord.disabled !== true && activeParticipation) {
+        // Independent of `wearableGrants`: the oracle applies the raw
+        // eligibility gates and the reach rule itself, so a shared wearability
+        // regression cannot hide behind the same primitive.
+        for (const grant of snapshot.grants) {
+          if (
+            grant.operationId !== operation.operationId ||
+            grant.organizationId !== actor.organizationId ||
+            grant.actorId !== actor.actorId ||
+            grant.revoked === true
+          ) {
+            continue;
+          }
+          if (grant.target.kind === "team") reached.add(grant.target.teamId);
+          else {
+            for (const team of snapshot.teams) {
+              if (team.siteId === grant.target.siteId) reached.add(team.teamId);
+            }
           }
         }
       }

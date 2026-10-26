@@ -161,6 +161,28 @@ test("the issuing interface version is provenance, not a gate on reading", async
   assert.equal(verified.claims.interfaceVersion, differentInterface, "and is reported unchanged");
 });
 
+test("an unrecognized optional claim is additive and does not gate reading", async () => {
+  // E3: claims grow additively within a format version. A newer issuer may
+  // carry a claim an older verifier does not know; canonical serialization
+  // covers it, and the verifier reads the claims it does know.
+  const signer = await webCryptoSigner("key-additive");
+  const signerKey = await ed25519VerifyKey("key-additive", await signer.publicKey());
+  const claims = { ...vectors.claims, futureClaim: { note: "additive" } };
+  const envelope: SignedAccessEnvelope = {
+    format: ACCESS_ENVELOPE_FORMAT,
+    v: 1,
+    keyId: "key-additive",
+    claims: claims as unknown as AccessEnvelopeClaimsV1,
+    signature: await signer.sign(canonicalJson(asJson(claims))),
+  };
+  const verified = successOf(await verify(envelope, new Map([[signerKey.keyId, signerKey]]), {
+    now: vectors.claims.iat + 1,
+  }));
+  assert.equal(verified.claims.operationId, vectors.claims.operationId);
+  assert.equal(verified.claims.v, 1);
+  assert.deepEqual(verified.access.readableOrganizationIds(), vectors.claims.readableOrganizationIds);
+});
+
 test("wrong-binding: another operation, or a site the envelope is not admitted to", async () => {
   const now = vectors.claims.iat + 1;
   const otherOp = failureOf(await verify(envelopeOf(vectors.claims), keys, { now, expectedOperationId: "op-61a8e3f2" }));

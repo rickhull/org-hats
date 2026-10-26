@@ -2,8 +2,8 @@
 
 **Status:** review 2026-10-25, fanned out through the project-local
 `test-reviewer` and `reviewer` agents (report-only): seven test batches plus a
-gate-topology pass. The low-risk fragility fixes and the clear speed wins
-landed with the review; the coverage gaps and remaining ring work are below.
+gate-topology pass. The low-risk fragility fixes, the clear speed wins, and
+most of the P1 coverage landed with the review; the remaining gaps are below.
 
 The project-local agents were the right tool: they read their batches in full
 and returned `file:line` findings without edits. `agentic-sweep` is an edit
@@ -45,26 +45,34 @@ coverage items below are separate.
   cleans `dist/`), and CI now fetches tags (`fetch-depth: 0`) and says it is a
   release mirror.
 
-## P1 — coverage gaps still open
+## P1 — coverage gaps (closed 2026-10-25)
 
-Ranked by the regression they would let through. Each is a place where a
-plausible deletion or inversion leaves the suite green.
+All entries landed on 2026-10-25; the P2 slice below remains.
 
-- [ ] `tests/policy.test.ts:6-55` — only about half of
+- [x] `tests/policy.test.ts:6-55` — only about half of
   `validatePolicyBundle`'s rejection branches are pinned (missing role
   actions, duplicate/empty title, missing `readPolicy`). Add one rejection per
   branch.
-- [ ] `tests/generative.test.ts:92-115` — the generator emits disabled actors
+  Landed 2026-10-25: one test per branch, including empty and duplicate
+  titles and a missing read policy.
+- [x] `tests/generative.test.ts:92-115` — the generator emits disabled actors
   and invited/revoked participations, but the denial check only asserts reason
   vocabulary; deleting the `disabled` or active-participation gates in
   `wearableGrants` would pass. Assert the denial reason for each ineligible
   actor.
-- [ ] `tests/generative.test.ts:205` — the read-reach oracle calls the same
+  Landed 2026-10-25: an independent eligibility predicate over the raw actor,
+  participation, and grant records asserts `not-admitted` for every ineligible
+  actor and forbids it for an eligible one.
+- [x] `tests/generative.test.ts:205` — the read-reach oracle calls the same
   `wearableGrants` primitive as `readReach`; a shared wearability regression is
   invisible. Inline an independent predicate for the granted-teams axis.
-- [ ] `packages/cloudflare/test/operation.test.ts:210` — `/intake` status is
+  Landed 2026-10-25: the oracle applies the eligibility gates and reach rule
+  directly to grants, not through `wearableGrants`.
+- [x] `packages/cloudflare/test/operation.test.ts:210` — `/intake` status is
   never asserted (only the body), so a regression flipping 503-for-retry
   against 200-recorded-no-op passes. Assert both.
+  Landed 2026-10-25: a recorded no-op is 200 and an unappliable message is
+  503 with its closed failure kind.
 - [x] `packages/cloudflare/test/exchange.test.ts:99` — no expired or wrong
   `aud`/`iss` token is exercised; deleting those checks passes. Add expiry,
   audience, issuer, and a rejected `alg` case.
@@ -76,16 +84,21 @@ plausible deletion or inversion leaves the suite green.
   Landed 2026-10-25: the RS256 test exposed a missing SHA-256 algorithm
   parameter (RS256 could not verify at all); the fixed high-bit DER vector
   pins the conversion.
-- [ ] `packages/cloudflare/test/conformance.test.ts:13` — asserts
+- [x] `packages/cloudflare/test/conformance.test.ts:13` — asserts
   `results.length > 0`, not the full inventory id set; a runtime-side skip
   passes. Assert the ids equal `CONFORMANCE_CASES`.
-- [ ] `tests/conformance.test.ts:11` — the id-shape test does not pin the id
+  Landed 2026-10-25: the runtime result ids must equal the exported case ids.
+- [x] `tests/conformance.test.ts:11` — the id-shape test does not pin the id
   values cited by `specs/authority.md`; assert the expected list.
-- [ ] `tests/keyset.test.ts:83-90` — reachable parse failures (non-object key,
+  Landed 2026-10-25: the 28 published ids are pinned in order.
+- [x] `tests/keyset.test.ts:83-90` — reachable parse failures (non-object key,
   missing id/key, non-array `keys`) are unpinned. Add one `throws` per branch.
-- [ ] `tests/access.test.ts` / `tests/fixtures/envelope-vectors.json` — no
+  Landed 2026-10-25: one named failure per shape.
+- [x] `tests/access.test.ts` / `tests/fixtures/envelope-vectors.json` — no
   vector carries an unrecognized optional claim, so E3's additive-growth
   claim is not executable. Add one.
+  Landed 2026-10-25: a freshly signed envelope with an unknown claim verifies,
+  and the known claims still read.
 
 ## P2 — smaller coverage and fragility fixes
 

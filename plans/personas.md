@@ -42,9 +42,9 @@ working; the AD/LDAP lesson that **ids resolve and aliases decorate**, unlike
 DN-anchored ACLs; bind/evidence separated from authority; offline verification
 with a bounded revocation window.
 
-**What loses him:** no consumer install line in the README; the envelope is
-not a JWT and needs an `org-hats/access` verifier; no LDAP, SCIM, SAML,
-service-account, group-grant, nesting, or deny story.
+**What loses him:** the envelope is not a JWT and needs an
+`org-hats/access` verifier; no LDAP, SCIM, SAML, service-account, group-grant,
+nesting, or deny story.
 
 **The five-minute path he would actually follow:**
 
@@ -65,12 +65,8 @@ calls `mayAct` through an HTTP handler, and switches hats for real with
 **Proof and content for him:**
 
 - `docs/from_ldap.md` — the AD/LDAP mapping and non-mapping table.
-- A "read this first" decision box: not an IdP or directory; no group grants,
-  nesting, deny, or inheritance; one active hat per session; Cloudflare is the
-  production runtime; the envelope is not JWT.
 - A comparison/decision matrix against the honest baseline (a role column),
   Keycloak/Entra, Casbin, OPA, and Zanzibar-style systems.
-- A consumer quickstart with the git pin, not just the repo's own pilot.
 
 ## Persona 2 — the access-control academic
 
@@ -120,11 +116,6 @@ then, position it as a reference architecture, not a foundational model.
 
 ## Content plan
 
-**P0 — adoption hook (low risk, no model decision needed):**
-
-1. A top-of-README decision box and a consumer quickstart with the git pin,
-   not just the repo's own examples.
-
 **P1 — credibility (needs decisions):**
 
 1. `plans/model_coherence.md` decisions: unit of authority, admission,
@@ -161,8 +152,9 @@ including multi-grant cases that expose the unit-of-authority divergence.
 
 ## Sequencing and success signals
 
-Sequence: P0 hook → P1 decisions/formalization → P2 release/acceptance → P3
-test depth. Success signals are qualitative and specific:
+Sequence: the adoption hook is landed; P1 decisions/formalization → P2
+release/acceptance → P3 test depth. Success signals are qualitative and
+specific:
 
 - a new user can go from clone to their own world without reading the engine;
 - practitioners ask about AD/LDAP mapping rather than "is this RBAC?";
