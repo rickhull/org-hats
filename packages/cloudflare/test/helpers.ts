@@ -39,13 +39,13 @@ export const organizationBootstrap = (
   organizationId,
   displayName: overrides.displayName ?? "Cedar Works",
   actors: [
-    { actorId: "actor-admin", displayName: "Nia Fields" },
-    { actorId: "actor-member", displayName: "Sam Whitfield" },
+    { actorId: "actor-lead", displayName: "Nia Fields" },
+    { actorId: "actor-crew", displayName: "Sam Whitfield" },
   ],
   principalLinks: [
-    { provider: "idp", subject: "admin", actorId: "actor-admin" },
-    { provider: "idp", subject: "member", actorId: "actor-member" },
+    { provider: "idp", subject: "lead", actorId: "actor-lead" },
+    { provider: "idp", subject: "crew", actorId: "actor-crew" },
   ],
-  orgAdmins: ["actor-admin"],
+  orgAdmins: ["actor-lead"],
   sealedIdpConfig: overrides.sealedIdpConfig ?? "sealed:test-only",
 });

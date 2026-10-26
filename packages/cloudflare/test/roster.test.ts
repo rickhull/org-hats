@@ -11,8 +11,8 @@ import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { call, organizationBootstrap } from "./helpers";
 
-const ADMIN = "actor-admin";
-const MEMBER = "actor-member";
+const LEAD = "actor-lead";
+const CREW = "actor-crew";
 const SITE = "site-roster";
 const TEAM = "team-roster";
 
@@ -51,7 +51,7 @@ const bootstrapOperation = async (current: World) =>
     sites: [{ siteId: SITE, path: "site", aliases: ["site"] }],
     teams: [{ teamId: TEAM, siteId: SITE, organizationId: current.orgId }],
     grants: [
-      { grantId: "g-roster", organizationId: current.orgId, actorId: MEMBER, role: "field", target: { kind: "team", teamId: TEAM }, primary: true },
+      { grantId: "g-roster", organizationId: current.orgId, actorId: CREW, role: "field", target: { kind: "team", teamId: TEAM }, primary: true },
     ],
   });
 
@@ -83,13 +83,13 @@ const participate = async (current: World): Promise<void> => {
   await bootstrapOperation(current);
   await call(current.op, "POST", "/invite", {
     organizationId: current.orgId,
-    byActorId: ADMIN,
+    byActorId: LEAD,
     idempotencyKey: `invite-${current.opId}`,
   });
   await drain(current.op);
   await call(current.org, "POST", "/accept", {
     operationId: current.opId,
-    actorId: ADMIN,
+    actorId: LEAD,
     idempotencyKey: `accept-${current.opId}`,
   });
   await drain(current.org);
@@ -101,8 +101,8 @@ describe("the org-actor projection", () => {
     await participate(current);
 
     expect(await projected(current)).toEqual([
-      { organization_id: current.orgId, actor_id: ADMIN, disabled: 0, synced_at: expect.any(Number) },
-      { organization_id: current.orgId, actor_id: MEMBER, disabled: 0, synced_at: expect.any(Number) },
+      { organization_id: current.orgId, actor_id: CREW, disabled: 0, synced_at: expect.any(Number) },
+      { organization_id: current.orgId, actor_id: LEAD, disabled: 0, synced_at: expect.any(Number) },
     ]);
     const current_status = await status(current);
     expect(current_status?.["orgActors"]).toBe(2);
@@ -115,15 +115,15 @@ describe("the org-actor projection", () => {
     await participate(current);
 
     await call(current.org, "POST", "/disable", {
-      actorId: MEMBER,
-      byActorId: ADMIN,
+      actorId: CREW,
+      byActorId: LEAD,
       idempotencyKey: "disable-roster",
     });
     expect((await drain(current.org)).body.value?.pending).toBe(0);
 
     const rows = await projected(current);
-    expect(rows.find((row) => row.actor_id === MEMBER)?.disabled).toBe(1);
-    expect(rows.find((row) => row.actor_id === ADMIN)?.disabled).toBe(0);
+    expect(rows.find((row) => row.actor_id === CREW)?.disabled).toBe(1);
+    expect(rows.find((row) => row.actor_id === LEAD)?.disabled).toBe(0);
     expect((await status(current))?.["disabledOrgActors"]).toBe(1);
   });
 
@@ -136,8 +136,8 @@ describe("the org-actor projection", () => {
     const added = {
       ...organizationBootstrap(current.orgId),
       actors: [
-        { actorId: ADMIN, displayName: "Nia Fields" },
-        { actorId: MEMBER, displayName: "Sam Whitfield" },
+        { actorId: LEAD, displayName: "Nia Fields" },
+        { actorId: CREW, displayName: "Sam Whitfield" },
         { actorId: "actor-late", displayName: "Ira Mendel" },
       ],
     };
@@ -152,9 +152,9 @@ describe("the org-actor projection", () => {
     );
     expect(reconciled.body.value).toEqual({ synced: 1, organizations: 1 });
     expect((await projected(current)).map((row) => row.actor_id)).toEqual([
-      ADMIN,
+      CREW,
       "actor-late",
-      MEMBER,
+      LEAD,
     ]);
   });
 
@@ -186,25 +186,25 @@ describe("the org-actor projection", () => {
 
     const issued = await call<{ claims: { actor: { actorId: string } } }>(current.op, "POST", "/issue", {
       organizationId: current.orgId,
-      actorId: MEMBER,
+      actorId: CREW,
     });
     expect(issued.body.ok).toBe(true);
-    expect(issued.body.value?.claims.actor.actorId).toBe(MEMBER);
+    expect(issued.body.value?.claims.actor.actorId).toBe(CREW);
 
     // the same grant, the same participation, but the actor is no longer in
     // the projection: before the projection existed this still issued,
     // because the snapshot fabricated the actor who was asking
     const removed = await call(current.op, "POST", "/intake", {
-      messageId: "roster-without-member",
+      messageId: "roster-without-crew",
       kind: "roster",
       organizationId: current.orgId,
-      actors: [{ actorId: ADMIN, disabled: false }],
+      actors: [{ actorId: LEAD, disabled: false }],
     });
     expect(removed.body.ok).toBe(true);
 
     const refused = await call(current.op, "POST", "/issue", {
       organizationId: current.orgId,
-      actorId: MEMBER,
+      actorId: CREW,
     });
     expect(refused.body.ok).toBe(false);
     expect(refused.body.failure?.kind).toBe("not-admitted");
@@ -215,19 +215,19 @@ describe("the org-actor projection", () => {
     await participate(current);
     expect((await call(current.op, "POST", "/issue", {
       organizationId: current.orgId,
-      actorId: MEMBER,
+      actorId: CREW,
     })).body.ok).toBe(true);
 
     await call(current.org, "POST", "/disable", {
-      actorId: MEMBER,
-      byActorId: ADMIN,
+      actorId: CREW,
+      byActorId: LEAD,
       idempotencyKey: "disable-denies",
     });
     await drain(current.org);
 
     const refused = await call(current.op, "POST", "/issue", {
       organizationId: current.orgId,
-      actorId: MEMBER,
+      actorId: CREW,
     });
     expect(refused.body.ok).toBe(false);
     expect(refused.body.failure?.kind).toBe("not-admitted");
@@ -239,7 +239,7 @@ describe("the org-actor projection", () => {
 
     const issued = await call<{ refresh: { handle: string } }>(current.op, "POST", "/issue", {
       organizationId: current.orgId,
-      actorId: MEMBER,
+      actorId: CREW,
     });
     expect(issued.body.ok).toBe(true);
     // refresh rotates, so the live handle is the one the last call returned
@@ -254,11 +254,11 @@ describe("the org-actor projection", () => {
     // at the organization, so it refuses on the live fact rather than on the
     // stale image.
     await call(current.org, "POST", "/disable", {
-      actorId: MEMBER,
-      byActorId: ADMIN,
+      actorId: CREW,
+      byActorId: LEAD,
       idempotencyKey: "disable-lost",
     });
-    expect((await projected(current)).find((row) => row.actor_id === MEMBER)?.disabled).toBe(0);
+    expect((await projected(current)).find((row) => row.actor_id === CREW)?.disabled).toBe(0);
 
     const refreshed = await call<{ refresh: { handle: string } }>(current.op, "POST", "/refresh", {
       handle: rotated.body.value?.refresh.handle ?? "",
@@ -287,7 +287,7 @@ describe("the org-actor projection", () => {
     // and issuance works immediately after the restore: the rebuild ran
     const issued = await call(current.op, "POST", "/issue", {
       organizationId: current.orgId,
-      actorId: MEMBER,
+      actorId: CREW,
     });
     expect(issued.body.ok).toBe(true);
   });
@@ -301,7 +301,7 @@ describe("the org-actor projection", () => {
     // participation, so the rows stay until an image says otherwise
     await call(current.op, "POST", "/revoke-participation", {
       organizationId: current.orgId,
-      byActorId: ADMIN,
+      byActorId: LEAD,
       idempotencyKey: "revoke-scope",
     });
     const reconciled = await call<{ synced: number; organizations: number }>(

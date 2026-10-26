@@ -40,14 +40,14 @@ describe("OrganizationAuthority", () => {
     expect(result.status).toBe(200);
     expect(result.body.ok).toBe(true);
 
-    const admin = await call<{ actorId: string; disabled: boolean }>(
+    const lead = await call<{ actorId: string; disabled: boolean }>(
       stub,
       "GET",
-      "/resolve?provider=idp&subject=admin",
+      "/resolve?provider=idp&subject=lead",
     );
-    expect(admin.body.ok).toBe(true);
-    expect(admin.body.value?.actorId).toBe("actor-admin");
-    expect(admin.body.value?.disabled).toBe(false);
+    expect(lead.body.ok).toBe(true);
+    expect(lead.body.value?.actorId).toBe("actor-lead");
+    expect(lead.body.value?.disabled).toBe(false);
 
     const unknown = await call(stub, "GET", "/resolve?provider=idp&subject=nobody");
     expect(unknown.body.ok).toBe(false);
@@ -69,22 +69,22 @@ describe("OrganizationAuthority", () => {
     await bootstrap(stub, "org/accept");
     await invite(stub, "op-accept");
 
-    const member = await accept(stub, "op-accept", "actor-member", "accept-member");
-    expect(member.body.ok).toBe(false);
-    expect(member.body.failure?.kind).toBe("denied");
+    const crew = await accept(stub, "op-accept", "actor-crew", "accept-crew");
+    expect(crew.body.ok).toBe(false);
+    expect(crew.body.failure?.kind).toBe("denied");
 
-    const first = await accept(stub, "op-accept", "actor-admin", "accept-1");
+    const first = await accept(stub, "op-accept", "actor-lead", "accept-1");
     expect(first.body.ok).toBe(true);
     expect(first.body.value?.applied).toBe(true);
     expect(first.body.value?.invitationId).toBe("inv-1");
 
-    const retry = await accept(stub, "op-accept", "actor-admin", "accept-1");
+    const retry = await accept(stub, "op-accept", "actor-lead", "accept-1");
     expect(retry.body.ok).toBe(true);
     expect(retry.body.value?.applied).toBe(false);
 
     const misuse = await call(stub, "POST", "/accept", {
       operationId: "op-other",
-      actorId: "actor-admin",
+      actorId: "actor-lead",
       idempotencyKey: "accept-1",
     });
     expect(misuse.body.ok).toBe(false);
@@ -115,7 +115,7 @@ describe("OrganizationAuthority", () => {
   it("refuses acceptance before the invitation arrives", async () => {
     const stub = organization("org-early");
     await bootstrap(stub, "org/early");
-    const early = await accept(stub, "op-early", "actor-admin", "accept-early");
+    const early = await accept(stub, "op-early", "actor-lead", "accept-early");
     expect(early.body.ok).toBe(false);
     expect(early.body.failure?.kind).toBe("denied");
   });
@@ -124,34 +124,34 @@ describe("OrganizationAuthority", () => {
     const stub = organization("org-disable");
     await bootstrap(stub, "org/disable");
     const disabled = await call(stub, "POST", "/disable", {
-      actorId: "actor-member",
-      byActorId: "actor-admin",
+      actorId: "actor-crew",
+      byActorId: "actor-lead",
       idempotencyKey: "disable-1",
     });
     expect(disabled.body.ok).toBe(true);
 
-    const member = await call<{ disabled: boolean }>(
+    const crew = await call<{ disabled: boolean }>(
       stub,
       "GET",
-      "/resolve?provider=idp&subject=member",
+      "/resolve?provider=idp&subject=crew",
     );
-    expect(member.body.value?.disabled).toBe(true);
+    expect(crew.body.value?.disabled).toBe(true);
 
     const messages = await outbox(stub);
     expect(messages.body.value?.some((message) => message.kind === "actor-disabled")).toBe(true);
 
     const trail = await audit(stub);
-    expect(trail.body.value?.some((entry) => entry.fact.includes("actor actor-member disabled"))).toBe(true);
+    expect(trail.body.value?.some((entry) => entry.fact.includes("actor actor-crew disabled"))).toBe(true);
   });
 
   it("revokes participation and emits the operation message", async () => {
     const stub = organization("org-revoke");
     await bootstrap(stub, "org/revoke");
     await invite(stub, "op-revoke");
-    await accept(stub, "op-revoke", "actor-admin", "accept-revoke");
+    await accept(stub, "op-revoke", "actor-lead", "accept-revoke");
     const revoked = await call(stub, "POST", "/revoke", {
       operationId: "op-revoke",
-      actorId: "actor-admin",
+      actorId: "actor-lead",
       idempotencyKey: "revoke-1",
     });
     expect(revoked.body.ok).toBe(true);
@@ -166,11 +166,11 @@ describe("OrganizationAuthority", () => {
     const first = await call(stub, "POST", "/bootstrap", {
       organizationId: "org/links",
       actors: [
-        { actorId: "actor-admin", displayName: "Nia Fields" },
-        { actorId: "actor-member", displayName: "Sam Whitfield" },
+        { actorId: "actor-lead", displayName: "Nia Fields" },
+        { actorId: "actor-crew", displayName: "Sam Whitfield" },
       ],
-      principalLinks: [{ provider: "idp", subject: "admin", actorId: "actor-admin" }],
-      orgAdmins: ["actor-admin"],
+      principalLinks: [{ provider: "idp", subject: "lead", actorId: "actor-lead" }],
+      orgAdmins: ["actor-lead"],
     });
     expect(first.body.ok).toBe(true);
 
@@ -178,19 +178,19 @@ describe("OrganizationAuthority", () => {
     // error, not a silent first-wins or last-wins
     const conflict = await call(stub, "POST", "/bootstrap", {
       organizationId: "org/links",
-      actors: [{ actorId: "actor-admin" }, { actorId: "actor-member" }],
-      principalLinks: [{ provider: "idp", subject: "admin", actorId: "actor-member" }],
+      actors: [{ actorId: "actor-lead" }, { actorId: "actor-crew" }],
+      principalLinks: [{ provider: "idp", subject: "lead", actorId: "actor-crew" }],
       orgAdmins: [],
     });
     expect(conflict.body.ok).toBe(false);
     expect(conflict.body.failure?.kind).toBe("invalid-command");
     expect(conflict.body.failure?.detail).toMatch(/already resolves/);
-    const stillAdmin = await call<{ actorId: string }>(
+    const stillLead = await call<{ actorId: string }>(
       stub,
       "GET",
-      "/resolve?provider=idp&subject=admin",
+      "/resolve?provider=idp&subject=lead",
     );
-    expect(stillAdmin.body.value?.actorId).toBe("actor-admin");
+    expect(stillLead.body.value?.actorId).toBe("actor-lead");
 
     // a link naming an actor nobody knows is refused, not stored dead
     const unknown = await call(stub, "POST", "/bootstrap", {

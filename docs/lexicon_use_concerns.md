@@ -11,9 +11,11 @@ accepted, and what remains deferred. The normative vocabulary is
   “membership”/“act capability”.
 - Test and fixture names: `invitee-admin` / `actor-inv-admin` →
   `invitee-lead` / `actor-inv-lead`; `qm-tenant` / `tenant.example` →
-  `qm-host` / `host.example`. The Cloudflare roster `ADMIN` / `MEMBER`
-  constants are deferred because `helpers.ts` shares the same actor ids
-  across many suites.
+  `qm-host` / `host.example`; the Cloudflare roster `actor-admin` /
+  `actor-member` → `actor-lead` / `actor-crew`, with the `ADMIN` / `MEMBER`
+  constants renamed `LEAD` / `CREW` and the idp subjects to match. The
+  projection assertions order rows by `actor_id`, so the rename reordered
+  them.
 - Read policy “team-audience axis” → “team-read axis”.
 - Current-behavior comments: “capability tables” → “ad-hoc tables”;
   “scope-path” / “coverage walk” → “path hierarchy” / “inheritance walk”;
@@ -41,9 +43,12 @@ accepted, and what remains deferred. The normative vocabulary is
   prove there is no hardcoded fallback; `tests/generative.test.ts` and the
   Cloudflare package tests use local fixtures. They are not built-in
   examples; leave them unless those tests are being touched.
-- `packages/cloudflare/test/helpers.ts` shares `actor-admin` / `actor-member`
-  across the Cloudflare suites; the roster constants are deferred until that
-  fixture is renamed as one change.
+- The Cloudflare suites keep `title: "admin"` paired with
+  `adminRoles: ["admin"]` (`operation.test.ts:52,56`, `ops.test.ts:43`,
+  `roster.test.ts:49`). That pair is policy fixture data, and an
+  administrative role is configuration rather than a built-in title; renaming
+  it would change what the fixture tests. The actor ids and roster constants
+  are renamed — see Resolved.
 - `adminRoles` / `orgAdmins` remain declared configuration fields, not
   built-in role titles.
 

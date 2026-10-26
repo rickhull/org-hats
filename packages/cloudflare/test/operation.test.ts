@@ -2,8 +2,8 @@ import { env, runDurableObjectAlarm } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { call, organizationBootstrap } from "./helpers";
 
-const ADMIN = "actor-admin";
-const MEMBER = "actor-member";
+const LEAD = "actor-lead";
+const CREW = "actor-crew";
 const SITE = "site-test";
 const TEAM = "team-test";
 
@@ -61,7 +61,7 @@ const bootstrapOperation = async (current: World, participating = false) =>
       {
         grantId: "g-field",
         organizationId: current.orgId,
-        actorId: MEMBER,
+        actorId: CREW,
         role: "field",
         target: { kind: "team", teamId: TEAM },
         primary: true,
@@ -92,14 +92,14 @@ const routingBootstrap = (operationId: string, overrides: Record<string, unknown
 const invite = async (current: World, key = "invite-1") =>
   call<{ applied: boolean; invitationId?: string }>(current.op, "POST", "/invite", {
     organizationId: current.orgId,
-    byActorId: ADMIN,
+    byActorId: LEAD,
     idempotencyKey: key,
   });
 
 const accept = async (current: World, key = "accept-1") =>
   call<{ applied: boolean }>(current.org, "POST", "/accept", {
     operationId: current.opId,
-    actorId: ADMIN,
+    actorId: LEAD,
     idempotencyKey: key,
   });
 
@@ -192,7 +192,7 @@ describe("OperationAuthority", () => {
 
     const revoked = await call(current.op, "POST", "/revoke-participation", {
       organizationId: current.orgId,
-      byActorId: ADMIN,
+      byActorId: LEAD,
       idempotencyKey: "revoke-race",
     });
     expect(revoked.body.ok).toBe(true);
@@ -233,7 +233,7 @@ describe("OperationAuthority", () => {
     const revoke = async (key: string, organizationId = current.orgId) =>
       call(current.op, "POST", "/revoke-participation", {
         organizationId,
-        byActorId: ADMIN,
+        byActorId: LEAD,
         idempotencyKey: key,
       });
 
@@ -253,7 +253,7 @@ describe("OperationAuthority", () => {
     await invite(current, "reinvite-1");
     await call(current.op, "POST", "/revoke-participation", {
       organizationId: current.orgId,
-      byActorId: ADMIN,
+      byActorId: LEAD,
       idempotencyKey: "reinvite-revoke",
     });
 
@@ -320,10 +320,10 @@ describe("OperationAuthority", () => {
 
     const base = {
       organizationId: current.orgId,
-      actorId: MEMBER,
+      actorId: CREW,
       role: "lead",
       target: { kind: "team", teamId: TEAM },
-      byActorId: ADMIN,
+      byActorId: LEAD,
     };
 
     // an actor the operation has never heard of: the projection is what
@@ -351,7 +351,7 @@ describe("OperationAuthority", () => {
     // and once the participation is revoked, no new grant stands on it
     await call(current.op, "POST", "/revoke-participation", {
       organizationId: current.orgId,
-      byActorId: ADMIN,
+      byActorId: LEAD,
       idempotencyKey: "grant-precondition-revoke",
     });
     const afterRevoke = await call(current.op, "POST", "/grant", {
@@ -374,10 +374,10 @@ describe("OperationAuthority", () => {
     const grant = await call<{ applied: boolean; grantId?: string }>(current.op, "POST", "/grant", {
       grantId: "g-new",
       organizationId: current.orgId,
-      actorId: MEMBER,
+      actorId: CREW,
       role: "lead",
       target: { kind: "team", teamId: TEAM },
-      byActorId: ADMIN,
+      byActorId: LEAD,
       idempotencyKey: "grant-1",
     });
     expect(grant.body.ok).toBe(true);
@@ -385,10 +385,10 @@ describe("OperationAuthority", () => {
     const retry = await call<{ applied: boolean }>(current.op, "POST", "/grant", {
       grantId: "g-new",
       organizationId: current.orgId,
-      actorId: MEMBER,
+      actorId: CREW,
       role: "lead",
       target: { kind: "team", teamId: TEAM },
-      byActorId: ADMIN,
+      byActorId: LEAD,
       idempotencyKey: "grant-1",
     });
     expect(retry.body.value?.applied).toBe(false);
@@ -396,25 +396,25 @@ describe("OperationAuthority", () => {
     const misuse = await call(current.op, "POST", "/grant", {
       grantId: "g-new",
       organizationId: current.orgId,
-      actorId: MEMBER,
+      actorId: CREW,
       role: "field",
       target: { kind: "team", teamId: TEAM },
-      byActorId: ADMIN,
+      byActorId: LEAD,
       idempotencyKey: "grant-1",
     });
     expect(misuse.body.failure?.kind).toBe("invalid-command");
 
     const selected = await call(current.op, "POST", "/select-hat", {
       grantId: "g-new",
-      actorId: MEMBER,
-      byActorId: MEMBER,
+      actorId: CREW,
+      byActorId: CREW,
       idempotencyKey: "select-1",
     });
     expect(selected.body.ok).toBe(true);
     const recorded = await call(current.op, "POST", "/refresh-record", {
       handleHash: "hash-1",
       organizationId: current.orgId,
-      actorId: MEMBER,
+      actorId: CREW,
     });
     expect(recorded.body.ok).toBe(true);
     const before = await call<Record<string, unknown>>(current.op, "GET", "/snapshot");
@@ -423,7 +423,7 @@ describe("OperationAuthority", () => {
 
     const revoked = await call(current.op, "POST", "/revoke-grant", {
       grantId: "g-new",
-      byActorId: ADMIN,
+      byActorId: LEAD,
       idempotencyKey: "revoke-1",
     });
     expect(revoked.body.ok).toBe(true);
@@ -443,12 +443,12 @@ describe("OperationAuthority", () => {
     await call(current.op, "POST", "/refresh-record", {
       handleHash: "hash-disable",
       organizationId: current.orgId,
-      actorId: MEMBER,
+      actorId: CREW,
     });
 
     const disabled = await call(current.org, "POST", "/disable", {
-      actorId: MEMBER,
-      byActorId: ADMIN,
+      actorId: CREW,
+      byActorId: LEAD,
       idempotencyKey: "disable-1",
     });
     expect(disabled.body.ok).toBe(true);
@@ -474,7 +474,7 @@ describe("OperationAuthority", () => {
 
     const revoked = await call(current.op, "POST", "/revoke-participation", {
       organizationId: current.orgId,
-      byActorId: ADMIN,
+      byActorId: LEAD,
       idempotencyKey: "revoke-participation-1",
     });
     expect(revoked.body.ok).toBe(true);
@@ -508,7 +508,7 @@ describe("OperationAuthority", () => {
         {
           grantId: "g-field",
           organizationId: current.orgId,
-          actorId: MEMBER,
+          actorId: CREW,
           role: "field",
           target: { kind: "team", teamId: TEAM },
           primary: true,
@@ -521,7 +521,7 @@ describe("OperationAuthority", () => {
       current.op,
       "POST",
       "/issue",
-      { organizationId: current.orgId, actorId: MEMBER },
+      { organizationId: current.orgId, actorId: CREW },
     );
     expect(issued.body.ok).toBe(true);
     const handle = issued.body.value?.refresh.kind === "rotated" ? issued.body.value.refresh.handle : undefined;

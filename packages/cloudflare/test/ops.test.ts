@@ -51,7 +51,7 @@ const opBootstrap = (operationId: string, organizationId: string) => ({
     {
       grantId: "g-ops",
       organizationId,
-      actorId: "actor-member",
+      actorId: "actor-crew",
       role: "field",
       target: { kind: "team", teamId: "team-ops" },
       primary: true,
@@ -182,7 +182,7 @@ describe("typed ops routes", () => {
       organizationId,
       provider: "idp",
       subject: "new-subject",
-      actorId: "actor-member",
+      actorId: "actor-crew",
     });
     expect(bind.status).toBe(200);
     expect((await bind.json() as { value?: { applied: boolean } }).value?.applied).toBe(true);
@@ -191,7 +191,7 @@ describe("typed ops routes", () => {
       organizationId,
       provider: "idp",
       subject: "new-subject",
-      actorId: "actor-member",
+      actorId: "actor-crew",
     });
     expect(again.status).toBe(200);
     expect((await again.json() as { value?: { applied: boolean } }).value?.applied).toBe(false);
@@ -200,13 +200,13 @@ describe("typed ops routes", () => {
       value?: { links: { subject: string; actorId: string }[] };
     };
     expect(after.value?.links).toHaveLength(3);
-    expect(after.value?.links.some((link) => link.subject === "new-subject" && link.actorId === "actor-member")).toBe(true);
+    expect(after.value?.links.some((link) => link.subject === "new-subject" && link.actorId === "actor-crew")).toBe(true);
 
     const conflict = await jsonPost("/ops/organization/principal-link", {
       organizationId,
       provider: "idp",
       subject: "new-subject",
-      actorId: "actor-admin",
+      actorId: "actor-lead",
     });
     expect(conflict.status).toBe(400);
     expect((await conflict.json() as { failure?: { kind: string } }).failure?.kind).toBe("invalid-command");
@@ -232,7 +232,7 @@ describe("typed ops routes", () => {
 
     const result = await bindPrincipalLink(
       { ...env, AUTHORITY_ORGANIZATION_IDS: `${target},${other}` } as Env,
-      { organizationId: target, provider: "idp", subject: "admin", actorId: "actor-member" },
+      { organizationId: target, provider: "idp", subject: "lead", actorId: "actor-crew" },
     );
     expect(result.status).toBe(400);
     expect((result.body as { failure?: { kind: string } }).failure?.kind).toBe("invalid-command");
