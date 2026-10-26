@@ -58,6 +58,8 @@ const twin = (fixture: {
 // Persistent, multi-site, multi-organization: crews that stay for the life
 // of the operation, read reach following team-bearing grants.
 
+// Role titles, including `admin`, are fixture policy data. The engine has no
+// built-in administrator title; administration is declared configuration.
 const professionalPolicy: PolicyBundle = {
   format: 1,
   id: "policy-meridian",

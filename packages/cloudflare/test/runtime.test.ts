@@ -61,7 +61,7 @@ const conformanceOrganizationIds = (): readonly string[] => [...new Set(
 describe("the Cloudflare runtime's cross-coordinator rules", () => {
   it("request-access asks as the evidence it carries, not the shell authorization", async () => {
     const world = await createCloudflareConformanceWorld(env);
-    const invitee = CONFORMANCE_PRINCIPALS.inviteeAdmin;
+    const invitee = CONFORMANCE_PRINCIPALS.inviteeLead;
     const result = await world.runtime.command({
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
       idempotencyKey: "runtime-request-own-evidence",
@@ -147,7 +147,7 @@ describe("the Cloudflare runtime's cross-coordinator rules", () => {
       operationId: MERIDIAN,
       issuer: "https://idp.example",
       clientId: "client",
-      redirectUri: "https://tenant.example/callback",
+      redirectUri: "https://host.example/callback",
       code: "code-1",
       codeVerifier: "a".repeat(43),
       expectedNonce: "nonce-1",

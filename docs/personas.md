@@ -75,7 +75,7 @@ whether to spend a meeting, a pilot, or a budget on it. They may never read
 **What intrigues them:** one identity wearing different hats in different
 operations; a single rule that fits on a slide; a signed decision that a
 service can verify without calling the authority; a bounded window instead of
-“eventually revoked”; explicit targets instead of a flat admin flag. Show the
+“eventually revoked”; explicit targets instead of a flat administrator flag. Show the
 Dana story and the one-line rule, then the honest limits.
 
 **What loses them:** unglossed terms (`twin`, `grant`, `envelope`), engine

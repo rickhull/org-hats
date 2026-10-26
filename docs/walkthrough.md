@@ -30,7 +30,7 @@ nobody can audit. The question this system answers instead is:
 may act = the hat she is wearing carries the action × that hat reaches the place
 ```
 
-Not "is Dana an admin," but "is Dana wearing a hat that may do *this*,
+Not "is Dana an administrator," but "is Dana wearing a hat that may do *this*,
 *here*, right now."
 
 > **The practitioner says:** this is the ticket I get every week — "why is
@@ -41,7 +41,7 @@ Not "is Dana an admin," but "is Dana wearing a hat that may do *this*,
 > attached to a target, and the binding is evaluated per act, not per
 > person.
 >
-> **The onlooker says:** so "admin" isn't a property of the person — it's a
+> **The onlooker says:** so "administrator" isn't a property of the person — it's a
 > property of a job they were given somewhere. That already sounds more
 > honest.
 
@@ -83,10 +83,10 @@ coordinator role carries exactly two actions, *review* and *resolve*. Not
 never guesses.
 
 At Riverbend Fest, the same employer participates, and Dana holds a
-different grant: *admin* over the *Park Gate* site. Because the target is a
-site, her hat reaches every team at that gate — including teams that belong
-to other organizations. She can also *configure* the gate, because the
-admin role there carries the configure action.
+different grant: the example policy's *admin* role over the *Park Gate* site.
+Because the target is a site, her hat reaches every team at that gate —
+including teams that belong to other organizations. She can also *configure*
+the gate, because that role there carries the configure action.
 
 What she can never do is carry one operation's authority into the other.
 Her festival hat does not exist at Meridian. There is no global role, no

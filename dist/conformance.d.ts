@@ -18,7 +18,7 @@ export declare const CONFORMANCE_PRINCIPALS: {
     readonly len: ConformancePrincipal;
     readonly iris: ConformancePrincipal;
     readonly rosa: ConformancePrincipal;
-    readonly inviteeAdmin: ConformancePrincipal;
+    readonly inviteeLead: ConformancePrincipal;
 };
 /** An organization that exists but does not participate in Meridian — the
  * invite target. It is conformance data, not a customer fixture. */

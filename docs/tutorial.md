@@ -67,10 +67,13 @@ actor, a role, and one target. A **hat** is that grant worn for one act, and
 what the target covers is the grant's **reach**. No actor carries a global
 role: Dana has one identity, one organization, and two operation-local hats.
 
+Role titles in these example bundles, including `admin` on the Festival, are
+policy data. The engine has no built-in administrator title.
+
 ### Counterpoint
 
 Three operations, a dozen fixed ids, and four people, before a single
-authority question is asked. Why not one operation, one site, and one admin,
+authority question is asked. Why not one operation, one site, and one administrator,
 and let the reader generalize?
 
 ### Rationale
@@ -365,7 +368,7 @@ either policy.
 ### Counterpoint
 
 Same actor, same organization — and a different hat, a different read board,
-and a different policy. Is this not just a second admin flag on one person?
+and a different policy. Is this not just a second administrator flag on one person?
 
 ### Rationale
 

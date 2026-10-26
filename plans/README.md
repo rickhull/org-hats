@@ -2,8 +2,8 @@
 
 One active plan:
 
-- [`lexicon_misuse.md`](lexicon_misuse.md) — remaining lexicon-use
-  violations, in priority order. The open register is
+- [`lexicon_misuse.md`](lexicon_misuse.md) — lexicon-use decisions and the
+  deferred interface work. The open register is
   [`docs/lexicon_use_concerns.md`](../docs/lexicon_use_concerns.md).
 
 The adoption hook is landed; the model posture is

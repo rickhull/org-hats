@@ -16,8 +16,8 @@ org-hats answers one question, precisely:
 
 Dana is a coordinator over the Yard crew at West Yard. She may `review` and
 `resolve` there, may not `observe`, and has no reach at East Hall. In
-Riverbend Fest the same Dana is an `admin` over Park Gate. One identity, two
-operation-local hats.
+Riverbend Fest the same Dana wears the example policy's `admin` role over
+Park Gate. One identity, two operation-local hats.
 
 The model is portable. An in-memory engine runs it in tests and examples; the
 Cloudflare package is the reference runtime. Both expose the same four
@@ -25,7 +25,7 @@ calls: `accessFromEvidence`, `refresh`, `context`, and `command`.
 
 > **Before you adopt it.** It is the organizational half of authorization,
 > not an identity provider or a policy engine: no directory sync
-> (LDAP/SAML/SCIM), group grants, nesting, deny, or inheritance. One hat is
+> (LDAP/SAML/SCIM), grants to groups, nesting, deny, or inheritance. One hat is
 > active per session, while read, configuration, and member reach are
 > currently unions over every wearable grant — the
 > [current limits](docs/positioning.md#current-limits) say where that is

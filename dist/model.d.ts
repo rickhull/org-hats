@@ -201,7 +201,7 @@ export interface ReadReach {
  * never rebuilds it. Each read-policy axis contributes independently; v1 has
  * only the organization axis (`granted-teams`: the organizations of the
  * teams the actor's wearable grants reach; `all-participating`: every
- * organization actively participating). A future team-audience axis composes
+ * organization actively participating). A future team-read axis composes
  * here without changing what this axis means. */
 export declare const readReach: (snapshot: Snapshot, bundle: PolicyBundle, organizationId: OrganizationId, actorId: ActorId, operationId: OperationId) => ReadReach;
 export declare const isHostnameLabel: (value: string) => boolean;

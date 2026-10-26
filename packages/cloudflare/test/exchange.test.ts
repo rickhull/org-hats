@@ -19,8 +19,8 @@ import {
 import { evidenceFromProviderCode } from "../src/runtime";
 
 const ISSUER = "https://idp.example";
-const CLIENT_ID = "qm-tenant";
-const REDIRECT_URI = "https://tenant.example/auth/callback";
+const CLIENT_ID = "qm-host";
+const REDIRECT_URI = "https://host.example/auth/callback";
 const CONFIG = { issuer: ISSUER, clientId: CLIENT_ID, clientSecret: "sealed-secret" };
 /** RFC 7636: 43-128 unreserved characters. */
 const CODE_VERIFIER = `verifier-${"a".repeat(34)}`;

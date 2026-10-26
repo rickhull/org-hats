@@ -496,7 +496,7 @@ grants; arbitrary roles or policy rules are not in the initial surface.
 
 The read policy is a structure of independent axes, one per dimension of
 reach — not a scalar enum. v1 defines the organization axis
-(`granted-teams` or `all-participating`). A team-audience axis is an additive
+(`granted-teams` or `all-participating`). A team-read axis is an additive
 property of the same structure: it changes neither the bundle format nor the
 meaning of the organization axis, and unknown axes fail closed until the
 runtime implements them.
@@ -728,8 +728,8 @@ open:
   configurable; the consumer's security review owns the number; and
 - a read-only hat: `validatePolicyBundle` rejects a role with zero
   actions, so an auditor (read reach, no action-bearing hat) has no natural
-  carrier in v1. It arrives with the team-audience axis — the consumer's
-  read-audience requirement — not by weakening bundle validation ahead of
+  carrier in v1. It arrives with the team-read axis — the consumer's
+  team-read requirement — not by weakening bundle validation ahead of
   the consumer that needs it.
 
 Those decisions should be made against concrete product flows. They should not

@@ -68,7 +68,7 @@ const ATLAS_ORG = organizationId("org-a53e90f7");
 const CIDERS_ORG = organizationId("org-d94b1c6e");
 const PARK_ORG = organizationId("org-08f7a2b5");
 const INVITEE_ORG = organizationId("org-invitee");
-const INVITEE_ACTOR = actorId("actor-inv-admin");
+const INVITEE_ACTOR = actorId("actor-inv-lead");
 const EAST = siteId("site-e4a1c9b3");
 const WEST = siteId("site-b8d620fa");
 const ROW = siteId("site-5c2f87ad");
@@ -115,7 +115,7 @@ export const CONFORMANCE_PRINCIPALS = {
   len: principal("Len Chu", "len", ATLAS_ORG, actorId("actor-77f2b0e5")),
   iris: principal("Iris Bell", "iris", CIDERS_ORG, actorId("actor-40e9d1a7")),
   rosa: principal("Rosa Quill", "rosa", PARK_ORG, actorId("actor-b17d39e8")),
-  inviteeAdmin: principal("Nia Fields", "invitee-admin", INVITEE_ORG, INVITEE_ACTOR),
+  inviteeLead: principal("Nia Fields", "invitee-lead", INVITEE_ORG, INVITEE_ACTOR),
 } as const;
 
 /** An organization that exists but does not participate in Meridian — the
@@ -267,7 +267,7 @@ const verifyOk = async (
 /** Invite, accept, and grant the invitee's first hat; returns the operation
  * administrator's envelope for the rest of the case. */
 const admitInvitee = async (world: ConformanceWorld): Promise<AccessIssue> => {
-  const invitee = CONFORMANCE_PRINCIPALS.inviteeAdmin;
+  const invitee = CONFORMANCE_PRINCIPALS.inviteeLead;
   const admin = await issue(world, CONFORMANCE_PRINCIPALS.len, MERIDIAN);
   const invite = await command(
     world,
@@ -627,7 +627,7 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
 
   runtimeCase("OH-PART-01", "invite, accept, admit: an invited organization receives a hat", async (world) => {
     await admitInvitee(world);
-    const issued = await issue(world, CONFORMANCE_PRINCIPALS.inviteeAdmin, MERIDIAN);
+    const issued = await issue(world, CONFORMANCE_PRINCIPALS.inviteeLead, MERIDIAN);
     equal(issued.envelope.claims.hat.role, "field", "invitee hat");
     equal(issued.envelope.claims.hat.teamIds.length, 1, "invitee team reach");
     await verifyOk(world, issued.envelope, {
@@ -638,7 +638,7 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
 
   runtimeCase("OH-PART-02", "revoke is terminal: new issuance stops, the live envelope survives", async (world) => {
     const admin = await admitInvitee(world);
-    const invitee = CONFORMANCE_PRINCIPALS.inviteeAdmin;
+    const invitee = CONFORMANCE_PRINCIPALS.inviteeLead;
     const live = await issue(world, invitee, MERIDIAN);
     const revoke = await command(
       world,
@@ -752,7 +752,7 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
   }),
 
   runtimeCase("OH-CMD-02", "request-access asks; it does not admit", async (world) => {
-    const invitee = CONFORMANCE_PRINCIPALS.inviteeAdmin;
+    const invitee = CONFORMANCE_PRINCIPALS.inviteeLead;
     const request = await command(
       world,
       { kind: "request-access", operationId: MERIDIAN, evidence: invitee.evidence },

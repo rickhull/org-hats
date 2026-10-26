@@ -26,14 +26,14 @@ const LEN_ID = actorId("actor-77f2b0e5");
 const MARCO_ORG = organizationId("org-2b7c41de");
 const MARCO_ID = actorId("actor-6e0d94b2");
 const INVITEE_ORG = organizationId("org-invitee");
-const INVITEE_ACTOR = actorId("actor-inv-admin");
+const INVITEE_ACTOR = actorId("actor-inv-lead");
 const TITLED_OP = operationId("op-titled");
 const TITLED_ORG = organizationId("org-titled");
 const TITLED_ACTOR = actorId("actor-titled");
 const LEN = { provider: "test-idp", subject: "len" } as const;
 const DANA = { provider: "test-idp", subject: "dana" } as const;
 const MARCO = { provider: "test-idp", subject: "marco" } as const;
-const INVITEE_ADMIN = { provider: "test-idp", subject: "inv-admin" } as const;
+const INVITEE_LEAD = { provider: "test-idp", subject: "inv-lead" } as const;
 
 /** A third, tiny fixture: an organization that exists but does not
  * participate in Meridian — the invite target. */
@@ -44,7 +44,7 @@ const invitee: TwinFixture = {
     operations: [{ operationId: "op-dummy", displayName: "Dummy Home Op" }],
     organizations: [{ organizationId: "org-invitee", displayName: "Cedar Works" }],
     actors: [
-      { organizationId: "org-invitee", actorId: "actor-inv-admin", displayName: "Nia Fields" },
+      { organizationId: "org-invitee", actorId: "actor-inv-lead", displayName: "Nia Fields" },
     ],
     sites: [],
     teams: [],
@@ -66,7 +66,7 @@ const setup = async (transportFailures = 0, envelopeLifetimeSeconds?: number) =>
       { provider: LEN.provider, subject: LEN.subject, organizationId: LEN_ORG, actorId: LEN_ID },
       { provider: DANA.provider, subject: DANA.subject, organizationId: HARBOR_LOGISTICS, actorId: DANA_OKAFOR },
       { provider: MARCO.provider, subject: MARCO.subject, organizationId: MARCO_ORG, actorId: MARCO_ID },
-      { provider: INVITEE_ADMIN.provider, subject: INVITEE_ADMIN.subject, organizationId: INVITEE_ORG, actorId: INVITEE_ACTOR },
+      { provider: INVITEE_LEAD.provider, subject: INVITEE_LEAD.subject, organizationId: INVITEE_ORG, actorId: INVITEE_ACTOR },
     ],
     orgAdmins: { [INVITEE_ORG]: [INVITEE_ACTOR], [HARBOR_LOGISTICS]: [DANA_OKAFOR] },
   });
@@ -279,7 +279,7 @@ test("participation: an acceptance delivered after a revoke does not resurrect i
   // the organization still holds a pending invitation and accepts it
   const accept = await engine.runtime.command(cmd(
     { kind: "participation-accept", operationId: OP },
-    { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
+    { kind: "fresh-evidence", evidence: INVITEE_LEAD, operationId: OP },
     "revoke-race-accept",
   ));
   okOf(accept);
@@ -293,7 +293,7 @@ test("participation: an acceptance delivered after a revoke does not resurrect i
     "revoked",
     "a revoked participation stays revoked",
   );
-  const after = await engine.runtime.accessFromEvidence(evidence(INVITEE_ADMIN));
+  const after = await engine.runtime.accessFromEvidence(evidence(INVITEE_LEAD));
   assert.equal(failureOf(after).kind, "not-admitted", "no issuance against a revoked participation");
 });
 
@@ -376,8 +376,8 @@ test("request-access keeps its note for the administrator who admits", async () 
   // so the record — note included — is what the administrator reads.
   const { engine } = await setup();
   const asked = await engine.runtime.command(cmd(
-    { kind: "request-access", operationId: OP, evidence: INVITEE_ADMIN, note: "booth power hookup" },
-    { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
+    { kind: "request-access", operationId: OP, evidence: INVITEE_LEAD, note: "booth power hookup" },
+    { kind: "fresh-evidence", evidence: INVITEE_LEAD, operationId: OP },
     "note-keep-ask",
   ));
   okOf(asked);
@@ -437,7 +437,7 @@ test("participation: invite → accept → active, with a visible partial state 
   assert.equal(before?.participations.find((p) => p.organizationId === "org-invitee")?.status, "invited");
   const earlyAccept = await engine.runtime.command(cmd(
     { kind: "participation-accept", operationId: OP },
-    { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
+    { kind: "fresh-evidence", evidence: INVITEE_LEAD, operationId: OP },
     "accept-early",
   ));
   assert.ok(!earlyAccept.ok); // no such invitation yet — the partial state is visible
@@ -447,7 +447,7 @@ test("participation: invite → accept → active, with a visible partial state 
   assert.equal(engine.invitationsOf(INVITEE_ORG).size, 1);
   const accept = await engine.runtime.command(cmd(
     { kind: "participation-accept", operationId: OP },
-    { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
+    { kind: "fresh-evidence", evidence: INVITEE_LEAD, operationId: OP },
     "accept-1",
   ));
   okOf(accept);
@@ -459,7 +459,7 @@ test("participation: invite → accept → active, with a visible partial state 
   // duplicate accept and second invite are both refused
   const dupAccept = await engine.runtime.command(cmd(
     { kind: "participation-accept", operationId: OP },
-    { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
+    { kind: "fresh-evidence", evidence: INVITEE_LEAD, operationId: OP },
     "accept-2",
   ));
   assert.ok(!dupAccept.ok);
@@ -599,18 +599,18 @@ test("request-access and admit: asking is not being admitted", async () => {
 
   // a linked principal can ask; the request is recorded, not admission
   const request = await engine.runtime.command(cmd(
-    { kind: "request-access", operationId: OP, evidence: INVITEE_ADMIN },
-    { kind: "fresh-evidence", evidence: INVITEE_ADMIN, operationId: OP },
+    { kind: "request-access", operationId: OP, evidence: INVITEE_LEAD },
+    { kind: "fresh-evidence", evidence: INVITEE_LEAD, operationId: OP },
     "req-invitee",
   ));
   okOf(request);
-  const beforeAdmit = await engine.runtime.accessFromEvidence(evidence(INVITEE_ADMIN));
+  const beforeAdmit = await engine.runtime.accessFromEvidence(evidence(INVITEE_LEAD));
   assert.ok(isFailed(beforeAdmit));
   assert.equal(failureOf(beforeAdmit).kind, "not-admitted", "asking did not admit");
 
   // admission is a separate, administrator act
   const admitted = await engine.runtime.command(cmd(
-    { kind: "admit", operationId: OP, organizationId: "org-invitee", actorId: "actor-inv-admin" },
+    { kind: "admit", operationId: OP, organizationId: "org-invitee", actorId: "actor-inv-lead" },
     { kind: "access-envelope", envelope: len.envelope },
     "admit-invitee",
   ));

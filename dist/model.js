@@ -12,9 +12,9 @@
 //   `(organizationId, actorId)`;
 // - grants, and primary/worn-hat selection, are operation-local;
 // - roles and their actions come from a policy bundle, not from entities or
-//   capability tables;
+//   ad-hoc tables;
 // - reach is discrete — a grant reaches a team or a site and its teams.
-//   There is no scope-path hierarchy and no coverage walk.
+//   There is no path hierarchy and no inheritance walk.
 //
 // This module is data and pure functions: no I/O, no storage, no clock, no
 // Cloudflare, compiled with `types: []`.
@@ -189,7 +189,7 @@ export const decide = (snapshot, bundle, organizationId, actorId, operationId, a
  * never rebuilds it. Each read-policy axis contributes independently; v1 has
  * only the organization axis (`granted-teams`: the organizations of the
  * teams the actor's wearable grants reach; `all-participating`: every
- * organization actively participating). A future team-audience axis composes
+ * organization actively participating). A future team-read axis composes
  * here without changing what this axis means. */
 export const readReach = (snapshot, bundle, organizationId, actorId, operationId) => {
     const teamsAt = (siteId) => snapshot.teams.filter((t) => t.siteId === siteId);

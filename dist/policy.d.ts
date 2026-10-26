@@ -5,7 +5,7 @@
  */
 export type OrganizationReadPolicy = "granted-teams" | "all-participating";
 /** The read policy is a set of independent axes, one per dimension of reach.
- * v1 defines only the organization axis. A future team-audience axis is an
+ * v1 defines only the organization axis. A future team-read axis is an
  * additive optional property on this interface, not a change to the shape of
  * `readPolicy` or to what the organization axis means; no code may assume
  * organization-level reach is the only axis. */

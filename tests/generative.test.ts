@@ -414,7 +414,7 @@ test("duplicate commands: every mutating command claims its key", async () => {
     await applyTwice(
       engine,
       { kind: "participation-accept", operationId: OP },
-      freshAuth(CONFORMANCE_PRINCIPALS.inviteeAdmin),
+      freshAuth(CONFORMANCE_PRINCIPALS.inviteeLead),
       "dup-accept",
     );
   }
@@ -426,7 +426,7 @@ test("duplicate commands: every mutating command claims its key", async () => {
     await command(
       engine,
       { kind: "participation-accept", operationId: OP },
-      freshAuth(CONFORMANCE_PRINCIPALS.inviteeAdmin),
+      freshAuth(CONFORMANCE_PRINCIPALS.inviteeLead),
       "dup-revoke-accept",
     );
     await engine.drainOutbox();
@@ -450,8 +450,8 @@ test("duplicate commands: every mutating command claims its key", async () => {
     const engine = await setup();
     await applyTwice(
       engine,
-      { kind: "request-access", operationId: OP, evidence: CONFORMANCE_PRINCIPALS.inviteeAdmin.evidence },
-      freshAuth(CONFORMANCE_PRINCIPALS.inviteeAdmin),
+      { kind: "request-access", operationId: OP, evidence: CONFORMANCE_PRINCIPALS.inviteeLead.evidence },
+      freshAuth(CONFORMANCE_PRINCIPALS.inviteeLead),
       "dup-request",
     );
   }
@@ -460,13 +460,13 @@ test("duplicate commands: every mutating command claims its key", async () => {
     const admin = await len(engine);
     await command(
       engine,
-      { kind: "request-access", operationId: OP, evidence: CONFORMANCE_PRINCIPALS.inviteeAdmin.evidence },
-      freshAuth(CONFORMANCE_PRINCIPALS.inviteeAdmin),
+      { kind: "request-access", operationId: OP, evidence: CONFORMANCE_PRINCIPALS.inviteeLead.evidence },
+      freshAuth(CONFORMANCE_PRINCIPALS.inviteeLead),
       "dup-admit-request",
     );
     await applyTwice(
       engine,
-      { kind: "admit", operationId: OP, organizationId: "org-invitee", actorId: "actor-inv-admin" },
+      { kind: "admit", operationId: OP, organizationId: "org-invitee", actorId: "actor-inv-lead" },
       admin,
       "dup-admit",
     );
@@ -506,7 +506,7 @@ test("partial workflow failure: retries converge, replays are no-ops, and state 
   const earlyAccept = await command(
     engine,
     { kind: "participation-accept", operationId: OP },
-    freshAuth(CONFORMANCE_PRINCIPALS.inviteeAdmin),
+    freshAuth(CONFORMANCE_PRINCIPALS.inviteeLead),
     "partial-early-accept",
   );
   assert.ok(!earlyAccept.ok && earlyAccept.failure.kind === "denied");
@@ -523,7 +523,7 @@ test("partial workflow failure: retries converge, replays are no-ops, and state 
   const accept = await command(
     engine,
     { kind: "participation-accept", operationId: OP },
-    freshAuth(CONFORMANCE_PRINCIPALS.inviteeAdmin),
+    freshAuth(CONFORMANCE_PRINCIPALS.inviteeLead),
     "partial-accept",
   );
   okOf(accept);

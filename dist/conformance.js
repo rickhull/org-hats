@@ -28,7 +28,7 @@ const ATLAS_ORG = organizationId("org-a53e90f7");
 const CIDERS_ORG = organizationId("org-d94b1c6e");
 const PARK_ORG = organizationId("org-08f7a2b5");
 const INVITEE_ORG = organizationId("org-invitee");
-const INVITEE_ACTOR = actorId("actor-inv-admin");
+const INVITEE_ACTOR = actorId("actor-inv-lead");
 const EAST = siteId("site-e4a1c9b3");
 const WEST = siteId("site-b8d620fa");
 const ROW = siteId("site-5c2f87ad");
@@ -61,7 +61,7 @@ export const CONFORMANCE_PRINCIPALS = {
     len: principal("Len Chu", "len", ATLAS_ORG, actorId("actor-77f2b0e5")),
     iris: principal("Iris Bell", "iris", CIDERS_ORG, actorId("actor-40e9d1a7")),
     rosa: principal("Rosa Quill", "rosa", PARK_ORG, actorId("actor-b17d39e8")),
-    inviteeAdmin: principal("Nia Fields", "invitee-admin", INVITEE_ORG, INVITEE_ACTOR),
+    inviteeLead: principal("Nia Fields", "invitee-lead", INVITEE_ORG, INVITEE_ACTOR),
 };
 /** An organization that exists but does not participate in Meridian — the
  * invite target. It is conformance data, not a customer fixture. */
@@ -164,7 +164,7 @@ const verifyOk = async (world, envelope, context) => {
 /** Invite, accept, and grant the invitee's first hat; returns the operation
  * administrator's envelope for the rest of the case. */
 const admitInvitee = async (world) => {
-    const invitee = CONFORMANCE_PRINCIPALS.inviteeAdmin;
+    const invitee = CONFORMANCE_PRINCIPALS.inviteeLead;
     const admin = await issue(world, CONFORMANCE_PRINCIPALS.len, MERIDIAN);
     const invite = await command(world, { kind: "participation-invite", operationId: MERIDIAN, organizationId: INVITEE_ORG }, envelopeAuth(admin.envelope), "conf-invite");
     assert(invite.ok, `invite failed: ${invite.ok ? "" : invite.failure.kind}`);
@@ -459,7 +459,7 @@ export const CONFORMANCE_CASES = [
     }),
     runtimeCase("OH-PART-01", "invite, accept, admit: an invited organization receives a hat", async (world) => {
         await admitInvitee(world);
-        const issued = await issue(world, CONFORMANCE_PRINCIPALS.inviteeAdmin, MERIDIAN);
+        const issued = await issue(world, CONFORMANCE_PRINCIPALS.inviteeLead, MERIDIAN);
         equal(issued.envelope.claims.hat.role, "field", "invitee hat");
         equal(issued.envelope.claims.hat.teamIds.length, 1, "invitee team reach");
         await verifyOk(world, issued.envelope, {
@@ -469,7 +469,7 @@ export const CONFORMANCE_CASES = [
     }),
     runtimeCase("OH-PART-02", "revoke is terminal: new issuance stops, the live envelope survives", async (world) => {
         const admin = await admitInvitee(world);
-        const invitee = CONFORMANCE_PRINCIPALS.inviteeAdmin;
+        const invitee = CONFORMANCE_PRINCIPALS.inviteeLead;
         const live = await issue(world, invitee, MERIDIAN);
         const revoke = await command(world, { kind: "participation-revoke", operationId: MERIDIAN, organizationId: INVITEE_ORG, by: "operation" }, envelopeAuth(admin.envelope), "conf-revoke");
         assert(revoke.ok, `revoke failed: ${revoke.ok ? "" : revoke.failure.kind}`);
@@ -551,7 +551,7 @@ export const CONFORMANCE_CASES = [
         assert(applied.ok && applied.receipt.applied, "the administrator's grant applies");
     }),
     runtimeCase("OH-CMD-02", "request-access asks; it does not admit", async (world) => {
-        const invitee = CONFORMANCE_PRINCIPALS.inviteeAdmin;
+        const invitee = CONFORMANCE_PRINCIPALS.inviteeLead;
         const request = await command(world, { kind: "request-access", operationId: MERIDIAN, evidence: invitee.evidence }, freshAuth(invitee, MERIDIAN), "conf-request");
         assert(request.ok, "request-access succeeds for a linked principal");
         const issued = await world.runtime.accessFromEvidence({
