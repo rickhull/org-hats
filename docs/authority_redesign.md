@@ -595,6 +595,12 @@ org-admin bootstrap. The conformance world returns a built verifier map,
 which is right for exercising verification; use `verificationKey()` material
 when the test is key-configuration parsing.
 
+A host that is not exercising a twin defines its own fixture with
+`defineWorld` from `org-hats/authority`. It converts hand-written,
+plain-string-id data once and refuses an incoherent world — a policy problem,
+an invariant violation, or a fixture carrying other than exactly one
+operation — before any runtime boots it.
+
 - table-driven cases cover every allow and denial reason, reach edge, fallback
   order, one organization actor participating in several operations, read
   reach under an active policy bundle, and invite/accept/revoke transition;

@@ -30,6 +30,7 @@ Node 24+ and pnpm:
 ```sh
 pnpm install
 node examples/pilot.ts
+node examples/own-world.ts
 ```
 
 It prints one actor, one operation, one worn hat, two local decisions, and a
@@ -53,6 +54,13 @@ The expiry timestamp depends on when you run it. The pilot is the smallest
 complete story: verified evidence becomes one organization actor; issuance
 returns a signed envelope and a refresh handle; the verifier answers locally;
 the same envelope fails at `exp`. All fixtures are synthetic design data.
+
+`node examples/own-world.ts` starts from a world that is not a twin: your
+organization, sites, teams, grants, and policy bundle enter through
+`defineWorld`, which validates them before the engine boots. The example then
+switches hats for real — `select-hat` to a second grant, refresh, verify the
+new capacity — and maps verification failures onto an HTTP handler's status
+codes.
 
 The [`tutorial`](docs/tutorial.md) continues this world through commands,
 refresh, a lost disable, and a crossed grant.

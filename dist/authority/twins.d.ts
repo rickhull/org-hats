@@ -1,9 +1,9 @@
-import type { Snapshot } from "../model.js";
-import type { PolicyBundle } from "../policy.js";
-export interface TwinFixture {
+import type { WorldFixture } from "./world.js";
+/** A fixture with a reserved twin name. The shape is `WorldFixture`; the
+ * name union is what makes a twin recognisable as public conformance data
+ * rather than a host's own world. */
+export interface TwinFixture extends WorldFixture {
     readonly name: "professional" | "festival" | "airlift" | "invitee";
-    readonly snapshot: Snapshot;
-    readonly policy: PolicyBundle;
 }
 /** The professional operation's id — the twin's own constant, so consumers
  * (the conformance inventory) import it rather than re-declaring the

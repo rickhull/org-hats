@@ -37,7 +37,7 @@ import {
   type OutboxMessage,
   type PrincipalLink,
 } from "./state.ts";
-import type { TwinFixture } from "./twins.ts";
+import type { WorldFixture } from "./world.ts";
 import type {
   AccessFromEvidenceInput,
   AccessIssue,
@@ -61,7 +61,7 @@ export type ClockLike = Clock;
  * no administering role title — administration then rests solely on holding
  * a hat that carries one of `configureActions`. */
 export interface InMemoryAuthorityConfig {
-  readonly fixtures?: readonly TwinFixture[];
+  readonly fixtures?: readonly WorldFixture[];
   /** Verified-principal links created at bootstrap: evidence resolution
    * never creates an actor or a link implicitly. */
   readonly principalLinks?: readonly {
@@ -136,7 +136,7 @@ export const createInMemoryAuthority = async (
 
   for (const fixture of config.fixtures ?? []) {
     const op = fixture.snapshot.operations[0];
-    if (op === undefined) throw new Error("a twin fixture needs an operation");
+    if (op === undefined) throw new Error("a fixture needs an operation");
     ops.set(op.operationId, {
       operationId: op.operationId,
       ...(op.displayName !== undefined ? { displayName: op.displayName } : {}),

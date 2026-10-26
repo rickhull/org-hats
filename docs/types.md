@@ -54,7 +54,9 @@ outside. Branding is an internal convenience, not a public type ceremony.
 Fixture data enters the same way. `Unbranded<Snapshot>` describes
 hand-written fixture shape; `fixtureSnapshot` converts once at the test
 boundary, and `invariantProblems` checks coherence. The cast does not make
-the data valid; the validator does.
+the data valid; the validator does. A host's complete world goes through
+`defineWorld`, which applies the policy and invariant validators and the
+one-operation rule before any runtime boots.
 
 `EpochSeconds` is the numeric sibling of the id brands, and the one that
 stays entirely internal: the clock seam, audit instants, and the
@@ -162,7 +164,7 @@ The type layer stops at these seams; each has a named parser or verifier:
 | Verification key set | text | `parseVerifyKeySet` |
 | Policy bundle | `PolicyBundle` | `validatePolicyBundle` at the Cloudflare bootstrap and in tests |
 | HTTP command body | `unknown` / JSON | `readBody`, `asString`, `asGrantTarget` |
-| Fixture snapshot | `Unbranded<Snapshot>` | `fixtureSnapshot` converts; `invariantProblems` checks in the tests |
+| Fixture snapshot | `Unbranded<Snapshot>` | `defineWorld` converts and validates a whole world; `fixtureSnapshot` converts a test snapshot; `invariantProblems` checks coherence |
 | Principal evidence | `PrincipalEvidence` | the identity adapter verifies the provider assertion |
 
 `canonicalJson` is a boundary too: its `JsonValue` type is the serializer's

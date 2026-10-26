@@ -15,9 +15,11 @@
 // CONFORMANCE_WORLD (fixtures, principal links, org admins) and
 // createInMemoryConformanceWorld(). That world returns a built verifier
 // map, which is right for exercising verification; use `verificationKey()`
-// material when the test is key-configuration parsing.
+// material when the test is key-configuration parsing. A host's own world
+// enters through `defineWorld`, which validates before the engine loads it.
 export { AUTHORITY_INTERFACE_VERSION } from "./types.js";
 export { actionsOf, validatePolicyBundle } from "../policy.js";
+export { defineWorld } from "./world.js";
 export { AIRLIFT, DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION, TWINS, } from "./twins.js";
 export { createInMemoryAuthority } from "./engine.js";
 export { assembleAccessClaims } from "./claims.js";

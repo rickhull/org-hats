@@ -42,12 +42,9 @@ working; the AD/LDAP lesson that **ids resolve and aliases decorate**, unlike
 DN-anchored ACLs; bind/evidence separated from authority; offline verification
 with a bounded revocation window.
 
-**What loses him:** the pilot is someone else's world; a first own-world
-fixture is undocumented and `TwinFixture.name` is a closed union of twin
-names; the tutorial's `select-hat` case selects the hat Dana already wears, so
-it never shows a real hat switch; no consumer install line in the README; the
-envelope is not a JWT and needs an `org-hats/access` verifier; no LDAP, SCIM,
-SAML, service-account, group-grant, nesting, or deny story.
+**What loses him:** no consumer install line in the README; the envelope is
+not a JWT and needs an `org-hats/access` verifier; no LDAP, SCIM, SAML,
+service-account, group-grant, nesting, or deny story.
 
 **The five-minute path he would actually follow:**
 
@@ -56,12 +53,14 @@ git clone https://codeberg.org/rickhull/org-hats.git
 cd org-hats
 pnpm install
 node examples/pilot.ts
+node examples/own-world.ts
 pnpm test
 ```
 
-Then: a **non-twin** `examples/own-world.ts` (his organization, site, team,
-grant), a tiny HTTP handler that verifies the envelope and calls `mayAct`,
-and a real `select-hat` → refresh example.
+`own-world.ts` is the non-twin path: a made-up organization, sites, teams,
+grants, and policy enter through `defineWorld`; the example issues, verifies,
+calls `mayAct` through an HTTP handler, and switches hats for real with
+`select-hat` → `refresh`.
 
 **Proof and content for him:**
 
@@ -123,19 +122,8 @@ then, position it as a reference architecture, not a foundational model.
 
 **P0 — adoption hook (low risk, no model decision needed):**
 
-1. `examples/own-world.ts` — a non-twin world with a made-up organization,
-   site, team, grant, issue, verify, and `mayAct`; plus a tiny HTTP handler
-   mapping failure kinds to product responses.
-2. A real hat-switch example (`select-hat` to a different grant, then refresh
-   or reissue), in the tutorial or a new example.
-3. `docs/from_ldap.md` — the practitioner mapping.
-4. `docs/positioning.md` — the current positioning, claims/non-claims,
-   comparison matrix, and language guidance.
-5. `docs/model_mapping.md` — the NIST/XACML/ABAC/ReBAC mapping and the
-   citable-model skeleton.
-5. A top-of-README decision box and a consumer quickstart with the git pin.
-6. Widen or replace `TwinFixture.name` for own-world use, or add a clearly
-   named world type; the closed twin union is an adoption wall.
+1. A top-of-README decision box and a consumer quickstart with the git pin,
+   not just the repo's own examples.
 
 **P1 — credibility (needs decisions):**
 

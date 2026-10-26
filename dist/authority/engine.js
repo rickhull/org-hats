@@ -43,7 +43,7 @@ export const createInMemoryAuthority = async (config = {}) => {
     for (const fixture of config.fixtures ?? []) {
         const op = fixture.snapshot.operations[0];
         if (op === undefined)
-            throw new Error("a twin fixture needs an operation");
+            throw new Error("a fixture needs an operation");
         ops.set(op.operationId, {
             operationId: op.operationId,
             ...(op.displayName !== undefined ? { displayName: op.displayName } : {}),

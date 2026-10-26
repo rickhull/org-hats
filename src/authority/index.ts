@@ -15,7 +15,8 @@
 // CONFORMANCE_WORLD (fixtures, principal links, org admins) and
 // createInMemoryConformanceWorld(). That world returns a built verifier
 // map, which is right for exercising verification; use `verificationKey()`
-// material when the test is key-configuration parsing.
+// material when the test is key-configuration parsing. A host's own world
+// enters through `defineWorld`, which validates before the engine loads it.
 
 export type {
   AccessFromEvidenceInput,
@@ -48,6 +49,8 @@ export type {
 export { actionsOf, validatePolicyBundle } from "../policy.ts";
 
 export type { TwinFixture } from "./twins.ts";
+export type { WorldDefinition, WorldFixture } from "./world.ts";
+export { defineWorld } from "./world.ts";
 export {
   AIRLIFT,
   DANA_OKAFOR,

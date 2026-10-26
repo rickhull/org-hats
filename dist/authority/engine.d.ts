@@ -1,7 +1,7 @@
 import { type ActorId, type OperationId, type OrganizationId, type VerificationKeyMaterial } from "../contract.js";
 import type { Snapshot } from "../model.js";
 import { type Clock, type Signer } from "./internal.js";
-import type { TwinFixture } from "./twins.js";
+import type { WorldFixture } from "./world.js";
 import type { AuthorityRuntime } from "./types.js";
 export type SignerLike = Signer;
 export type ClockLike = Clock;
@@ -11,7 +11,7 @@ export type ClockLike = Clock;
  * no administering role title — administration then rests solely on holding
  * a hat that carries one of `configureActions`. */
 export interface InMemoryAuthorityConfig {
-    readonly fixtures?: readonly TwinFixture[];
+    readonly fixtures?: readonly WorldFixture[];
     /** Verified-principal links created at bootstrap: evidence resolution
      * never creates an actor or a link implicitly. */
     readonly principalLinks?: readonly {

@@ -59,8 +59,9 @@ echo "== v1 suites (node:test) =="
 node --test tests/*.test.ts
 
 echo
-echo "== portable example =="
+echo "== portable examples =="
 node examples/pilot.ts
+node examples/own-world.ts
 
 echo
 echo "== release metadata: a version tag matches package.json =="

@@ -3,6 +3,8 @@ export { AUTHORITY_INTERFACE_VERSION } from "./types.js";
 export type { OrganizationReadPolicy, PolicyBundle, PolicyProblem, PolicyRole, ReadPolicy, } from "../policy.js";
 export { actionsOf, validatePolicyBundle } from "../policy.js";
 export type { TwinFixture } from "./twins.js";
+export type { WorldDefinition, WorldFixture } from "./world.js";
+export { defineWorld } from "./world.js";
 export { AIRLIFT, DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, PROFESSIONAL_OPERATION, TWINS, } from "./twins.js";
 export { createInMemoryAuthority } from "./engine.js";
 export { assembleAccessClaims } from "./claims.js";
