@@ -132,7 +132,7 @@ type _AccessActorIdsArePlain = Expect<
   Equal<ReturnType<NeutralAccess["actor"]>["organizationId"], string>
 >;
 type _MemberTeamsArePlain = Expect<
-  Equal<ReturnType<NeutralAccess["memberTeamIds"]>[number], string>
+  Equal<ReturnType<NeutralAccess["teamReach"]>[number], string>
 >;
 
 // --- the numeric time brand stays internal ------------------------------------------

@@ -330,7 +330,7 @@ export type DenialReason =
    * participating, or every grant revoked */
   | "not-admitted"
   /** the worn hat reaches the target but its role does not carry the action */
-  | "no-capability"
+  | "action-not-carried"
   /** no grant reaches the target at all */
   | "out-of-reach"
   /** the worn grant names a role the active bundle does not carry: the
@@ -364,11 +364,11 @@ export const decide = (
   if (chosen === undefined) return { allowed: false, reason: "out-of-reach" };
   // An unknown role is not a hat with no actions. Collapsing the two is
   // what `actionsOf`'s contract forbids: it would deny with
-  // `no-capability`, describing the actor, when the fault is that the
+  // `action-not-carried`, describing the actor, when the fault is that the
   // snapshot and the bundle disagree.
   const hat = hatOf(bundle, chosen);
   if (hat === undefined) return { allowed: false, reason: "policy-inconsistent" };
-  if (!hat.actions.includes(action)) return { allowed: false, reason: "no-capability" };
+  if (!hat.actions.includes(action)) return { allowed: false, reason: "action-not-carried" };
   return { allowed: true, hat };
 };
 

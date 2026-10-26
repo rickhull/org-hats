@@ -52,7 +52,7 @@ test("vector: the committed signature verifies with the committed public key", a
 
 test("vector: the claims were issued by an older interface and still verify", async () => {
   // The committed vector claims carry a historical `interfaceVersion`: the
-  // fixture predates interface 2. That they verify is the contract —
+  // fixture records interface 1. That they verify is the contract —
   // provenance is not a gate — and that they load into the claims type with
   // no cast is the type-layer claim: the field is `IssuerInterfaceVersion`,
   // not the current call-surface literal.
@@ -237,7 +237,7 @@ test("neutral access: a host maps product facts onto neutral targets", async () 
   assert.equal(access.expiresAt(), vectors.claims.exp);
   // member reach, authentication facts, and the holder — all without reading
   // raw claims
-  assert.deepEqual(access.memberTeamIds(), ["team-2e8c64b9"]);
+  assert.deepEqual(access.teamReach(), ["team-2e8c64b9"]);
   assert.deepEqual(access.authenticatedWith(), ["pwd"]);
   assert.equal(access.authenticatedAt(), 1_699_996_400);
   assert.equal(access.actor().organizationId, "org-4c1f9a2e");
@@ -262,5 +262,5 @@ test("neutral access: absent authentication facts flatten honestly", async () =>
   }));
   assert.deepEqual(access.authenticatedWith(), []);
   assert.equal(access.authenticatedAt(), undefined);
-  assert.deepEqual(access.memberTeamIds(), ["team-2e8c64b9"]);
+  assert.deepEqual(access.teamReach(), ["team-2e8c64b9"]);
 });

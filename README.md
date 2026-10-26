@@ -257,7 +257,7 @@ full inventory.
 | What | Version |
 | --- | --- |
 | `org-hats` | 2.1.0 |
-| Authority interface | 2 |
+| Authority interface | 3 |
 | Access envelope | 1 |
 | Cloudflare runtime | separate `0.x` on `cloudflare-v*` tags; operation schema 4 |
 
@@ -265,9 +265,13 @@ The interface version and the envelope version move for different reasons. A
 command-surface break moves the interface; a change to what the claims mean
 moves the envelope. An envelope records its issuing interface as provenance,
 but verification reads the envelope's own version pair — so the line can be
-at interface 2 while still reading format-1 envelopes. The 2.0 break changed
+at interface 3 while still reading format-1 envelopes. The 2.0 break changed
 `grant-hat` to one `GrantTarget` (team or site); see
-[`docs/migration-v2.md`](docs/migration-v2.md). `2.1.0` is additive — the
+[`docs/migration-v2.md`](docs/migration-v2.md). The 3.0 break renames the
+denial reason `no-capability` to `action-not-carried` and the neutral
+accessor `memberTeamIds()` to `teamReach()`; the claim keeps its historical
+name, so envelope format 1 still reads. See
+[`docs/migration-v3.md`](docs/migration-v3.md). `2.1.0` is additive — the
 fixture boundary, the claims assembler, and neutral-access accessors — and
 leaves both versions where they are.
 

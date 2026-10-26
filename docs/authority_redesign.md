@@ -227,8 +227,9 @@ The envelope carries four named layers, not one:
 - **read reach** — the readable organization ids and exceptional team ids,
   computed by the issuer under the active policy;
 - **configuration reach** — the sites where the holder may configure;
-- **member reach** — the teams the actor's wearable grants reach
-  (`memberTeamIds`, a historical name).
+- **member reach** — the teams the actor's wearable grants reach. The
+  envelope field keeps the historical name `memberTeamIds`; neutral access
+  exposes the same set as `teamReach()`.
 
 The hat does not bound the other three. Each is issuer-computed from the
 actor's wearable grants and compared by the verifier; none is derived from
@@ -467,10 +468,11 @@ Durable Object namespaces, or authority database rows. It does not reconstruct
 reach, fallback, participation, or worn-hat rules from envelope claims, and
 its product verbs map onto neutral access facts rather than extending them.
 
-The accepted contract is authority interface `2` and access envelope `1`,
-recorded in Quartermaster's `specs/login.md`. The portable v2 line and the
-Cloudflare reference runtime implement it; the consumer's deployment and
-stand-in retirement are tracked in their own plans. Quartermaster's
+The contract in this line is authority interface `3` and access envelope
+`1`. Quartermaster's `specs/login.md` records the accepted `2.x` contract
+until the consumer moves; the portable v3 line and the Cloudflare reference
+runtime implement `3`, and the consumer's deployment and stand-in retirement
+are tracked in their own plans. Quartermaster's
 `apps/authority-dev` and
 `packages/access` are temporary stand-ins and are deleted together when the
 consumer adopts the runtime binding, so it never grows a second envelope

@@ -59,7 +59,7 @@ test("claims: the actor, wearable hat, reach, and lifetime in one shape", () => 
   const claims = claimsFor(DANA_OKAFOR, HARBOR_LOGISTICS);
   assert.ok(!("kind" in claims));
   assert.equal(claims.v, 1);
-  assert.equal(claims.interfaceVersion, 2);
+  assert.equal(claims.interfaceVersion, 3);
   assert.equal(claims.operationId, OP);
   assert.deepEqual(claims.actor, { organizationId: HARBOR_LOGISTICS, actorId: DANA_OKAFOR });
   assert.deepEqual(claims.hat, {

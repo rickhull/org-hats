@@ -29,7 +29,7 @@ export const epochSeconds = (raw) => raw;
  * outlives the call signatures that produced it, so a command-surface break
  * must not strand live sessions. The envelope's own version pair is what
  * gates. */
-export const AUTHORITY_INTERFACE_VERSION = 2;
+export const AUTHORITY_INTERFACE_VERSION = 3;
 /** The envelope and claims format version. This, with the format marker and
  * the envelope's own `v`, is what `verify` gates reading on. It moves only
  * when the meaning of the claims changes, never for a command-surface

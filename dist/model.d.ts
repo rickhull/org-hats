@@ -168,7 +168,7 @@ export type DenialReason =
  * participating, or every grant revoked */
 "not-admitted"
 /** the worn hat reaches the target but its role does not carry the action */
- | "no-capability"
+ | "action-not-carried"
 /** no grant reaches the target at all */
  | "out-of-reach"
 /** the worn grant names a role the active bundle does not carry: the

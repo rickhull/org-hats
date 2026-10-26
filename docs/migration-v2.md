@@ -2,7 +2,8 @@
 
 **Status:** `2.0.0` crosses this break; `1.2.0` is the last 1.x release and
 stays a valid pin until the consumer moves. `2.1.0` is additive: no consumer
-action is required, and the interface and envelope versions do not move. This
+action is required, and the interface and envelope versions do not move.
+**Later:** interface 3 follows; see [migration-v3.md](migration-v3.md). This
 note records the deltas a consumer crosses. The architecture itself is
 unchanged — see [authority_redesign.md](authority_redesign.md).
 

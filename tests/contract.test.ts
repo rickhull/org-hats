@@ -67,7 +67,7 @@ test("the interface version names the call surface, not the wire format", () => 
   // 1.x callers used the two-optional grant shape; 2 carries GrantTarget.
   // Envelope readability does not move with it — claims record the issuing
   // interface as provenance, and the format pair above gates.
-  assert.equal(AUTHORITY_INTERFACE_VERSION, 2);
+  assert.equal(AUTHORITY_INTERFACE_VERSION, 3);
 });
 
 test("signature transport is unpadded base64url and round-trips", () => {

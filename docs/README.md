@@ -41,6 +41,9 @@ public `org-hats` docs are normative for the seam.
 - [`migration-v2.md`](migration-v2.md) — the 1.2 → 2.0 break: the
   `GrantTarget` command shape, interface version 2, and why envelope format
   1 keeps reading across it; plus the additive 2.1 surface.
+- [`migration-v3.md`](migration-v3.md) — the 2.x → 3.0 break: interface
+  version 3, the `action-not-carried` reason, and `teamReach()`; envelope
+  format 1 keeps reading.
 - [`publishing.md`](publishing.md) — canonical host, mirror, CI, the
   release ritual, and why deployment is the consuming host's act.
 

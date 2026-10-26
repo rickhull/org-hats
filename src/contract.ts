@@ -157,7 +157,7 @@ type _TargetRefIsPlain = AssertPlainId<
  * outlives the call signatures that produced it, so a command-surface break
  * must not strand live sessions. The envelope's own version pair is what
  * gates. */
-export const AUTHORITY_INTERFACE_VERSION = 2 as const;
+export const AUTHORITY_INTERFACE_VERSION = 3 as const;
 export type AuthorityInterfaceVersion = typeof AUTHORITY_INTERFACE_VERSION;
 
 /** The interface version as envelope claims record it: which runtime
@@ -241,7 +241,8 @@ export interface SiteBinding {
  * - `readableOrganizationIds` / `readableTeamIds` are precomputed by the
  *   issuer under the active policy bundle; a verifier never rebuilds reach;
  * - `hat` is the selected, worn hat: its role's actions and where it reaches;
- * - `memberTeamIds` supports site-local views without a grant query.
+ * - `memberTeamIds` supports site-local views without a grant query; neutral
+ *   access exposes it as `teamReach()`.
  */
 export interface AccessEnvelopeClaimsV1 {
   readonly v: typeof ACCESS_ENVELOPE_VERSION;

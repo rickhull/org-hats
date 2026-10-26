@@ -176,7 +176,7 @@ test("generated states: invariants hold and every decision is internally consist
             assert.ok(grantReaches(snapshot, grant, target), `seed ${seed}: hat reaches the target`);
           } else {
             assert.ok(
-              ["not-admitted", "no-capability", "out-of-reach"].includes(decision.reason),
+              ["not-admitted", "action-not-carried", "out-of-reach"].includes(decision.reason),
               `seed ${seed}: closed denial vocabulary`,
             );
             // The eligibility predicate is independent of `wearableGrants`:

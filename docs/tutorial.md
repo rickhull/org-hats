@@ -242,7 +242,8 @@ version, key id and signature, `iat` and `exp` — are omitted.
 The `hat` names the grant's own target. A team grant has a team id and no
 site id in `hat`, but the site it sits at appears in `sites`; the site grant
 case below adds the site to `hat` and expands its teams. `memberTeamIds` (not
-shown) is the union of teams the wearable grants touch.
+shown) is the envelope field for the union of teams the wearable grants
+touch; neutral access exposes it as `teamReach()`.
 
 What the verifier returns:
 
@@ -273,7 +274,7 @@ team grants whose organization is outside the readable organization set. The
 shipped examples produce an empty list.
 
 `NeutralAccess` exposes the booleans; the model's `decide` also carries a
-reason (`no-capability`, `out-of-reach`, `not-admitted`, `policy-inconsistent`)
+reason (`action-not-carried`, `out-of-reach`, `not-admitted`, `policy-inconsistent`)
 for hosts and diagnostics, but the verifier's product surface stays neutral.
 
 Presentation context comes from the runtime, not the verifier:

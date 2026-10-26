@@ -80,7 +80,7 @@ export const readAccess = (access: NeutralAccess): boolean =>
   access.mayConfigure(siteId) &&
   access.readableOrganizationIds().every((id: string) => id.length > 0) &&
   access.readableTeamIds().every((id: string) => id.length > 0) &&
-  access.memberTeamIds().every((id: string) => id.length > 0) &&
+  access.teamReach().every((id: string) => id.length > 0) &&
   access.authenticatedWith().every((method: string) => method.length > 0) &&
   typeof access.authenticatedAt() !== "object" &&
   access.actor().organizationId === organizationId &&

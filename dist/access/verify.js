@@ -54,7 +54,7 @@ const neutralAccess = (claims) => ({
     readableOrganizationIds: () => claims.readableOrganizationIds,
     readableTeamIds: () => claims.readableTeamIds,
     mayConfigure: (siteId) => claims.configurableSiteIds.includes(siteId),
-    memberTeamIds: () => claims.memberTeamIds,
+    teamReach: () => claims.memberTeamIds,
     authenticatedWith: () => claims.amr ?? [],
     authenticatedAt: () => claims.auth_time,
     actor: () => ({ organizationId: claims.actor.organizationId, actorId: claims.actor.actorId }),

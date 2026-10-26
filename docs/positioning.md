@@ -144,7 +144,8 @@ policy; a directory remains the identity source.
   read set.
 - **Semantic coherence:** `decide` is per-target, issuance selects one action
   hat, and read/config/member reach are separate issuer-computed layers over
-  wearable grants. `memberTeamIds` is grant-reached teams despite the name;
+  wearable grants. `memberTeamIds` is the envelope field for grant-reached
+  teams despite the name; neutral access exposes it as `teamReach()`;
   the grant is the operative admission. These are named in
   [`authority_redesign.md`](authority_redesign.md) § Access and
   [`../specs/authority.md`](../specs/authority.md) A14/A15.

@@ -175,13 +175,13 @@ export const decide = (snapshot, bundle, organizationId, actorId, operationId, a
         return { allowed: false, reason: "out-of-reach" };
     // An unknown role is not a hat with no actions. Collapsing the two is
     // what `actionsOf`'s contract forbids: it would deny with
-    // `no-capability`, describing the actor, when the fault is that the
+    // `action-not-carried`, describing the actor, when the fault is that the
     // snapshot and the bundle disagree.
     const hat = hatOf(bundle, chosen);
     if (hat === undefined)
         return { allowed: false, reason: "policy-inconsistent" };
     if (!hat.actions.includes(action))
-        return { allowed: false, reason: "no-capability" };
+        return { allowed: false, reason: "action-not-carried" };
     return { allowed: true, hat };
 };
 ;

@@ -107,10 +107,10 @@ test("allow: the worn hat carries the action and reaches the target", () => {
   assert.equal(d.hat.role, "coordinator");
 });
 
-test("deny/no-capability: the role reaches but does not carry the action", () => {
+test("deny/action-not-carried: the role reaches but does not carry the action", () => {
   const d = meridian("configure", { kind: "team", teamId: "team-2e8c64b9" });
   assert.ok(!d.allowed);
-  assert.equal(reasonOf(d), "no-capability");
+  assert.equal(reasonOf(d), "action-not-carried");
 });
 
 test("deny/out-of-reach: no grant reaches the target", () => {

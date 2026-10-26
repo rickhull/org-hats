@@ -15,7 +15,7 @@ write the story, replace it.*
 | OH-MODEL-03 | a site grant reaches the site and every team at it, never another site | [tutorial](tutorial.md) Case 2 · [walkthrough](walkthrough.md) §3 |
 | OH-MODEL-04 | nothing reaches a whole operation | [tutorial](tutorial.md) Case 1 |
 | OH-MODEL-05 | allow: the worn role carries the action and the grant reaches the target | [tutorial](tutorial.md) Case 1 |
-| OH-MODEL-06 | deny/no-capability: the worn role does not carry the action | [tutorial](tutorial.md) Case 1 · [walkthrough](walkthrough.md) §3 |
+| OH-MODEL-06 | deny/action-not-carried: the worn role does not carry the action | [tutorial](tutorial.md) Case 1 · [walkthrough](walkthrough.md) §3 |
 | OH-MODEL-07 | deny/out-of-reach: no grant reaches the target | [tutorial](tutorial.md) Case 1 |
 | OH-MODEL-08 | deny/not-admitted: unknown, disabled, or non-participating actors | [tutorial](tutorial.md) Case 1 |
 | OH-MODEL-09 | fallback: a primary that does not reach the target stands aside | — |

@@ -48,7 +48,8 @@ rebuilds organization unions, peer reach, fallback, or worn-hat rules.
 The `hat` is the action layer. `readableOrganizationIds`/`readableTeamIds`,
 `configurableSiteIds`, and `memberTeamIds` are separate issuer-computed
 layers over the actor's wearable grants; the verifier compares each layer's
-ids and never derives one from another.
+ids and never derives one from another. The `memberTeamIds` claim keeps its
+historical name; neutral access exposes the same set as `teamReach()`.
 
 `amr` and `auth_time` are the OIDC claim names (`amr` from RFC 8176,
 `auth_time` from OpenID Connect Core), carried verbatim the way `iat` and

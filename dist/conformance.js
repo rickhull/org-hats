@@ -228,10 +228,10 @@ export const CONFORMANCE_CASES = [
         assert(decision.allowed, "expected allow");
         equal(decision.hat?.role, "coordinator", "worn role");
     }),
-    modelCase("OH-MODEL-06", "deny/no-capability: the worn role does not carry the action", () => {
+    modelCase("OH-MODEL-06", "deny/action-not-carried: the worn role does not carry the action", () => {
         const decision = decide(professional, PROFESSIONAL_OPERATION.policy, NORTH_ORG, PRIYA, MERIDIAN, "configure", { kind: "team", teamId: NORTH_TEAM });
         assert(!decision.allowed, "expected deny");
-        equal(decision.reason, "no-capability", "denial reason");
+        equal(decision.reason, "action-not-carried", "denial reason");
     }),
     modelCase("OH-MODEL-07", "deny/out-of-reach: no grant reaches the target", () => {
         const decision = decide(professional, PROFESSIONAL_OPERATION.policy, NORTH_ORG, PRIYA, MERIDIAN, "review", { kind: "team", teamId: HARBOR_TEAM });
