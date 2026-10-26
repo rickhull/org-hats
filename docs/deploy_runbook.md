@@ -17,10 +17,12 @@ a relay note.*
    ```
 
    `check-artifact` requires an annotated tag that peels to a full commit, a
-   manifest version matching the tag, a production config naming
-   `reporting-stream-authority` with no routes and `workers_dev: false`, a
-   present `main`, and — when the checkout is the tag — a successful
-   `wrangler deploy --dry-run` bundle.
+   manifest version matching the tag, a production config that names some
+   Worker with no routes and `workers_dev: false`, a present `main`, and —
+   when the checkout is the tag — a successful `wrangler deploy --dry-run`
+   bundle. The config's name is a neutral default; the host supplies its own
+   Worker name at upload, so the gate does not certify which Worker a tag
+   lands on.
 
 2. **Full gate.** `pnpm verify` in the upstream checkout. The host's own gate
    is separate and is not replaced by it.

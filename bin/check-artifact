@@ -15,7 +15,6 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const WORKER_NAME = "reporting-stream-authority";
 
 const fail = (message) => {
   console.error(`check-artifact: ${message}`);
@@ -107,8 +106,11 @@ if (tag !== undefined && tag !== `cloudflare-v${manifest.version}`) {
 }
 
 const config = parseJsonc(read(configPath), configPath);
-if (config.name !== WORKER_NAME) {
-  fail(`${configPath} names ${JSON.stringify(config.name)}, expected ${WORKER_NAME}`);
+/** The Worker name is the deploying host's fact, supplied at upload with
+ * `wrangler versions upload --name`. A tag certifies the config is valid, not
+ * which Worker it lands on, so only the presence of a name is checked. */
+if (typeof config.name !== "string" || config.name.length === 0) {
+  fail(`${configPath} must name a Worker; the host overrides it at upload`);
 }
 if (config.workers_dev !== false) fail(`${configPath} must set workers_dev false`);
 if (config.routes !== undefined && !(Array.isArray(config.routes) && config.routes.length === 0)) {
@@ -163,6 +165,6 @@ const label = tag === undefined
   ? `working tree (version ${manifest.version})`
   : `${tag} -> ${commit.slice(0, 12)} (version ${manifest.version})`;
 console.log(`check-artifact: ${label}`);
-console.log(`check-artifact: ${config.name}, no routes, workers_dev false`);
+console.log(`check-artifact: template name ${config.name}, no routes, workers_dev false`);
 if (built) console.log("check-artifact: bundle ok");
 console.log("check-artifact: ok");

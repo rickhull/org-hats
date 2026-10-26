@@ -21,7 +21,7 @@ const testEnv = {
 
 const configFor = (overrides: Record<string, unknown> = {}): string => {
   const config = {
-    name: "reporting-stream-authority",
+    name: "org-hats-authority",
     main: "src/index.ts",
     compatibility_date: "2026-10-24",
     workers_dev: false,
@@ -79,8 +79,25 @@ test("a working tree with the production shape passes", () => {
   }
 });
 
+// The Worker name is the deploying host's fact, supplied at upload. The gate
+// certifies that a name is present, never which one, so a foreign name passes
+// and only an absent or empty one is refused.
+for (const name of ["other-worker", "a-foreign-host-authority"]) {
+  test(`the foreign Worker name ${name} is accepted`, () => {
+    const root = repo({ config: configFor({ name }) });
+    try {
+      const result = run(root);
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, new RegExp(`template name ${name}`));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+}
+
 for (const [label, config, expected] of [
-  ["a wrong Worker name", configFor({ name: "other-worker" }), /names "other-worker"/],
+  ["an empty Worker name", configFor({ name: "" }), /must name a Worker/],
+  ["a missing Worker name", configFor({ name: undefined }), /must name a Worker/],
   ["workers_dev true", configFor({ workers_dev: true }), /must set workers_dev false/],
   ["routes", configFor({ routes: [{ pattern: "example.com/*" }] }), /must not declare routes/],
   ["a missing main module", configFor({ main: "src/missing.ts" }), /missing packages\/cloudflare\/src\/missing\.ts/],

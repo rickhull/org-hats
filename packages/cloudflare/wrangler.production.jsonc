@@ -1,5 +1,11 @@
 // The Cloudflare reference runtime's production Worker — the deployment
-// shape Quartermaster's `reporting-stream-authority` uses.
+// shape a consuming host uses.
+//
+// `name` is a neutral default, not a deployment target. Wrangler requires a
+// name, so this config carries one; the deploying host supplies its own at
+// upload (`wrangler versions upload --name <worker>`), and the release gate
+// checks only that a name is present. A host that relies on this default
+// deploys a Worker called `org-hats-authority`.
 //
 // Differences from wrangler.jsonc (the test Worker): no committed
 // `OPS_TOKEN` (a secret, set once by the operator), no harness `Counter`
@@ -20,7 +26,7 @@
 //                                 directory (no global registry)
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "reporting-stream-authority",
+  "name": "org-hats-authority",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-24",
   "workers_dev": false,

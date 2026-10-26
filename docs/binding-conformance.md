@@ -18,9 +18,10 @@ acceptance. `cloudflare-v0.4.0` is the rollback target.*
 
 ## Preconditions
 
-- A dedicated authority deployment at the accepted `cloudflare-v*` tag, with
-  `reporting-stream-authority` and the `AuthorityRuntimeEntrypoint` service
-  binding.
+- A dedicated authority deployment at the accepted `cloudflare-v*` tag,
+  reachable as the host's Worker through the `AuthorityRuntimeEntrypoint`
+  service binding. The claim names the binding contract, not any host's
+  Worker name.
 - A dedicated operation and organization fixture, a linked principal, and a
   wearable grant for the test actor. This is not the product operation.
 - The distributed `VerifyKeySet` for the deployment, in `org-hats/access`

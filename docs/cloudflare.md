@@ -126,7 +126,10 @@ Two Wrangler configs, two purposes:
   migrations history.
 - `wrangler.production.jsonc` — the deploying operator's Worker: both
   coordinators, one fresh migration declaring both classes, no `Counter`,
-  no committed token, `workers_dev: false`, no routes. The Worker is
+  no committed token, `workers_dev: false`, no routes. Its `name` is a
+  neutral default (`org-hats-authority`), because Wrangler requires one; the
+  host supplies its own with `wrangler versions upload --name`, and the
+  Worker name is the host's fact, not the tag's. The Worker is
   reachable through its service binding; secrets come from an ignored,
   operator-held file (`wrangler secret put` / `--secrets-file`): the
   signing set above, `OPS_TOKEN`, and `AUTHORITY_ORGANIZATION_IDS` — the
@@ -153,8 +156,9 @@ witness — is [deploy_runbook.md](deploy_runbook.md).
 The host-side shape the runtime supports:
 
 - verify the annotated tag, peel it to a commit, and require that commit's
-  package version and `wrangler.production.jsonc` (Worker name, no routes,
-  `workers_dev: false`);
+  package version and `wrangler.production.jsonc` (no routes,
+  `workers_dev: false`); the host asserts its own Worker name on its side,
+  since the gate does not certify which Worker a tag lands on;
 - export every named coordinator before upload; a failed export aborts;
 - upload a Worker Version tagged with the full upstream commit, serving no
   traffic; activate it with `wrangler versions deploy`, never

@@ -105,7 +105,9 @@ The skill is `~/git/quartermaster/.agents/skills/moshpit/SKILL.md`; read it
 there.  It is Quartermaster's file: do not edit it, and do not vendor a copy
 here, because two copies of one pattern drift.  This assumes both clones are
 on one machine, as the relay does.  Invoke it deliberately — below three
-areas, or for a mechanical sweep, do the work inline.
+areas, or for a mechanical sweep, do the work inline.  It opens by mapping
+this machine's models to the layers, asked once with a default per question,
+and only after the entry test passes; a failing test means no questionnaire.
 
 ## Tooling
 
