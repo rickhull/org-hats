@@ -44,6 +44,8 @@ public `org-hats` docs are normative for the seam.
 
 ## Audience guides
 
+- [`personas.md`](personas.md) — the practitioner, the academic, and the
+  onlooker: what to show each, and what not to claim.
 - [`from_ldap.md`](from_ldap.md) — the Active Directory/LDAP practitioner's
   map: what transfers, what does not, and why ids beat DNs.
 - [`model_mapping.md`](model_mapping.md) — the access-control literature

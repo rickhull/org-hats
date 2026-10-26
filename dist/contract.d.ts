@@ -212,6 +212,12 @@ export interface SignedAccessEnvelope {
     readonly claims: AccessEnvelopeClaimsV1;
     readonly signature: string;
 }
+/** The envelope version gate shared by the verifier and the runtime's command
+ * and context authorization. The format marker, the envelope's own version,
+ * and the claims' version must agree before a signature is trusted or claims
+ * are read. The claims' `interfaceVersion` is provenance and is deliberately
+ * not checked here. */
+export declare const envelopeVersionFailure: (envelope: SignedAccessEnvelope) => Failure | undefined;
 /** What happened to the refresh handle alongside a new envelope. A host never
  * infers session state; the issuer states it. */
 export type RefreshHandleOutcome = {

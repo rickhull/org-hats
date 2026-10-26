@@ -119,7 +119,7 @@ The core is the smallest reusable statement of the organization model. It
 owns:
 
 - actors, organizations, operations, sites, teams, roles, and hats;
-- grants, actions, reach, admission, and worn-hat selection;
+- grants, actions, reach, access requests, and worn-hat selection;
 - operation-local authority and organization-local actor identity;
 - policy-bundle validation and decision reason values;
 - pure state-machine transitions and invariant checks where those transitions
@@ -148,7 +148,7 @@ complete organizational use cases. It owns:
 - links from verified external principals to organization actors;
 - organization participation in multiple operations;
 - sites, teams, roles, policy versions, hats, and grants within an operation;
-- invitations, acceptance, admission, access requests, grant, revoke, and hat
+- invitations, acceptance, access requests, grant, revoke, and hat
   selection workflows;
 - idempotency, audit facts, and explicit partial states for multi-owner
   workflows;
@@ -218,6 +218,23 @@ important properties are:
   needed for local product decisions; and
 - an unsupported envelope version fails closed.
 
+#### The layered projection
+
+The envelope carries four named layers, not one:
+
+- the selected **action hat** — the role and actions `mayAct` evaluates;
+- **read reach** — the readable organization ids and exceptional team ids,
+  computed by the issuer under the active policy;
+- **configuration reach** — the sites where the holder may configure;
+- **member reach** — the teams the actor's wearable grants reach
+  (`memberTeamIds`, a historical name).
+
+The hat does not bound the other three. Each is issuer-computed from the
+actor's wearable grants and compared by the verifier; none is derived from
+another. A host reads the layer its decision belongs to. The grant is the
+operation's operative admission; access requests are a review queue, not a
+stored relation. Formal and threat models are not claims in this line.
+
 The module uses portable cryptographic interfaces or Web Platform primitives.
 It does not know how sessions are transported and does not import Cloudflare
 bindings.
@@ -283,8 +300,9 @@ envelope claims (`amr`, `auth_time`) and `AuthorityContext`, preserving
 them through refresh while envelope `iat` moves. What the values mean and
 when they suffice is host step-up policy, never an authority rule.
 
-Authentication never creates participation or a hat implicitly. Admission and
-granting remain explicit, idempotent, and auditable authority commands.
+Authentication never creates participation or a hat implicitly. The grant is
+the operation's operative admission; access requests and granting remain
+explicit, idempotent, and auditable authority commands.
 
 ## State ownership
 
@@ -313,7 +331,7 @@ One operation-authority instance owns operation-local authority:
 - the operation's hostname slug;
 - sites, their permanent identifiers, canonical paths, and alias labels;
 - teams, roles, policy version, hats, and grants;
-- operation-local admission and access requests;
+- operation-local access requests (a review queue) and grants;
 - refresh/session authority and access-projection issuance; and
 - operation-administration audit events.
 
@@ -374,19 +392,17 @@ and an envelope's lifetime bounds the rest.
 The projection is derived, so it is not state to back up: a coordinator
 export carries the operation's own facts and leaves the projection out, and a
 restore clears it and rebuilds by pulling. The failure direction is the safe
-one — an actor absent from the projection reads as unknown and is not
-admitted, never wrongly admitted — and the operator's inspection view
+one — an actor absent from the projection reads as unknown and issuance
+fails closed, never wrongly issued — and the operator's inspection view
 reports the projection's contents and age so staleness is visible rather
 than inferred.
 
 The projection carries the full roster of actively participating
 organizations, which is what keeps the portable model's `Snapshot.actors`
-meaning the shared organization directory it has always meant. The intended
-end state is narrower — only actors **admitted** to the operation, written
-by the admission command itself, so an operation knows only the people
-introduced to it and the shared object holds less roster material. That is a
-re-specification of the model rather than a projection change, and it waits
-for its own pass.
+meaning the shared organization directory it has always meant. The model does
+not keep a separate admitted relation: the grant is the operative admission,
+and `request-access`/`admit` are a reviewed queue. A narrower roster
+projection is not part of this line.
 
 Work spanning the two coordinators is an explicit, retryable workflow with
 idempotent messages and visible partial states. It is not presented as a

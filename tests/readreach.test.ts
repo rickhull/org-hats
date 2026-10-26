@@ -31,7 +31,10 @@ test("granted-teams: a site grant reaches every team's organization at the site"
 
 test("all-participating: festival-wide read, no exceptional teams", () => {
   const r = readReach(FESTIVAL.snapshot, FESTIVAL.policy, HARBOR_LOGISTICS, DANA_OKAFOR, FESTIVAL_OP);
-  assert.equal(r.readableOrganizationIds.length, 3);
+  assert.deepEqual(
+    [...r.readableOrganizationIds].sort(),
+    ["org-08f7a2b5", "org-4c1f9a2e", "org-d94b1c6e"],
+  );
   assert.deepEqual(r.readableTeamIds, []);
 });
 

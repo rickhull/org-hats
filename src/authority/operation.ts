@@ -17,6 +17,7 @@ import {
   ACCESS_ENVELOPE_VERSION,
   actorId,
   canonicalJson,
+  envelopeVersionFailure,
   isFailed,
   operationId,
   organizationId,
@@ -181,7 +182,8 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
 
   const context = async (input: ContextRequest): Promise<AuthorityContext | Failed> => {
     const { envelope } = input;
-    if (envelope.format !== ACCESS_ENVELOPE_FORMAT) return { failure: { kind: "invalid-signature" } };
+    const versionFailure = envelopeVersionFailure(envelope);
+    if (versionFailure !== undefined) return { failure: versionFailure };
     if (!(await signer.verify(canonicalJson(envelope.claims as unknown as JsonValue), envelope.signature))) {
       return { failure: { kind: "invalid-signature" } };
     }
@@ -425,6 +427,12 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     if (replay !== undefined) return replay;
     const grant = op.grants.find((g) => g.grantId === input.grantId);
     if (grant === undefined) return fail("invalid-command", "unknown grant");
+    const snapshot = snapshotOf(op.operationId);
+    if (snapshot === undefined) return fail("wrong-binding", "unknown operation");
+    const wearable = wearableGrants(snapshot, grant.organizationId, grant.actorId, op.operationId);
+    if (!wearable.some((g) => g.grantId === grant.grantId)) {
+      return fail("denied", "the grant is not wearable");
+    }
     commitClaim(op.claims, input);
     op.grants = op.grants.map((g) => {
       if (g.grantId === input.grantId) return { ...g, primary: true };

@@ -1,8 +1,8 @@
 # Positioning — what org-hats is, and what it is not
 
-*The current positioning reference. Plans for adoption and for the model
-decisions this document depends on live in `plans/personas.md` and
-`plans/model_coherence.md`.*
+*The current positioning reference. Audience guidance is in
+[`personas.md`](personas.md); the model posture and non-goals are in
+[`authority_redesign.md`](authority_redesign.md) § Access.*
 
 ## One paragraph
 
@@ -84,9 +84,10 @@ policy; a directory remains the identity source.
   `src/model.ts`; `specs/authority.md`; the conformance inventory.
 - **Issuer-computed reach, verifier-side comparison, no policy rebuild.**
   `src/access/verify.ts`; `specs/authority.md` A5; `specs/envelope.md`.
-- **Authentication, participation, admission, assignment, and activation are
-  separate concepts.** Evidence never creates an actor or a grant.
-  `docs/authority_redesign.md` § Identity boundary; `specs/authority.md`.
+- **Authentication, participation, assignment, and activation are separate
+  concepts.** The grant is the operative admission; evidence never creates an
+  actor or a grant. `docs/authority_redesign.md` § Identity boundary;
+  `specs/authority.md`.
 - **Interface version and envelope version move for different reasons.**
   `specs/envelope.md` E8; `docs/migration-v2.md`.
 - **Executable invariants and a public conformance inventory.**
@@ -97,16 +98,17 @@ policy; a directory remains the identity source.
 ## What not to claim
 
 - "RBAC", "ABAC", "ReBAC", "Zanzibar", or "a policy engine" as the category.
-- "A foundational access-control model" — until the unit-of-authority,
-  admission, read-reach, and formal-model work in
-  `plans/model_coherence.md` is settled.
+- "A foundational access-control model" — this line is a reference
+  architecture; the layered projection and explicit non-goals are in
+  [`authority_redesign.md`](authority_redesign.md) § Access.
 - Role hierarchy, separation of duty, delegation, temporal validity,
   obligations, negative permissions, or immediate revocation.
 - Standards conformance (NIST/INCITS 359, XACML, OAuth, UMA).
-- "One hat bounds all authority": read, configuration, and member reach are
-  currently unions over wearable grants, not only the selected action hat.
-- "Admission is enforced": the concept is documented, but the grant is the
-  operative admission today.
+- "One hat bounds all authority": the action hat is one layer; read,
+  configuration, and member reach are separate issuer-computed layers over
+  wearable grants.
+- "Admission is enforced": the grant is the operative admission; access
+  requests are a reviewed queue, not a stored relation.
 - "Bounded operations close automatically": `bounded` is a label, not a
   schedule.
 - "Drop-in portable": the honest phrase is **portable semantics, one
@@ -122,7 +124,7 @@ policy; a directory remains the identity source.
 | `grant` | A target-scoped user-role assignment | OAuth grant, SQL `GRANT`, or "the authorization itself" |
 | `hat` | The active assignment for this envelope | "Wearing several hats" — the model selects one action hat |
 | `principal` (evidence) | The external subject before linking | Using "principal" for the linked actor |
-| `admission` | The intent to enroll an actor in an operation | Claiming it is enforced; today the grant is operative |
+| `admission` | The grant is the operative acceptance; access requests are a queue | Claiming a stored admission relation is enforced |
 | `bounded` | A label on a time-boxed operation | A schedule that closes the operation |
 | `memberTeamIds` | Team ids reached by wearable grants | A directory membership list |
 
@@ -140,11 +142,20 @@ policy; a directory remains the identity source.
   validity, obligations, or negative permissions. Read reach is
   role-independent; `all-participating` gives every hat the operation-wide
   read set.
-- **Semantic coherence:** `decide` is per-target, issuance selects one hat per
-  envelope, and read/config/member reach are unions. `memberTeamIds` is
-  grant-reached teams despite the name. Admission is not a stored, checked
-  relation. These are the decisions in `plans/model_coherence.md`, not
-  marketing footnotes.
+- **Semantic coherence:** `decide` is per-target, issuance selects one action
+  hat, and read/config/member reach are separate issuer-computed layers over
+  wearable grants. `memberTeamIds` is grant-reached teams despite the name;
+  the grant is the operative admission. These are named in
+  [`authority_redesign.md`](authority_redesign.md) § Access and
+  [`../specs/authority.md`](../specs/authority.md) A14/A15.
+- **Known code limits:** the envelope does not carry `grantId` or a policy
+  version, so `context` identifies the selected grant by role; two grants
+  sharing a role are ambiguous for presentation. The refresh-handle type
+  reserves `kept`/`revoked`, but both engines currently return `rotated`. The
+  canonical JSON has one implementation and makes no cross-language
+  interoperability claim. `expectedOperationId`/`expectedSiteId` are optional;
+  a caller that omits them accepts any binding, and the key id is outside the
+  signed payload.
 - **Operations:** the deploying host owns secrets, versions, traffic, state
   restore, roster rebuild, and the registry/DNS projection.
 
@@ -159,6 +170,5 @@ policy; a directory remains the identity source.
   contract.
 - [`binding-conformance.md`](binding-conformance.md) — what a deployed binding
   proves, and what it does not.
-- [`../plans/personas.md`](../plans/personas.md) — the adoption plan.
-- [`../plans/model_coherence.md`](../plans/model_coherence.md) — the model
-  decisions that precede a foundational claim.
+- [`personas.md`](personas.md) — who the message is for, and what to show
+  each audience.

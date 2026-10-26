@@ -2,8 +2,8 @@
 
 *For the standards reader and the access-control researcher. The current
 positioning and non-claims are in [`positioning.md`](positioning.md); the
-decisions that must precede a "foundational" claim are in
-[`../plans/model_coherence.md`](../plans/model_coherence.md).*
+layered projection and non-goals are in
+[`authority_redesign.md`](authority_redesign.md) § Access.*
 
 ## Summary
 
@@ -155,8 +155,7 @@ mechanized proof.
 ## Citable-model work
 
 The formal model, threat model, language-independent envelope specification,
-structured audit/provenance, and comparative evaluation are work, not current
-claims. The sequence is in
-[`../plans/model_coherence.md`](../plans/model_coherence.md) P3. The invariant
-style in `specs/authority.md` and `specs/envelope.md` — claim, "held by", "if
-it breaks" — is the right skeleton for the formal appendix.
+structured audit/provenance, and comparative evaluation are not current
+claims and are not pursued in this line. The invariant style in
+`specs/authority.md` and `specs/envelope.md` — claim, "held by", "if it
+breaks" — is the right skeleton for a future appendix.

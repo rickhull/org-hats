@@ -607,3 +607,86 @@ test("select-hat: an actor selects their own hat; a stranger cannot", async () =
   assert.ok(!stranger.ok);
   assert.equal(failureOf(stranger).kind, "denied");
 });
+
+test("select-hat: a revoked or non-wearable grant cannot be selected", async () => {
+  const clock = fixedClock(1_700_000_000);
+  const signer = await webCryptoSigner("key-select");
+  const op = "op-select";
+  const org = organizationId("org-select");
+  const actor = actorId("actor-select");
+  const fixture: TwinFixture = {
+    name: "professional",
+    policy: PROFESSIONAL_OPERATION.policy,
+    snapshot: fixtureSnapshot({
+      operations: [{ operationId: op }],
+      organizations: [{ organizationId: "org-select" }],
+      actors: [{ organizationId: "org-select", actorId: "actor-select" }],
+      sites: [{ siteId: "site-select", operationId: op, aliases: [] }],
+      teams: [{ teamId: "team-select", siteId: "site-select", organizationId: "org-select" }],
+      grants: [
+        {
+          grantId: "g-select-active", operationId: op, organizationId: "org-select",
+          actorId: "actor-select", role: "field",
+          target: { kind: "team", teamId: "team-select" }, primary: true,
+        },
+        {
+          grantId: "g-select-revoked", operationId: op, organizationId: "org-select",
+          actorId: "actor-select", role: "reviewer",
+          target: { kind: "team", teamId: "team-select" }, revoked: true,
+        },
+      ],
+      participations: [{ organizationId: "org-select", operationId: op, status: "active" }],
+    }),
+  };
+  const engine = await createInMemoryAuthority({
+    clock,
+    signer,
+    fixtures: [fixture],
+    principalLinks: [
+      { provider: "test-idp", subject: "select", organizationId: org, actorId: actor },
+    ],
+  });
+  const auth = {
+    kind: "fresh-evidence" as const,
+    evidence: { provider: "test-idp", subject: "select" },
+    operationId: op,
+  };
+  const revoked = await engine.runtime.command(cmd(
+    { kind: "select-hat", operationId: op, grantId: "g-select-revoked" },
+    auth,
+    "select-revoked",
+  ));
+  assert.ok(!revoked.ok);
+  assert.equal(failureOf(revoked).kind, "denied");
+  const active = await engine.runtime.command(cmd(
+    { kind: "select-hat", operationId: op, grantId: "g-select-active" },
+    auth,
+    "select-active",
+  ));
+  assert.ok(active.ok);
+});
+
+test("command and context use the envelope version gate, not just the signature", async () => {
+  const { engine } = await setup();
+  const issued = await engine.runtime.accessFromEvidence(evidence(DANA));
+  assert.ok(!isFailed(issued));
+  const wrongEnvelope = { ...issued.envelope, v: 2 as never };
+  const command = await engine.runtime.command(cmd(
+    { kind: "select-hat", operationId: OP, grantId: "g-mer-3" },
+    { kind: "access-envelope", envelope: wrongEnvelope },
+    "bad-envelope-version",
+  ));
+  assert.ok(!command.ok);
+  assert.equal(failureOf(command).kind, "wrong-interface-version");
+
+  const wrongClaims = {
+    ...issued.envelope,
+    claims: { ...issued.envelope.claims, v: 2 as never },
+  };
+  const context = await engine.runtime.context({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    envelope: wrongClaims,
+  });
+  assert.ok(isFailed(context));
+  assert.equal(failureOf(context).kind, "wrong-interface-version");
+});

@@ -36,13 +36,14 @@ _Avoid_: identity (when you mean the external subject)
 canonical for whether the organization may receive authority there.
 _Avoid_: membership (for the organization–operation relation)
 
-**Admission** — An operation accepting an actor to act there. Admission is
-neither authentication nor participation: an organization may participate
-while a particular actor is not admitted.
+**Admission** — An operation accepting an actor to act there. In this line
+the grant is the operative admission; access requests are a reviewed queue,
+not a stored relation. Admission is neither authentication nor participation:
+an organization may participate while a particular actor is not admitted.
 _Avoid_: signup, registration, enrollment
 
 **Access request** — A person asking an operation to be admitted. It is an
-authority command, never an issuance input.
+authority command, never an issuance input, and it does not create a grant.
 _Avoid_: login request, token request
 
 **Team** — An organization-fielded group anchored to exactly one site. A
@@ -72,7 +73,9 @@ currently worn.
 _Avoid_: assignment, membership (when you mean a grant)
 
 **Hat** — The grant an actor wears when acting: one role, its actions, and
-its target. Exactly one hat is worn at a time.
+its target. Exactly one action hat is active per envelope; read,
+configuration, and member reach are separate issuer-computed layers over
+wearable grants.
 _Avoid_: session role, active role
 
 **Worn / selected** — The hat currently activated for an act. Authority

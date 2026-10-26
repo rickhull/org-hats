@@ -9,7 +9,7 @@
 // The coordinator reads the operation map for the participation state a
 // revoke must move; that read is the reference world's, not a distributed
 // one. The deployed shape projects the facts it needs instead.
-import { ACCESS_ENVELOPE_FORMAT, actorId, canonicalJson, operationId, organizationId, } from "../contract.js";
+import { actorId, canonicalJson, envelopeVersionFailure, operationId, organizationId, } from "../contract.js";
 import { principalKey, revokeParticipation, checkClaim, commitClaim, } from "./state.js";
 import { fail, ok } from "./result.js";
 export const createOrganizationCoordinator = (deps) => {
@@ -33,8 +33,9 @@ export const createOrganizationCoordinator = (deps) => {
             };
         }
         const claims = authorization.envelope.claims;
-        if (authorization.envelope.format !== ACCESS_ENVELOPE_FORMAT)
-            return { kind: "invalid-signature" };
+        const versionFailure = envelopeVersionFailure(authorization.envelope);
+        if (versionFailure !== undefined)
+            return versionFailure;
         if (!(await signer.verify(canonicalJson(claims), authorization.envelope.signature))) {
             return { kind: "invalid-signature" };
         }

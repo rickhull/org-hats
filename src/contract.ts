@@ -297,6 +297,24 @@ export interface SignedAccessEnvelope {
   readonly signature: string;
 }
 
+/** The envelope version gate shared by the verifier and the runtime's command
+ * and context authorization. The format marker, the envelope's own version,
+ * and the claims' version must agree before a signature is trusted or claims
+ * are read. The claims' `interfaceVersion` is provenance and is deliberately
+ * not checked here. */
+export const envelopeVersionFailure = (envelope: SignedAccessEnvelope): Failure | undefined => {
+  if (envelope.format !== ACCESS_ENVELOPE_FORMAT) {
+    return { kind: "wrong-interface-version", detail: "not a recognized access envelope" };
+  }
+  if (envelope.v !== ACCESS_ENVELOPE_VERSION) {
+    return { kind: "wrong-interface-version", detail: "unrecognized envelope version" };
+  }
+  if (envelope.claims.v !== ACCESS_ENVELOPE_VERSION) {
+    return { kind: "wrong-interface-version", detail: "envelope and claims disagree on the version" };
+  }
+  return undefined;
+};
+
 /** What happened to the refresh handle alongside a new envelope. A host never
  * infers session state; the issuer states it. */
 export type RefreshHandleOutcome =

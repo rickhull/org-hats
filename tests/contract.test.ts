@@ -58,6 +58,10 @@ test("the format constants are stable strings — changing one is a format chang
   assert.equal(ACCESS_ENVELOPE_FORMAT, "org-hats.access");
   assert.equal(ACCESS_ENVELOPE_VERSION, 1);
 });
+test("canonicalJson escapes controls and orders non-ASCII by code unit", () => {
+  const text = canonicalJson({ é: 1, a: "line\n\u0001", "😀": true });
+  assert.equal(text, '{"a":"line\\n\\u0001","é":1,"😀":true}');
+});
 
 test("the interface version names the call surface, not the wire format", () => {
   // 1.x callers used the two-optional grant shape; 2 carries GrantTarget.

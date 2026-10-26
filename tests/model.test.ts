@@ -239,6 +239,14 @@ test("the ranked selection is one primitive: primary, then role, target, grant i
   firstByRank(input);
   assert.deepEqual(input.map((g) => g.grantId), ["g-b", "g-a"]);
   assert.equal(firstByRank([]), undefined);
+  // a tuple comparison, not a `|`-joined string: a role containing the old
+  // separator used to sort as if its suffix were the target id
+  const pipeRole: ActiveGrant = { ...grant("g-a", "field"), role: "field|extra" };
+  const pipeTarget: ActiveGrant = {
+    ...grant("g-b", "field"),
+    target: { kind: "team", teamId: teamId("team-rank|x") },
+  };
+  assert.equal(firstByRank([pipeRole, pipeTarget])?.grantId, "g-b");
 });
 
 test("a primary that does not reach the target stands aside for the fallback", () => {

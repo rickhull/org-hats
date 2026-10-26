@@ -11,9 +11,9 @@
 // one. The deployed shape projects the facts it needs instead.
 
 import {
-  ACCESS_ENVELOPE_FORMAT,
   actorId,
   canonicalJson,
+  envelopeVersionFailure,
   operationId,
   organizationId,
   type ActorId,
@@ -81,7 +81,8 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
       };
     }
     const claims = authorization.envelope.claims;
-    if (authorization.envelope.format !== ACCESS_ENVELOPE_FORMAT) return { kind: "invalid-signature" };
+    const versionFailure = envelopeVersionFailure(authorization.envelope);
+    if (versionFailure !== undefined) return versionFailure;
     if (!(await signer.verify(canonicalJson(claims as unknown as JsonValue), authorization.envelope.signature))) {
       return { kind: "invalid-signature" };
     }

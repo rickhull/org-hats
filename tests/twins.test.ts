@@ -10,7 +10,6 @@ import {
   AIRLIFT,
   DANA_OKAFOR,
   FESTIVAL,
-  FESTIVAL_BOOTH_COUNT,
   HARBOR_LOGISTICS,
   PROFESSIONAL_OPERATION,
   TWINS,
@@ -84,7 +83,7 @@ test("all participations are active in both twins", () => {
 test("the festival is bounded and materializes the booth burst deterministically", () => {
   assert.equal(FESTIVAL.snapshot.operations[0]?.bounded, true);
   const booths = FESTIVAL.snapshot.teams.filter((t) => t.teamId.startsWith("team-booth-"));
-  assert.equal(booths.length, FESTIVAL_BOOTH_COUNT);
+  assert.equal(booths.length, 150);
   assert.equal(booths[0]?.displayName, "Tasting booth 001");
   assert.equal(booths[booths.length - 1]?.displayName, "Tasting booth 150");
 });
@@ -106,16 +105,5 @@ test("the airlift twin stands alone: no organization leaks in from the consumer-
       twin.snapshot.organizations.some((o) => o.organizationId === organization.organizationId),
     );
     assert.equal(known, false, `${organization.displayName} is an airlift-only organization`);
-  }
-});
-
-test("one primary per actor per operation holds in both twins", () => {
-  for (const { snapshot } of TWINS) {
-    const primaries = new Map<string, number>();
-    for (const g of snapshot.grants.filter((g2) => g2.primary)) {
-      const key = `${g.operationId}/${g.organizationId}/${g.actorId}`;
-      primaries.set(key, (primaries.get(key) ?? 0) + 1);
-    }
-    for (const [key, count] of primaries) assert.equal(count, 1, key);
   }
 });

@@ -168,3 +168,29 @@ in-memory engine's live organization lookup; the lost-disable refresh case in
 `packages/cloudflare/test/roster.test.ts`.
 *If it breaks:* a lost roster push becomes indefinite refresh authority, and a
 disabled actor keeps a session past the envelope lease.
+
+### A14 — The projection names its layers
+
+The envelope's selected action hat bounds the actions `mayAct` evaluates.
+Read reach, configuration reach, and member reach are separate, issuer-computed
+layers over the actor's wearable grants; the verifier compares each layer's
+ids and never derives one layer from another. The hat is not claimed to bound
+all authority.
+
+*Held by:* the claims shape (`hat`, `readableOrganizationIds`,
+`readableTeamIds`, `configurableSiteIds`, `memberTeamIds`),
+`assembleAccessClaims`, `NeutralAccess`, and the access/claims suites.
+*If it breaks:* "one hat at a time" becomes an overclaim, and a host cannot
+name the layer a decision came from.
+
+### A15 — Access requests are a queue, not an admission relation
+
+`request-access` records a request; `admit` records a review and a note.
+Neither establishes an authority relation. The grant is the operation's
+operative acceptance, and wearability checks the actor, participation, and
+revocation — never an admission table.
+
+*Held by:* the `request-access`/`admit` handlers and their tests;
+`wearableGrants`; `tests/engine.test.ts`.
+*If it breaks:* the docs claim an enforced admission relation the code does
+not have, and a queue review becomes mistaken for authority.

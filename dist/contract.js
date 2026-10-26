@@ -43,6 +43,23 @@ export const ACCESS_ENVELOPE_FORMAT = "org-hats.access";
  * results keep their `ok` discriminant and do not use this. Narrowing a
  * typed union is all this does — it parses nothing. */
 export const isFailed = (result) => "failure" in result;
+/** The envelope version gate shared by the verifier and the runtime's command
+ * and context authorization. The format marker, the envelope's own version,
+ * and the claims' version must agree before a signature is trusted or claims
+ * are read. The claims' `interfaceVersion` is provenance and is deliberately
+ * not checked here. */
+export const envelopeVersionFailure = (envelope) => {
+    if (envelope.format !== ACCESS_ENVELOPE_FORMAT) {
+        return { kind: "wrong-interface-version", detail: "not a recognized access envelope" };
+    }
+    if (envelope.v !== ACCESS_ENVELOPE_VERSION) {
+        return { kind: "wrong-interface-version", detail: "unrecognized envelope version" };
+    }
+    if (envelope.claims.v !== ACCESS_ENVELOPE_VERSION) {
+        return { kind: "wrong-interface-version", detail: "envelope and claims disagree on the version" };
+    }
+    return undefined;
+};
 const isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 export const canonicalJson = (value) => {
     if (isRecord(value)) {

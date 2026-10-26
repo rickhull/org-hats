@@ -275,9 +275,19 @@ export interface WornHat {
  * issuance — so the rule is written once. Only active grants enter; the
  * revocation filter happened upstream in `wearableGrants`. */
 export const firstByRank = (grants: readonly ActiveGrant[]): ActiveGrant | undefined => {
-  const rank = (g: ActiveGrant): string =>
-    `${g.primary === true ? 0 : 1}|${g.role}|${g.target.kind === "team" ? g.target.teamId : g.target.siteId}|${g.grantId}`;
-  return [...grants].sort((a, b) => (rank(a) < rank(b) ? -1 : rank(a) > rank(b) ? 1 : 0))[0];
+  const targetId = (g: ActiveGrant): string =>
+    g.target.kind === "team" ? g.target.teamId : g.target.siteId;
+  return [...grants].sort((a, b) => {
+    const primaryA = a.primary === true ? 0 : 1;
+    const primaryB = b.primary === true ? 0 : 1;
+    if (primaryA !== primaryB) return primaryA - primaryB;
+    if (a.role !== b.role) return a.role < b.role ? -1 : 1;
+    const targetA = targetId(a);
+    const targetB = targetId(b);
+    if (targetA !== targetB) return targetA < targetB ? -1 : 1;
+    if (a.grantId !== b.grantId) return a.grantId < b.grantId ? -1 : 1;
+    return 0;
+  })[0];
 };
 
 /** A hat the bundle can describe. `undefined` when the grant names a role

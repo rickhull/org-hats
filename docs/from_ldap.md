@@ -34,7 +34,7 @@ decoration. That is the right lesson for cross-organization, multi-site work.
 | **Role** | Role / permission set | Flat action set. No role hierarchy, dominance, nested roles, prerequisites, or constraints. |
 | **Hat** | Active role / PAM role activation | The assignment exercised by this envelope. One action hat per envelope; unlike a Kerberos ticket or PAC, the envelope carries a selected capacity, not every group. |
 | **Participation** | Cross-org relationship / membership | A two-party lifecycle: invite → accept → activate → revoke. It belongs to the organization–operation relationship, not to the actor's group list. |
-| **Admission** | Enrollment in an application | The intent is separate from participation and grant; today the grant is the operative admission. See `plans/model_coherence.md`. |
+| **Admission** | Enrollment in an application | The intent is separate from participation and grant; the grant is the operative admission, and access requests are a reviewed queue. See `authority_redesign.md` § Access. |
 | **Evidence** | Bind / token authentication result | A typed assertion (`provider`, `subject`, optional `amr`/`auth_time`). It creates no actor, participation, or grant. Authentication is not authority. |
 | **Envelope** | Kerberos ticket / PAC / JWT-ish projection | Signed with Ed25519 over canonical JSON; verified locally. It is not a JWT, not a Kerberos ticket, and not a PAC. Downstream services use `org-hats/access`, not standard JWT middleware. |
 | **Verifier** | Resource service / PEP | Checks signature, expiry, and binding, then compares signed ids. It never rebuilds the organization's rules or queries the directory. |
@@ -125,8 +125,9 @@ verified. The consumer pin is in [`publishing.md`](publishing.md).
 - No LDAP, SAML, or SCIM connector; OIDC only.
 - The live `cloudflare-v0.3.2` verifies ES256 and RS256. Check the provider's
   signing algorithm before a pilot.
-- One hat per envelope, and read/config/member reach are currently unions over
-  wearable grants; the model review is in `plans/model_coherence.md`.
+- One action hat per envelope, and read/config/member reach are separate
+  issuer-computed layers over wearable grants; the layers are named in
+  `authority_redesign.md` § Access.
 - The envelope is not a JWT; every downstream service needs the verifier and
   the distributed key set.
 - Production is Cloudflare-only; the in-memory engine is for tests and
@@ -137,4 +138,4 @@ verified. The consumer pin is in [`publishing.md`](publishing.md).
 - [`positioning.md`](positioning.md) — current positioning and comparisons.
 - [`authority_redesign.md`](authority_redesign.md) — the architecture.
 - [`tutorial.md`](tutorial.md) — the longer walkthrough.
-- [`../plans/personas.md`](../plans/personas.md) — the adoption plan.
+- [`personas.md`](personas.md) — the three audiences and what to show each.

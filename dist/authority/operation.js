@@ -11,7 +11,7 @@
 // the actor exists and is not disabled. The reference world shares one
 // process; the deployed shape projects those facts into the operation
 // instead (docs/authority_redesign.md § State ownership).
-import { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, actorId, canonicalJson, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";
+import { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, actorId, canonicalJson, envelopeVersionFailure, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";
 import { applyParticipationEvent, wearableGrants, } from "../model.js";
 import { actionsOf } from "../policy.js";
 import { sha256Hex } from "./internal.js";
@@ -106,8 +106,9 @@ export const createOperationCoordinator = (deps) => {
     };
     const context = async (input) => {
         const { envelope } = input;
-        if (envelope.format !== ACCESS_ENVELOPE_FORMAT)
-            return { failure: { kind: "invalid-signature" } };
+        const versionFailure = envelopeVersionFailure(envelope);
+        if (versionFailure !== undefined)
+            return { failure: versionFailure };
         if (!(await signer.verify(canonicalJson(envelope.claims), envelope.signature))) {
             return { failure: { kind: "invalid-signature" } };
         }
@@ -371,6 +372,13 @@ export const createOperationCoordinator = (deps) => {
         const grant = op.grants.find((g) => g.grantId === input.grantId);
         if (grant === undefined)
             return fail("invalid-command", "unknown grant");
+        const snapshot = snapshotOf(op.operationId);
+        if (snapshot === undefined)
+            return fail("wrong-binding", "unknown operation");
+        const wearable = wearableGrants(snapshot, grant.organizationId, grant.actorId, op.operationId);
+        if (!wearable.some((g) => g.grantId === grant.grantId)) {
+            return fail("denied", "the grant is not wearable");
+        }
         commitClaim(op.claims, input);
         op.grants = op.grants.map((g) => {
             if (g.grantId === input.grantId)

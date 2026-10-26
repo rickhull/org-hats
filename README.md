@@ -132,7 +132,7 @@ The **policy bundle** is versioned data: an action vocabulary, roles that
 carry actions, and a read policy. A **role** is a title in that data; an
 **action** is an opaque verb such as `review`.
 
-Three consequences do most of the work:
+Four consequences do most of the work:
 
 - **Identity is organization-scoped.** An IdP subject resolves through a
   **principal link** to one actor. Evidence creates no participation and no
@@ -149,6 +149,9 @@ Three consequences do most of the work:
 - **Read reach is policy.** The issuer computes it under the bundle —
   `granted-teams` or `all-participating` — and writes the resulting ids into
   the envelope. The verifier compares ids; it never rebuilds the rule.
+- **The envelope names its layers.** The worn hat is the action layer. Read
+  reach, configuration reach, and member reach are separate issuer-computed
+  layers over the actor's wearable grants; the hat does not bound them.
 
 **What it is not:** this is the organizational half of authorization.
 Product objects and verbs, role hierarchy, and what the UI shows belong to

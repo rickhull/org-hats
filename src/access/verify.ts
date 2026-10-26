@@ -12,11 +12,10 @@
 // verbs are host code mapping onto these neutral targets.
 
 import {
-  ACCESS_ENVELOPE_FORMAT,
-  ACCESS_ENVELOPE_VERSION,
   base64Decode,
   base64UrlDecode,
   canonicalJson,
+  envelopeVersionFailure,
   epochSeconds,
   utf8,
   type AccessEnvelopeClaimsV1,
@@ -145,16 +144,8 @@ export const verify = async (
   keys: ReadonlyMap<string, VerifyKey>,
   context: VerifyContext = {},
 ): Promise<Verified | Failed> => {
-  if (envelope.format !== ACCESS_ENVELOPE_FORMAT || envelope.v !== ACCESS_ENVELOPE_VERSION) {
-    return failed({ kind: "wrong-interface-version", detail: "not a recognized access envelope" });
-  }
-  // The claims carry their own version, and it was never checked: a
-  // signature-valid `v: 2` claims payload inside a `v: 1` envelope was
-  // accepted and read as v1. The envelope's `v` is the wrapper's; this is
-  // the payload's, and they must agree.
-  if (envelope.claims.v !== ACCESS_ENVELOPE_VERSION) {
-    return failed({ kind: "wrong-interface-version", detail: "envelope and claims disagree on the version" });
-  }
+  const versionFailure = envelopeVersionFailure(envelope);
+  if (versionFailure !== undefined) return failed(versionFailure);
   const key = keys.get(envelope.keyId);
   if (key === undefined) {
     return failed({ kind: "invalid-signature", detail: `unknown key id ${envelope.keyId}` });
