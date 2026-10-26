@@ -4,8 +4,8 @@
 
 import {
   base64Decode,
+  asJson,
   canonicalJson,
-  type JsonValue,
   type VerificationKeyMaterial,
 } from "../contract.ts";
 import { ed25519VerifyKey, type VerifyKey } from "./verify.ts";
@@ -61,11 +61,11 @@ const materials = (input: readonly VerificationKeyMaterial[]): readonly Verifica
 
 /** Canonical JSON for deployment configuration. */
 export const serializeVerifyKeySet = (input: readonly VerificationKeyMaterial[]): string =>
-  canonicalJson({
+  canonicalJson(asJson({
     format: VERIFY_KEY_SET_FORMAT,
     v: VERIFY_KEY_SET_VERSION,
     keys: materials(input),
-  } as unknown as JsonValue);
+  }));
 
 /** Fail closed on malformed JSON, unknown format/version, duplicate ids, and
  * an empty set. A set that verifies nothing looks like a credential problem

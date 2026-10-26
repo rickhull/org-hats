@@ -231,6 +231,11 @@ export type RefreshHandleOutcome = {
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | {
     readonly [key: string]: JsonValue;
 };
+/** The one named conversion at the signing seam: structured claims become
+ * the JSON model canonical serialization addresses. TypeScript cannot see
+ * an interface as an index-signature record, so the cast is deliberate and
+ * lives here rather than inline at every sign and verify. */
+export declare const asJson: (value: unknown) => JsonValue;
 export declare const canonicalJson: (value: JsonValue) => string;
 export declare const utf8: (text: string) => Uint8Array;
 export declare const base64Encode: (bytes: Uint8Array) => string;

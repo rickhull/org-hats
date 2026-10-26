@@ -18,13 +18,12 @@
 import {
   AUTHORITY_INTERFACE_VERSION,
   actorId,
+  isFailed,
   operationId,
   organizationId,
   siteId,
   teamId,
   type ActorId,
-  type Failed,
-  type Failure,
   type FailureKind,
   type OperationId,
   type OrganizationId,
@@ -35,7 +34,6 @@ import {
 import type {
   AccessIssue,
   AuthorityCommand,
-  AuthorityContext,
   AuthorityRuntime,
   CommandResult,
   PrincipalEvidence,
@@ -205,13 +203,9 @@ const deepEqual = (actual: unknown, expected: unknown, message: string): void =>
   if (left !== right) throw new Error(`${message}: expected ${right}, got ${left}`);
 };
 
-const failureOf = (result: unknown): Failure | undefined => {
-  if (typeof result !== "object" || result === null || !("failure" in result)) return undefined;
-  return (result as Failed).failure;
-};
-
-const expectFailure = (result: unknown, kind: FailureKind, message: string): void => {
-  equal(failureOf(result)?.kind, kind, message);
+const expectFailure = (result: object, kind: FailureKind, message: string): void => {
+  if (!isFailed(result)) throw new Error(`${message}: expected ${kind}, got success`);
+  equal(result.failure.kind, kind, message);
 };
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
@@ -228,7 +222,7 @@ const command = (
     idempotencyKey: key,
     authorization,
     ...body,
-  } as AuthorityCommand);
+  });
 
 const envelopeAuth = (envelope: SignedAccessEnvelope): AuthorityCommand["authorization"] => ({
   kind: "access-envelope",
@@ -254,11 +248,10 @@ const issue = async (
     operationId,
     evidence: entry.evidence,
   });
-  const failure = failureOf(result);
-  if (failure !== undefined) {
-    throw new Error(`issuance for ${entry.label} at ${operationId}: ${failure.kind}`);
+  if (isFailed(result)) {
+    throw new Error(`issuance for ${entry.label} at ${operationId}: ${result.failure.kind}`);
   }
-  return result as AccessIssue;
+  return result;
 };
 
 const verifyOk = async (
@@ -267,9 +260,8 @@ const verifyOk = async (
   context: VerifyContext,
 ): Promise<Verified> => {
   const result = await verify(envelope, world.keys, context);
-  const failure = failureOf(result);
-  if (failure !== undefined) throw new Error(`verification: ${failure.kind}`);
-  return result as Verified;
+  if (isFailed(result)) throw new Error(`verification: ${result.failure.kind}`);
+  return result;
 };
 
 /** Invite, accept, and grant the invitee's first hat; returns the operation
@@ -531,18 +523,16 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
       operationId: MERIDIAN,
       handle: first.refresh.handle,
     });
-    const failure = failureOf(second);
-    assert(failure === undefined, `refresh failed: ${failure?.kind ?? ""}`);
-    const rotated = second as AccessIssue;
-    equal(rotated.refresh.kind, "rotated", "second refresh outcome");
+    if (isFailed(second)) throw new Error(`refresh failed: ${second.failure.kind}`);
+    equal(second.refresh.kind, "rotated", "second refresh outcome");
     const replay = await world.runtime.refresh({
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
       operationId: MERIDIAN,
       handle: first.refresh.handle,
     });
     expectFailure(replay, "unauthenticated", "superseded handle");
-    await verifyOk(world, rotated.envelope, {
-      now: rotated.envelope.claims.iat + 1,
+    await verifyOk(world, second.envelope, {
+      now: second.envelope.claims.iat + 1,
       expectedOperationId: MERIDIAN,
     });
   }),
@@ -555,9 +545,10 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
       operationId: MERIDIAN,
       evidence: { ...entry.evidence, amr: ["hwk", "pin"], authTime: AUTH_TIME },
     });
-    const issueFailure = failureOf(withMethods);
-    assert(issueFailure === undefined, `issuance with methods failed: ${issueFailure?.kind ?? ""}`);
-    const issued = withMethods as AccessIssue;
+    if (isFailed(withMethods)) {
+      throw new Error(`issuance with methods failed: ${withMethods.failure.kind}`);
+    }
+    const issued = withMethods;
     deepEqual(issued.envelope.claims.amr, ["hwk", "pin"], "methods copied from evidence");
     equal(issued.envelope.claims.auth_time, AUTH_TIME, "authentication time copied from evidence");
     assert(issued.envelope.claims.auth_time !== issued.envelope.claims.iat, "authentication time is not envelope time");
@@ -567,9 +558,8 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
       operationId: MERIDIAN,
       handle: issued.refresh.kind === "rotated" ? issued.refresh.handle : "",
     });
-    const refreshFailure = failureOf(renewedResult);
-    assert(refreshFailure === undefined, `refresh failed: ${refreshFailure?.kind ?? ""}`);
-    const renewed = renewedResult as AccessIssue;
+    if (isFailed(renewedResult)) throw new Error(`refresh failed: ${renewedResult.failure.kind}`);
+    const renewed = renewedResult;
     deepEqual(renewed.envelope.claims.amr, ["hwk", "pin"], "refresh preserves the methods");
     equal(renewed.envelope.claims.auth_time, AUTH_TIME, "refresh preserves the authentication time");
     assert(renewed.envelope.claims.iat >= issued.envelope.claims.iat, "envelope time moves on");
@@ -577,9 +567,8 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
       envelope: renewed.envelope,
     });
-    const contextFailure = failureOf(contextResult);
-    assert(contextFailure === undefined, `context failed: ${contextFailure?.kind ?? ""}`);
-    const context = contextResult as AuthorityContext;
+    if (isFailed(contextResult)) throw new Error(`context failed: ${contextResult.failure.kind}`);
+    const context = contextResult;
     deepEqual(context.amr, ["hwk", "pin"], "context surfaces the methods");
     equal(context.authTime, AUTH_TIME, "context surfaces the authentication time");
     const plain = await issue(world, entry, MERIDIAN);
@@ -609,9 +598,8 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
       envelope: issued.envelope,
     });
-    const contextFailure = failureOf(contextResult);
-    assert(contextFailure === undefined, `context failed: ${contextFailure?.kind ?? ""}`);
-    const context = contextResult as AuthorityContext;
+    if (isFailed(contextResult)) throw new Error(`context failed: ${contextResult.failure.kind}`);
+    const context = contextResult;
     equal(context.wearableHats.length, 2, "two wearable hats after the grant");
     const ids = context.wearableHats.map((hat) => hat.grantId);
     equal(new Set(ids).size, ids.length, "the grant ids are unique");
@@ -633,9 +621,8 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
       operationId: MERIDIAN,
       handle: issued.refresh.kind === "rotated" ? issued.refresh.handle : "",
     });
-    const wornFailure = failureOf(worn);
-    assert(wornFailure === undefined, `refresh after select failed: ${wornFailure?.kind ?? ""}`);
-    equal((worn as AccessIssue).envelope.claims.hat.role, "reviewer", "the next envelope wears the selected hat");
+    if (isFailed(worn)) throw new Error(`refresh after select failed: ${worn.failure.kind}`);
+    equal(worn.envelope.claims.hat.role, "reviewer", "the next envelope wears the selected hat");
   }),
 
   runtimeCase("OH-PART-01", "invite, accept, admit: an invited organization receives a hat", async (world) => {
@@ -804,7 +791,7 @@ export const CONFORMANCE_CASES: readonly ConformanceCase[] = [
       now: issued.envelope.claims.exp - 1,
       expectedOperationId: MERIDIAN,
     });
-    assert(failureOf(before) === undefined, "one second before expiry verifies");
+    assert(!isFailed(before), "one second before expiry verifies");
     const at = await verify(issued.envelope, world.keys, {
       now: issued.envelope.claims.exp,
       expectedOperationId: MERIDIAN,

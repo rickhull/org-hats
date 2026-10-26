@@ -11,7 +11,7 @@
 // the actor exists and is not disabled. The reference world shares one
 // process; the deployed shape projects those facts into the operation
 // instead (docs/authority_redesign.md § State ownership).
-import { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, actorId, canonicalJson, envelopeVersionFailure, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";
+import { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, actorId, asJson, canonicalJson, envelopeVersionFailure, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";
 import { applyParticipationEvent, wearableGrants, } from "../model.js";
 import { actionsOf } from "../policy.js";
 import { sha256Hex } from "./internal.js";
@@ -47,7 +47,7 @@ export const createOperationCoordinator = (deps) => {
         const claims = buildEnvelope(op, organizationId, actorId, auth);
         if ("kind" in claims)
             return { ok: false, failure: claims };
-        const signature = await signer.sign(canonicalJson(claims));
+        const signature = await signer.sign(canonicalJson(asJson(claims)));
         const envelope = {
             format: ACCESS_ENVELOPE_FORMAT,
             v: ACCESS_ENVELOPE_VERSION,
@@ -109,7 +109,7 @@ export const createOperationCoordinator = (deps) => {
         const versionFailure = envelopeVersionFailure(envelope);
         if (versionFailure !== undefined)
             return { failure: versionFailure };
-        if (!(await signer.verify(canonicalJson(envelope.claims), envelope.signature))) {
+        if (!(await signer.verify(canonicalJson(asJson(envelope.claims)), envelope.signature))) {
             return { failure: { kind: "invalid-signature" } };
         }
         if (clock.now() >= envelope.claims.exp)

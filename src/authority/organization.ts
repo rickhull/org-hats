@@ -12,13 +12,13 @@
 
 import {
   actorId,
+  asJson,
   canonicalJson,
   envelopeVersionFailure,
   operationId,
   organizationId,
   type ActorId,
   type Failure,
-  type JsonValue,
   type OperationId,
   type OrganizationId,
 } from "../contract.ts";
@@ -83,7 +83,7 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
     const claims = authorization.envelope.claims;
     const versionFailure = envelopeVersionFailure(authorization.envelope);
     if (versionFailure !== undefined) return versionFailure;
-    if (!(await signer.verify(canonicalJson(claims as unknown as JsonValue), authorization.envelope.signature))) {
+    if (!(await signer.verify(canonicalJson(asJson(claims)), authorization.envelope.signature))) {
       return { kind: "invalid-signature" };
     }
     if (clock.now() >= claims.exp) return { kind: "expired" };

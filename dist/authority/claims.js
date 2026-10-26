@@ -104,6 +104,9 @@ export const assembleAccessClaims = (input) => {
         configurableSiteIds,
         iat: issuedAt,
         exp: issuedAt + input.envelopeLifetimeSeconds,
+        // Optional facts emit conditionally: exactOptionalPropertyTypes keeps
+        // absence off the wire — a present-but-undefined field would change the
+        // canonical bytes and with them the signature.
         ...(input.auth?.amr !== undefined ? { amr: [...input.auth.amr] } : {}),
         ...(input.auth?.authTime !== undefined ? { auth_time: input.auth.authTime } : {}),
     };

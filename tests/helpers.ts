@@ -1,7 +1,7 @@
 // Shared helpers for the generative suites: the deterministic mulberry32
 // PRNG and a pick over its stream. Same seed, same world, in every suite.
 
-import { isFailed, type Failed, type Failure, type JsonValue, type RefreshHandle, type RefreshHandleOutcome, type Unbranded } from "../src/contract.ts";
+import { isFailed, type Failed, type Failure, type RefreshHandle, type RefreshHandleOutcome, type Unbranded } from "../src/contract.ts";
 import type { PolicyBundle } from "../src/policy.ts";
 import type { Snapshot } from "../src/model.ts";
 import type { AuthorityCommandBody, CommandResult } from "../src/authority/types.ts";
@@ -33,8 +33,9 @@ export const fixtureSnapshot = (snapshot: Unbranded<Snapshot>): Snapshot =>
 export const uncheckedPolicy = (value: unknown): PolicyBundle =>
   value as PolicyBundle;
 
-/** The source canonicalizes claims through the same boundary assertion. */
-export const asJson = (value: unknown): JsonValue => value as JsonValue;
+/** The source canonicalizes claims through the same boundary conversion
+ * (`asJson` from `src/contract.ts`). */
+export { asJson } from "../src/contract.ts";
 
 /** A failed result, with a clear test failure if the call succeeded. */
 export const failureOf = (value: unknown): Failure => {

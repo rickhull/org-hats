@@ -14,6 +14,7 @@
 import {
   base64Decode,
   base64UrlDecode,
+  asJson,
   canonicalJson,
   envelopeVersionFailure,
   epochSeconds,
@@ -22,7 +23,6 @@ import {
   type EpochSeconds,
   type Failed,
   type Failure,
-  type JsonValue,
   type OperationId,
   type Unbranded,
   type SiteId,
@@ -150,7 +150,7 @@ export const verify = async (
   if (key === undefined) {
     return failed({ kind: "invalid-signature", detail: `unknown key id ${envelope.keyId}` });
   }
-  const payload = canonicalJson(envelope.claims as unknown as JsonValue);
+  const payload = canonicalJson(asJson(envelope.claims));
   if (!(await key.verify(payload, envelope.signature))) {
     return failed({ kind: "invalid-signature" });
   }

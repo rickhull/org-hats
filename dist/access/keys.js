@@ -1,7 +1,7 @@
 // The canonical verification-key set: the public half of one or more signing
 // keys, serialized for deployment configuration. Rotation is
 // install-before-sign, so the set is the unit, never a single key.
-import { base64Decode, canonicalJson, } from "../contract.js";
+import { base64Decode, asJson, canonicalJson, } from "../contract.js";
 import { ed25519VerifyKey } from "./verify.js";
 export const VERIFY_KEY_SET_FORMAT = "org-hats.verify-keys";
 export const VERIFY_KEY_SET_VERSION = 1;
@@ -46,11 +46,11 @@ const materials = (input) => {
     return keys;
 };
 /** Canonical JSON for deployment configuration. */
-export const serializeVerifyKeySet = (input) => canonicalJson({
+export const serializeVerifyKeySet = (input) => canonicalJson(asJson({
     format: VERIFY_KEY_SET_FORMAT,
     v: VERIFY_KEY_SET_VERSION,
     keys: materials(input),
-});
+}));
 /** Fail closed on malformed JSON, unknown format/version, duplicate ids, and
  * an empty set. A set that verifies nothing looks like a credential problem
  * and is really a deployment problem. Unknown *fields* are deliberately

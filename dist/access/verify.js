@@ -10,7 +10,7 @@
 // reach, fallback, or worn-hat rules: the issuer computed those; the
 // verifier compares ids and evaluates the selected hat locally. Product
 // verbs are host code mapping onto these neutral targets.
-import { base64Decode, base64UrlDecode, canonicalJson, envelopeVersionFailure, epochSeconds, utf8, } from "../contract.js";
+import { base64Decode, base64UrlDecode, asJson, canonicalJson, envelopeVersionFailure, epochSeconds, utf8, } from "../contract.js";
 const failed = (failure) => ({ failure });
 /** Pure and platform-free, for tests and alternate runtimes: accepts any
  * verify predicate. */
@@ -87,7 +87,7 @@ export const verify = async (envelope, keys, context = {}) => {
     if (key === undefined) {
         return failed({ kind: "invalid-signature", detail: `unknown key id ${envelope.keyId}` });
     }
-    const payload = canonicalJson(envelope.claims);
+    const payload = canonicalJson(asJson(envelope.claims));
     if (!(await key.verify(payload, envelope.signature))) {
         return failed({ kind: "invalid-signature" });
     }

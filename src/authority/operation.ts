@@ -16,6 +16,7 @@ import {
   ACCESS_ENVELOPE_FORMAT,
   ACCESS_ENVELOPE_VERSION,
   actorId,
+  asJson,
   canonicalJson,
   envelopeVersionFailure,
   isFailed,
@@ -26,7 +27,6 @@ import {
   type AccessEnvelopeClaimsV1,
   type ActorId,
   type Failure,
-  type JsonValue,
   type OperationId,
   type OrganizationId,
 } from "../contract.ts";
@@ -124,7 +124,7 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
   ): Promise<AccessIssue | { ok: false; failure: Failure }> => {
     const claims = buildEnvelope(op, organizationId, actorId, auth);
     if ("kind" in claims) return { ok: false, failure: claims };
-    const signature = await signer.sign(canonicalJson(claims as unknown as JsonValue));
+    const signature = await signer.sign(canonicalJson(asJson(claims)));
     const envelope = {
       format: ACCESS_ENVELOPE_FORMAT,
       v: ACCESS_ENVELOPE_VERSION,
@@ -184,7 +184,7 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     const { envelope } = input;
     const versionFailure = envelopeVersionFailure(envelope);
     if (versionFailure !== undefined) return { failure: versionFailure };
-    if (!(await signer.verify(canonicalJson(envelope.claims as unknown as JsonValue), envelope.signature))) {
+    if (!(await signer.verify(canonicalJson(asJson(envelope.claims)), envelope.signature))) {
       return { failure: { kind: "invalid-signature" } };
     }
     if (clock.now() >= envelope.claims.exp) return { failure: { kind: "expired" } };

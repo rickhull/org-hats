@@ -60,6 +60,11 @@ export const envelopeVersionFailure = (envelope) => {
     }
     return undefined;
 };
+/** The one named conversion at the signing seam: structured claims become
+ * the JSON model canonical serialization addresses. TypeScript cannot see
+ * an interface as an index-signature record, so the cast is deliberate and
+ * lives here rather than inline at every sign and verify. */
+export const asJson = (value) => value;
 const isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 export const canonicalJson = (value) => {
     if (isRecord(value)) {

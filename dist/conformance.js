@@ -14,7 +14,7 @@
 // suites, not part of the runtime inventory's world.
 //
 // The ids are a fresh scheme (`OH-*`), not the frozen v0.4 `OH-QM-*` ids.
-import { AUTHORITY_INTERFACE_VERSION, actorId, operationId, organizationId, siteId, teamId, } from "./contract.js";
+import { AUTHORITY_INTERFACE_VERSION, actorId, isFailed, operationId, organizationId, siteId, teamId, } from "./contract.js";
 import { createInMemoryAuthority } from "./authority/engine.js";
 import { DANA_OKAFOR, FESTIVAL, FESTIVAL_BOOTH_COUNT, HARBOR_LOGISTICS, MERIDIAN, PROFESSIONAL_OPERATION, } from "./authority/twins.js";
 import { decide, grantReaches, invariantProblems, readReach } from "./model.js";
@@ -124,13 +124,10 @@ const deepEqual = (actual, expected, message) => {
     if (left !== right)
         throw new Error(`${message}: expected ${right}, got ${left}`);
 };
-const failureOf = (result) => {
-    if (typeof result !== "object" || result === null || !("failure" in result))
-        return undefined;
-    return result.failure;
-};
 const expectFailure = (result, kind, message) => {
-    equal(failureOf(result)?.kind, kind, message);
+    if (!isFailed(result))
+        throw new Error(`${message}: expected ${kind}, got success`);
+    equal(result.failure.kind, kind, message);
 };
 const command = (world, body, authorization, key) => world.runtime.command({
     interfaceVersion: AUTHORITY_INTERFACE_VERSION,
@@ -153,17 +150,15 @@ const issue = async (world, entry, operationId) => {
         operationId,
         evidence: entry.evidence,
     });
-    const failure = failureOf(result);
-    if (failure !== undefined) {
-        throw new Error(`issuance for ${entry.label} at ${operationId}: ${failure.kind}`);
+    if (isFailed(result)) {
+        throw new Error(`issuance for ${entry.label} at ${operationId}: ${result.failure.kind}`);
     }
     return result;
 };
 const verifyOk = async (world, envelope, context) => {
     const result = await verify(envelope, world.keys, context);
-    const failure = failureOf(result);
-    if (failure !== undefined)
-        throw new Error(`verification: ${failure.kind}`);
+    if (isFailed(result))
+        throw new Error(`verification: ${result.failure.kind}`);
     return result;
 };
 /** Invite, accept, and grant the invitee's first hat; returns the operation
@@ -370,18 +365,17 @@ export const CONFORMANCE_CASES = [
             operationId: MERIDIAN,
             handle: first.refresh.handle,
         });
-        const failure = failureOf(second);
-        assert(failure === undefined, `refresh failed: ${failure?.kind ?? ""}`);
-        const rotated = second;
-        equal(rotated.refresh.kind, "rotated", "second refresh outcome");
+        if (isFailed(second))
+            throw new Error(`refresh failed: ${second.failure.kind}`);
+        equal(second.refresh.kind, "rotated", "second refresh outcome");
         const replay = await world.runtime.refresh({
             interfaceVersion: AUTHORITY_INTERFACE_VERSION,
             operationId: MERIDIAN,
             handle: first.refresh.handle,
         });
         expectFailure(replay, "unauthenticated", "superseded handle");
-        await verifyOk(world, rotated.envelope, {
-            now: rotated.envelope.claims.iat + 1,
+        await verifyOk(world, second.envelope, {
+            now: second.envelope.claims.iat + 1,
             expectedOperationId: MERIDIAN,
         });
     }),
@@ -393,8 +387,9 @@ export const CONFORMANCE_CASES = [
             operationId: MERIDIAN,
             evidence: { ...entry.evidence, amr: ["hwk", "pin"], authTime: AUTH_TIME },
         });
-        const issueFailure = failureOf(withMethods);
-        assert(issueFailure === undefined, `issuance with methods failed: ${issueFailure?.kind ?? ""}`);
+        if (isFailed(withMethods)) {
+            throw new Error(`issuance with methods failed: ${withMethods.failure.kind}`);
+        }
         const issued = withMethods;
         deepEqual(issued.envelope.claims.amr, ["hwk", "pin"], "methods copied from evidence");
         equal(issued.envelope.claims.auth_time, AUTH_TIME, "authentication time copied from evidence");
@@ -405,8 +400,8 @@ export const CONFORMANCE_CASES = [
             operationId: MERIDIAN,
             handle: issued.refresh.kind === "rotated" ? issued.refresh.handle : "",
         });
-        const refreshFailure = failureOf(renewedResult);
-        assert(refreshFailure === undefined, `refresh failed: ${refreshFailure?.kind ?? ""}`);
+        if (isFailed(renewedResult))
+            throw new Error(`refresh failed: ${renewedResult.failure.kind}`);
         const renewed = renewedResult;
         deepEqual(renewed.envelope.claims.amr, ["hwk", "pin"], "refresh preserves the methods");
         equal(renewed.envelope.claims.auth_time, AUTH_TIME, "refresh preserves the authentication time");
@@ -415,8 +410,8 @@ export const CONFORMANCE_CASES = [
             interfaceVersion: AUTHORITY_INTERFACE_VERSION,
             envelope: renewed.envelope,
         });
-        const contextFailure = failureOf(contextResult);
-        assert(contextFailure === undefined, `context failed: ${contextFailure?.kind ?? ""}`);
+        if (isFailed(contextResult))
+            throw new Error(`context failed: ${contextResult.failure.kind}`);
         const context = contextResult;
         deepEqual(context.amr, ["hwk", "pin"], "context surfaces the methods");
         equal(context.authTime, AUTH_TIME, "context surfaces the authentication time");
@@ -440,8 +435,8 @@ export const CONFORMANCE_CASES = [
             interfaceVersion: AUTHORITY_INTERFACE_VERSION,
             envelope: issued.envelope,
         });
-        const contextFailure = failureOf(contextResult);
-        assert(contextFailure === undefined, `context failed: ${contextFailure?.kind ?? ""}`);
+        if (isFailed(contextResult))
+            throw new Error(`context failed: ${contextResult.failure.kind}`);
         const context = contextResult;
         equal(context.wearableHats.length, 2, "two wearable hats after the grant");
         const ids = context.wearableHats.map((hat) => hat.grantId);
@@ -458,8 +453,8 @@ export const CONFORMANCE_CASES = [
             operationId: MERIDIAN,
             handle: issued.refresh.kind === "rotated" ? issued.refresh.handle : "",
         });
-        const wornFailure = failureOf(worn);
-        assert(wornFailure === undefined, `refresh after select failed: ${wornFailure?.kind ?? ""}`);
+        if (isFailed(worn))
+            throw new Error(`refresh after select failed: ${worn.failure.kind}`);
         equal(worn.envelope.claims.hat.role, "reviewer", "the next envelope wears the selected hat");
     }),
     runtimeCase("OH-PART-01", "invite, accept, admit: an invited organization receives a hat", async (world) => {
@@ -588,7 +583,7 @@ export const CONFORMANCE_CASES = [
             now: issued.envelope.claims.exp - 1,
             expectedOperationId: MERIDIAN,
         });
-        assert(failureOf(before) === undefined, "one second before expiry verifies");
+        assert(!isFailed(before), "one second before expiry verifies");
         const at = await verify(issued.envelope, world.keys, {
             now: issued.envelope.claims.exp,
             expectedOperationId: MERIDIAN,
