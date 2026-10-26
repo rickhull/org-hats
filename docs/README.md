@@ -64,6 +64,11 @@ public `org-hats` docs are normative for the seam.
   hat produces, commands and denial, refresh rotation, a lost disable message,
   and the Airlift's crossed grant.
 
+## Implementation notes
+
+- [`golang.md`](golang.md) — the Go posture: interesting, not needed yet; a
+  wire contract and byte-exact vectors come before any module.
+
 ## Background
 
 Phase-1 toeholds. Each carries only the opening that still holds in v1; the
