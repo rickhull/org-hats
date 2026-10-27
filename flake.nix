@@ -21,6 +21,7 @@
             pnpm_11
             git
             ripgrep
+            python3
             forgejo-cli
             jq
             nixfmt

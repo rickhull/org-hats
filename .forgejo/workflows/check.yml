@@ -31,17 +31,8 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install root dependencies
-        run: pnpm install --frozen-lockfile --filter org-hats
-
-      - name: dist/ is committed and in sync with src/
-        run: bin/check-dist
-
-      - name: Check (fence, suites, example)
-        run: bin/check
-
-      - name: Cloudflare artifact gate (configuration)
-        run: bin/check-artifact --no-build
+      - name: Portable CI contract
+        run: CI=1 ci/run portable
 
       # The checkout action force-writes the peeled commit into
       # refs/tags/<tag>, leaving a lightweight ref where the annotated object

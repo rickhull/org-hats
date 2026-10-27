@@ -13,8 +13,8 @@ set -eu
 cd "$(dirname "$0")/.." || exit 1
 
 if [ ! -x node_modules/.bin/tsc ]; then
-	printf 'check-dist: skipped — run pnpm install to enable the build\n'
-	exit 0
+	printf 'check-dist: tsc is required — run pnpm install\n' >&2
+	exit 1
 fi
 
 if command -v pnpm >/dev/null 2>&1; then

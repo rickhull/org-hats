@@ -15,52 +15,14 @@
  *           judged this path.
  *
  * Keep DENY and ASK in lockstep with AGENTS.md ("Git policy") and
- * .claude/settings.json (permissions). Both were last aligned 2026-10-26.
- *
- * Scope note: the parser takes the first non-flag word after `git` as the
- * subcommand. That covers the forms this repository's agent uses, running
- * from the repo root (`git add <path>`); it does not resolve option values,
- * so `git -C <dir> add ...` would classify `<dir>` instead of `add`. If the
- * harness ever needs that shape, add a value-consuming-option skip list.
+ * .claude/settings.json (permissions). The parser lives separately so its
+ * shell forms and value-taking global options can have portable regression
+ * coverage without loading Pi's extension package.
  */
 
 import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-
-const DENY = [
-  "commit",
-  "reset",
-  "push",
-  "checkout",
-  "switch",
-  "merge",
-  "rebase",
-  "stash",
-  "cherry-pick",
-  "revert",
-  "clean",
-];
-
-const ASK = ["add", "rm", "mv", "restore"];
-
-function gitSubcommands(command: string): string[] {
-  const words = command.trim().split(/\s+/);
-  const subs: string[] = [];
-  for (let i = 0; i < words.length; i++) {
-    if (words[i] !== "git") continue;
-    // Skip flags and their values that follow `git`; the subcommand is the
-    // first word that is neither a flag nor another `git`. (Value-taking
-    // options like -C are deliberately unresolved — see scope note.)
-    for (let j = i + 1; j < words.length; j++) {
-      const w = words[j];
-      if (w === "git") break;
-      if (w.startsWith("-")) continue;
-      subs.push(w);
-      break;
-    }
-  }
-  return subs;
-}
+import { ASK, DENY, gitSubcommands } from "./git-command-classifier.ts";
 
 export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {

@@ -8,6 +8,11 @@ release-metadata guard. `pnpm verify` is the full local gate (`bin/verify`):
 workerd suites. A clean commit that passes records the local gate cache, so
 the next pre-push does not repeat the portable gate.
 
+CI backends call the repository-owned `ci/run <portable|cloudflare>`
+contract. It performs the frozen install, scrubs inherited Cloudflare
+credentials, and runs the mode's gates; workflow YAML owns only runner setup
+and the annotated-tag repair imposed by checkout actions.
+
 ## Rings
 
 - **Ring 0 — targeted.** `node --test tests/<file>.test.ts` for one portable
@@ -25,9 +30,11 @@ the next pre-push does not repeat the portable gate.
   on the GitHub release mirror is the release-time backstop, not the live
   gate. A Cloudflare tag also passes `bin/check-artifact`.
 
-`pnpm test:tools` runs the release-guard suites alone
-(`release-tools.test.ts`, `gate-cache.test.ts`, `artifact-check.test.ts`); they
-need only Node and git. Use it alone for a fast loop; ring 1 runs them too.
+`pnpm test:tools` runs the release and harness suites alone
+(`release-tools.test.ts`, `gate-cache.test.ts`, `artifact-check.test.ts`,
+`tooling-policy.test.ts`, `git-guards.test.ts`, and `ci-run.test.ts`); they
+use Node, git, rg, jq, and Python 3 from the project shell. Use it alone for
+a fast loop; ring 1 runs them too.
 
 Pre-push and the Codeberg per-push CI run the portable gate. The workerd
 suite runs in ring 2, `pnpm verify`, `bin/release`, and the GitHub mirror job;
@@ -88,6 +95,12 @@ public types fails the gate instead of failing at runtime.
   invalidation by dirt, a new commit, or a changed toolchain.
 - `artifact-check.test.ts` — the Cloudflare artifact gate: the
   production config, the annotated tag, and the version match.
+- `tooling-policy.test.ts` — required compiler tooling fails closed, and
+  operational scripts never confuse ripgrep replacement with recursion.
+- `git-guards.test.ts` — the Codex and Pi command classifiers plus the shared
+  deny/approval lists carried by all three agent harnesses.
+- `ci-run.test.ts` — the repository-owned CI modes, checkout preconditions,
+  credential scrubbing, and exact gate order.
 
 The inventory ships as `org-hats/conformance`; `tests/conformance.test.ts` is
 only its in-memory runner. A case that cannot be expressed through the public

@@ -112,8 +112,11 @@ and only after the entry test passes; a failing test means no questionnaire.
 ## Tooling
 
 - The project flake (`flake.nix`) provides Node 24, pnpm 11, `git`, `rg`,
-  and `fj` 0.7+; `.envrc` enters it with `use flake`.  Run `direnv allow`
-  once per clone.  Never install pnpm through corepack or npm.
+  `jq`, Python 3, and `fj` 0.7+; `.envrc` enters it with `use flake`.  Run
+  `direnv allow` once per clone.  Never install pnpm through corepack or npm.
+- `rg` searches recursively by default.  Never pass its short `-r` flag:
+  it means output replacement, not recursion.  Spell a real replacement as
+  `--replace`; ordinary recursive searches need no recursion flag.
 - CI still uses the workflow's pinned pnpm and Node; the flake is the local
   development shell, not a second release path.  `flake.lock` is tracked and
   updated deliberately with the change that needs it.
@@ -131,6 +134,8 @@ and only after the entry test passes; a failing test means no questionnaire.
   `pnpm check` and report.  `pnpm check` runs the compiler fence, the
   cloudflare-import guard, the tests/examples typecheck, and the
   `node --test` suites; a single suite is `node --test tests/<file>.test.ts`.
+  It fails closed when its required TypeScript tooling is absent; install
+  dependencies before invoking it.
   `pnpm typecheck` is a fast standalone source check; `bin/check`'s
   `tsconfig.tests` pass and `bin/check-dist`'s build already cover it, so it
   is a convenience, not a separate gate.  The full local gate is

@@ -71,18 +71,19 @@ Codeberg is the per-push CI. Hosted Forgejo Actions runs
 push and on `workflow_dispatch`, on `codeberg-small`:
 
 - checkout with tags (`fetch-depth: 0`), pnpm 11.21.0, Node 24;
-- `pnpm install --frozen-lockfile --filter org-hats` — root only, so workerd
-  and vitest stay off the light runner;
-- `bin/check-dist` and `bin/check`.
+- `CI=1 ci/run portable` — the repository-owned contract performs the
+  root-only frozen install, build-freshness check, portable gate, and static
+  Cloudflare artifact check. Workerd and vitest stay off the light runner.
 
 The first run was green: 96 portable tests in about 1m25s, well inside the
 5-minute cap. Workerd is not on this runner; it stays in the local and
 release rings.
 
 GitHub Actions remains the **release-mirror backstop**: it runs only when
-`bin/release --push` updates GitHub. It installs the workspace, runs
-`bin/check-dist` and `bin/check`, and runs the workerd suites in a separate
-job; a tag push also runs `bin/check-version`. Its runner is pinned
+`bin/release --push` updates GitHub. Its portable and workerd jobs call
+`CI=1 ci/run portable` and `CI=1 ci/run cloudflare`; the latter performs the
+full workspace install, rebuild, typecheck, and workerd suites. A tag push
+also runs the tag-specific artifact audit. Its runner is pinned
 (`ubuntu-24.04`) rather than `ubuntu-latest`, because a workflow that runs
 only at release time must not meet a new runner image under a release.
 
@@ -104,6 +105,12 @@ ref and the gate stays offline.
 
 The live gate for a working checkout is still the local pre-push hook and
 `pnpm verify`; CI is the remote evidence.
+
+`ci/run` is the backend-independent CI contract. In `CI=1` mode it requires
+a clean, full checkout before installing anything; a local dirty run is
+allowed but says plainly that it is not CI evidence. It removes inherited
+Cloudflare credentials and never deploys. Forgejo and GitHub workflow files
+provide checkout and tool versions, then delegate the gates to this script.
 
 ### Codeberg CI setup
 

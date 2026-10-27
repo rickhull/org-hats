@@ -26,7 +26,7 @@ DENY = {
 }
 VALUE_OPTIONS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
 OPERATORS = {";", "&&", "||", "|", "&", "(", ")"}
-ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
+ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=.*")
 
 lexer = shlex.shlex(sys.argv[1], posix=True, punctuation_chars=";&|()")
 lexer.whitespace_split = True

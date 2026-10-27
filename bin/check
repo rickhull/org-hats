@@ -10,21 +10,22 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
+if [ ! -x node_modules/.bin/tsc ]; then
+  echo "tsc is required — run 'pnpm install'" >&2
+  exit 1
+fi
+
 echo "== release metadata: a version tag matches package.json =="
 "$(dirname "$0")/check-version"
 
 echo
 echo "== fence: all of src compiles without node or cloudflare types =="
-if [ -x node_modules/.bin/tsc ]; then
-  node_modules/.bin/tsc -p tsconfig.authority.json
-  echo "ok — contract, authority, and access compile with types: []"
-else
-  echo "(skipped — run 'pnpm install' to enable the fence)"
-fi
+node_modules/.bin/tsc -p tsconfig.authority.json
+echo "ok — contract, authority, and access compile with types: []"
 
 echo
 echo "== fence: no cloudflare imports anywhere in src =="
-if grep -Rn -e "cloudflare:" -e "@cloudflare/" src; then
+if rg -n -e "cloudflare:" -e "@cloudflare/" src; then
   echo "fail — src must not import cloudflare" >&2
   exit 1
 fi
@@ -32,7 +33,7 @@ echo "ok — no cloudflare imports"
 
 echo
 echo "== fence: published declarations use runtime specifiers =="
-if grep -RIn --include='*.d.ts' -E 'from "\.{1,2}/[^"]+\.ts"' dist; then
+if rg -n -g '*.d.ts' 'from "\.{1,2}/[^"]+\.ts"' dist; then
   echo "fail — a .d.ts imports a .ts specifier; consumers without skipLibCheck break" >&2
   exit 1
 fi
@@ -40,23 +41,15 @@ echo "ok — dist declarations use .js specifiers"
 
 echo
 echo "== fence: the published surface takes plain string ids =="
-if [ -x node_modules/.bin/tsc ]; then
-  # Incremental: the first run after a dist/ change is cold, a repeat is warm.
-  # tsconfig.consumer.json keeps the build info inside node_modules.
-  node_modules/.bin/tsc -p tsconfig.consumer.json
-  echo "ok — a consumer builds commands and reads claims without an id constructor"
-else
-  echo "(skipped — run 'pnpm install' to enable the fence)"
-fi
+# Incremental: the first run after a dist/ change is cold, a repeat is warm.
+# tsconfig.consumer.json keeps the build info inside node_modules.
+node_modules/.bin/tsc -p tsconfig.consumer.json
+echo "ok — a consumer builds commands and reads claims without an id constructor"
 
 echo
 echo "== fence: tests and examples typecheck =="
-if [ -x node_modules/.bin/tsc ]; then
-  node_modules/.bin/tsc -p tsconfig.tests.json
-  echo "ok — suites and examples typecheck"
-else
-  echo "(skipped — run 'pnpm install' to enable the test typecheck)"
-fi
+node_modules/.bin/tsc -p tsconfig.tests.json
+echo "ok — suites and examples typecheck"
 
 echo
 echo "== v1 suites (node:test) =="

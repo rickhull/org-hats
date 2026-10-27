@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Repository-local CI contract. Backends provide checkout and tool setup; this
+# script owns the mode-specific dependency install and gates.
+
+set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+
+usage() {
+  printf 'usage: ci/run <portable|cloudflare>\n' >&2
+  exit 2
+}
+
+[[ "$#" -eq 1 ]] || usage
+case "$1" in
+  portable|cloudflare) mode=$1 ;;
+  *) usage ;;
+esac
+
+for tool in node pnpm git rg jq python3; do
+  command -v "$tool" >/dev/null 2>&1 || {
+    printf 'ci: %s is required\n' "$tool" >&2
+    exit 2
+  }
+done
+
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+  printf 'ci: not in a git work tree\n' >&2
+  exit 2
+}
+
+dirty=$(git status --porcelain)
+shallow=$(git rev-parse --is-shallow-repository)
+if [[ -n "${CI:-}" ]]; then
+  if [[ -n "$dirty" ]]; then
+    printf 'ci: CI mode requires a clean checkout; the tree is dirty:\n%s\n' "$dirty" >&2
+    exit 1
+  fi
+  if [[ "$shallow" == true ]]; then
+    printf 'ci: CI mode requires a full clone; this checkout is shallow\n' >&2
+    exit 1
+  fi
+else
+  [[ -z "$dirty" ]] || printf 'ci: local run on a dirty tree — this is not CI evidence\n' >&2
+  [[ "$shallow" != true ]] || printf 'ci: local shallow clone — checks requiring tags/history may fail\n' >&2
+fi
+
+# CI must never inherit an operator credential from a developer shell.
+unset CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID WRANGLER_API_TOKEN
+unset CLOUDFLARE_API_TOKEN_STATUS CLOUDFLARE_API_TOKEN_CONTENT
+unset CLOUDFLARE_API_TOKEN_EDIT CLOUDFLARE_API_TOKEN_ADMIN
+unset CLOUDFLARE_API_TOKEN_READ CLOUDFLARE_API_TOKEN_PROVISION
+
+case "$mode" in
+  portable)
+    pnpm install --frozen-lockfile --filter org-hats
+    bin/check-dist
+    bin/check
+    bin/check-artifact --no-build
+    ;;
+  cloudflare)
+    pnpm install --frozen-lockfile
+    bin/check-dist
+    pnpm check:cloudflare
+    ;;
+esac
