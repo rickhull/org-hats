@@ -67,6 +67,11 @@ the rollback target):
 No reset or bootstrap is called, and this subset does not exercise the
 remaining `OH-*` cases. Do not report it as the full inventory.
 
+The seven steps above are six groups: steps 1 and 2 are one check.  The
+runner's names are `issue-and-verify`, `refresh-and-supersede`, `context`,
+`denied-command`, `wrong-binding-and-expired`, and
+`stale-projection-refresh`.
+
 ## Procedure
 
 Use the service binding as the `AuthorityRuntime` in the test host, and a

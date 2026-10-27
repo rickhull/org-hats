@@ -56,7 +56,7 @@ accepted, and what remains deferred. The normative vocabulary is
 
 ### Operation “scope”
 
-- `docs/lexicon.md:19`; `README.md:121`. Operation’s “scope” is the generic
+- `docs/lexicon.md:19`; `README.md:128`. Operation’s “scope” is the generic
   extent of the undertaking, not Reach’s scope. Accepted.
 
 ### Considered, not violations

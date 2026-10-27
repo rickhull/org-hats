@@ -40,10 +40,10 @@ a relay note.*
 The reference host's porcelain is `qm ops authority …`; any host implements
 the same contract:
 
-1. **Candidate.** Verify the tag and configuration, snapshot state, upload a
+1. **Upload.** Verify the tag and configuration, snapshot state, upload a
    Worker Version tagged with the full upstream commit, and serve no traffic.
 
-2. **Canary (when traffic exists).** Activate the candidate at a small
+2. **Canary (when traffic exists).** Activate the uploaded version at a small
    percentage against the one other tagged live version. Inspect version,
    secret names, signing key id, and schema status. Do not run the acceptance
    smoke during a split: binding calls may hit either version.
@@ -56,7 +56,7 @@ the same contract:
    for every named operation. A failure after activation does not auto-roll
    back.
 
-A first deploy of a Worker that does not exist collapses candidate and
+A first deploy of a Worker that does not exist collapses upload and
 activation; there is no traffic to split. Every later deploy uses the two-step
 form.
 
@@ -106,9 +106,9 @@ Activate the previous tagged version at 100%:
 qm ops authority promote <previous-tag> --percentage 100
 ```
 
-Never delete a Worker Version. If the candidate upload failed, the old version
-is still serving. A failed post-activation check is an operator rollback or a
-snapshot restore, not an automatic one.
+Never delete a Worker Version. If the upload failed, the old version is still
+serving. A failed post-activation check is an operator rollback or a snapshot
+restore, not an automatic one.
 
 ## Deployment witness
 
@@ -117,7 +117,7 @@ Record, without secret values:
 ```text
 upstream tag / tag object / peeled commit / version
 snapshot directory
-candidate Worker Version tag and id
+uploaded Worker Version tag and id
 active Worker Version id / tag / percentage
 secret names present; signing key id
 schema status per operation

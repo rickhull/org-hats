@@ -245,10 +245,19 @@ ends at the published artifact:
 
 - **Adopt** — consume an upstream release artifact into implementation;
   the consumer's loop between implement and deploy.
+- **Consumer** — the project that adopts an upstream artifact; it may also be
+  the host that runs it. Its deploy is its own act.
+- **Host** — the application a consumer deploys: it carries the envelope in
+  its session and owns routes, cookies, and product responses. It is not the
+  authority.
 - **Deploy** — activate a published artifact in a runtime the operator
   controls. Not an org-hats act; `deploy_runbook.md` records the
   host-neutral shape of the deploy that follows a `cloudflare-v*` tag, as a
   consumer contract.
+- **Configuration-only version** — a Worker Version that changes only host
+  configuration — the organization directory or the live key set — not code.
+  Its tag is the code commit plus a stable digest of that configuration;
+  `deploy_runbook.md` owns the rule.
 - **Include / cutback / provision / ship** — the deploying host's deploy
   mechanics and their records. None is an org-hats concept or command. The
   authority ops route `bootstrap` seeds declared state and is ours; the

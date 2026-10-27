@@ -28,7 +28,8 @@ If cut:
 4. The consumer deploys it and runs the binding smoke on a fresh fixture.
 5. Only after acceptance, update the live pointer and acceptance history in
    `docs/binding-conformance.md`, `docs/cloudflare.md`, `docs/positioning.md`,
-   and `docs/publishing.md`.  `cloudflare-v0.6.0` becomes the rollback target.
+   `docs/publishing.md`, and `docs/from_ldap.md`.  `cloudflare-v0.6.0`
+   becomes the rollback target.
 6. Record the new Worker Version id, configuration version, secret names, key
    id, schema status, and smoke result in the deployment witness.
 
@@ -43,8 +44,9 @@ that does not exist.
 
 ## 2. The envelope-size limit (hold, with a trigger)
 
-The host budget is 3,800 encoded bytes, reserved from the 4 KB browser cookie
-cap.  The synthetic festival's site-wide read reach is 7,843 encoded bytes; no
+The host budget is 3,800 URI-encoded JSON bytes, reserved from the 4 KB
+browser cookie cap.  The synthetic festival's site-wide read reach is 7,843 URI-encoded JSON
+bytes; no
 cookie holds it, and the host refuses at issuance.  This is documented and
 tested, not a defect in the current consumer, whose envelopes are in the
 sub-1,100 range.
@@ -56,7 +58,7 @@ sub-1,100 range.
 - Leave it a documented host limit and require the host to narrow the read
   projection or carry the envelope differently.  This is the current default.
 - Cap read reach upstream so an envelope cannot be issued over a bound.  That
-  needs a failure kind, which is an interface-version change.
+  needs a rule for reach past the cap, and a failure kind is the honest one.
 - Introduce a host-side handle or indirection so the cookie carries a reference
   instead of the full reach.  That is a larger seam change.
 

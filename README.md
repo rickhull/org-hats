@@ -44,6 +44,7 @@ Node 24+ and pnpm:
 pnpm install
 node examples/pilot.ts
 node examples/own-world.ts
+node examples/consumer-access.ts
 ```
 
 The pilot prints one actor, one operation, one worn hat, two local decisions,
@@ -75,11 +76,17 @@ switches hats for real — `select-hat` to a second grant, refresh, verify the
 new capacity — and maps verification failures onto an HTTP handler's status
 codes.
 
+`node examples/consumer-access.ts` is the host's side of the seam: it verifies
+a real envelope, shows the wrong-operation 404 and the expired and forged
+401s, and maps every kind in the closed failure taxonomy to an illustrative
+product response. The switch is exhaustive; a new kind stops the example
+compiling.
+
 The [`tutorial`](docs/tutorial.md) continues this world through commands,
 refresh, a lost disable, and a crossed grant.
 
 `pnpm verify` is the full gate: dist freshness, the compiler fences, the
-portable suites, the test and example typecheck, both examples, the release
+portable suites, the test and example typecheck, the examples, the release
 metadata check, and the Cloudflare workerd suite. It runs locally and needs
 no Cloudflare account. `pnpm test` runs only the portable suites;
 `pnpm check:cloudflare` runs only the reference runtime.

@@ -137,7 +137,7 @@ The compiler is used as a boundary enforcer, not only as a build step:
 - `tsconfig.authority.json` compiles `src/` with `types: []`; `bin/check`
   also rejects any Cloudflare import under `src/`. `erasableSyntaxOnly`
   keeps every source erasable, so Node's type stripping runs the `.ts`
-  suites and both examples directly; the root and the Cloudflare package are
+  suites and the examples directly; the root and the Cloudflare package are
   aligned on TypeScript 5.9.
 - `tsconfig.json` builds the published declarations; `tsconfig.consumer.json`
   compiles the consumer surface against `dist/`.
@@ -193,7 +193,7 @@ These are current facts, not future promises:
 3. **Keep public ids plain.** Brand internally; prove the public surface
    with `AssertPlainId` and the consumer fence.
 4. **Do not over-brand.** `GrantId`, `KeyId`, `RefreshHandle`, and
-   `IdempotencyKey` are candidates only when a concrete mix-up appears.
+   `IdempotencyKey` are possible only when a concrete mix-up appears.
    `EpochSeconds` exists — internal to the clock seam, audit instants, and
    verification — and is the ceiling: the next brand needs a failure mode
    at least as concrete as seconds-versus-milliseconds.

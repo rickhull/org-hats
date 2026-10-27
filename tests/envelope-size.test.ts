@@ -1,8 +1,10 @@
 // The carriage boundary, measured on the synthetic envelopes.
 //
-// `docs/consumer-session.md` states the size table and the host budget.  A
-// fixture or envelope-shape change must move the document and this test in
-// the same commit, or the host budget stops describing a real envelope.
+// `docs/consumer-session.md` states the size table and the host budget.  The
+// table's encoded column is URI-encoded JSON; a base64url carriage would
+// measure differently.  A fixture or envelope-shape change must move the
+// document and this test in the same commit, or the host budget stops
+// describing a real envelope.
 
 import test from "node:test";
 import assert from "node:assert/strict";

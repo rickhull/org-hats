@@ -53,15 +53,16 @@ reference runtime stops being a reference.
 ### P5 — No real people in a public repository
 
 The design tests are the synthetic example worlds (Professional Operation,
-Festival, Berlin Airlift); real rosters, customer names, and key material
-live with the consumer or the operator. A host's own world enters through
+Festival, Berlin Airlift); real rosters, customer names, and production key
+material live with the consumer or the operator.  Test-only signing keys in
+fixtures are test material, not secrets.  A host's own world enters through
 `defineWorld` and is not committed here with real data.
 
 *Held by:* the committed fixtures are synthetic — the three twins, the
-conformance invitee, the own-world example, and the test-local worlds; the
-fixture boundary (`defineWorld`) is the entry for a host's own world; both
-relay notes are written as if public; `SECURITY.md` exists before
-production data.
+conformance invitee, the own-world example, the devidp test provider, and the
+test-local worlds; the fixture boundary (`defineWorld`) is the entry for a
+host's own world; the relay notes are written as if public; `SECURITY.md`
+exists before production data.
 *If it breaks:* it is an incident, not a bug — exposure cannot be un-pushed
 from a public mirror.
 
@@ -97,7 +98,7 @@ what should be a wire-compatible value.
 
 ### P8 — The suites and examples typecheck
 
-The root tests and both examples compile under `tsconfig.tests.json`; a
+The root tests and the examples compile under `tsconfig.tests.json`; a
 fixture that sends a shape the interface no longer accepts fails the gate
 rather than failing at runtime.
 
@@ -133,7 +134,7 @@ invariant violation, or a fixture carrying other than exactly one
 operation. The built-in example worlds pass the same checks.
 
 *Held by:* `defineWorld` in `src/authority/world.ts`; `tests/world.test.ts`
-(pins one refusal per rule and revalidates every twin); both examples run in
+(pins one refusal per rule and revalidates every twin); the examples run in
 `bin/check`; `docs/authority_redesign.md` § Verification strategy names the
 boundary.
 *If it breaks:* the first own-world fixture reaches a runtime as an

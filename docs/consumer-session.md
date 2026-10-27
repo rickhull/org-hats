@@ -22,8 +22,9 @@ Both are `__Host-` cookies: `Secure`, `Path=/`, no `Domain`, and `HttpOnly`.
 `SameSite=Lax` is the reference choice; a stricter value is the host's call.
 The names are the host's; only the attributes and the pairing are fixed.
 
-The envelope is opaque to the host.  It does not parse the claims, choose a
-hat, or derive a lifetime from anything but `exp`.
+The envelope is opaque to product code.  The session layer reads `exp` to
+size the access cookie and nothing else; it does not interpret the claims or
+choose a hat.
 
 ## Lifetimes and rotation
 
@@ -42,12 +43,13 @@ hat, or derive a lifetime from anything but `exp`.
 
 A browser caps one cookie at about 4 KB **including attributes**.  The host
 reserves room for the attributes and measures the encoded envelope value,
-not the raw JSON.  The reference budget is 3,800 bytes of encoded envelope;
-a host may choose a tighter one.
+not the raw JSON.  The reference encoding is URI-encoded JSON; base64url is
+also valid, and a host that uses it measures that form.  The reference budget
+is 3,800 bytes of encoded envelope; a host may choose a tighter one.
 
-The host refuses at issuance when the envelope exceeds its budget.  It does
-not truncate, does not store a partial value, and does not let the browser
-decide.  An envelope the browser drops is indistinguishable from a login
+The host refuses to establish the session when the issued envelope exceeds
+its budget.  It does not truncate, does not store a partial value, and does
+not let the browser decide.  An envelope the browser drops is indistinguishable from a login
 that half-worked.
 
 Upstream documents the same 3,800-byte maximum as the figure a host should
@@ -58,7 +60,7 @@ document is what makes the two limits agree.
 
 The synthetic twins show why the check exists:
 
-| Envelope | JSON bytes | Encoded bytes |
+| Envelope | JSON bytes | URI-encoded bytes |
 | --- | ---: | ---: |
 | Professional operation, a coordinator | 600 | 904 |
 | Festival, a gate administrator | 706 | 1,054 |

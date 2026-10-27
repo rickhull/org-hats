@@ -161,7 +161,7 @@ host's ops porcelain owns the deploy verbs. A deployed tag can lag `main`;
 the tag is the deployment unit.
 
 The artifact gate is `bin/check-artifact`; the host-neutral runbook —
-preflight, candidate, canary, rollback, acceptance, and the deployment
+preflight, version upload, canary, rollback, acceptance, and the deployment
 witness — is [deploy_runbook.md](deploy_runbook.md).
 
 The host-side shape the runtime supports:
