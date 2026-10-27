@@ -45,7 +45,7 @@ The portable suite is already smoke-sized: all of it runs in ~2.5 s, and a
 single file costs ~0.3 s of Node startup, so a subset saves pennies while
 dropping a domain — run it whole or not at all. The workerd side is the
 opposite trade: the vitest harness floor is ~4–5 s and marginal files are
-cheap (all eleven files run in ~13 s; the conformance file alone, which
+cheap (all thirteen files run in ~14 s; the conformance file alone, which
 runs the full public inventory through the deployed coordinators, in
 ~12 s), so a workerd subset buys almost nothing. Either skip ring 2 or run
 it whole.

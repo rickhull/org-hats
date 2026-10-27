@@ -99,11 +99,11 @@ status for every named operation. It is a deploy, not an acceptance.
 
 ## Rollback
 
-Release the previous tagged version at 100%:
+Activate the previous tagged version at 100%:
 
 ```sh
 # reference host
-qm ops authority release cloudflare-v0.3.1 --percentage 100
+qm ops authority promote <previous-tag> --percentage 100
 ```
 
 Never delete a Worker Version. If the candidate upload failed, the old version
