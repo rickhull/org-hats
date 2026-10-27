@@ -91,15 +91,17 @@ cookie, and the login looks half-worked.
 `docs/cloudflare.md`, cross-linked from `specs/authority.md` A7 and
 `docs/envelope.md`.
 
-**Settled by review.**  Both checks are required.  Upstream documents an
-envelope maximum and refuses at issuance; the host enforces the cookie budget
-and refuses above it.  The host value is the binding one, because the 4 KB
-cap includes the cookie attributes and an upstream bound alone cannot account
-for them.
+**Settled by review.**  Both checks are required.  Upstream documents a
+3,800-byte encoded maximum; the host enforces its cookie budget and refuses
+above it at issuance.  The host value is the binding one, because the 4 KB
+cap includes attributes, and the closed failure taxonomy has no "too large"
+kind worth a version break.  The measurement test records the synthetic
+envelopes, including the festival's site-wide reach, which already exceeds a
+browser budget.
 
-**Done when.**  The carriage rules are normative; the upstream maximum is
-stated and proved by a conformance vector at the boundary; the host budget is
-documented as the binding check; no module is published.
+**Done when.**  The carriage rules are normative; the host budget is stated
+as binding; the synthetic sizes are measured against it; no module is
+published.
 
 **Tradeoffs.**  Prose drifts; tie the budget rule to a test.  A published
 helper package would blur the boundary the seam depends on.

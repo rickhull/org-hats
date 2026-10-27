@@ -87,6 +87,9 @@ state.
 *If it breaks:* a revoked actor keeps an endless session and the bounded
 revocation window of E7 becomes an unbounded one.
 
+The host-side carriage that depends on this rule is
+[`docs/consumer-session.md`](../docs/consumer-session.md).
+
 ### A8 — An idempotency claim commits with its mutation
 
 The claim and the fact land in one transaction; a denial never poisons its

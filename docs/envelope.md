@@ -22,7 +22,9 @@ SignedAccessEnvelope {
 The envelope is opaque to product code. Hosts transport it (typically a
 cookie value, base64url of the whole envelope) and hand it to the
 verification-only `org-hats/access` module; nobody but the verifier reads
-claims and nobody but the issuer writes them.
+claims and nobody but the issuer writes them.  The carriage rules — cookie
+attributes, lifetimes, the 4 KB budget, and refresh rotation — are
+[`consumer-session.md`](consumer-session.md).
 
 ## Claims
 

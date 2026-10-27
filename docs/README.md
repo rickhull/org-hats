@@ -28,6 +28,9 @@ public `org-hats` docs are normative for the seam.
   built: its coordinators, the Worker surface and the provider-callback
   exchange, signing and key rotation, configuration, the deployment
   contract, ops routes, and the state lifecycle.
+- [`consumer-session.md`](consumer-session.md) — the host's browser
+  carriage: the two cookies, lifetimes and rotation, the 4 KB budget, login
+  state, and the return path.
 - [`binding-conformance.md`](binding-conformance.md) — the documented
   service-binding smoke subset and what it does not claim.
 - [`inventory.md`](inventory.md) — the story index: every conformance case
