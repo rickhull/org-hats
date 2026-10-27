@@ -123,7 +123,7 @@ verified. The consumer pin is in [`publishing.md`](publishing.md).
 ## Current limits for an AD shop
 
 - No LDAP, SAML, or SCIM connector; OIDC only.
-- The live `cloudflare-v0.6.0` verifies ES256 and RS256. Check the provider's
+- The live `cloudflare-v0.6.1` verifies ES256 and RS256. Check the provider's
   signing algorithm before a pilot.
 - One action hat per envelope, and read/config/member reach are separate
   issuer-computed layers over wearable grants; the layers are named in

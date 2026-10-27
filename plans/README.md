@@ -9,12 +9,10 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-- [`immediate.md`](immediate.md) — the `cloudflare-v0.6.1` release decision.
+No active plans.
 
 Durable decisions live in `docs/` and `specs/`; the lexicon register is
-[`docs/lexicon_use_concerns.md`](../docs/lexicon_use_concerns.md). The next
-consumer handoff — after the consumer's authority binding and the provider
-decision — belongs to the host.
+[`docs/lexicon_use_concerns.md`](../docs/lexicon_use_concerns.md).
 
 Retired plans are removed; their results live in `docs/` and the commit
 history. Completed work is not kept here.

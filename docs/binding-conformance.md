@@ -8,19 +8,23 @@ binding and entrypoint preserve the public runtime behaviour for a dedicated,
 pre-bootstrapped operation without resetting it.*
 
 *The reference runtime is deployed by the consuming host. The live
-deployment is `cloudflare-v0.6.0` (configuration version `6044e4fe…`,
-Worker Version tag `2720efd9…-config-5837ca5f866e`), accepted on
-2026-10-26 with fresh fixture `org-authority-smoke-20261027a`; the subset
-passed all six groups, and `exec authority verify` and schema status passed.
-The previous acceptance, `cloudflare-v0.5.0` (configuration
+deployment is `cloudflare-v0.6.1` (Worker Version
+`fc3d9e1d-651e-4e40-bc6c-1f2152db288b`, tagged
+`a020ed6f81a9e4b64c57d0f7ff0f345f4c64cd1a`), accepted on 2026-10-27 with
+fresh fixture `org-authority-smoke-20261027b`; the subset passed all six
+groups, and `exec authority verify` and schema status passed. The previous
+accepted code release, `cloudflare-v0.6.0`, passed with fresh fixture
+`org-authority-smoke-20261027a`; its last configuration,
+`e4940c33-e8d1-43c2-9d45-4333d0de3287`, tagged
+`2720efd9478b7cc609f0155f49f0b33459cf94d9-config-2cdcb1368840`, is the
+rollback target. `cloudflare-v0.5.0` (configuration
 `e7b4529…-config-627ee8a6f000`, fresh fixture
-`org-authority-smoke-20261026c`), also passed all six groups on 2026-10-26;
+`org-authority-smoke-20261026c`) also passed all six groups on 2026-10-26;
 `cloudflare-v0.4.0` (configuration
 `c22a252efdcb391d796503c760b90a1a20392381-config-5ad6c5e46589`, fixture
 `org-authority-smoke-20261026b`) passed the same day, and the host recorded
-each acceptance. `cloudflare-v0.5.0` is the rollback target.  The live
-pointer is the host's acceptance: upstream records it only after the host has
-deployed and accepted the version.*
+each acceptance. The live pointer is the host's acceptance: upstream records
+it only after the host has deployed and accepted the version.*
 
 ## Preconditions
 
@@ -42,9 +46,8 @@ deployed and accepted the version.*
 
 ## Claim
 
-Through the service binding, with the interface version the deployed tag
-carries (`3` for the live `cloudflare-v0.6.0`; `2` for `cloudflare-v0.5.0`,
-the rollback target):
+Through the service binding, with interface version `3`, carried by both the
+live `cloudflare-v0.6.1` and the `cloudflare-v0.6.0` rollback target:
 
 1. `accessFromEvidence` for the linked evidence returns a signed envelope and
    a refresh handle.

@@ -156,7 +156,7 @@ is in [deploy_runbook.md](deploy_runbook.md#configuration-only-versions).
 Upstream's release act ends at an immutable `cloudflare-v*` tag and its
 publication. Deploying that tag — the host's Cloudflare account, Worker
 Versions, secrets, traffic, and service binding — is the consuming host's
-act. The live deployment is the consuming host's `cloudflare-v0.6.0`; the
+act. The live deployment is the consuming host's `cloudflare-v0.6.1`; the
 host's ops porcelain owns the deploy verbs. A deployed tag can lag `main`;
 the tag is the deployment unit.
 
