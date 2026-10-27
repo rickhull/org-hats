@@ -66,6 +66,7 @@ echo
 echo "== portable examples =="
 node examples/pilot.ts
 node examples/own-world.ts
+node examples/consumer-access.ts
 
 echo
 echo "all checks passed"

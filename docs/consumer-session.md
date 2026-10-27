@@ -107,6 +107,8 @@ document is the contract at the boundary between them.
 
 ## Related
 
+- [`consumer-login.md`](consumer-login.md) — the login round trip that
+  issues the envelope and refresh handle this carriage carries.
 - [`envelope.md`](envelope.md) — the envelope format, expiry, and claims.
 - [`cloudflare.md`](cloudflare.md) — the reference runtime and the
   provider-callback exchange.

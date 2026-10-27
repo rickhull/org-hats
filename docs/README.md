@@ -31,6 +31,9 @@ public `org-hats` docs are normative for the seam.
 - [`consumer-session.md`](consumer-session.md) — the host's browser
   carriage: the two cookies, lifetimes and rotation, the 4 KB budget, login
   state, and the return path.
+- [`consumer-login.md`](consumer-login.md) — the host half of the OIDC
+  login: the flow, who holds what, state/nonce/PKCE, the evidence exchange,
+  the closed failure set, and a refused first login.
 - [`binding-conformance.md`](binding-conformance.md) — the documented
   service-binding smoke subset and what it does not claim.
 - [`inventory.md`](inventory.md) — the story index: every conformance case

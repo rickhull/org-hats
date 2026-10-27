@@ -84,7 +84,9 @@ and returns typed `PrincipalEvidence` or a closed failure:
 for malformed input. Issuance stays `accessFromEvidence` — evidence in,
 one verb per crossing. Discovery is cached a day and JWKS an hour per
 isolate; a failing signature triggers exactly one JWKS refetch per
-exchange, which is the key-rotation window.
+exchange, which is the key-rotation window.  The host half of this flow —
+the redirect, state, nonce, PKCE, and the callback — is
+[`consumer-login.md`](consumer-login.md).
 
 Evidence and command authorization read the organization live where the
 decision needs it. A disabled actor's fresh evidence is refused
