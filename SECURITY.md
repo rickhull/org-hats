@@ -8,14 +8,15 @@ GitHub repository is a push-only mirror.*
 
 | Version | Supported |
 | --- | --- |
-| `v2.x` (from `v2.0.0`) | current release line; fixes land as a new tag |
-| `cloudflare-v0.4.x` | current Cloudflare runtime line; separate cadence |
-| `cloudflare-v0.3.x` | previous line; fixes land in the current line |
+| `v3.x` (from `v3.0.0`) | current release line; fixes land as a new tag |
+| `cloudflare-v0.6.x` (from `cloudflare-v0.6.0`) | current Cloudflare runtime line; separate cadence |
+| `v2.x` (from `v2.0.0`) | previous line; fixes land in the current line |
+| `cloudflare-v0.5.x`, `cloudflare-v0.4.x`, `cloudflare-v0.3.x` | previous lines; fixes land in the current line |
 | `v1.x` (from `v1.0.0`) | frozen at its tags; no fixes |
 | `v0.4.x` | frozen at its tags; no fixes |
 
 Tags are immutable. A fix ships as a new version; a tag is never moved. The
-v0.4 and v1 lines live at their tags; `main` is the v2 line.
+v0.4 and v1 lines live at their tags; `main` is the v3 line.
 
 ## Reporting a vulnerability
 

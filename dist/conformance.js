@@ -6,7 +6,7 @@
 // AuthorityRuntime, the synthetic twins, and the access verifier. A case
 // that cannot be expressed here is a design bug, not a test gap. The same
 // inventory runs against another runtime by supplying a different
-// ConformanceWorld factory (the Cloudflare adapter in M6).
+// ConformanceWorld factory, as the Cloudflare adapter does.
 //
 // The inventory world is the two consumer-design twins plus the invitee
 // fixture below; the Berlin Airlift twin is deliberately excluded — it is

@@ -3,8 +3,8 @@
 // These are injection points on the engine's configuration — inline
 // structural types, not a published adapter SPI (docs/authority_redesign.md
 // § Authority: no adapter interface is public until a second committed
-// runtime implementation exists). The Cloudflare adapter (M6) implements the
-// same shapes privately.
+// runtime implementation exists). The Cloudflare adapter implements the same
+// shapes privately.
 //
 // Web Platform crypto is reached through minimal structural types rather
 // than a DOM lib, so the portable fence (`types: []`) stays narrow and an

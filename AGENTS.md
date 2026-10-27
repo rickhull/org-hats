@@ -120,10 +120,10 @@ and only after the entry test passes; a failing test means no questionnaire.
 - Use `rg`, not `grep`.
 - Keep the flake minimal.  A routine tool belongs in the thinkpad devbox or
   the project flake when contributors need it; an occasional tool comes from
-  `nix shell nixpkgs#<pkg>`.  When the Cloudflare package arrives (M6), its
-  pnpm-installed foreign binaries (workerd, esbuild) run through the system
-  nix-ld loader — extend `programs.nix-ld.libraries` in the thinkpad flake if
-  one fails to exec; do not add a per-project FHS wrapper.
+  `nix shell nixpkgs#<pkg>`.  The Cloudflare package's pnpm-installed foreign
+  binaries (workerd, esbuild) run through the system nix-ld loader — extend
+  `programs.nix-ld.libraries` in the thinkpad flake if one fails to exec; do
+  not add a per-project FHS wrapper.
 
 ## Checks before handing work back
 
@@ -157,7 +157,7 @@ and only after the entry test passes; a failing test means no questionnaire.
 - The portable fence is law: everything under `src/` compiles with
   `types: []` and imports nothing Cloudflare.  `bin/check` enforces it; when
   code and the fence disagree, fix the code.
-- The v1 line is a clean break with v0.4: the old model, port, spine,
+- The redesign line is a clean break with v0.4: the old model, port, spine,
   adapter, examples, and docs live at their tags, and content returns only
   by being re-specified against `docs/authority_redesign.md` — never copied
   from the old tree.

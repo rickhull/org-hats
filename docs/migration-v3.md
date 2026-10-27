@@ -61,7 +61,12 @@ Cross the break with blue/green at the service binding:
    3.x caller reaches a v2 authority or a 2.x caller reaches the v3
    authority.
 3. Roll back by flipping the binding back to the v2 Worker, reverting the
-   caller changes in the same motion.
+   caller changes in the same motion. State is per-Worker: a write the v3
+   Worker accepted after the flip does not exist in the v2 Worker, so a
+   binding flip alone loses it. Roll back either with no writes since the
+   flip, or export the v3 state, restore it into the v2 Worker, and then
+   flip the binding and revert the callers. The operation schema does not
+   move, so a v3 export restores into v2.
 
 Already-issued envelopes keep verifying across the flip: `ACCESS_ENVELOPE_VERSION`
 stays 1, and verification never gates on the claims' `interfaceVersion` (see

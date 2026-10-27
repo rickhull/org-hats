@@ -3,7 +3,7 @@
   "version": "3.0.0",
   "type": "module",
   "engines": { "node": ">=24" },
-  "description": "A portable organizational authority subsystem — use-case authority runtime, signed access envelopes, and a verification-only access module. v2 line; the v0.4 organization model lives at its tags.",
+  "description": "A portable organizational authority subsystem — use-case authority runtime, signed access envelopes, and a verification-only access module. The v0.4 organization model lives at its tags.",
   "license": "MIT",
   "author": "Rick <rick@thinkpad>",
   "repository": { "type": "git", "url": "git+https://codeberg.org/rickhull/org-hats.git" },
