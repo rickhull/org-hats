@@ -47,10 +47,29 @@ The version gate is strict equality in both directions
 is refused by a v3 authority, and a 3.x caller sending `interfaceVersion: 3`
 is refused by a live v2 authority. Neither side can move first by
 tolerating the other's version; there is no compatibility window upstream.
-This is why the cutover happens at the binding, not inside a single
-deployment.
+The cutover is therefore an explicit version change on both sides, with a
+short interval in which one side is ahead — never a tolerant mixed state.
+There are two shapes, chosen by what the platform retains.
 
-Cross the break with blue/green at the service binding:
+**Same Worker, version flip.** When the platform keeps Worker Versions and
+both versions share the Worker's storage (Cloudflare Worker Versions against
+the same Durable Object namespace), flip the active version on the existing
+Worker:
+
+1. Publish the v3 authority and the changed callers as Worker Versions,
+   leaving the live versions active. The previous versions stay
+   addressable, so rollback is an activation, not a redeploy.
+2. Flip the authority's active version to v3 and the callers' active
+   versions to the changed code. A short `wrong-interface-version` window
+   is unavoidable while a caller and the authority disagree; envelopes are
+   unaffected, so only new commands and calls fail.
+3. Roll back by reactivating the previous versions. Both authority versions
+   use the same storage, so state does not diverge and no export/restore is
+   involved.
+
+**Two Workers, binding flip.** When the platform does not keep addressable
+versions, or the two deployments do not share storage, cross the break
+blue/green at the service binding:
 
 1. Stand the v3 authority up as a second Worker, alongside the live v2
    deployment. Both run; neither caller population is touched yet.
@@ -68,7 +87,7 @@ Cross the break with blue/green at the service binding:
    flip the binding and revert the callers. The operation schema does not
    move, so a v3 export restores into v2.
 
-Already-issued envelopes keep verifying across the flip: `ACCESS_ENVELOPE_VERSION`
+Already-issued envelopes keep verifying across either flip: `ACCESS_ENVELOPE_VERSION`
 stays 1, and verification never gates on the claims' `interfaceVersion` (see
 [specs/envelope.md](../specs/envelope.md) E8). A 2.x-issued envelope keeps
 verifying on the v3 Worker, so a session in flight at the moment of the flip
