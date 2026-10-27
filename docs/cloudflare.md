@@ -147,6 +147,10 @@ An operation carries no identity-provider configuration or reference to one.
 The host chooses the provider, and the runtime resolves the sealed
 registration from the organization directory by issuer and client id.
 
+The host rule for a configuration-only Worker Version's tag — the code
+commit plus a stable digest of the organization ids and the live key set —
+is in [deploy_runbook.md](deploy_runbook.md#configuration-only-versions).
+
 ## The host's deployment contract
 
 Upstream's release act ends at an immutable `cloudflare-v*` tag and its

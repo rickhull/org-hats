@@ -60,11 +60,37 @@ A first deploy of a Worker that does not exist collapses candidate and
 activation; there is no traffic to split. Every later deploy uses the two-step
 form.
 
+## Configuration-only versions
+
+A configuration-only version changes the organization directory or the live
+verification key set, not code. It is still a Worker Version and still an
+upload; only its identity and its evidence differ.
+
+Tag it from the code commit plus a stable digest of the configuration it
+applies — the organization ids and the live key set, in their canonical
+serialized form:
+
+- the same code and the same configuration produce the same tag, so a retry
+  is idempotent;
+- a changed organization directory or key set produces a different tag, so a
+  stale upload cannot pass for the current configuration;
+- the code commit stays in the tag, so the version still names its source.
+
+The tag is a Worker Version label, not a Git tag, a release identity, or a
+record of acceptance. It does not move an upstream tag or the consumer's
+pin. The host records it in the deployment witness beside the Worker Version
+id.
+
+A configuration-only version takes no state snapshot and runs no routine
+schema backfill; it changes no code, so it may be activated at 100%. It still
+gets the post-checks: active version, secret names, signing key id, and schema
+status for every named operation. It is a deploy, not an acceptance.
+
 ## Acceptance (separate from deploy)
 
 - The binding smoke runs against a dedicated, pre-bootstrapped fixture. A
   spent fixture needs fresh ids; `configure` updates the organization
-  directory without moving code.
+  directory without moving code (see § Configuration-only versions).
 - State restore and routing-facts backfill belong to a schema change or a
   recovery drill, never to a routine deploy.
 - Record the acceptance before a host session depends on the new version.
