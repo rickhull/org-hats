@@ -1,6 +1,6 @@
 {
   "name": "org-hats-cloudflare",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "Cloudflare reference runtime for org-hats: Durable Objects, SQLite storage, and the authority Worker surface. Separate 0.x cadence from the portable package.",
