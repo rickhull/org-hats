@@ -66,6 +66,9 @@ The synthetic twins show why the check exists:
 | Festival, a gate administrator | 706 | 1,054 |
 | Festival, site-wide read reach | 5,723 | 7,843 |
 
+The table and `tests/envelope-size.test.ts` move together: a fixture or
+envelope-shape change updates both in one commit.
+
 The last row is a real envelope the authority can issue today.  A host that
 admits that reach in one envelope must use another carriage for it or narrow
 the read projection; a 4 KB cookie cannot hold it, and no host-side check

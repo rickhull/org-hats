@@ -18,7 +18,9 @@ The previous acceptance, `cloudflare-v0.5.0` (configuration
 `cloudflare-v0.4.0` (configuration
 `c22a252efdcb391d796503c760b90a1a20392381-config-5ad6c5e46589`, fixture
 `org-authority-smoke-20261026b`) passed the same day, and the host recorded
-each acceptance. `cloudflare-v0.5.0` is the rollback target.*
+each acceptance. `cloudflare-v0.5.0` is the rollback target.  The live
+pointer is the host's acceptance: upstream records it only after the host has
+deployed and accepted the version.*
 
 ## Preconditions
 

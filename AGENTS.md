@@ -173,6 +173,13 @@ and only after the entry test passes; a failing test means no questionnaire.
 - Distribution stays on git tags; no registry publication.
 - Commentary states the invariant that must hold, present tense; history
   stays in commit messages.
+- `plans/` is forward work: each plan names the work or decision, its
+  done-when, and the evidence that closes it.  Retire a plan by implementing
+  it; remove it when it lands.  Durable facts belong in `docs/` or `specs/`,
+  not in a plan.  When you do not know what to do next, read `plans/` and
+  take a plan with a clear next action; if none has one, ask Rick for the
+  decision.  Do not park deferred items in a miscellaneous file, and do not
+  keep a plan alive to justify work.
 
 ## Where agent configuration lives
 

@@ -90,6 +90,12 @@ Its distinct contribution is the workerd suites on a clean machine: `pnpm
 verify` already runs every gate locally, but only through the nix-ld loader,
 so CI is the one execution of the deployable artifact outside it.
 
+Codeberg's per-push job runs the portable gate only.  The workerd suites run
+in ring 2 locally and at release on this mirror, so a workerd regression can
+land on `main` and stay unseen until the next release.  That is accepted
+while `packages/cloudflare` is private and on `0.x`; revisit if a regression
+reaches a release tag or the package gains a second consumer.
+
 A `cloudflare-v*` tag job restores the tag ref before the artifact gate reads
 it. The checkout action force-writes the peeled commit into `refs/tags/<tag>`,
 so the annotated object the gate requires is absent until it is re-fetched;
@@ -125,7 +131,7 @@ first run was `success` in 1m25s. A manual dispatch is
 
 ## The release
 
-Releases are cut with `bin/release` (bump → verify → build → commit → tag; the tag comes from the manifest) and `--push` sends the release commit and tag to both hosts; GitHub receives release updates only. `v0.4.4` is the last v0.4 release; `v1.0.0` is historical; the current line is v2.x. The Cloudflare reference runtime is released from the same script with `--package cloudflare`.
+Releases are cut with `bin/release` (bump → verify → build → commit → tag; the tag comes from the manifest) and `--push` sends the release commit and tag to both hosts; GitHub receives release updates only. `v0.4.4` is the last v0.4 release; `v1.0.0` is historical; the current line is v3.x, with v2.x the previous line. The Cloudflare reference runtime is released from the same script with `--package cloudflare`.
 
 A consumer pins one of:
 
@@ -140,7 +146,9 @@ Pick the bump from the surface: `minor` for an additive public export or model
 fact, `patch` for a fix within the released surface, and `major` when the
 authority interface breaks. The Cloudflare package follows its own 0.x
 cadence and ships its fixes as patches; a root release does not move a
-Cloudflare tag.
+Cloudflare tag.  A docs-only change, or a `dist/` rebuild whose only change
+is comments, does not warrant a tag; the functional release remains the last
+source change.
 
 ## Deployment is the host's act
 
