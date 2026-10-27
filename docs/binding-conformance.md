@@ -101,3 +101,15 @@ pnpm --filter org-hats-cloudflare test
 That suite boots the real coordinators in workerd, resets them per case, and
 runs the complete inventory. It is the authority for the full claim; the
 binding smoke is the additional evidence for the deployed entrypoint.
+
+The binding subset and the exchange round trip are executable here:
+
+```sh
+pnpm --filter org-hats-cloudflare exec vitest run test/binding-smoke.test.ts
+pnpm --filter org-hats-cloudflare exec vitest run test/exchange-devidp.test.ts
+```
+
+The first bootstraps the conformance world and supplies the runtime, key set,
+operation-status, and direct-disable dependencies the smoke needs. The second
+drives the provider exchange against a test provider through the fetch seam.
+Both are test assets, not published surface.

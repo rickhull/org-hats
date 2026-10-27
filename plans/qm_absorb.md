@@ -1,8 +1,7 @@
 # Absorbing the Quartermaster consumer assets
 
-**Status:** Proposed.  The direction is accepted; each item below is
-reviewable and landable on its own.  Nothing moves until its item is
-accepted.
+**Status:** Proposed.  The boundary and the cookie-budget rule are settled;
+each item below is reviewable and landable on its own.
 
 `org-hats` owns the authority seam, and Quartermaster is its first committed
 consumer.  Some of the consumer's work is contract-shaped — it implements or
@@ -17,7 +16,9 @@ leaves the product alone.  Delivery tooling is out of scope: the consumer's
 provider exchange, binding conformance, and the deployment contract.
 
 The host owns browser routes, state/nonce/PKCE creation, cookies, session
-responses, routing, and ops verbs.
+responses, routing, and ops verbs.  The cookie boundary in particular is the
+host's: upstream states an envelope maximum, and the host applies the browser
+budget and refuses above it.
 
 Code is absorbed only when it implements an `org-hats` contract.  Host policy
 is documented here as a guide or example, never published as a module.  A
@@ -34,11 +35,14 @@ and its imports are only `org-hats/access` and `org-hats/authority`.
 
 **Shape.**
 
-- A runner parameterized by an `AuthorityRuntime` binding, a verification key
-  set, and fixtures, covering the six documented groups.
-- `devidp` as the test provider, so `exchange.ts` is exercised end to end:
-  discovery, authorization redirect, code exchange, JWKS, and ID-token
-  verification through `evidenceFromProviderCode`.
+- A runner taking the smoke's dependency seam — the `AuthorityRuntime`, the
+  verification key set, an operation-status source, and a `disableActor`
+  that reaches the organization authority directly — covering the six
+  documented groups.  The stale-projection case needs the organization
+  Durable Object, and the key set and status need a source; a small harness
+  wires them.
+- `devidp` as a workerd fixture, not a library: a separate Worker with its
+  own signing key and configuration.
 - A bootstrap/fixture contract for the dedicated operation the smoke
   consumes.
 
@@ -46,14 +50,16 @@ and its imports are only `org-hats/access` and `org-hats/authority`.
 package export; these are test assets, not surface.  The portable
 `types: []` fence is untouched.
 
-**Done when.**  The six groups run in `pnpm check:cloudflare` against a real
-service binding; `exchange.ts` has an end-to-end provider round trip; the
-portable ring still runs without workerd; no consumer name, hostname, or real
-fixture appears in the checked-in assets.
+**Done when.**  The six groups run in `pnpm check:cloudflare` through that
+seam against a real service binding; `exchange.ts` has an end-to-end provider
+round trip through `devidp`; the portable ring still runs without workerd; no
+consumer name, hostname, or real fixture appears in the checked-in assets.
 
 **Tradeoffs.**  Adds roughly 700 lines and workerd time, and needs a fixture
-contract that fixes a bootstrap shape the host may still be moving.  Keep the
-runner test-only so it cannot become a second public API.
+contract that fixes a bootstrap shape the host may still be moving.  The
+harness must not assume the consumer's ops Worker; the dependency seam is the
+portability boundary.  Keep the runner test-only so it cannot become a second
+public API.
 
 ## 2. Host session carriage contract
 
@@ -73,6 +79,8 @@ cookie, and the login looks half-worked.
   lifetime;
 - an envelope that exceeds the browser cookie budget is refused at issuance,
   not truncated or silently dropped;
+- upstream states an envelope maximum, and the host applies the full cookie
+  budget including attributes;
 - the refresh handle is re-sent only when issuance says it rotated;
 - every refusal clears both cookies;
 - login state is single-use with a short TTL;
@@ -83,12 +91,15 @@ cookie, and the login looks half-worked.
 `docs/cloudflare.md`, cross-linked from `specs/authority.md` A7 and
 `docs/envelope.md`.
 
-**Open decision.**  Either `org-hats` bounds envelope size against the
-cookie budget, or the consumer refuses at issuance.  Whichever is chosen is
-stated once and proved by a conformance vector at the boundary.
+**Settled by review.**  Both checks are required.  Upstream documents an
+envelope maximum and refuses at issuance; the host enforces the cookie budget
+and refuses above it.  The host value is the binding one, because the 4 KB
+cap includes the cookie attributes and an upstream bound alone cannot account
+for them.
 
-**Done when.**  The carriage rules are normative, the budget rule is stated
-and tested, and no module is published.
+**Done when.**  The carriage rules are normative; the upstream maximum is
+stated and proved by a conformance vector at the boundary; the host budget is
+documented as the binding check; no module is published.
 
 **Tradeoffs.**  Prose drifts; tie the budget rule to a test.  A published
 helper package would blur the boundary the seam depends on.
@@ -135,15 +146,28 @@ product's responses.  Keep it an example.
 
 **Why.**  Two independent implementations of the provider exchange are a
 review opportunity.  The consumer's copy carries a bounded JWKS cache policy
-and follow-time endpoint checks that upstream may not.
+and follow-time endpoint checks that upstream does not yet carry.
 
 **Shape.**  Compare the consumer's `oidc.ts` with
-`packages/cloudflare/src/exchange.ts`.  Candidates include
-`Cache-Control`-bounded JWKS TTLs with a refetch floor, secure-endpoint checks
-at the point a URL is followed, and discovery validation.
+`packages/cloudflare/src/exchange.ts`.  The consumer's policy is deliberate
+and should be ported if the exchange moves wholly into the runtime:
+
+- JWKS cached an hour by default, clamped to the issuer's `Cache-Control`
+  max-age between one minute and 24 hours;
+- an unknown `kid` forces one refetch, floored at 30 seconds; when the floor
+  blocks it, verification falls back to the cached keys and fails closed;
+- secure-endpoint checks at the point a URL is followed, and discovery
+  validation.
+
+The production login already exchanges and verifies through the runtime; the
+consumer file is the development path and its tests.
 
 **Done when.**  Each difference is either ported with a failing test first,
-or recorded as rejected with its reason.  Nothing is copied wholesale.
+or recorded as rejected with its reason.  Nothing is copied wholesale.  The
+dev-only path can then be deleted on the host side once the kit carries
+`devidp` and the end-to-end exchange, provided the host keeps state, nonce,
+PKCE, cookies, and return-path, and a test that the runtime wiring still
+works.
 
 **Tradeoffs.**  This is security-sensitive; a port needs its own tests.  The
 consumer's duplicate exchange verification is deleted there, not absorbed
@@ -165,7 +189,8 @@ contract and cross-referenced from the configuration section of
 `docs/cloudflare.md`.
 
 **Tradeoffs.**  Deployment policy rather than platform behavior; keep it
-host-neutral and free of consumer command names.
+host-neutral and free of consumer command names.  The tag-creating porcelain
+stays with the host.
 
 ## 7. Policy bundle example (optional)
 
@@ -188,15 +213,15 @@ it carries no customer policy.
   vendored.
 - The consumer's policy bundle and exact product responses.
 - The consumer's dev-only JWKS/ID-token verification: it duplicates
-  `exchange.ts` and is deleted, not absorbed.
+  `exchange.ts` and is deleted on the host side once the kit lands; not
+  absorbed here.
 - Any real roster, customer, hostname, or provider registration.
 
-## Order and decisions
+## Order
 
-1. Confirm the boundary rule and the workerd placement for items 1 and 2.
-2. Choose the owner of the cookie-budget rule (item 2).
-3. Land item 1 with item 2's exchange fixture; then items 3 and 4; then
-   item 5; then items 6 and 7.
+The boundary, the workerd placement, and the cookie-budget split are settled.
+Land item 1 with item 2's exchange fixture; then items 3 and 4; then item 5;
+then items 6 and 7.
 
 Each item lands as its own commit with its own verification.  Documentation
 items follow the documentation rule.  Code items run the workerd ring and,

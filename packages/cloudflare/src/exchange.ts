@@ -69,8 +69,8 @@ class MetadataError extends Error {}
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const fetchJson = async (url: string): Promise<unknown> => {
-  const response = await fetch(url, { headers: { accept: "application/json" } });
+const fetchJson = async (url: string, providerFetch: typeof fetch = fetch): Promise<unknown> => {
+  const response = await providerFetch(url, { headers: { accept: "application/json" } });
   if (!response.ok) throw new Error(`fetch ${url} failed with ${response.status}`);
   try {
     return await response.json();
@@ -96,11 +96,11 @@ const httpsEndpoint = (value: unknown, field: string): string => {
   return value;
 };
 
-const discoveryOf = async (issuer: string): Promise<Discovery> => {
+const discoveryOf = async (issuer: string, providerFetch: typeof fetch = fetch): Promise<Discovery> => {
   const cached = discoveryCache.get(issuer);
   if (cached !== undefined && cached.expiresAt > nowSeconds()) return cached.value;
   const url = `${issuer.replace(/\/+$/, "")}/.well-known/openid-configuration`;
-  const document = await fetchJson(url);
+  const document = await fetchJson(url, providerFetch);
   if (!isRecord(document)) throw new MetadataError("the discovery document is not an object");
   // RFC 8414 §3.3: `issuer` is required and must identify this issuer.
   if (document["issuer"] !== issuer) {
@@ -114,10 +114,10 @@ const discoveryOf = async (issuer: string): Promise<Discovery> => {
   return value;
 };
 
-const jwksOf = async (issuer: string, jwksUri: string): Promise<readonly Jwk[]> => {
+const jwksOf = async (issuer: string, jwksUri: string, providerFetch: typeof fetch = fetch): Promise<readonly Jwk[]> => {
   const cached = jwksCache.get(issuer);
   if (cached !== undefined && cached.expiresAt > nowSeconds()) return cached.value;
-  const document = (await fetchJson(jwksUri)) as { keys?: unknown };
+  const document = (await fetchJson(jwksUri, providerFetch)) as { keys?: unknown };
   if (!Array.isArray(document.keys)) throw new Error("the JWKS document has no keys");
   const value = document.keys as Jwk[];
   jwksCache.set(issuer, { value, expiresAt: nowSeconds() + JWKS_TTL_SECONDS });
@@ -312,6 +312,7 @@ export const parseSealedProviderConfig = (sealed: string): SealedProviderConfig 
 export const exchangeCodeForEvidence = async (
   input: EvidenceFromProviderCodeInput,
   config: SealedProviderConfig,
+  providerFetch: typeof fetch = fetch,
 ): Promise<EvidenceFromProviderCodeResult> => {
   if (input.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) {
     return failed({ kind: "wrong-interface-version" });
@@ -341,7 +342,7 @@ export const exchangeCodeForEvidence = async (
 
   let discovery: Discovery;
   try {
-    discovery = await discoveryOf(input.issuer);
+    discovery = await discoveryOf(input.issuer, providerFetch);
   } catch (error) {
     // A reachable provider with a wrong discovery document is a trust
     // failure (`unauthenticated`); a provider that could not be reached is
@@ -362,7 +363,7 @@ export const exchangeCodeForEvidence = async (
   });
   let idToken: string;
   try {
-    const response = await fetch(discovery.tokenEndpoint, {
+    const response = await providerFetch(discovery.tokenEndpoint, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body,
@@ -380,7 +381,7 @@ export const exchangeCodeForEvidence = async (
   }
 
   try {
-    const keys = await jwksOf(input.issuer, discovery.jwksUri);
+    const keys = await jwksOf(input.issuer, discovery.jwksUri, providerFetch);
     const claims = await verifyIdToken(idToken, {
       issuer: input.issuer,
       clientId: input.clientId,
@@ -398,7 +399,7 @@ export const exchangeCodeForEvidence = async (
     // not a rotation signal, so only a signature failure gets the retry.
     try {
       jwksCache.delete(input.issuer);
-      const fresh = await jwksOf(input.issuer, discovery.jwksUri);
+      const fresh = await jwksOf(input.issuer, discovery.jwksUri, providerFetch);
       const claims = await verifyIdToken(idToken, {
         issuer: input.issuer,
         clientId: input.clientId,
