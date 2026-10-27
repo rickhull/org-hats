@@ -55,16 +55,39 @@ type Jwk = JsonWebKey & { readonly kid?: string };
 
 const DISCOVERY_TTL_SECONDS = 24 * 60 * 60;
 const JWKS_TTL_SECONDS = 60 * 60;
+const JWKS_TTL_MIN_SECONDS = 60;
+const JWKS_TTL_MAX_SECONDS = 24 * 60 * 60;
+const JWKS_MIN_REFETCH_SECONDS = 30;
 
 const discoveryCache = new Map<string, { value: Discovery; expiresAt: number }>();
 const jwksCache = new Map<string, { value: readonly Jwk[]; expiresAt: number }>();
+/** The last forced refetch per issuer, so a stream of unknown `kid` values
+ * cannot become a stream of provider requests. */
+const forcedRefetchAt = new Map<string, number>();
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
+
+/** The JWKS lifetime: an hour by default, clamped to the issuer's
+ * `Cache-Control` max-age between one minute and one day.  A provider that
+ * says "a year" must not strand a rotation; one that says "no-store" must
+ * not turn every login into a fetch. */
+export const jwksTtlSeconds = (cacheControl: string | null): number => {
+  const match = cacheControl?.match(/(?:^|[,\s])max-age\s*=\s*(\d+)/i);
+  if (match === null || match === undefined) return JWKS_TTL_SECONDS;
+  const seconds = Number(match[1]);
+  if (!Number.isFinite(seconds) || seconds <= 0) return JWKS_TTL_SECONDS;
+  return Math.min(Math.max(seconds, JWKS_TTL_MIN_SECONDS), JWKS_TTL_MAX_SECONDS);
+};
 
 /** A discovery document that is reachable but not trustworthy: the provider
  * answered, and the answer is wrong. Distinct from a network failure so the
  * exchange can report `unauthenticated` rather than `unavailable`. */
 class MetadataError extends Error {}
+
+/** The provider answered the exchange but its key set could not be reached.
+ * Distinct from a trust failure: the answer is `unavailable`, not
+ * `unauthenticated`. */
+class ProviderUnavailable extends Error {}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -114,13 +137,48 @@ const discoveryOf = async (issuer: string, providerFetch: typeof fetch = fetch):
   return value;
 };
 
-const jwksOf = async (issuer: string, jwksUri: string, providerFetch: typeof fetch = fetch): Promise<readonly Jwk[]> => {
+const jwksOf = async (
+  issuer: string,
+  jwksUri: string,
+  providerFetch: typeof fetch = fetch,
+  force = false,
+): Promise<readonly Jwk[]> => {
   const cached = jwksCache.get(issuer);
-  if (cached !== undefined && cached.expiresAt > nowSeconds()) return cached.value;
-  const document = (await fetchJson(jwksUri, providerFetch)) as { keys?: unknown };
-  if (!Array.isArray(document.keys)) throw new Error("the JWKS document has no keys");
+  const now = nowSeconds();
+  if (cached !== undefined) {
+    if (force) {
+      const last = forcedRefetchAt.get(issuer);
+      if (last !== undefined && now - last < JWKS_MIN_REFETCH_SECONDS) return cached.value;
+    } else if (cached.expiresAt > now) {
+      return cached.value;
+    }
+  }
+
+  let response: Response;
+  try {
+    response = await providerFetch(jwksUri, { headers: { accept: "application/json" } });
+  } catch {
+    throw new ProviderUnavailable("the key set could not be reached");
+  }
+  if (!response.ok) throw new ProviderUnavailable(`the key set returned ${response.status}`);
+
+  let document: unknown;
+  try {
+    document = await response.json();
+  } catch {
+    throw new MetadataError("the provider returned invalid JSON");
+  }
+  if (!isRecord(document) || !Array.isArray(document.keys)) {
+    throw new MetadataError("the JWKS document has no keys");
+  }
+
   const value = document.keys as Jwk[];
-  jwksCache.set(issuer, { value, expiresAt: nowSeconds() + JWKS_TTL_SECONDS });
+  jwksCache.set(issuer, {
+    value,
+    expiresAt: now + jwksTtlSeconds(response.headers.get("cache-control")),
+  });
+  if (force) forcedRefetchAt.set(issuer, now);
+  else forcedRefetchAt.delete(issuer);
   return value;
 };
 
@@ -390,6 +448,9 @@ export const exchangeCodeForEvidence = async (
     });
     return { ok: true, evidence: evidenceOf(claims, input.issuer) };
   } catch (error) {
+    if (error instanceof ProviderUnavailable) {
+      return failed({ kind: "unavailable", detail: error.message });
+    }
     const message = error instanceof Error ? error.message : "the ID token did not verify";
     if (message !== "the ID token signature does not verify") {
       return failed({ kind: "unauthenticated", detail: message });
@@ -398,8 +459,7 @@ export const exchangeCodeForEvidence = async (
     // one refetch, one retry, then the failure stands. A malformed token is
     // not a rotation signal, so only a signature failure gets the retry.
     try {
-      jwksCache.delete(input.issuer);
-      const fresh = await jwksOf(input.issuer, discovery.jwksUri, providerFetch);
+      const fresh = await jwksOf(input.issuer, discovery.jwksUri, providerFetch, true);
       const claims = await verifyIdToken(idToken, {
         issuer: input.issuer,
         clientId: input.clientId,
@@ -409,7 +469,7 @@ export const exchangeCodeForEvidence = async (
       return { ok: true, evidence: evidenceOf(claims, input.issuer) };
     } catch (retryError) {
       return failed({
-        kind: "unauthenticated",
+        kind: retryError instanceof ProviderUnavailable ? "unavailable" : "unauthenticated",
         detail: retryError instanceof Error ? retryError.message : message,
       });
     }
@@ -420,4 +480,5 @@ export const exchangeCodeForEvidence = async (
 export const resetExchangeCaches = (): void => {
   discoveryCache.clear();
   jwksCache.clear();
+  forcedRefetchAt.clear();
 };

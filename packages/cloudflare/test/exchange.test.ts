@@ -13,6 +13,7 @@ import type { Env } from "../src/env";
 import {
   derSignatureOf,
   exchangeCodeForEvidence,
+  jwksTtlSeconds,
   resetExchangeCaches,
   type EvidenceFromProviderCodeInput,
 } from "../src/exchange";
@@ -248,6 +249,54 @@ describe("the provider-callback exchange", () => {
     expect(served.requests.filter((r) => r.url.endsWith("/jwks"))).toHaveLength(2);
   });
 
+  it("floors repeated rotation refetches at 30 seconds", async () => {
+    const other = await providerKeys();
+    const { sign } = await providerKeys();
+    served = serveIdp([{ keys: [other.jwk] }], await sign(claims(["pwd"], nowSeconds())));
+
+    const first = await exchangeCodeForEvidence(input(), CONFIG);
+    expect(first.ok).toBe(false);
+    const afterFirst = served.requests.filter((r) => r.url.endsWith("/jwks")).length;
+    expect(afterFirst).toBe(2);
+
+    // The cache is fresh and the last forced refetch was seconds ago, so the
+    // second exchange must not ask the provider again.
+    const second = await exchangeCodeForEvidence(input(), CONFIG);
+    expect(second.ok).toBe(false);
+    expect(served.requests.filter((r) => r.url.endsWith("/jwks"))).toHaveLength(afterFirst);
+  });
+
+  it("clamps the JWKS lifetime to the issuer's Cache-Control", () => {
+    expect(jwksTtlSeconds(null)).toBe(3_600);
+    expect(jwksTtlSeconds("max-age=1")).toBe(60);
+    expect(jwksTtlSeconds("public, max-age=86400")).toBe(86_400);
+    expect(jwksTtlSeconds("max-age=999999")).toBe(86_400);
+    expect(jwksTtlSeconds("no-store")).toBe(3_600);
+  });
+
+  it("reuses a cached key set within its lifetime", async () => {
+    const { jwk, sign } = await providerKeys();
+    served = serveIdp([{ keys: [jwk] }], await sign(claims(["pwd"], nowSeconds())));
+
+    expect((await exchangeCodeForEvidence(input(), CONFIG)).ok).toBe(true);
+    expect((await exchangeCodeForEvidence(input(), CONFIG)).ok).toBe(true);
+    expect(served.requests.filter((r) => r.url.endsWith("/jwks"))).toHaveLength(1);
+  });
+
+  it("answers unavailable when the key set cannot be reached", async () => {
+    const { sign } = await providerKeys();
+    // Discovery and the token endpoint answer; the JWKS route is absent.
+    served = serve([
+      { method: "GET", url: `${ISSUER}/.well-known/openid-configuration`, bodies: [DISCOVERY] },
+      { method: "POST", url: TOKEN_URL, bodies: [{ id_token: await sign(claims(["pwd"], nowSeconds())) }] },
+    ]);
+
+    const result = await exchangeCodeForEvidence(input(), CONFIG);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.kind).toBe("unavailable");
+  });
+
   it("answers unavailable when the provider cannot be reached", async () => {
     served = serve([]);
     const result = await exchangeCodeForEvidence(input(), CONFIG);
@@ -335,6 +384,8 @@ describe("the provider-callback exchange", () => {
       ["auth_time", { auth_time: "soon" }, /auth_time/],
       ["name", { name: 7 }, /name/],
     ] as const) {
+      served?.restore();
+      resetExchangeCaches();
       const { jwk, sign } = await providerKeys();
       served = serveIdp([{ keys: [jwk] }], await sign({ ...claims(["pwd"], nowSeconds()), ...override }));
 
@@ -466,6 +517,8 @@ describe("the provider-callback exchange", () => {
       },
     ] as const;
     for (const entry of cases) {
+      served?.restore();
+      resetExchangeCaches();
       const { jwk, sign } = await providerKeys();
       served = serveIdp([{ keys: [jwk] }], await sign(entry.claims, entry.header));
       const result = await exchangeCodeForEvidence(input(), CONFIG);

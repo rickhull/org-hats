@@ -82,9 +82,14 @@ and returns typed `PrincipalEvidence` or a closed failure:
 `unauthenticated` for anything the provider or token got wrong,
 `unavailable` for a provider that could not be reached, `invalid-command`
 for malformed input. Issuance stays `accessFromEvidence` — evidence in,
-one verb per crossing. Discovery is cached a day and JWKS an hour per
-isolate; a failing signature triggers exactly one JWKS refetch per
-exchange, which is the key-rotation window.  The host half of this flow —
+one verb per crossing. Discovery is cached a day per isolate. JWKS is
+cached an hour by default, clamped to the issuer's `Cache-Control` max-age
+between one minute and one day; a provider that says "a year" must not
+strand a rotation, and one that says "no-store" must not turn every login
+into a fetch. A failing signature asks for the current key set once;
+repeated forced refetches are floored at 30 seconds and fall back to the
+cached set, so a rotation is recovered without turning a stream of bad
+tokens into provider traffic.  The host half of this flow —
 the redirect, state, nonce, PKCE, and the callback — is
 [`consumer-login.md`](consumer-login.md).
 
