@@ -10,9 +10,9 @@
 ## Mirroring to GitHub
 
 GitHub is updated by the release mechanism, not by a per-commit or periodic
-mirror. `bin/release ... --push` pushes the release commit and its tag to
-`origin`, then the same branch and tag to `github`. There is no separate
-mirror push step.
+mirror. `bin/release` publishes the release commit and its tag to `origin`,
+then the same branch and tag to `github`; `--no-push` keeps the release
+local. There is no separate mirror push step.
 
 Set the remote once per clone:
 
@@ -20,9 +20,11 @@ Set the remote once per clone:
 git remote add github git@github.com:rickhull/org-hats.git
 ```
 
-If `--push` finds no `github` remote, it still pushes `origin` and says the
-mirror was skipped. If the GitHub push fails after `origin` succeeded,
-retry:
+If there is no `github` remote, the release still pushes `origin` and says
+the mirror was skipped. Publication is best-effort per push: every push is
+attempted, any failure is reported, and the release exits nonzero while the
+local commit and tag remain. If the GitHub push fails after `origin`
+succeeded, retry:
 
 ```sh
 git push github HEAD
@@ -55,7 +57,7 @@ Codeberg and then force-push the GitHub mirror; GitHub follows only when
 told.
 - **Codeberg is the truth.** GitHub holds no authority, only a copy.
 
-**Current status:** GitHub carries every `bin/release --push`; branch commits
+**Current status:** GitHub carries every release; branch commits
 after the last release wait for the next one.
 
 **Historical anomaly:** `v0.4.3` points at `8d2551d` ("docs update /
@@ -80,7 +82,7 @@ The first run was green: 96 portable tests in about 1m25s, well inside the
 release rings.
 
 GitHub Actions remains the **release-mirror backstop**: it runs only when
-`bin/release --push` updates GitHub. Its portable and workerd jobs call
+a release updates GitHub. Its portable and workerd jobs call
 `CI=1 ci/run portable` and `CI=1 ci/run cloudflare`; the latter performs the
 full workspace install, rebuild, typecheck, and workerd suites. A tag push
 also runs the tag-specific artifact audit. Its runner is pinned
@@ -138,7 +140,7 @@ first run was `success` in 1m25s. A manual dispatch is
 
 ## The release
 
-Releases are cut with `bin/release` (bump → verify → build → commit → tag; the tag comes from the manifest) and `--push` sends the release commit and tag to both hosts; GitHub receives release updates only. `v0.4.4` is the last v0.4 release; `v1.0.0` is historical; the current line is v3.x, with v2.x the previous line. The Cloudflare reference runtime is released from the same script with `--package cloudflare`.
+Releases are cut with `bin/release` (bump → verify → build → commit → tag; the tag comes from the manifest), which publishes the release commit and tag to both hosts by default; `--no-push` keeps a release local, and GitHub receives release updates only. `v0.4.4` is the last v0.4 release; `v1.0.0` is historical; the current line is v3.x, with v2.x the previous line. The Cloudflare reference runtime is released from the same script with `--package cloudflare`.
 
 A consumer pins one of:
 
@@ -184,15 +186,17 @@ From a clean `main`:
 
 1. Cut and push it:
    ```sh
-   bin/release patch --push                    # root: vX.Y.Z
-   bin/release --package cloudflare minor --push
+   bin/release patch                         # root: vX.Y.Z
+   bin/release --package cloudflare minor
    ```
    That bumps the selected manifest, runs `bin/check-dist` and `bin/check`
    (plus the Cloudflare suites for a root release), rebuilds `dist/`, commits
    the manifest and generated output, and tags the commit. It re-checks the
    new tag with `bin/check-version` before anything is pushed — the tag and
-   manifest cannot disagree. `--push` then sends the branch and tag to
-   `origin`, and the same to `github` when that remote exists. `--dry-run`
+   manifest cannot disagree. It then publishes the branch and tag to
+   `origin`, and the same to `github` when that remote exists; `--no-push`
+   stops before publication. Every push is attempted, any failure is
+   reported, and the release exits nonzero. `--dry-run`
    previews; `--no-cloudflare` skips the workspace suites on a root release.
    **Tag only through `bin/release`** — it keeps the tag and the manifest
    equal by construction; a hand-made tag (the agent exception in
@@ -207,7 +211,8 @@ From a clean `main`:
    the deployment paragraph in this file, `positioning.md`,
    `personas/practitioner.md`, and `migration-v2.md` move after the host
    deploy, because they describe what is running.
-2. If the release was cut without `--push`, send it to both hosts:
+2. If the release was cut with `--no-push`, or a push failed, send it to both
+   hosts:
    ```sh
    git push origin HEAD
    git push origin <tag>

@@ -16,7 +16,8 @@ working tree, so they proceed only with Rick's approval — ask for specific
 paths and say what each file is.  Never `git add -A` or `git add .`.
 
 Codeberg is canonical (remote `origin`); GitHub is a release mirror, updated
-by `bin/release --push`, never a second place to work.  The authority redesign
+by `bin/release`, which publishes by default (`--no-push` keeps a release
+local), never a second place to work.  The authority redesign
 is `main`'s line; the v0.4 surface stays frozen at its tags.
 
 ## The Quartermaster relay

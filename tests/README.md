@@ -26,7 +26,8 @@ and the annotated-tag repair imposed by checkout actions.
   `check-dist` cleans and rebuilds `dist/`; run it before the workerd suites
   and never concurrently with `pnpm check` in the same checkout.
 - **Ring 3 — full.** `pnpm verify` (ring 2 plus ring 1; records the local
-  gate cache for a clean commit) and `bin/release --push` for a release. CI
+  gate cache for a clean commit) and `bin/release` for a release, which
+  publishes by default. CI
   on the GitHub release mirror is the release-time backstop, not the live
   gate. A Cloudflare tag also passes `bin/check-artifact`.
 

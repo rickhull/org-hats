@@ -1,17 +1,20 @@
 // The release-metadata guard against throwaway repositories. This covers the
 // failure we actually hit — a release tag on the commit before the version
 // bump — and the Cloudflare tag family the guard did not previously know.
+// The release script's publication posture is covered here too: it pushes by
+// default, attempts every push, and exits nonzero when any of them fails.
 
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const script = fileURLToPath(new URL("../bin/check-version", import.meta.url));
 const setVersion = fileURLToPath(new URL("../bin/set-version", import.meta.url));
+const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 
 // The guard reads GITHUB_REF and runs git in a temp repository. Neither an
 // ambient CI tag nor a developer's global git config may influence it.
@@ -169,5 +172,120 @@ test("a tag on the wrong commit or in the wrong family fails closed", () => {
     assert.match(notAReleaseTag.stderr ?? "", /no such tag|not a release tag/);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// --- the release script's publication posture ---------------------------------
+
+const releaseFixture = (): {
+  root: string;
+  base: string;
+  origin: string;
+  github: string;
+  env: NodeJS.ProcessEnv;
+} => {
+  const base = mkdtempSync(join(tmpdir(), "org-hats-release-push-"));
+  const root = join(base, "work");
+  mkdirSync(join(root, "bin"), { recursive: true });
+  mkdirSync(join(root, "dist"));
+  mkdirSync(join(root, "packages", "cloudflare"), { recursive: true });
+  for (const name of ["release", "set-version", "check-version"]) {
+    copyFileSync(join(projectRoot, "bin", name), join(root, "bin", name));
+    chmodSync(join(root, "bin", name), 0o755);
+  }
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "root", version: "1.2.3" }, null, 2) + "\n");
+  writeFileSync(join(root, "dist", "index.js"), "export {};\n");
+  writeFileSync(
+    join(root, "packages", "cloudflare", "package.json"),
+    JSON.stringify({ name: "cloudflare", version: "0.1.0" }, null, 2) + "\n",
+  );
+  git(root, "init", "-q", "-b", "main");
+  git(root, "config", "user.name", "Release Test");
+  git(root, "config", "user.email", "release@example.test");
+  git(root, "config", "commit.gpgsign", "false");
+  git(root, "config", "tag.gpgsign", "false");
+  git(root, "add", ".");
+  git(root, "commit", "-q", "-m", "release fixtures");
+
+  const origin = join(base, "origin.git");
+  const github = join(base, "github.git");
+  git(base, "init", "-q", "--bare", origin);
+  git(base, "init", "-q", "--bare", github);
+  git(root, "remote", "add", "origin", origin);
+  git(root, "remote", "add", "github", github);
+
+  // The release runs `pnpm build` without the gates; the fixture supplies a
+  // no-op so the script is exercised, not the workspace.
+  const path = join(base, "path");
+  mkdirSync(path);
+  writeFileSync(join(path, "pnpm"), "#!/usr/bin/env sh\nexit 0\n", { mode: 0o755 });
+  const env = { ...testEnv, PATH: `${path}:${process.env["PATH"] ?? ""}` };
+  return { root, base, origin, github, env };
+};
+
+const release = (fixture: ReturnType<typeof releaseFixture>, ...args: string[]) =>
+  spawnSync(join(fixture.root, "bin", "release"), args, {
+    cwd: fixture.root,
+    env: fixture.env,
+    encoding: "utf8",
+  });
+
+const tagCommit = (base: string, bare: string, tag: string): string =>
+  git(base, "-C", bare, "rev-parse", "--verify", `refs/tags/${tag}^{}`).trim();
+
+test("the release publishes to both hosts by default", () => {
+  const fixture = releaseFixture();
+  try {
+    const result = release(fixture, "patch", "--no-verify");
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout ?? "", /published branch and v1\.2\.4 to origin and github/);
+
+    const head = git(fixture.root, "rev-parse", "HEAD").trim();
+    assert.equal(git(fixture.base, "-C", fixture.origin, "rev-parse", "refs/heads/main").trim(), head);
+    assert.equal(git(fixture.base, "-C", fixture.github, "rev-parse", "refs/heads/main").trim(), head);
+    assert.equal(tagCommit(fixture.base, fixture.origin, "v1.2.4"), head);
+    assert.equal(tagCommit(fixture.base, fixture.github, "v1.2.4"), head);
+  } finally {
+    rmSync(fixture.base, { recursive: true, force: true });
+  }
+});
+
+test("--no-push keeps the tag local and prints the publication commands", () => {
+  const fixture = releaseFixture();
+  try {
+    const result = release(fixture, "patch", "--no-verify", "--no-push");
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout ?? "", /not published; push with/);
+
+    const head = git(fixture.root, "rev-parse", "HEAD").trim();
+    assert.equal(git(fixture.root, "rev-parse", "--verify", "refs/tags/v1.2.4^{}").trim(), head);
+    const remoteTag = spawnSync(
+      "git",
+      ["-C", fixture.origin, "rev-parse", "--verify", "refs/tags/v1.2.4"],
+      { encoding: "utf8", env: testEnv },
+    );
+    assert.notEqual(remoteTag.status, 0, "the origin must not receive a --no-push release");
+  } finally {
+    rmSync(fixture.base, { recursive: true, force: true });
+  }
+});
+
+test("a failed push is reported per push, continues best-effort, and exits nonzero", () => {
+  const fixture = releaseFixture();
+  try {
+    git(fixture.root, "remote", "set-url", "origin", join(fixture.base, "missing.git"));
+    const result = release(fixture, "patch", "--no-verify");
+    assert.notEqual(result.status, 0, "a failed push must not report a successful release");
+    assert.match(result.stderr ?? "", /branch push to origin failed/);
+    assert.match(result.stderr ?? "", /tag push to origin failed/);
+    assert.match(result.stderr ?? "", /publication incomplete/);
+
+    // Best effort: the mirror is still attempted after origin fails, and the
+    // local release survives either way.
+    const head = git(fixture.root, "rev-parse", "HEAD").trim();
+    assert.equal(tagCommit(fixture.base, fixture.github, "v1.2.4"), head);
+    assert.equal(git(fixture.root, "rev-parse", "--verify", "refs/tags/v1.2.4^{}").trim(), head);
+  } finally {
+    rmSync(fixture.base, { recursive: true, force: true });
   }
 });

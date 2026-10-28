@@ -1,7 +1,9 @@
 #!/usr/bin/env sh
 # Cut a release: bump the manifest, run the gates, build the artifact
-# (dist/), commit, and tag; `--push` publishes the branch and tag to
-# origin and the mirror.
+# (dist/), commit, tag, and publish the branch and tag to origin and the
+# mirror. Publication is best-effort per push: every push is attempted, any
+# failure is reported, and the release exits nonzero. `--no-push` keeps the
+# release local.
 #
 #   bin/release patch                 # root: vX.Y.Z from package.json
 #   bin/release minor
@@ -21,7 +23,8 @@
 # Options:
 #   --package root|cloudflare   which package to release (default: root)
 #   --dry-run                   print the plan and change nothing
-#   --push                      push the branch and tag to origin, then the GitHub mirror
+#   --push                      publish (the default; accepted for compatibility)
+#   --no-push                   keep the release local; print the push commands
 #   --no-verify                 skip the gates (the build still runs)
 #   --no-cloudflare             skip the Cloudflare suites on a root release
 #   -h, --help                  this help
@@ -29,12 +32,12 @@ set -eu
 cd "$(dirname "$0")/.." || exit 1
 
 die() { printf 'release: %s\n' "$*" >&2; exit 1; }
-usage() { sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,/^set -eu$/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; }
 
 package=root
 bump=
 dry=false
-push=false
+push=true
 verify=true
 cloudflare=true
 
@@ -51,6 +54,7 @@ while [ "$#" -gt 0 ]; do
 			;;
 		--dry-run) dry=true; shift ;;
 		--push) push=true; shift ;;
+		--no-push) push=false; shift ;;
 		--no-verify) verify=false; shift ;;
 		--no-cloudflare) cloudflare=false; shift ;;
 		-h|--help) usage; exit 0 ;;
@@ -167,21 +171,47 @@ git tag -a "$tag" -m "$tag"
 bin/check-version "$tag"
 
 # The gates ran on this tree before the commit. Record the clean tagged commit
-# for the pre-push hook so a --push does not repeat check-dist and check.
+# for the pre-push hook so publication does not repeat check-dist and check.
 if $verify && [ -z "$(git status --porcelain)" ]; then
 	"$(dirname "$0")/gate-cache" record "$(git rev-parse HEAD)" >/dev/null 2>&1 || true
 fi
 
 if $push; then
-	git push origin HEAD
-	git push origin "$tag"
-	if git remote get-url github >/dev/null 2>&1; then
-		git push github HEAD
-		git push github "$tag"
-		printf 'release: pushed branch and %s to origin and github\n' "$tag"
+	push_fail=0
+	printf '\n== publication ==\n'
+	if git push origin HEAD; then
+		printf 'release: pushed branch to origin\n'
 	else
-		printf 'release: no github remote; origin pushed, mirror skipped\n' >&2
+		printf 'release: branch push to origin failed\n' >&2
+		push_fail=1
 	fi
+	if git push origin "$tag"; then
+		printf 'release: pushed %s to origin\n' "$tag"
+	else
+		printf 'release: tag push to origin failed\n' >&2
+		push_fail=1
+	fi
+	if git remote get-url github >/dev/null 2>&1; then
+		if git push github HEAD; then
+			printf 'release: pushed branch to github\n'
+		else
+			printf 'release: branch push to github failed\n' >&2
+			push_fail=1
+		fi
+		if git push github "$tag"; then
+			printf 'release: pushed %s to github\n' "$tag"
+		else
+			printf 'release: tag push to github failed\n' >&2
+			push_fail=1
+		fi
+	else
+		printf 'release: no github remote; mirror skipped\n' >&2
+	fi
+	if [ "$push_fail" -ne 0 ]; then
+		printf 'release: publication incomplete; the release exists locally. Retry with\n  git push origin HEAD\n  git push origin %s\n  git push github HEAD\n  git push github %s\n' "$tag" "$tag" >&2
+		exit 1
+	fi
+	printf 'release: published branch and %s to origin and github\n' "$tag"
 else
-	printf 'release: push with\n  git push origin HEAD\n  git push origin %s\n  git push github HEAD\n  git push github %s\n' "$tag" "$tag"
+	printf 'release: not published; push with\n  git push origin HEAD\n  git push origin %s\n  git push github HEAD\n  git push github %s\n' "$tag" "$tag"
 fi
