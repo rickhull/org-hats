@@ -91,6 +91,12 @@ metadata check, and the Cloudflare workerd suite. It runs locally and needs
 no Cloudflare account. `pnpm test` runs only the portable suites;
 `pnpm check:cloudflare` runs only the reference runtime.
 
+*The rest of this page through "Versions and compatibility" is integrator and
+implementer depth — install commands, the model's vocabulary, call
+signatures. Deciding whether this is worth a meeting? See
+[`docs/positioning.md`](docs/positioning.md) for the one-paragraph position,
+or skip to [Read next](#read-next).*
+
 ## Use it in a service
 
 There is no registry publication; pin a release tag. A verifier needs only
@@ -164,6 +170,11 @@ Four consequences do most of the work:
 Product objects and verbs, role hierarchy, and what the UI shows belong to
 the host. If one application and one role per person is the whole problem, a
 role column is simpler.
+
+In the literature's terms, this is target-scoped RBAC with a signed bearer
+authorization projection — not a new RBAC variant, not ABAC, and not
+Zanzibar/ReBAC. See [`docs/model_mapping.md`](docs/model_mapping.md) for the
+full mapping.
 
 ## The four calls
 
@@ -291,6 +302,11 @@ is not copied forward.
 - **First:** [`docs/tutorial.md`](docs/tutorial.md) — the longer walkthrough:
   commands, refresh, a lost disable, a crossed grant, and the objections each
   shape answers.
+- **Audience:** [`docs/personas.md`](docs/personas.md) — who this message is
+  for. [`docs/from_ldap.md`](docs/from_ldap.md) for the AD/LDAP practitioner;
+  [`docs/model_mapping.md`](docs/model_mapping.md), [`specs/authority.md`](specs/authority.md),
+  and [`specs/envelope.md`](specs/envelope.md) for the access-control
+  academic.
 - **Reference:** [`docs/authority_redesign.md`](docs/authority_redesign.md) ·
   [`docs/envelope.md`](docs/envelope.md) · [`docs/types.md`](docs/types.md) ·
   [`docs/lexicon.md`](docs/lexicon.md) · [`docs/README.md`](docs/README.md)
