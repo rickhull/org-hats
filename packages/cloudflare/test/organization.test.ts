@@ -34,6 +34,51 @@ const audit = async (stub: DurableObjectStub) =>
   call<readonly { seq: number; actor: string; fact: string }[]>(stub, "GET", "/audit");
 
 describe("OrganizationAuthority", () => {
+  it("persists only activation digests and atomically accepts one subject", async () => {
+    const stub = organization("org-activation");
+    const bootstrapped = await call(stub, "POST", "/bootstrap", {
+      ...organizationBootstrap("org/activation"),
+      principalLinks: [{ provider: "idp", subject: "lead", actorId: "actor-lead" }],
+    });
+    expect(bootstrapped.body.ok).toBe(true);
+
+    const issued = await call<{ requestId: string; expiresAt: number }>(stub, "POST", "/activation-request", {
+      actorId: "actor-crew",
+      byActorId: "actor-lead",
+      secretHash: "hash-only-not-plaintext",
+    });
+    expect(issued.body.ok).toBe(true);
+    const inspected = await call<{ usable: true }>(stub, "POST", "/activation-inspect", {
+      secretHash: "hash-only-not-plaintext",
+    });
+    expect(inspected.body.value).toEqual({ usable: true });
+
+    const accepted = await call<{ applied: boolean; actorId: string }>(stub, "POST", "/activation-accept", {
+      secretHash: "hash-only-not-plaintext",
+      provider: "idp",
+      subject: "crew-new",
+    });
+    expect(accepted.body.value).toEqual({ applied: true, actorId: "actor-crew" });
+    const replay = await call<{ applied: boolean; actorId: string }>(stub, "POST", "/activation-accept", {
+      secretHash: "hash-only-not-plaintext",
+      provider: "idp",
+      subject: "crew-new",
+    });
+    expect(replay.body.value).toEqual({ applied: false, actorId: "actor-crew" });
+    const different = await call(stub, "POST", "/activation-accept", {
+      secretHash: "hash-only-not-plaintext",
+      provider: "idp",
+      subject: "crew-other",
+    });
+    expect(different.body.failure?.kind).toBe("unauthenticated");
+
+    const snapshot = await call<{ tables: Record<string, Record<string, unknown>[]> }>(stub, "GET", "/export");
+    const request = snapshot.body.value?.tables["activation_requests"]?.[0];
+    expect(request?.["secret_hash"]).toBe("hash-only-not-plaintext");
+    expect(request).not.toHaveProperty("provider");
+    expect(request).not.toHaveProperty("subject");
+  });
+
   it("bootstraps, resolves principals, and keeps the sealed config opaque", async () => {
     const stub = organization("org-bootstrap");
     const result = await bootstrap(stub, "org/bootstrap");
@@ -54,7 +99,7 @@ describe("OrganizationAuthority", () => {
     expect(unknown.body.failure?.kind).toBe("unauthenticated");
 
     const status = await call<Record<string, unknown>>(stub, "GET", "/status");
-    expect(status.body.value?.["schemaVersion"]).toBe("1");
+    expect(status.body.value?.["schemaVersion"]).toBe("2");
     expect(status.body.value?.["organizationId"]).toBe("org/bootstrap");
     expect(status.body.value?.["actors"]).toBe(2);
     expect(status.body.value?.["hasSealedIdpConfig"]).toBe(true);

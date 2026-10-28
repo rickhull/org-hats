@@ -7,6 +7,12 @@ import {
   type AccessEnvelopeClaimsV1,
   type AccessFromEvidenceInput,
   type AccessIssue,
+  type ActivationAcceptInput,
+  type ActivationAcceptance,
+  type ActivationInspectInput,
+  type ActivationInspection,
+  type ActivationRequestInput,
+  type ActivationRequestResult,
   type AuthorityCommand,
   type AuthorityContext,
   type AuthorityRuntime,
@@ -32,6 +38,7 @@ import {
   type VerifyKeySet,
 } from "org-hats/access";
 import type { Env } from "./env";
+import { subjectGuardName } from "./subject-guard";
 
 /** The signing half the portable engine keeps internal. The Cloudflare
  * runtime signs at the Worker boundary; the operation coordinator never sees
@@ -247,6 +254,14 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
   const operation = (operationId: string): DurableObjectStub =>
     env.OPERATION.get(env.OPERATION.idFromName(operationId));
 
+  const hashActivationSecret = async (secret: string): Promise<string> => {
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", utf8(secret)));
+    return [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  };
+
+  const newActivationSecret = (): string =>
+    base64UrlEncode(crypto.getRandomValues(new Uint8Array(16)));
+
   const call = async <T>(
     stub: DurableObjectStub,
     method: "GET" | "POST",
@@ -364,7 +379,9 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         claims,
       };
     }
-    const preferred = command.kind === "disable-actor" ? command.organizationId : undefined;
+    const preferred = command.kind === "disable-actor" || command.kind === "unlink-principal" || command.kind === "revoke-activation"
+      ? command.organizationId
+      : undefined;
     const resolved = await resolve(command.authorization.evidence, preferred);
     if (isFailed(resolved)) return resolved;
     // The live organization read is the disable gate; the projection is not
@@ -478,6 +495,91 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     };
   };
 
+  const activationRequest = async (
+    input: ActivationRequestInput,
+  ): Promise<ActivationRequestResult | Failed> => {
+    if (input.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) return failed({ kind: "wrong-interface-version" });
+    const resolved = await resolve(input.evidence, input.organizationId);
+    if (isFailed(resolved)) return resolved;
+    if (resolved.disabled) return failed({ kind: "not-admitted", detail: "actor disabled" });
+    if (resolved.organizationId !== input.organizationId) return failed({ kind: "wrong-binding" });
+    if (!(await adminOfOrganization(resolved.organizationId, resolved.actorId))) {
+      return failed({ kind: "denied", detail: "the caller does not administer this organization" });
+    }
+    const secret = newActivationSecret();
+    const result = await call<{ requestId: string; expiresAt: number }>(
+      organization(input.organizationId),
+      "POST",
+      "/activation-request",
+      { actorId: input.actorId, byActorId: resolved.actorId, secretHash: await hashActivationSecret(secret) },
+    );
+    if (!result.ok || result.value === undefined) return failed(result.failure ?? { kind: "unavailable" });
+    return { ...result.value, secret };
+  };
+
+  const activationInspect = async (
+    input: ActivationInspectInput,
+  ): Promise<ActivationInspection | Failed> => {
+    if (input.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) return failed({ kind: "wrong-interface-version" });
+    const secretHash = await hashActivationSecret(input.secret);
+    let usable = false;
+    for (const organizationId of organizationIds) {
+      const result = await call<{ usable: true }>(organization(organizationId), "POST", "/activation-inspect", { secretHash });
+      if (result.ok) {
+        if (usable) return failed({ kind: "unavailable", detail: "the activation directory is ambiguous" });
+        usable = true;
+      } else if (result.failure?.kind !== "unauthenticated") {
+        return failed(result.failure ?? { kind: "unavailable" });
+      }
+    }
+    return usable ? { usable: true } : failed({ kind: "unauthenticated", detail: "activation is not usable" });
+  };
+
+  const activationAccept = async (
+    input: ActivationAcceptInput,
+  ): Promise<ActivationAcceptance | Failed> => {
+    if (input.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) return failed({ kind: "wrong-interface-version" });
+    const secretHash = await hashActivationSecret(input.secret);
+    let targetOrganizationId: string | undefined;
+    let replayActorId: string | undefined;
+    for (const organizationId of organizationIds) {
+      const result = await call<{ state: "active" } | { state: "replay"; actorId: string }>(
+        organization(organizationId),
+        "POST",
+        "/activation-preflight",
+        { secretHash, provider: input.evidence.provider, subject: input.evidence.subject },
+      );
+      if (result.ok) {
+        if (targetOrganizationId !== undefined) return failed({ kind: "unavailable", detail: "the activation directory is ambiguous" });
+        targetOrganizationId = organizationId;
+        replayActorId = result.value?.state === "replay" ? result.value.actorId : undefined;
+      } else if (result.failure?.kind !== "unauthenticated") {
+        return failed(result.failure ?? { kind: "unavailable" });
+      }
+    }
+    if (targetOrganizationId === undefined) return failed({ kind: "unauthenticated", detail: "activation is not usable" });
+    if (replayActorId !== undefined) {
+      const resolved = await resolve(input.evidence, targetOrganizationId);
+      if (isFailed(resolved)) return resolved;
+      if (resolved.organizationId !== targetOrganizationId || resolved.actorId !== replayActorId) {
+        return failed({ kind: "unavailable", detail: "the principal link is ambiguous" });
+      }
+      return { applied: false, actor: { organizationId: targetOrganizationId, actorId: replayActorId } };
+    }
+    const guardName = await subjectGuardName(input.evidence.provider, input.evidence.subject);
+    const guard = env.SUBJECT_GUARD.get(env.SUBJECT_GUARD.idFromName(guardName));
+    const result = await call<{ applied: boolean; actorId: string }>(guard, "POST", "/activation-accept", {
+      kind: "activation-accept",
+      organizationId: targetOrganizationId,
+      organizationIds,
+      provider: input.evidence.provider,
+      subject: input.evidence.subject,
+      secretHash,
+    });
+    if (!result.ok || result.value === undefined) return failed(result.failure ?? { kind: "unavailable" });
+    return { applied: result.value.applied, actor: { organizationId: targetOrganizationId, actorId: result.value.actorId } };
+  };
+
   const command = async (input: AuthorityCommand): Promise<CommandResult> => {
     if (input.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) {
       return { ok: false, failure: { kind: "wrong-interface-version" } };
@@ -584,6 +686,19 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
           byActorId: authorized.actorId,
         });
         break;
+      case "unlink-principal":
+      case "revoke-activation":
+        if (input.authorization.kind !== "fresh-evidence") {
+          return deny({ kind: "denied", detail: "principal recovery requires fresh evidence" });
+        }
+        if (authorized.organizationId !== input.organizationId) return deny({ kind: "wrong-binding" });
+        if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
+        result = await route(
+          organization(input.organizationId),
+          input.kind === "unlink-principal" ? "/unlink-principal" : "/revoke-activation",
+          { actorId: input.actorId, byActorId: authorized.actorId },
+        );
+        break;
       default: {
         // The exhaustiveness witness: this arm is `never` when every command
         // kind has a case, so adding one fails the build here instead of
@@ -599,6 +714,5 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     return result;
   };
 
-  return { accessFromEvidence, refresh, context, command };
+  return { accessFromEvidence, refresh, context, command, activationRequest, activationInspect, activationAccept };
 };
-

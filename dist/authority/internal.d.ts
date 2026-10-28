@@ -12,6 +12,8 @@ export declare const fixedClock: (start: number) => Clock & {
 };
 /** The wall clock: the in-memory runtime's real-time default. */
 export declare const systemClock: () => Clock;
+/** A 128-bit return-once bearer secret, unpadded base64url. */
+export declare const randomActivationSecret: () => string;
 /** What the engine signs envelopes with and verifies against. */
 export interface Signer {
     readonly keyId: string;

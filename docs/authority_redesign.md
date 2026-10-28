@@ -171,11 +171,18 @@ it. The properties that matter:
 - `context` yields presentation facts for the envelope's actor;
 - `command` executes a typed, idempotent command — "access request" keeps
   its organizational meaning and is never an issuance input's name.
+- `activationRequest`, `activationInspect`, and `activationAccept` own the
+  return-once lifecycle that links verified evidence to a pre-provisioned
+  actor; issuance rotates on retry, inspection reveals only usability, and
+  acceptance is replay-safe for the same subject.
 
 Commands are typed discriminated unions with consistent results and error
 semantics. Mutating commands carry an idempotency key derived from the
 caller's intent; the claim commits with its mutation, so a denied command
-cannot poison its key. The authority module validates a complete command
+cannot poison its key. Activation issuance is deliberately outside that
+rule: authority stores only a digest, so retry revokes the prior request and
+returns a new secret rather than retaining recoverable plaintext. The
+authority module validates a complete command
 before committing it. The session and command surfaces share one closed
 failure taxonomy — unavailable, unauthenticated, not-admitted, expired,
 wrong interface version, wrong operation/site binding, invalid signature,
@@ -286,6 +293,12 @@ refused, and a cross-organization ambiguity fails `unavailable` until an
 operator resolves it. The authority does not keep a store of unlinked evidence;
 a host that audits a first refused login keeps that evidence in its own audit.
 
+Activation is the authority-owned path from an unlinked actor to a principal
+link. A return-once bearer secret selects the pre-provisioned actor; verified
+evidence supplies the subject. Acceptance creates no actor or grant. The
+lifecycle, disclosure boundary, retry rule, and recovery commands are
+specified in [activation.md](activation.md).
+
 An identity adapter verifies external evidence and supplies a typed, validated
 principal to authority. Two arrangements are supported, and the portable
 interface is the same either way: a host may verify evidence itself and
@@ -330,6 +343,11 @@ explicit, idempotent, and auditable authority commands.
   One subject resolves to one actor; conflicting binds are refused, and
   cross-organization ambiguity fails closed. Unlinked evidence lives in the
   host's audit, not in authority state.
+- **Activation and recovery are authority use cases.** Activation calls are
+  portable; unlink and standalone activation revocation are idempotent
+  organization commands. The Cloudflare operator surface supplies the
+  first-administrator and emergency paths without placing an ops token in
+  the portable interface.
 
 ## State ownership
 

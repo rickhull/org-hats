@@ -58,6 +58,7 @@ export const organizationTables: readonly TableSpec[] = [
   { name: "organization", columns: ["organization_id", "display_name", "sealed_idp_config", "sealed_idp_config_updated_at", "created_at", "updated_at"], orderBy: "organization_id" },
   { name: "actors", columns: ["actor_id", "display_name", "disabled", "created_at", "updated_at"], orderBy: "actor_id" },
   { name: "principal_links", columns: ["provider", "subject", "actor_id", "created_at"], orderBy: "provider, subject" },
+  { name: "activation_requests", columns: ["request_id", "actor_id", "secret_hash", "issued_at", "expires_at", "consumed_at", "revoked_at"], orderBy: "request_id" },
   { name: "org_admins", columns: ["actor_id", "created_at"], orderBy: "actor_id" },
   { name: "invitations", columns: ["invitation_id", "operation_id", "status", "created_at", "updated_at"], orderBy: "invitation_id" },
   { name: "audit", columns: ["seq", "at", "actor", "fact"], orderBy: "seq" },

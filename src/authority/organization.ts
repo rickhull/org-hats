@@ -23,7 +23,18 @@ import {
   type OrganizationId,
 } from "../contract.ts";
 import type { Clock, Signer } from "./internal.ts";
-import type { AuthorityCommand, CommandResult } from "./types.ts";
+import { sha256Hex } from "./internal.ts";
+import type {
+  ActivationAcceptInput,
+  ActivationAcceptance,
+  ActivationInspectInput,
+  ActivationInspection,
+  ActivationRequestInput,
+  ActivationRequestResult,
+  AuthorityCommand,
+  CommandResult,
+  Failed,
+} from "./types.ts";
 import {
   principalKey,
   revokeParticipation,
@@ -49,6 +60,8 @@ export interface OrganizationDeps {
   readonly adminRoles: Readonly<Record<OperationId, readonly string[]>>;
   readonly orgAdmins: Readonly<Record<OrganizationId, readonly ActorId[]>>;
   readonly configureActions: readonly string[];
+  readonly activationLifetime: number;
+  readonly activationSecret: () => string;
 }
 
 export interface OrganizationCoordinator {
@@ -57,10 +70,35 @@ export interface OrganizationCoordinator {
     boundTo?: OperationId,
   ): Promise<Principal | Failure>;
   command: CommandHandler;
+  activationRequest(input: ActivationRequestInput): Promise<ActivationRequestResult | Failed>;
+  activationInspect(input: ActivationInspectInput): Promise<ActivationInspection | Failed>;
+  activationAccept(input: ActivationAcceptInput): Promise<ActivationAcceptance | Failed>;
 }
 
 export const createOrganizationCoordinator = (deps: OrganizationDeps): OrganizationCoordinator => {
-  const { orgs, ops, principalLinks, outbox, clock, signer, nextId, adminRoles, orgAdmins, configureActions } = deps;
+  const {
+    orgs, ops, principalLinks, outbox, clock, signer, nextId, adminRoles,
+    orgAdmins, configureActions, activationLifetime, activationSecret,
+  } = deps;
+
+  const unusableActivation = (): Failed => ({
+    failure: { kind: "unauthenticated", detail: "activation is not usable" },
+  });
+
+  const linksTo = (organization: OrganizationId, actor: ActorId): string[] =>
+    [...principalLinks.entries()]
+      .filter(([, link]) => link.organizationId === organization && link.actorId === actor)
+      .map(([key]) => key);
+
+  const revokeActiveRequests = (org: OrgState, target: ActorId): void => {
+    const at = clock.now();
+    for (const request of org.activationRequests) {
+      if (
+        request.actorId === target && request.consumedAt === undefined &&
+        request.revokedAt === undefined && clock.now() < request.expiresAt
+      ) request.revokedAt = at;
+    }
+  };
 
   const resolvePrincipal = async (
     authorization: AuthorityCommand["authorization"],
@@ -167,6 +205,7 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
     if (actor === undefined) return fail("invalid-command", "unknown actor");
     commitClaim(org.claims, input);
     actor.disabled = true;
+    revokeActiveRequests(org, actor.actorId);
     for (const op of ops.values()) {
       outbox.push({
         id: `ob-${nextId()}`, target: op.operationId, operationId: op.operationId,
@@ -177,13 +216,157 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
     return ok(input.idempotencyKey, true);
   };
 
+  const revokeActivation = (input: AuthorityCommand, principal: Principal): CommandResult => {
+    if (input.kind !== "revoke-activation") return fail("invalid-command", "wrong coordinator");
+    const org = orgs.get(organizationId(input.organizationId));
+    if (org === undefined) return fail("wrong-binding", "unknown organization");
+    if (input.authorization.kind !== "fresh-evidence") {
+      return fail("denied", "activation recovery requires fresh evidence");
+    }
+    if (principal.organizationId !== org.organizationId) return fail("wrong-binding");
+    if (!principal.adminOfOrganization) return fail("denied", "the caller does not administer this organization");
+    const replay = checkClaim(org.claims, input);
+    if (replay !== undefined) return replay;
+    const target = org.actors.find((candidate) => candidate.actorId === input.actorId);
+    if (target === undefined) return fail("invalid-command", "unknown actor");
+    revokeActiveRequests(org, target.actorId);
+    commitClaim(org.claims, input);
+    org.audit.push({
+      at: clock.now(),
+      by: `${org.organizationId}/${principal.actorId}`,
+      fact: `activation for actor ${target.actorId} revoked`,
+    });
+    return ok(input.idempotencyKey, true);
+  };
+
+  const unlinkPrincipal = (input: AuthorityCommand, principal: Principal): CommandResult => {
+    if (input.kind !== "unlink-principal") return fail("invalid-command", "wrong coordinator");
+    const org = orgs.get(organizationId(input.organizationId));
+    if (org === undefined) return fail("wrong-binding", "unknown organization");
+    if (input.authorization.kind !== "fresh-evidence") {
+      return fail("denied", "principal recovery requires fresh evidence");
+    }
+    if (principal.organizationId !== org.organizationId) return fail("wrong-binding");
+    if (!principal.adminOfOrganization) return fail("denied", "the caller does not administer this organization");
+    const replay = checkClaim(org.claims, input);
+    if (replay !== undefined) return replay;
+    const target = org.actors.find((candidate) => candidate.actorId === input.actorId);
+    if (target === undefined) return fail("invalid-command", "unknown actor");
+    for (const key of linksTo(org.organizationId, target.actorId)) principalLinks.delete(key);
+    revokeActiveRequests(org, target.actorId);
+    for (const op of ops.values()) {
+      outbox.push({
+        id: `ob-${nextId()}`,
+        target: op.operationId,
+        operationId: op.operationId,
+        kind: "actor-unlinked",
+        organizationId: org.organizationId,
+        actorId: target.actorId,
+      });
+    }
+    commitClaim(org.claims, input);
+    org.audit.push({
+      at: clock.now(),
+      by: `${org.organizationId}/${principal.actorId}`,
+      fact: `principal links for actor ${target.actorId} removed`,
+    });
+    return ok(input.idempotencyKey, true);
+  };
+
+  const activationRequest = async (
+    input: ActivationRequestInput,
+  ): Promise<ActivationRequestResult | Failed> => {
+    const principal = await resolvePrincipal({ kind: "fresh-evidence", evidence: input.evidence, operationId: "" });
+    if ("kind" in principal) return { failure: principal };
+    const org = orgs.get(organizationId(input.organizationId));
+    if (org === undefined || principal.organizationId !== org.organizationId) {
+      return { failure: { kind: "wrong-binding" } };
+    }
+    if (!principal.adminOfOrganization) {
+      return { failure: { kind: "denied", detail: "the caller does not administer this organization" } };
+    }
+    const target = org.actors.find((candidate) => candidate.actorId === input.actorId);
+    if (target === undefined) return { failure: { kind: "invalid-command", detail: "unknown actor" } };
+    if (target.disabled) return { failure: { kind: "not-admitted", detail: "actor disabled" } };
+    if (linksTo(org.organizationId, target.actorId).length > 0) {
+      return { failure: { kind: "denied", detail: "actor already has a principal link" } };
+    }
+    const secret = activationSecret();
+    const secretHash = await sha256Hex(secret);
+    revokeActiveRequests(org, target.actorId);
+    const issuedAt = clock.now();
+    const request = {
+      requestId: `activation-${nextId()}`,
+      organizationId: org.organizationId,
+      actorId: target.actorId,
+      secretHash,
+      issuedAt,
+      expiresAt: (issuedAt + activationLifetime) as typeof issuedAt,
+    };
+    org.activationRequests.push(request);
+    org.audit.push({ at: issuedAt, by: `${org.organizationId}/${principal.actorId}`, fact: `activation for actor ${target.actorId} issued` });
+    return { requestId: request.requestId, secret, expiresAt: request.expiresAt };
+  };
+
+  const requestForSecret = async (secret: string) => {
+    const secretHash = await sha256Hex(secret);
+    for (const org of orgs.values()) {
+      const request = org.activationRequests.find((candidate) => candidate.secretHash === secretHash);
+      if (request !== undefined) return { org, request };
+    }
+    return undefined;
+  };
+
+  const activationInspect = async (
+    input: ActivationInspectInput,
+  ): Promise<ActivationInspection | Failed> => {
+    const found = await requestForSecret(input.secret);
+    if (
+      found === undefined || found.request.consumedAt !== undefined ||
+      found.request.revokedAt !== undefined || clock.now() >= found.request.expiresAt
+    ) return unusableActivation();
+    return { usable: true };
+  };
+
+  const activationAccept = async (
+    input: ActivationAcceptInput,
+  ): Promise<ActivationAcceptance | Failed> => {
+    const found = await requestForSecret(input.secret);
+    if (found === undefined) return unusableActivation();
+    const { org, request } = found;
+    const key = principalKey(input.evidence.provider, input.evidence.subject);
+    const existing = principalLinks.get(key);
+    if (request.consumedAt !== undefined) {
+      return existing?.organizationId === org.organizationId && existing.actorId === request.actorId
+        ? { applied: false, actor: { organizationId: org.organizationId, actorId: request.actorId } }
+        : unusableActivation();
+    }
+    if (request.revokedAt !== undefined || clock.now() >= request.expiresAt) return unusableActivation();
+    const target = org.actors.find((candidate) => candidate.actorId === request.actorId);
+    if (target === undefined || target.disabled) return unusableActivation();
+    if (existing !== undefined && (existing.organizationId !== org.organizationId || existing.actorId !== target.actorId)) {
+      return { failure: { kind: "denied", detail: "the principal is already linked to another actor" } };
+    }
+    const targetLinks = linksTo(org.organizationId, target.actorId);
+    if (targetLinks.length > 0) return unusableActivation();
+    principalLinks.set(key, { organizationId: org.organizationId, actorId: target.actorId });
+    request.consumedAt = clock.now();
+    org.audit.push({ at: request.consumedAt, by: "activation", fact: `activation for actor ${target.actorId} accepted` });
+    return { applied: true, actor: { organizationId: org.organizationId, actorId: target.actorId } };
+  };
+
   return {
     resolvePrincipal,
+    activationRequest,
+    activationInspect,
+    activationAccept,
     command(input, principal) {
       switch (input.kind) {
         case "participation-accept": return acceptParticipation(input, principal);
         case "participation-revoke": return revokeOrganizationParticipation(input, principal);
         case "disable-actor": return disableActor(input, principal);
+        case "unlink-principal": return unlinkPrincipal(input, principal);
+        case "revoke-activation": return revokeActivation(input, principal);
         default: return fail("invalid-command", "not an organization command");
       }
     },

@@ -61,6 +61,18 @@ interface SubtleLike {
 
 const subtle: SubtleLike | undefined = (globalThis as { crypto?: { subtle?: SubtleLike } }).crypto?.subtle;
 
+interface CryptoLike {
+  getRandomValues<T extends Uint8Array>(values: T): T;
+}
+
+const cryptoSource: CryptoLike | undefined = (globalThis as { crypto?: CryptoLike }).crypto;
+
+/** A 128-bit return-once bearer secret, unpadded base64url. */
+export const randomActivationSecret = (): string => {
+  if (cryptoSource === undefined) throw new Error("Web Platform crypto (crypto.getRandomValues) is unavailable");
+  return base64UrlEncode(cryptoSource.getRandomValues(new Uint8Array(16)));
+};
+
 /** What the engine signs envelopes with and verifies against. */
 export interface Signer {
   readonly keyId: string;

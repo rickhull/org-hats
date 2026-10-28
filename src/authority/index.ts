@@ -21,6 +21,12 @@
 export type {
   AccessFromEvidenceInput,
   AccessIssue,
+  ActivationAcceptInput,
+  ActivationAcceptance,
+  ActivationInspectInput,
+  ActivationInspection,
+  ActivationRequestInput,
+  ActivationRequestResult,
   AdmissionCommand,
   AuthorityCommand,
   AuthorityCommandBody,

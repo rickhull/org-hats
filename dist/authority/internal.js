@@ -27,6 +27,13 @@ export const fixedClock = (start) => {
 /** The wall clock: the in-memory runtime's real-time default. */
 export const systemClock = () => ({ now: () => epochSeconds(Math.floor(Date.now() / 1000)) });
 const subtle = globalThis.crypto?.subtle;
+const cryptoSource = globalThis.crypto;
+/** A 128-bit return-once bearer secret, unpadded base64url. */
+export const randomActivationSecret = () => {
+    if (cryptoSource === undefined)
+        throw new Error("Web Platform crypto (crypto.getRandomValues) is unavailable");
+    return base64UrlEncode(cryptoSource.getRandomValues(new Uint8Array(16)));
+};
 const signerFromKeys = (subtle, keyId, pair) => ({
     keyId,
     algorithm: "Ed25519",

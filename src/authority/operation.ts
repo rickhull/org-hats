@@ -169,6 +169,12 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     if (record === undefined) return { failure: { kind: "unauthenticated", detail: "unknown refresh handle" } };
     if (record.revoked) return { failure: { kind: "unauthenticated", detail: "refresh handle revoked" } };
     if (record.superseded) return { failure: { kind: "unauthenticated", detail: "refresh handle superseded" } };
+    if (![...principalLinks.values()].some(
+      (link) => link.organizationId === record.organizationId && link.actorId === record.actorId,
+    )) {
+      record.revoked = true;
+      return { failure: { kind: "unauthenticated", detail: "actor has no principal link" } };
+    }
     // Supersede before issue, deliberately: the handle was consumed by
     // this attempt, and if issuance then fails — the actor disabled, the
     // participation revoked — the old handle must not survive to be

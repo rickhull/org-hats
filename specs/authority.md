@@ -7,7 +7,8 @@ Distilled from `docs/authority_redesign.md` and held by `src/authority`,
 ### A1 — Authentication never creates authority
 
 Evidence resolves an actor or fails. Actors, participation, and hats change
-only through explicit, idempotent, audited commands.
+only through explicit, audited acts. Commands are idempotent; return-once
+activation issuance rotates on retry and creates no authority by itself.
 
 *Held by:* the runtime surface — no write path begins at evidence;
 `OH-CMD-02` pins asking-is-not-admission, and `OH-PART-02` pins terminal
@@ -31,8 +32,9 @@ per-fact owner to appeal to.
 
 ### A3 — The seam serves use cases, not storage
 
-Callers receive four methods — issue from evidence, refresh, context,
-command — and never a grant query, a row, or a repository.
+Callers receive complete use cases — issue from evidence, refresh, context,
+command, and the three activation lifecycle calls — and never a grant query,
+a row, or a repository.
 
 *Held by:* `AuthorityRuntime` is the only public surface; the conformance
 inventory runs through the public surface exclusively.
@@ -92,8 +94,10 @@ The host-side carriage that depends on this rule is
 
 ### A8 — An idempotency claim commits with its mutation
 
-The claim and the fact land in one transaction; a denial never poisons its
-key, and a reused key with a different payload is named misuse.
+For every idempotent command, the claim and the fact land in one transaction;
+a denial never poisons its key, and a reused key with a different payload is
+named misuse. Activation issuance is not a command and takes no key: retry
+rotates the secret because authority retains only its digest.
 
 *Held by:* claim tables co-committed with every mutation in both runtimes;
 `OH-CMD-01`.
@@ -116,16 +120,18 @@ unmovable.
 A principal link resolves one `(organizationId, actorId)`; no provider
 claim links two actors, and equal mail-shaped subjects never merge them.
 
-Links enter through explicit bootstrap or the typed organization-authority
-ops surface. A bind that would resolve the subject to a different actor is
-refused, and a cross-organization ambiguity fails `unavailable` until an
-operator resolves it. The authority stores no unlinked evidence; a refused
-first login is the host's audit material.
+Links enter through explicit bootstrap, activation acceptance, or the typed
+organization-authority ops surface. Every Cloudflare writer passes through a
+deterministic subject guard whose scan-and-bind critical section stays
+exclusive across organization calls. A bind that would resolve the subject
+to a different actor is refused, and a cross-organization ambiguity fails
+`unavailable` until an operator resolves it. The authority stores no unlinked
+evidence; a refused first login is the host's audit material.
 
 *Held by:* no provider claim links actors — evidence carries identifying
 and authentication facts only; `linkPrincipal` and bootstrap check the
-existing link and actor before mutating; the worker checks the rest of the
-evidence directory before a bind (`packages/cloudflare/src/index.ts`);
+existing link and actor before mutating; `PrincipalSubjectGuard` serializes
+the directory check and target commit for manual bind and activation;
 `tests/ops.test.ts` and `organization.test.ts` pin the conflicts; the
 Cloudflare runtime's directory refuses a `(provider, subject)` found in more
 than one organization (`packages/cloudflare/test/runtime.test.ts`); the
@@ -135,8 +141,8 @@ and removing an actor from one operation starts affecting another.
 
 ### A11 — The portable seam is evidence-only
 
-No provider credential, authorization code, or secret crosses the portable
-`AuthorityRuntime`; the exchange that turns a provider callback into
+No provider credential, authorization code, or provider-issued secret crosses
+the portable `AuthorityRuntime`; the exchange that turns a provider callback into
 evidence is runtime surface, supplied per deployment.
 
 *Held by:* `PrincipalEvidence` carries identity and authentication facts
@@ -205,3 +211,17 @@ revocation — never an admission table.
 `wearableGrants`; `tests/engine.test.ts`.
 *If it breaks:* the docs claim an enforced admission relation the code does
 not have, and a queue review becomes mistaken for authority.
+
+### A16 — Activation is return-once and metadata-minimal
+
+An activation request names an existing actor and stores only a secret digest
+and lifecycle timestamps. Inspection reveals only usability. Acceptance
+derives the actor from the secret, binds verified evidence once, and creates
+no actor, grant, participation, or administrator standing. Issuance retry
+rotates rather than replaying plaintext.
+
+*Held by:* the three activation methods in both runtimes; organization
+activation-request storage; `tests/activation.test.ts` and the Cloudflare
+organization/runtime cases.
+*If it breaks:* activation becomes self-registration, a roster oracle, or a
+plaintext-secret recovery store.

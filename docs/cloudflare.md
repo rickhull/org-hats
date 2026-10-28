@@ -8,7 +8,7 @@ dependency. The portable modules and their contract are
 [authority_redesign.md](authority_redesign.md); this document covers what
 sits on top of them.*
 
-## Shape: two coordinators and a Worker
+## Shape: two fact owners, a subject guard, and a Worker
 
 Authority state has two owners, each a Durable Object class with SQLite
 storage:
@@ -16,7 +16,8 @@ storage:
 - **`OrganizationAuthority`** (`src/organization.ts`) — the facts that
   stay stable while an organization joins several operations: the
   organization record, actors, verified-principal links, organization
-  administrators, invitations received, audit, idempotency claims, the
+  administrators, activation-request digests and lifecycle timestamps,
+  invitations received, audit, idempotency claims, the
   outbox, and the sealed identity-provider configuration (stored
   opaquely; parsed only by the provider-callback exchange).
 - **`OperationAuthority`** (`src/operation.ts`) — operation-local
@@ -25,6 +26,13 @@ storage:
   refresh records, admission requests, audit, claims, the outbox carrying
   invitations and revocations to organization authority, and the `org_actors`
   projection of each participating organization's roster.
+
+`PrincipalSubjectGuard` is a third Durable Object class but not a fact owner.
+It is deterministically addressed by a digest of `(provider, subject)` and
+serializes each directory scan plus target bind across awaited object calls.
+Every production principal-link writer uses it, including bootstrap binds,
+manual operator binds, and activation acceptance. The target organization
+remains the durable owner of the link and audit.
 
 Every mutation commits with its audit event, idempotency claim, and outbox
 rows inside one `transactionSync`. Work spanning the two coordinators is a
@@ -64,10 +72,11 @@ segment per site, local path and alias uniqueness, and alias/slug collisions;
 deployment-wide slug uniqueness is the registry's check.
 
 **`AuthorityRuntimeEntrypoint`** (`src/index.ts`) is the Worker consumers
-bind to. Over a `services` binding it exposes the four portable
+bind to. Over a `services` binding it exposes the portable
 `AuthorityRuntime` methods — `accessFromEvidence`, `refresh`, `context`
-(names, wearable hats, and the selected hat from both coordinators), and
-`command` — plus one runtime-only method:
+(names, wearable hats, and the selected hat from both coordinators),
+`command`, `activationRequest`, `activationInspect`, and `activationAccept`
+— plus one runtime-only method:
 
 **`evidenceFromProviderCode`** — the provider-callback exchange, the
 identity-adapter surface for OIDC logins. The host's callback supplies
@@ -199,6 +208,12 @@ public key distribution:
 - `POST /ops/organization/principal-link` — bind a verified provider subject
   to an existing actor; the worker refuses a subject already linked in
   another organization in the evidence directory
+- `POST /ops/organization/activation-request` — mint the first
+  administrator's return-once activation secret
+- `POST /ops/organization/revoke-activation` — revoke an actor's outstanding
+  activation without disabling the actor
+- `POST /ops/organization/unlink-principal` — emergency principal recovery;
+  remove the actor's links and revoke refresh authority without removing grants
 - `POST /ops/operation/routing-facts` — `{ operationId, slug, sites }`,
   backfilling the operation's complete routing facts; a rename waits for
   history and is not this route's job

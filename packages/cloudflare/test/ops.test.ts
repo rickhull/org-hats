@@ -60,6 +60,39 @@ const opBootstrap = (operationId: string, organizationId: string) => ({
 });
 
 describe("typed ops routes", () => {
+  it("mints and revokes the first administrator activation through operator routes", async () => {
+    const organizationId = "org-ops-first-admin";
+    expect((await jsonPost("/ops/organization/bootstrap", {
+      ...orgBootstrap(organizationId),
+      principalLinks: [],
+    })).status).toBe(200);
+
+    const issued = await jsonPost("/ops/organization/activation-request", {
+      organizationId,
+      actorId: "actor-lead",
+    });
+    const issuedBody = await issued.json() as {
+      ok: boolean;
+      value?: { requestId: string; secret: string; expiresAt: number };
+    };
+    expect(issuedBody.ok).toBe(true);
+    expect(issuedBody.value?.secret).toMatch(/^[A-Za-z0-9_-]{22}$/);
+
+    const revoked = await jsonPost("/ops/organization/revoke-activation", {
+      organizationId,
+      actorId: "actor-lead",
+      idempotencyKey: "ops-revoke-first-admin",
+    });
+    expect((await revoked.json() as { ok: boolean }).ok).toBe(true);
+
+    const exported = await (await ops(`/ops/export?coordinator=organization&id=${organizationId}`)).json() as {
+      tables: Record<string, Record<string, unknown>[]>;
+    };
+    const request = exported.tables["activation_requests"]?.[0];
+    expect(request?.["revoked_at"]).not.toBeNull();
+    expect(JSON.stringify(request)).not.toContain(issuedBody.value?.secret);
+  });
+
   it("requires the ops token", async () => {
     const denied = await SELF.fetch(`https://authority.internal/ops/schema-status?coordinator=operation&id=${OP}`);
     expect(denied.status).toBe(401);
@@ -120,6 +153,32 @@ describe("typed ops routes", () => {
     expect(restoredOrg.status).toBe(200);
     const restoredOrgExport = await (await ops(`/ops/export?coordinator=organization&id=${RESTORED_ORG}`)).json();
     expect(restoredOrgExport).toEqual(orgExport);
+  });
+
+  it("restores a schema-1 organization export with an empty activation table", async () => {
+    const sourceId = "org-ops-schema-one";
+    expect((await jsonPost("/ops/organization/bootstrap", orgBootstrap(sourceId))).status).toBe(200);
+    const current = await (await ops(`/ops/export?coordinator=organization&id=${sourceId}`)).json() as {
+      coordinator: string;
+      schemaVersion: string;
+      tables: Record<string, unknown[]>;
+    };
+    const { activation_requests: _activationRequests, ...oldTables } = current.tables;
+    const targetId = "org-ops-schema-one-restored";
+    const restored = await jsonPost("/ops/restore", {
+      coordinator: "organization",
+      id: targetId,
+      snapshot: { ...current, schemaVersion: "1", tables: oldTables },
+    });
+    expect(restored.status).toBe(200);
+    expect((await restored.json() as { ok: boolean }).ok).toBe(true);
+    const after = await (await ops(`/ops/export?coordinator=organization&id=${targetId}`)).json() as {
+      schemaVersion: string;
+      tables: Record<string, unknown[]>;
+    };
+    expect(after.schemaVersion).toBe("2");
+    expect(after.tables["actors"]).toHaveLength(2);
+    expect(after.tables["activation_requests"]).toEqual([]);
   });
 
   it("restores a schema-3 export and backfills routing facts", async () => {

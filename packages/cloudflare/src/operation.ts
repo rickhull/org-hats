@@ -857,12 +857,16 @@ export class OperationAuthority extends DurableObject<Env> {
             : `participation ${input.organizationId} not revoked: ${revoked.problem}`,
           at,
         );
-      } else if (input.kind === "actor-disabled") {
+      } else if (input.kind === "actor-disabled" || input.kind === "actor-unlinked") {
         if (input.organizationId === undefined || input.actorId === undefined) {
-          return failure("invalid-command", "actor-disabled needs organizationId and actorId");
+          return failure("invalid-command", `${input.kind} needs organizationId and actorId`);
         }
         this.revokeRefreshRecords(input.organizationId, input.actorId);
-        this.audit("outbox", `actor ${input.organizationId}/${input.actorId} disabled; refresh records revoked`, at);
+        this.audit(
+          "outbox",
+          `actor ${input.organizationId}/${input.actorId} ${input.kind === "actor-disabled" ? "disabled" : "unlinked"}; refresh records revoked`,
+          at,
+        );
       } else if (input.kind === "roster") {
         if (input.organizationId === undefined) return failure("invalid-command", "roster needs an organizationId");
         if (input.actors === undefined) return failure("invalid-command", "roster needs an actors list");
@@ -1328,7 +1332,7 @@ export class OperationAuthority extends DurableObject<Env> {
   private async organizationActor(
     organizationId: OrganizationId,
     actorId: ActorId,
-  ): Promise<{ readonly actorId: string; readonly disabled: boolean } | "unknown" | "unavailable"> {
+  ): Promise<{ readonly actorId: string; readonly disabled: boolean; readonly linked: boolean } | "unknown" | "unavailable"> {
     let response: Response;
     try {
       response = await this.env.ORGANIZATION
@@ -1342,7 +1346,7 @@ export class OperationAuthority extends DurableObject<Env> {
     try {
       const body = await response.json() as {
         readonly ok?: boolean;
-        readonly value?: { readonly actorId: string; readonly disabled: boolean };
+        readonly value?: { readonly actorId: string; readonly disabled: boolean; readonly linked: boolean };
       };
       if (body.ok !== true || body.value === undefined) return "unavailable";
       return body.value;
@@ -1381,6 +1385,7 @@ export class OperationAuthority extends DurableObject<Env> {
     if (live === "unknown") return failure("not-admitted", "actor is not known at the organization");
     if (live === "unavailable") return failure("unavailable", "the organization could not confirm the actor");
     if (live.disabled) return failure("not-admitted", "actor disabled");
+    if (!live.linked) return failure("unauthenticated", "actor has no principal link");
     const built = this.buildClaims(organization, actor, auth);
     if (!built.ok) return built;
     this.ctx.storage.sql.exec(

@@ -34,6 +34,9 @@ public `org-hats` docs are normative for the seam.
 - [`consumer-login.md`](consumer-login.md) — the host half of the OIDC
   login: the flow, who holds what, state/nonce/PKCE, the evidence exchange,
   the closed failure set, and a refused first login.
+- [`activation.md`](activation.md) — claiming a pre-provisioned actor,
+  return-once secret rotation, global subject serialization, revocation, and
+  principal recovery.
 - [`binding-conformance.md`](binding-conformance.md) — the documented
   service-binding smoke subset and what it does not claim.
 - [`inventory.md`](inventory.md) — the story index: every conformance case

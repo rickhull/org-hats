@@ -1,7 +1,7 @@
 # org-hats-cloudflare
 
-The optional Cloudflare reference runtime: the two authority coordinators
-as SQLite-backed Durable Objects, and the `AuthorityRuntimeEntrypoint`
+The optional Cloudflare reference runtime: the two authority fact owners and
+the subject-keyed race guard as Durable Objects, and the `AuthorityRuntimeEntrypoint`
 Worker a consumer binds to. Private, on its own `0.x` cadence, consumed
 by deployment through a service binding rather than by dependency.
 
@@ -25,6 +25,8 @@ pnpm --filter org-hats-cloudflare demo    # self-contained: bootstrap, dev login
   participation, policy, refresh records
 - `src/runtime.ts` — the portable `AuthorityRuntime` over both, plus
   `evidenceFromProviderCode`
+- `src/subject-guard.ts` — per-provider-subject serialization for every
+  principal-link writer
 - `src/index.ts` — the entrypoint, ops routes, and demo
 - `src/state.ts` — canonical export/restore
 - `test/` — workerd suites; no `isolatedStorage`, so tests use unique

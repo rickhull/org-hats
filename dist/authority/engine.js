@@ -13,7 +13,7 @@
 // fresh signer gives reproducible behavior (ids, failure kinds, receipts)
 // without pinning signature bytes.
 import { AUTHORITY_INTERFACE_VERSION, operationId, } from "../contract.js";
-import { counter, systemClock, webCryptoSigner } from "./internal.js";
+import { counter, randomActivationSecret, systemClock, webCryptoSigner } from "./internal.js";
 import { createOperationCoordinator } from "./operation.js";
 import { createOrganizationCoordinator } from "./organization.js";
 import { deliverPending } from "./outbox.js";
@@ -24,6 +24,8 @@ export const createInMemoryAuthority = async (config = {}) => {
     const clock = config.clock ?? systemClock();
     const signer = config.signer ?? (await webCryptoSigner(`key-${nextSigningKey()}`));
     const lifetime = config.envelopeLifetimeSeconds ?? 900;
+    const activationLifetime = config.activationLifetimeSeconds ?? 86_400;
+    const activationSecret = config.activationSecret ?? randomActivationSecret;
     const configureActions = config.configureActions ?? ["configure"];
     const adminRoles = config.adminRoles ?? {};
     const orgAdmins = config.orgAdmins ?? {};
@@ -69,6 +71,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                     invitations: new Map(),
                     audit: [{ at: clock.now(), by: "bootstrap", fact: `organization ${organization.organizationId} created` }],
                     claims: new Map(),
+                    activationRequests: [],
                 });
                 allOrganizations.push({ organizationId: organization.organizationId, ...(organization.displayName !== undefined ? { displayName: organization.displayName } : {}) });
             }
@@ -126,6 +129,8 @@ export const createInMemoryAuthority = async (config = {}) => {
         adminRoles,
         orgAdmins,
         configureActions,
+        activationLifetime,
+        activationSecret,
     });
     // The outbox drain. `failTransport` consumes the injected failures, so a
     // message whose attempt failed stays in the outbox for the next call.
@@ -150,6 +155,27 @@ export const createInMemoryAuthority = async (config = {}) => {
     // refuses must not even deliver pending coordinator messages — a rejected
     // caller causes no side effects, and delivery is one.
     const runtime = {
+        async activationRequest(input) {
+            const versionFail = checkVersion(input.interfaceVersion);
+            if (versionFail !== undefined)
+                return failed(versionFail);
+            await deliver();
+            return organizations.activationRequest(input);
+        },
+        async activationInspect(input) {
+            const versionFail = checkVersion(input.interfaceVersion);
+            if (versionFail !== undefined)
+                return failed(versionFail);
+            await deliver();
+            return organizations.activationInspect(input);
+        },
+        async activationAccept(input) {
+            const versionFail = checkVersion(input.interfaceVersion);
+            if (versionFail !== undefined)
+                return failed(versionFail);
+            await deliver();
+            return organizations.activationAccept(input);
+        },
         async accessFromEvidence(input) {
             const versionFail = checkVersion(input.interfaceVersion);
             if (versionFail !== undefined)
@@ -181,7 +207,9 @@ export const createInMemoryAuthority = async (config = {}) => {
                 return operations.requestAccess(inputCommand);
             // which operation this command binds to, if any: `disable-actor` is
             // organization-scoped and binds to none
-            const boundOperation = inputCommand.kind === "disable-actor"
+            const boundOperation = inputCommand.kind === "disable-actor" ||
+                inputCommand.kind === "unlink-principal" ||
+                inputCommand.kind === "revoke-activation"
                 ? undefined
                 : "operationId" in inputCommand
                     ? operationId(inputCommand.operationId)
@@ -192,6 +220,8 @@ export const createInMemoryAuthority = async (config = {}) => {
             switch (inputCommand.kind) {
                 case "participation-accept":
                 case "disable-actor":
+                case "unlink-principal":
+                case "revoke-activation":
                     return organizations.command(inputCommand, principalOrFailure);
                 case "participation-revoke":
                     return inputCommand.by === "operation"

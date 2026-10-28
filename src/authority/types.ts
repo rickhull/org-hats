@@ -75,6 +75,43 @@ export interface RefreshInput extends Versioned {
   readonly handle: RefreshHandle;
 }
 
+/** Mint a return-once activation secret for an existing, unlinked actor.
+ * Retrying rotates the secret; this call intentionally has no idempotency
+ * key because authority stores only its digest. */
+export interface ActivationRequestInput extends Versioned {
+  readonly organizationId: Unbranded<OrganizationId>;
+  readonly actorId: Unbranded<ActorId>;
+  readonly evidence: PrincipalEvidence;
+}
+
+export interface ActivationRequestResult {
+  readonly requestId: string;
+  readonly secret: string;
+  readonly expiresAt: number;
+}
+
+export interface ActivationInspectInput extends Versioned {
+  readonly secret: string;
+}
+
+/** Deliberately reveals no actor, organization, or expiry metadata. */
+export interface ActivationInspection {
+  readonly usable: true;
+}
+
+export interface ActivationAcceptInput extends Versioned {
+  readonly secret: string;
+  readonly evidence: PrincipalEvidence;
+}
+
+export interface ActivationAcceptance {
+  readonly applied: boolean;
+  readonly actor: {
+    readonly organizationId: Unbranded<OrganizationId>;
+    readonly actorId: Unbranded<ActorId>;
+  };
+}
+
 /** Presentation context for the signed-in actor, proven by a valid envelope.
  * Display names are presentation, not identity; ids resolve. */
 export interface ContextRequest extends Versioned {
@@ -162,7 +199,9 @@ export type GrantCommand =
   | { readonly kind: "select-hat"; readonly operationId: Unbranded<OperationId>; readonly grantId: string };
 
 export type OrganizationCommand =
-  | { readonly kind: "disable-actor"; readonly organizationId: Unbranded<OrganizationId>; readonly actorId: Unbranded<ActorId> };
+  | { readonly kind: "disable-actor"; readonly organizationId: Unbranded<OrganizationId>; readonly actorId: Unbranded<ActorId> }
+  | { readonly kind: "unlink-principal"; readonly organizationId: Unbranded<OrganizationId>; readonly actorId: Unbranded<ActorId> }
+  | { readonly kind: "revoke-activation"; readonly organizationId: Unbranded<OrganizationId>; readonly actorId: Unbranded<ActorId> };
 
 export type AuthorityCommandBody =
   | ParticipationCommand
@@ -243,4 +282,10 @@ export interface AuthorityRuntime {
   context(input: ContextRequest): Promise<AuthorityContext | Failed>;
   /** A typed, idempotent authority command. */
   command(input: AuthorityCommand): Promise<CommandResult>;
+  /** Administrator-authorized return-once activation issuance. */
+  activationRequest(input: ActivationRequestInput): Promise<ActivationRequestResult | Failed>;
+  /** Non-consuming, metadata-free bearer-secret inspection. */
+  activationInspect(input: ActivationInspectInput): Promise<ActivationInspection | Failed>;
+  /** Atomically bind verified evidence and consume its activation. */
+  activationAccept(input: ActivationAcceptInput): Promise<ActivationAcceptance | Failed>;
 }

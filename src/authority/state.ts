@@ -52,6 +52,18 @@ export interface OrgState {
   invitations: Map<string, { operationId: OperationId; status: "pending" | "accepted" }>;
   audit: AuditEvent[];
   claims: Map<IdempotencyKey, Claim>;
+  activationRequests: ActivationRequest[];
+}
+
+export interface ActivationRequest {
+  readonly requestId: string;
+  readonly organizationId: OrganizationId;
+  readonly actorId: ActorId;
+  readonly secretHash: string;
+  readonly issuedAt: EpochSeconds;
+  readonly expiresAt: EpochSeconds;
+  consumedAt?: EpochSeconds;
+  revokedAt?: EpochSeconds;
 }
 
 export interface RefreshRecord {
@@ -88,7 +100,7 @@ export interface OpState {
 export interface OutboxMessage {
   readonly id: string;
   readonly target: string;
-  readonly kind: "invitation" | "acceptance" | "actor-disabled";
+  readonly kind: "invitation" | "acceptance" | "actor-disabled" | "actor-unlinked";
   readonly invitationId?: string;
   readonly operationId?: OperationId;
   readonly organizationId?: OrganizationId;

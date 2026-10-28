@@ -27,6 +27,17 @@ export interface OrgState {
     }>;
     audit: AuditEvent[];
     claims: Map<IdempotencyKey, Claim>;
+    activationRequests: ActivationRequest[];
+}
+export interface ActivationRequest {
+    readonly requestId: string;
+    readonly organizationId: OrganizationId;
+    readonly actorId: ActorId;
+    readonly secretHash: string;
+    readonly issuedAt: EpochSeconds;
+    readonly expiresAt: EpochSeconds;
+    consumedAt?: EpochSeconds;
+    revokedAt?: EpochSeconds;
 }
 export interface RefreshRecord {
     readonly handleHash: string;
@@ -79,7 +90,7 @@ export interface OpState {
 export interface OutboxMessage {
     readonly id: string;
     readonly target: string;
-    readonly kind: "invitation" | "acceptance" | "actor-disabled";
+    readonly kind: "invitation" | "acceptance" | "actor-disabled" | "actor-unlinked";
     readonly invitationId?: string;
     readonly operationId?: OperationId;
     readonly organizationId?: OrganizationId;

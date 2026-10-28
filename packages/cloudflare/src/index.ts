@@ -5,6 +5,12 @@ import {
   isFailed,
   type AccessFromEvidenceInput,
   type AccessIssue,
+  type ActivationAcceptInput,
+  type ActivationAcceptance,
+  type ActivationInspectInput,
+  type ActivationInspection,
+  type ActivationRequestInput,
+  type ActivationRequestResult,
   type AuthorityCommand,
   type AuthorityContext,
   type AuthorityRuntime,
@@ -23,13 +29,15 @@ import {
   type CloudflareSigner,
 } from "./runtime";
 import type { EvidenceFromProviderCodeInput, EvidenceFromProviderCodeResult } from "./exchange";
-import { verify, type Failed, type VerifyKey } from "org-hats/access";
+import { base64UrlEncode, utf8, verify, type Failed, type VerifyKey } from "org-hats/access";
 import { CONFORMANCE_PRINCIPALS, type ConformanceWorld } from "org-hats/conformance";
 import { createCloudflareConformanceWorld } from "./conformance";
+import { subjectGuardName } from "./subject-guard";
 
 export { Counter } from "./counter";
 export { OrganizationAuthority } from "./organization";
 export { OperationAuthority } from "./operation";
+export { PrincipalSubjectGuard } from "./subject-guard";
 
 const keysFor = async (env: Env, signer: CloudflareSigner): Promise<ReadonlyMap<string, VerifyKey>> =>
   verificationKeys(env, signer);
@@ -107,6 +115,15 @@ async function check() { show(await api("/demo/access", { envelope })); }
  * same four methods the in-memory engine implements, plus the runtime-only
  * provider-callback exchange. */
 export class AuthorityRuntimeEntrypoint extends WorkerEntrypoint<Env> implements AuthorityRuntime {
+  activationRequest(input: ActivationRequestInput): Promise<ActivationRequestResult | Failed> {
+    return runtime(this.env).then((value) => value.activationRequest(input));
+  }
+  activationInspect(input: ActivationInspectInput): Promise<ActivationInspection | Failed> {
+    return runtime(this.env).then((value) => value.activationInspect(input));
+  }
+  activationAccept(input: ActivationAcceptInput): Promise<ActivationAcceptance | Failed> {
+    return runtime(this.env).then((value) => value.activationAccept(input));
+  }
   accessFromEvidence(input: AccessFromEvidenceInput): Promise<AccessIssue | Failed> {
     return runtime(this.env).then((value) => value.accessFromEvidence(input));
   }
@@ -149,29 +166,19 @@ const relay = async (stub: DurableObjectStub, path: string, body?: unknown): Pro
 const organizationStub = (env: Env, organizationId: string): DurableObjectStub =>
   env.ORGANIZATION.get(env.ORGANIZATION.idFromName(organizationId));
 
+const activationSecret = (): string => base64UrlEncode(crypto.getRandomValues(new Uint8Array(16)));
+
+const activationSecretHash = async (secret: string): Promise<string> => {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", utf8(secret)));
+  return [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
 export interface PrincipalLinkInput {
   readonly organizationId: string;
   readonly provider: string;
   readonly subject: string;
   readonly actorId: string;
 }
-
-const resolveAt = async (
-  env: Env,
-  organizationId: string,
-  provider: string,
-  subject: string,
-): Promise<{ readonly ok: boolean; readonly failure?: { readonly kind: string } }> => {
-  try {
-    const response = await relay(
-      organizationStub(env, organizationId),
-      `/resolve?provider=${encodeURIComponent(provider)}&subject=${encodeURIComponent(subject)}`,
-    );
-    return await response.json() as { ok: boolean; failure?: { kind: string } };
-  } catch {
-    return { ok: false, failure: { kind: "unavailable" } };
-  }
-};
 
 /** Bind a principal link through the directory. One identity is never two
  * actors: if another directory organization already resolves the subject, the
@@ -194,29 +201,17 @@ export const bindPrincipalLink = async (
       },
     };
   }
-  for (const organizationId of organizationDirectory(env)) {
-    if (organizationId === input.organizationId) continue;
-    const resolved = await resolveAt(env, organizationId, input.provider, input.subject);
-    if (resolved.ok) {
-      return {
-        status: 400,
-        body: {
-          ok: false,
-          failure: {
-            kind: "invalid-command",
-            detail: `the principal link is already present in organization ${organizationId}`,
-          },
-        },
-      };
-    }
-    if (resolved.failure?.kind !== "unauthenticated") {
-      return {
-        status: 503,
-        body: { ok: false, failure: resolved.failure ?? { kind: "unavailable" } },
-      };
-    }
-  }
-  const response = await relay(organizationStub(env, input.organizationId), "/principal-link", input);
+  const guardName = await subjectGuardName(input.provider, input.subject);
+  const guard = env.SUBJECT_GUARD.get(env.SUBJECT_GUARD.idFromName(guardName));
+  const response = await guard.fetch("https://authority.internal/bind", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      kind: "bind",
+      ...input,
+      organizationIds: [...new Set([input.organizationId, ...organizationDirectory(env)])],
+    }),
+  });
   return { status: response.status, body: await response.json() };
 };
 
@@ -239,9 +234,31 @@ export default {
       }
       try {
         if (request.method === "POST" && url.pathname === "/ops/organization/bootstrap") {
-          const body = await request.json() as { organizationId?: string };
+          const body = await request.json() as {
+            organizationId?: string;
+            principalLinks?: readonly { provider?: string; subject?: string; actorId?: string }[];
+          };
           if (typeof body.organizationId !== "string") throw new Error("organizationId is required");
-          return relay(env.ORGANIZATION.get(env.ORGANIZATION.idFromName(body.organizationId)), "/bootstrap", body);
+          const links = body.principalLinks ?? [];
+          const bootstrapped = await relay(
+            env.ORGANIZATION.get(env.ORGANIZATION.idFromName(body.organizationId)),
+            "/bootstrap",
+            { ...body, principalLinks: [] },
+          );
+          if (!bootstrapped.ok) return bootstrapped;
+          for (const link of links) {
+            if (typeof link.provider !== "string" || typeof link.subject !== "string" || typeof link.actorId !== "string") {
+              throw new Error("each principal link requires provider, subject, and actorId");
+            }
+            const bound = await bindPrincipalLink(env, {
+              organizationId: body.organizationId,
+              provider: link.provider,
+              subject: link.subject,
+              actorId: link.actorId,
+            });
+            if (bound.status >= 400) return Response.json(bound.body, { status: bound.status });
+          }
+          return bootstrapped;
         }
         if (request.method === "GET" && url.pathname === "/ops/organization/principal-links") {
           const organizationId = url.searchParams.get("organizationId");
@@ -267,6 +284,40 @@ export default {
             actorId: body.actorId,
           });
           return Response.json(result.body, { status: result.status });
+        }
+        if (request.method === "POST" && url.pathname === "/ops/organization/activation-request") {
+          const body = await request.json() as { organizationId?: string; actorId?: string };
+          if (typeof body.organizationId !== "string" || typeof body.actorId !== "string") {
+            throw new Error("organizationId and actorId are required");
+          }
+          const secret = activationSecret();
+          const response = await organizationStub(env, body.organizationId).fetch("https://authority.internal/activation-request", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              actorId: body.actorId,
+              byActorId: "operator",
+              operator: true,
+              secretHash: await activationSecretHash(secret),
+            }),
+          });
+          const result = await response.json() as { ok: boolean; value?: Record<string, unknown>; failure?: unknown };
+          return Response.json(result.ok ? { ...result, value: { ...result.value, secret } } : result, { status: response.status });
+        }
+        if (
+          request.method === "POST" &&
+          (url.pathname === "/ops/organization/revoke-activation" || url.pathname === "/ops/organization/unlink-principal")
+        ) {
+          const body = await request.json() as { organizationId?: string; actorId?: string; idempotencyKey?: string };
+          if (
+            typeof body.organizationId !== "string" || typeof body.actorId !== "string" ||
+            typeof body.idempotencyKey !== "string"
+          ) throw new Error("organizationId, actorId, and idempotencyKey are required");
+          return relay(
+            organizationStub(env, body.organizationId),
+            url.pathname.endsWith("unlink-principal") ? "/unlink-principal" : "/revoke-activation",
+            { actorId: body.actorId, byActorId: "operator", operator: true, idempotencyKey: body.idempotencyKey },
+          );
         }
         if (request.method === "POST" && url.pathname === "/ops/operation/bootstrap") {
           const body = await request.json() as { operationId?: string };

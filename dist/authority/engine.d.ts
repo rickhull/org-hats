@@ -29,6 +29,10 @@ export interface InMemoryAuthorityConfig {
      * concern (T6.4). */
     readonly signer?: SignerLike;
     readonly envelopeLifetimeSeconds?: number;
+    /** Defaults to 24 hours. */
+    readonly activationLifetimeSeconds?: number;
+    /** Test seam; production defaults to 128 cryptographic random bits. */
+    readonly activationSecret?: () => string;
     /** Actions that confer site-configuration reach (default `["configure"]`). */
     readonly configureActions?: readonly string[];
     readonly adminRoles?: Readonly<Record<OperationId, readonly string[]>>;

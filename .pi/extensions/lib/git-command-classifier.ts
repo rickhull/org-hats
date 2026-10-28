@@ -2,6 +2,12 @@
 // It deliberately recognizes only the command shapes agents commonly emit;
 // unrecognized text never becomes a Git command merely because it mentions
 // the words "git" and a protected subcommand.
+//
+// Placement: this module lives in lib/ — a subdirectory pi's extension
+// discovery never enters (it loads only top-level *.ts and */index.ts) — so
+// it stays importable without being mistaken for an extension.  A top-level
+// library file with no default factory export breaks pi startup with
+// "Extension does not export a valid factory function".
 
 export const DENY: readonly string[] = [
   "commit",

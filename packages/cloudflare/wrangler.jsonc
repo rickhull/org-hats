@@ -17,11 +17,13 @@
     "bindings": [
       { "name": "COUNTER", "class_name": "Counter" },
       { "name": "ORGANIZATION", "class_name": "OrganizationAuthority" },
-      { "name": "OPERATION", "class_name": "OperationAuthority" }
+      { "name": "OPERATION", "class_name": "OperationAuthority" },
+      { "name": "SUBJECT_GUARD", "class_name": "PrincipalSubjectGuard" }
     ]
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["Counter", "OrganizationAuthority"] },
-    { "tag": "v2", "new_sqlite_classes": ["OperationAuthority"] }
+    { "tag": "v2", "new_sqlite_classes": ["OperationAuthority"] },
+    { "tag": "v3", "new_sqlite_classes": ["PrincipalSubjectGuard"] }
   ]
 }

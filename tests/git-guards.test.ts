@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
-import { ASK, DENY, gitSubcommands } from "../.pi/extensions/git-command-classifier.ts";
+import { ASK, DENY, gitSubcommands } from "../.pi/extensions/lib/git-command-classifier.ts";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const codexGuard = join(root, ".codex", "git-guard.sh");

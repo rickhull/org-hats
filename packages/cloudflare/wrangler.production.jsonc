@@ -24,6 +24,8 @@
 //   AUTHORITY_VERIFICATION_KEYS   canonical serialized VerifyKeySet JSON
 //   AUTHORITY_ORGANIZATION_IDS    comma-separated evidence-resolution
 //                                 directory (no global registry)
+//   AUTHORITY_ACTIVATION_LIFETIME_SECONDS
+//                                 positive seconds; default 86400
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "org-hats-authority",
@@ -33,10 +35,12 @@
   "durable_objects": {
     "bindings": [
       { "name": "ORGANIZATION", "class_name": "OrganizationAuthority" },
-      { "name": "OPERATION", "class_name": "OperationAuthority" }
+      { "name": "OPERATION", "class_name": "OperationAuthority" },
+      { "name": "SUBJECT_GUARD", "class_name": "PrincipalSubjectGuard" }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["OrganizationAuthority", "OperationAuthority"] }
+    { "tag": "v1", "new_sqlite_classes": ["OrganizationAuthority", "OperationAuthority"] },
+    { "tag": "v2", "new_sqlite_classes": ["PrincipalSubjectGuard"] }
   ]
 }

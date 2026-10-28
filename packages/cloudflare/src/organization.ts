@@ -18,7 +18,7 @@ import {
  * while the organization participates in several operations: actors,
  * verified-principal links, organization administrators, the organization's
  * side of invitations, audit, idempotency claims, and its outbox. */
-const SCHEMA_VERSION = "1";
+const SCHEMA_VERSION = "2";
 
 type Row = Record<string, string | number | null>;
 
@@ -31,7 +31,7 @@ const now = (): number => Math.floor(Date.now() / 1000);
 /** Messages addressed to every operation this organization is known to,
  * rather than to one named target: a roster image and an actor disable are
  * both facts every participating operation must learn. */
-const FAN_OUT_KINDS = new Set(["actor-disabled", "roster"]);
+const FAN_OUT_KINDS = new Set(["actor-disabled", "actor-unlinked", "roster"]);
 
 const failure = (kind: FailureKind, detail?: string): { readonly ok: false; readonly failure: Failure } => ({
   ok: false,
@@ -91,6 +91,26 @@ interface DisableInput {
   readonly idempotencyKey: string;
 }
 
+interface ActivationRequestInput {
+  readonly actorId: string;
+  readonly byActorId: string;
+  readonly secretHash: string;
+  readonly operator?: boolean;
+}
+
+interface ActivationAcceptInput {
+  readonly secretHash: string;
+  readonly provider: string;
+  readonly subject: string;
+}
+
+interface RecoveryInput {
+  readonly actorId: string;
+  readonly byActorId: string;
+  readonly idempotencyKey: string;
+  readonly operator?: boolean;
+}
+
 export class OrganizationAuthority extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -128,6 +148,17 @@ export class OrganizationAuthority extends DurableObject<Env> {
         actor_id TEXT NOT NULL,
         created_at INTEGER NOT NULL,
         PRIMARY KEY (provider, subject)
+      )`,
+    );
+    sql.exec(
+      `CREATE TABLE IF NOT EXISTS activation_requests (
+        request_id TEXT PRIMARY KEY,
+        actor_id TEXT NOT NULL,
+        secret_hash TEXT NOT NULL UNIQUE,
+        issued_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        consumed_at INTEGER,
+        revoked_at INTEGER
       )`,
     );
     sql.exec(
@@ -171,6 +202,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
       "INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', ?)",
       SCHEMA_VERSION,
     );
+    sql.exec("UPDATE meta SET value = ? WHERE key = 'schema_version'", SCHEMA_VERSION);
   }
 
   private rows(query: string, ...bindings: (string | number | null)[]): Row[] {
@@ -447,6 +479,161 @@ export class OrganizationAuthority extends DurableObject<Env> {
     });
   }
 
+  private activationRequest(input: ActivationRequestInput): Result<{ requestId: string; expiresAt: number }> {
+    const at = now();
+    return this.ctx.storage.transactionSync(() => {
+      if (!input.operator && !this.isAdmin(input.byActorId)) {
+        return failure("denied", "the caller does not administer this organization");
+      }
+      const actor = this.actor(input.actorId);
+      if (actor === undefined) return failure("invalid-command", "unknown actor");
+      if (actor.disabled) return failure("not-admitted", "actor disabled");
+      if (this.one("SELECT 1 AS present FROM principal_links WHERE actor_id = ? LIMIT 1", input.actorId) !== undefined) {
+        return failure("denied", "actor already has a principal link");
+      }
+      this.ctx.storage.sql.exec(
+        "UPDATE activation_requests SET revoked_at = ? WHERE actor_id = ? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at > ?",
+        at, input.actorId, at,
+      );
+      const requestId = `activation-${crypto.randomUUID()}`;
+      const configuredLifetime = this.env.AUTHORITY_ACTIVATION_LIFETIME_SECONDS;
+      const lifetime = configuredLifetime === undefined ? 86_400 : Number(configuredLifetime);
+      if (!Number.isSafeInteger(lifetime) || lifetime <= 0) {
+        return failure("unavailable", "activation lifetime configuration is invalid");
+      }
+      const expiresAt = at + lifetime;
+      this.ctx.storage.sql.exec(
+        "INSERT INTO activation_requests (request_id, actor_id, secret_hash, issued_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+        requestId, input.actorId, input.secretHash, at, expiresAt,
+      );
+      this.audit(input.operator ? "operator" : input.byActorId, `activation for actor ${input.actorId} issued`, at);
+      return value({ requestId, expiresAt });
+    });
+  }
+
+  private activationInspect(secretHash: string): Result<{ usable: true }> {
+    const row = this.one(
+      "SELECT consumed_at, revoked_at, expires_at FROM activation_requests WHERE secret_hash = ?",
+      secretHash,
+    );
+    if (
+      row === undefined || row["consumed_at"] !== null || row["revoked_at"] !== null ||
+      now() >= Number(row["expires_at"])
+    ) return failure("unauthenticated", "activation is not usable");
+    return value({ usable: true });
+  }
+
+  private activationPreflight(input: ActivationAcceptInput): Result<
+    { state: "active" } | { state: "replay"; actorId: string }
+  > {
+    const request = this.one(
+      "SELECT actor_id, consumed_at, revoked_at, expires_at FROM activation_requests WHERE secret_hash = ?",
+      input.secretHash,
+    );
+    if (request === undefined) return failure("unauthenticated", "activation is not usable");
+    const targetActorId = String(request["actor_id"]);
+    if (request["consumed_at"] !== null) {
+      const linked = this.one(
+        "SELECT actor_id FROM principal_links WHERE provider = ? AND subject = ?",
+        input.provider, input.subject,
+      );
+      return linked !== undefined && String(linked["actor_id"]) === targetActorId
+        ? value({ state: "replay", actorId: targetActorId })
+        : failure("unauthenticated", "activation is not usable");
+    }
+    const actor = this.actor(targetActorId);
+    if (
+      request["revoked_at"] !== null || now() >= Number(request["expires_at"]) ||
+      actor === undefined || actor.disabled ||
+      this.one("SELECT 1 AS present FROM principal_links WHERE actor_id = ? LIMIT 1", targetActorId) !== undefined
+    ) return failure("unauthenticated", "activation is not usable");
+    return value({ state: "active" });
+  }
+
+  private activationAccept(input: ActivationAcceptInput): Result<{ applied: boolean; actorId: string }> {
+    const at = now();
+    return this.ctx.storage.transactionSync(() => {
+      const request = this.one(
+        "SELECT actor_id, consumed_at, revoked_at, expires_at FROM activation_requests WHERE secret_hash = ?",
+        input.secretHash,
+      );
+      if (request === undefined) return failure("unauthenticated", "activation is not usable");
+      const targetActorId = String(request["actor_id"]);
+      const linked = this.one(
+        "SELECT actor_id FROM principal_links WHERE provider = ? AND subject = ?",
+        input.provider, input.subject,
+      );
+      if (request["consumed_at"] !== null) {
+        return linked !== undefined && String(linked["actor_id"]) === targetActorId
+          ? value({ applied: false, actorId: targetActorId })
+          : failure("unauthenticated", "activation is not usable");
+      }
+      if (request["revoked_at"] !== null || at >= Number(request["expires_at"])) {
+        return failure("unauthenticated", "activation is not usable");
+      }
+      const actor = this.actor(targetActorId);
+      if (actor === undefined || actor.disabled) return failure("unauthenticated", "activation is not usable");
+      if (linked !== undefined && String(linked["actor_id"]) !== targetActorId) {
+        return failure("denied", "the principal is already linked to another actor");
+      }
+      const other = this.one("SELECT 1 AS present FROM principal_links WHERE actor_id = ? LIMIT 1", targetActorId);
+      if (other !== undefined) return failure("unauthenticated", "activation is not usable");
+      if (linked === undefined) {
+        this.ctx.storage.sql.exec(
+          "INSERT INTO principal_links (provider, subject, actor_id, created_at) VALUES (?, ?, ?, ?)",
+          input.provider, input.subject, targetActorId, at,
+        );
+      }
+      this.ctx.storage.sql.exec("UPDATE activation_requests SET consumed_at = ? WHERE secret_hash = ?", at, input.secretHash);
+      this.audit("activation", `activation for actor ${targetActorId} accepted`, at);
+      return value({ applied: true, actorId: targetActorId });
+    });
+  }
+
+  private revokeActivation(input: RecoveryInput): Result<{ applied: boolean }> {
+    const at = now();
+    const payload = payloadOf({ kind: "revoke-activation", actorId: input.actorId });
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replay(input.idempotencyKey, payload);
+      if (replay !== undefined) return replay;
+      if (!input.operator && !this.isAdmin(input.byActorId)) {
+        return failure("denied", "the caller does not administer this organization");
+      }
+      if (this.actor(input.actorId) === undefined) return failure("invalid-command", "unknown actor");
+      this.ctx.storage.sql.exec(
+        "UPDATE activation_requests SET revoked_at = ? WHERE actor_id = ? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at > ?",
+        at, input.actorId, at,
+      );
+      this.audit(input.operator ? "operator" : input.byActorId, `activation for actor ${input.actorId} revoked`, at);
+      this.claim(input.idempotencyKey, payload, at);
+      return value({ applied: true });
+    });
+  }
+
+  private unlinkPrincipal(input: RecoveryInput): Result<{ applied: boolean }> {
+    const at = now();
+    const payload = payloadOf({ kind: "unlink-principal", actorId: input.actorId });
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replay(input.idempotencyKey, payload);
+      if (replay !== undefined) return replay;
+      if (!input.operator && !this.isAdmin(input.byActorId)) {
+        return failure("denied", "the caller does not administer this organization");
+      }
+      if (this.actor(input.actorId) === undefined) return failure("invalid-command", "unknown actor");
+      this.ctx.storage.sql.exec("DELETE FROM principal_links WHERE actor_id = ?", input.actorId);
+      this.ctx.storage.sql.exec(
+        "UPDATE activation_requests SET revoked_at = ? WHERE actor_id = ? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at > ?",
+        at, input.actorId, at,
+      );
+      this.outbox("actor-unlinked", "*", {
+        kind: "actor-unlinked", organizationId: this.organizationId(), actorId: input.actorId,
+      }, at);
+      this.audit(input.operator ? "operator" : input.byActorId, `principal links for actor ${input.actorId} removed`, at);
+      this.claim(input.idempotencyKey, payload, at);
+      return value({ applied: true });
+    });
+  }
+
   private invite(invitationId: string, operationId: string): Result<{ invitationId: string }> {
     if (this.organizationId() === undefined) return failure("unavailable", "organization is not bootstrapped");
     const at = now();
@@ -570,6 +757,10 @@ export class OrganizationAuthority extends DurableObject<Env> {
         at,
         input.actorId,
       );
+      this.ctx.storage.sql.exec(
+        "UPDATE activation_requests SET revoked_at = ? WHERE actor_id = ? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at > ?",
+        at, input.actorId, at,
+      );
       this.outbox(
         "actor-disabled",
         "*",
@@ -684,7 +875,9 @@ export class OrganizationAuthority extends DurableObject<Env> {
     const snapshot = input as Partial<ExportSnapshot>;
     if (snapshot.coordinator !== "organization") return failure("invalid-command", "snapshot is not organization state");
     const version = String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0");
-    if (snapshot.schemaVersion !== version) return failure("invalid-command", "snapshot schema version does not match");
+    if (snapshot.schemaVersion !== version && snapshot.schemaVersion !== "1") {
+      return failure("invalid-command", "snapshot schema version does not match");
+    }
     if (typeof snapshot.tables !== "object" || snapshot.tables === null) return failure("invalid-command", "snapshot has no tables");
     this.ctx.storage.transactionSync(() => {
       restoreTables(
@@ -753,6 +946,53 @@ export class OrganizationAuthority extends DurableObject<Env> {
           actorId: asString(body["actorId"], "actorId"),
         });
         return json(result, result.ok ? 200 : result.failure.kind === "unavailable" ? 503 : 400);
+      }
+
+      if (request.method === "POST" && url.pathname === "/activation-request") {
+        const body = await request.json();
+        const input = asRecord(body);
+        return json(this.activationRequest({
+          actorId: asString(input["actorId"], "actorId"),
+          byActorId: asString(input["byActorId"], "byActorId"),
+          secretHash: asString(input["secretHash"], "secretHash"),
+          ...(input["operator"] === true ? { operator: true } : {}),
+        }));
+      }
+
+      if (request.method === "POST" && url.pathname === "/activation-inspect") {
+        const body = asRecord(await request.json());
+        return json(this.activationInspect(asString(body["secretHash"], "secretHash")));
+      }
+
+      if (request.method === "POST" && url.pathname === "/activation-preflight") {
+        const body = asRecord(await request.json());
+        return json(this.activationPreflight({
+          secretHash: asString(body["secretHash"], "secretHash"),
+          provider: asString(body["provider"], "provider"),
+          subject: asString(body["subject"], "subject"),
+        }));
+      }
+
+      if (request.method === "POST" && url.pathname === "/activation-accept") {
+        const body = asRecord(await request.json());
+        return json(this.activationAccept({
+          secretHash: asString(body["secretHash"], "secretHash"),
+          provider: asString(body["provider"], "provider"),
+          subject: asString(body["subject"], "subject"),
+        }));
+      }
+
+      if (request.method === "POST" && (url.pathname === "/revoke-activation" || url.pathname === "/unlink-principal")) {
+        const body = asRecord(await request.json());
+        const input: RecoveryInput = {
+          actorId: asString(body["actorId"], "actorId"),
+          byActorId: asString(body["byActorId"], "byActorId"),
+          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
+          ...(body["operator"] === true ? { operator: true } : {}),
+        };
+        return json(url.pathname === "/revoke-activation"
+          ? this.revokeActivation(input)
+          : this.unlinkPrincipal(input));
       }
 
       if (request.method === "POST" && url.pathname === "/invite") {
@@ -830,7 +1070,10 @@ export class OrganizationAuthority extends DurableObject<Env> {
         const actor = this.actor(actorId);
         return actor === undefined
           ? json(failure("unauthenticated", "unknown actor"), 404)
-          : json(value(actor));
+          : json(value({
+              ...actor,
+              linked: this.one("SELECT 1 AS present FROM principal_links WHERE actor_id = ? LIMIT 1", actorId) !== undefined,
+            }));
       }
 
       if (request.method === "GET" && url.pathname === "/roster") {
@@ -869,7 +1112,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
       }
 
       if (request.method === "POST" && url.pathname === "/reset") {
-        for (const table of ["organization", "actors", "principal_links", "org_admins", "invitations", "audit", "claims", "outbox"]) {
+        for (const table of ["organization", "actors", "principal_links", "activation_requests", "org_admins", "invitations", "audit", "claims", "outbox"]) {
           this.ctx.storage.sql.exec(`DELETE FROM ${table}`);
         }
         return json(value({ reset: true }));

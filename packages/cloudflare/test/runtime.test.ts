@@ -59,6 +59,102 @@ const conformanceOrganizationIds = (): readonly string[] => [...new Set(
 )];
 
 describe("the Cloudflare runtime's cross-coordinator rules", () => {
+  it("fails refresh after unlink even when the revocation outbox has not drained", async () => {
+    const world = await createCloudflareConformanceWorld(env);
+    const dana = CONFORMANCE_PRINCIPALS.dana;
+    const issued = await world.runtime.accessFromEvidence({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      operationId: MERIDIAN,
+      evidence: dana.evidence,
+    });
+    expect(isFailed(issued)).toBe(false);
+    if (isFailed(issued) || issued.refresh.kind !== "rotated") return;
+
+    const unlinked = await post(organization(dana.organizationId), "/unlink-principal", {
+      actorId: dana.actorId,
+      byActorId: dana.actorId,
+      idempotencyKey: "runtime-unlink-without-drain",
+    });
+    expect(unlinked.ok).toBe(true);
+    const refreshed = await world.runtime.refresh({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      operationId: MERIDIAN,
+      handle: issued.refresh.handle,
+    });
+    expect(isFailed(refreshed)).toBe(true);
+    if (isFailed(refreshed)) expect(refreshed.failure.kind).toBe("unauthenticated");
+  }, 30_000);
+
+  it("serializes one provider subject across concurrent organization claims", async () => {
+    const firstId = "org-activation-race-a";
+    const secondId = "org-activation-race-b";
+    for (const organizationId of [firstId, secondId]) {
+      const stub = organization(organizationId);
+      await post(stub, "/reset", {});
+      const bootstrapped = await post(stub, "/bootstrap", {
+        organizationId,
+        actors: [{ actorId: "actor-admin" }, { actorId: "actor-target" }],
+        principalLinks: [{ provider: "idp", subject: `${organizationId}-admin`, actorId: "actor-admin" }],
+        orgAdmins: ["actor-admin"],
+      });
+      expect(bootstrapped.ok).toBe(true);
+    }
+    const signer = await createEphemeralSigner("key-activation-race");
+    const key = await verificationKeyOf(signer);
+    const runtime = createCloudflareRuntime({
+      env: env as Env,
+      signer,
+      keys: new Map([[key.keyId, key]]),
+      organizationIds: [firstId, secondId],
+    });
+    const issue = (organizationId: string) => runtime.activationRequest({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      organizationId,
+      actorId: "actor-target",
+      evidence: { provider: "idp", subject: `${organizationId}-admin` },
+    });
+    const [first, second] = await Promise.all([issue(firstId), issue(secondId)]);
+    expect(isFailed(first)).toBe(false);
+    expect(isFailed(second)).toBe(false);
+    if (isFailed(first) || isFailed(second)) return;
+
+    const claim = { provider: "idp", subject: "one-raced-subject" };
+    const results = await Promise.all([
+      runtime.activationAccept({ interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret: first.secret, evidence: claim }),
+      runtime.activationAccept({ interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret: second.secret, evidence: claim }),
+    ]);
+    expect(results.filter((result) => !isFailed(result))).toHaveLength(1);
+    expect(results.filter((result) => isFailed(result)).map((result) => isFailed(result) && result.failure.kind)).toEqual(["denied"]);
+
+    const winner = isFailed(results[0]!)
+      ? { organizationId: secondId, secret: second.secret }
+      : { organizationId: firstId, secret: first.secret };
+    const loser = winner.organizationId === firstId
+      ? { organizationId: secondId, secret: second.secret }
+      : { organizationId: firstId, secret: first.secret };
+    const replay = await runtime.activationAccept({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      secret: winner.secret,
+      evidence: claim,
+    });
+    expect(isFailed(replay)).toBe(false);
+    if (!isFailed(replay)) expect(replay.applied).toBe(false);
+
+    await post(organization(loser.organizationId), "/revoke-activation", {
+      actorId: "actor-target",
+      byActorId: "operator",
+      operator: true,
+      idempotencyKey: "revoke-losing-activation",
+    });
+    const terminal = await runtime.activationAccept({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      secret: loser.secret,
+      evidence: claim,
+    });
+    expect(isFailed(terminal)).toBe(true);
+    if (isFailed(terminal)) expect(terminal.failure.kind).toBe("unauthenticated");
+  }, 30_000);
+
   it("request-access asks as the evidence it carries, not the shell authorization", async () => {
     const world = await createCloudflareConformanceWorld(env);
     const invitee = CONFORMANCE_PRINCIPALS.inviteeLead;

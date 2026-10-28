@@ -1,6 +1,6 @@
 # Activation and principal recovery
 
-**Status:** Accepted direction; contract and implementation not started.
+**Status:** Contract approved 2026-10-28; implementation in progress.
 
 ## Goal
 
@@ -33,48 +33,268 @@ administrators, and team lifecycle are separate future work.
 - URLs, pages, QR rendering, delivery, login prompts, provider redirects, and
   source-based rate limiting remain host concerns. There is no short code.
 
-## Decisions required before implementation
+## Approved contract
 
-These decisions are part of the contract slice, not details to discover while
-writing an adapter.
+This section settles the cross-runtime decisions before executable types or
+storage schemas make them expensive to change. It is the implementation
+contract until the work lands and its durable facts move to `docs/` and
+`specs/`.
 
-1. **Public use-case shape.** `activation-request` returns a secret and
-   `activation-accept` is claim-authorized, while today's `command` accepts
-   only evidence or an access envelope and returns only a receipt. Specify
-   whether activation is expressed as dedicated `AuthorityRuntime` methods or
-   as an additive command/result family. Keep the operator transport outside
-   the portable authorization vocabulary.
-2. **Non-consuming inspection.** Quartermaster's link route validates before
-   provider authentication without spending the request. Specify whether the
-   portable seam exposes an activation-inspection use case, exactly what it
-   reveals, and how expired, spent, revoked, and unknown secrets remain
-   indistinguishable where disclosure would create an oracle.
-3. **Directory-wide serialization.** The Cloudflare runtime currently scans a
-   configured organization directory before binding inside one organization
-   coordinator. Two concurrent binds can pass that read before either writes.
-   Activation must not widen that race into a public path. Specify and test a
-   per-subject serialization point, or another mechanism that makes the global
-   one-subject/one-actor invariant true under concurrent accepts while keeping
-   organization state single-writer.
-4. **Retry results.** Define idempotency for request creation, repeated accept
-   by the same subject after consumption, and unlink. A retried request must
-   not silently mint a new plaintext secret that cannot be recovered from the
-   committed result.
-5. **Lifetime and hashing.** Record the default request lifetime, clock
-   boundary, secret generation source, hash representation, and constant-time
-   comparison requirements in the normative contract. A request export may
-   contain only the hash and lifecycle state.
+### Portable surface
+
+Activation adds three dedicated methods to `AuthorityRuntime`. They are
+additive calls under interface version 3; the failure taxonomy and envelope
+format do not move. `unlink` remains a typed organization command because it
+returns an ordinary idempotent receipt and uses the existing command
+authorization machinery.
+
+```ts
+interface ActivationRequestInput {
+  readonly interfaceVersion: 3;
+  readonly organizationId: string;
+  readonly actorId: string;
+  readonly evidence: PrincipalEvidence;
+}
+
+interface ActivationRequestResult {
+  readonly requestId: string;
+  readonly secret: string;
+  readonly expiresAt: number;
+}
+
+interface ActivationInspectInput {
+  readonly interfaceVersion: 3;
+  readonly secret: string;
+}
+
+interface ActivationInspection {
+  readonly usable: true;
+}
+
+interface ActivationAcceptInput {
+  readonly interfaceVersion: 3;
+  readonly secret: string;
+  readonly evidence: PrincipalEvidence;
+}
+
+interface ActivationAcceptance {
+  readonly applied: boolean;
+  readonly actor: {
+    readonly organizationId: string;
+    readonly actorId: string;
+  };
+}
+
+interface AuthorityRuntime {
+  // Existing four methods stay unchanged.
+  activationRequest(input: ActivationRequestInput):
+    Promise<ActivationRequestResult | Failed>;
+  activationInspect(input: ActivationInspectInput):
+    Promise<ActivationInspection | Failed>;
+  activationAccept(input: ActivationAcceptInput):
+    Promise<ActivationAcceptance | Failed>;
+}
+```
+
+The ordinary unlink body joins `OrganizationCommand`:
+
+```ts
+{ readonly kind: "unlink-principal";
+  readonly organizationId: string;
+  readonly actorId: string }
+```
+
+It requires `fresh-evidence`; an access envelope is refused for this
+organization-scoped recovery act. The authorization's operation id has no
+authority meaning for this command and is retained only because the existing
+`CommandAuthorization` shape requires it. Removing that accidental field is
+outside Tier 1.
+
+The first-administrator request and emergency unlink are trusted adapter
+operations, not new portable authorization variants. The in-memory handle may
+expose an operator test harness; Cloudflare exposes OPS_TOKEN-protected routes.
+No ops token, provider credential, or browser protocol value enters
+`AuthorityRuntime`.
+
+### Request state and secret
+
+One request record contains:
+
+```text
+request id
+organization id
+actor id
+SHA-256(secret)
+issued at
+expires at
+consumed at, or null
+revoked at, or null
+```
+
+The authority generates 16 random bytes with a cryptographic generator and
+returns their unpadded base64url encoding (22 characters). Only the SHA-256
+digest is stored. The default lifetime is 24 hours and is configurable by the
+reference-engine constructor/runtime configuration; `now >= expiresAt` is
+expired. Request exports, audit facts, errors, and logs never contain the
+plaintext secret. Tier 1 retains terminal request rows; a later compaction
+policy may remove them only after the longest supported retry window.
+
+There is at most one active request per actor. Issuing another request
+atomically revokes every earlier active request for that actor and returns the
+only usable secret. Request creation intentionally takes no idempotency key:
+retrying is a rotate-and-return operation, so a response lost at an unknown
+outcome is recovered by retrying and invalidating the possibly committed
+secret. An idempotency key cannot safely replay a return-once plaintext value
+that authority does not store.
+
+An enabled actor with any principal link cannot receive a request. The actor
+may keep grants while unlinked; activation itself creates no actor, grant,
+participation, or administrator standing.
+
+### Inspection
+
+Inspection is non-consuming because browsers, chat clients, and scanners may
+prefetch a link. It returns only `usable: true` for an active request. It returns
+the same `unauthenticated` failure with the same public detail for an unknown,
+expired, consumed, or revoked secret. It never returns organization id, actor
+id, display name, provider data, or request state.
+
+Possession of a valid secret therefore proves only that an activation may
+continue. The host may name the operation from its own route; it cannot use
+inspection as a roster oracle. A host with an already authenticated session
+may proceed directly to acceptance to obtain the same-subject replay outcome.
+
+### Acceptance
+
+Acceptance derives the request and target actor from the secret; neither id
+is caller input. One atomic organization mutation requires:
+
+1. the request exists, is active, and is not expired;
+2. the actor exists, is enabled, and still has no different principal link;
+3. the verified `(provider, subject)` is unbound globally, or already resolves
+   to this actor; and
+4. binding the link, consuming the request, and writing the audit event all
+   commit together.
+
+The first application returns `applied: true`. Repeating the consumed secret
+with the same subject returns the same actor with `applied: false`; it does not
+store evidence on the request to achieve this, but compares the durable
+principal link. A different subject, a request whose actor was linked by a
+different subject, and every unusable-secret state fail without mutation.
+Anonymous unusable-secret failures are uniform. A subject already bound to a
+different actor is `denied`; directory ambiguity or unavailability is
+`unavailable`.
+
+### Directory-wide uniqueness
+
+The current Cloudflare check-then-bind directory scan is insufficient under
+two concurrent writers. Every principal-link writer — existing operator bind
+and activation acceptance — must enter one deterministic coordination point
+keyed by `SHA-256(canonicalJson([provider, subject]))` before scanning and
+binding. The point owns serialization, not the principal-link fact; the
+organization remains the sole durable owner of its link and audit.
+
+The coordination point must keep one subject's scan-and-bind critical section
+exclusive across awaited organization calls. It may be a subject-keyed
+Durable Object or an equivalent mechanism with the same tested guarantee. A
+plain Worker scan, an unlocked check followed by a write, or a local SQL
+transaction in only the target organization does not satisfy the contract.
+All binding entry points use the same guard, so activation cannot race manual
+operator recovery.
+
+### Unlink and revocation
+
+`unlink-principal` removes every principal link targeting the named actor. It
+leaves the actor enabled and leaves grants and participation unchanged. In the
+same organization commit it revokes outstanding activation requests, records
+the idempotency claim and audit, and emits durable refresh-revocation work for
+operations. Duplicate delivery is harmless.
+
+New evidence resolution fails immediately after unlink. Refresh fails once the
+operation applies the revocation; the operation's existing organization
+liveness read is the fail-closed repair for a lost message. Already-issued
+envelopes remain valid only until their signed expiry. A later request can
+bind a replacement subject to the actor.
+
+Emergency unlink performs the same mutation through the operator adapter. It
+does not bypass the state transition and is not offboarding; `disable-actor`
+remains the offboarding act.
+
+### Failure mapping
+
+No new failure kind is added.
+
+| Condition | Failure kind |
+| --- | --- |
+| Wrong interface version | `wrong-interface-version` |
+| Caller evidence has no principal link | `unauthenticated` |
+| Caller is not an organization administrator | `denied` |
+| Target organization differs from caller organization | `wrong-binding` |
+| Request target actor does not exist | `invalid-command` |
+| Request target actor is disabled | `not-admitted` |
+| Request target actor already has a link | `denied` |
+| Inspect/accept secret is unknown, expired, consumed by another subject, or revoked | `unauthenticated` with one uniform detail |
+| Accept subject belongs to another actor | `denied` |
+| Directory is ambiguous or unavailable | `unavailable` |
+
+Operator HTTP status mapping remains adapter policy and uses the existing
+structured failure body.
+
+### Threat model and boundaries
+
+Trust crosses at fresh evidence, the bearer secret, OPS_TOKEN routes, and the
+configured organization directory. Assets are the principal link, the
+pre-provisioned actor's grants, activation secrets, and refresh authority.
+
+- A stolen secret can claim its actor until expiry; short life, single use,
+  rotation, and audit bound the damage. It is never logged or stored in
+  plaintext.
+- Secret enumeration receives uniform failures and no actor identity.
+- A malicious caller cannot substitute actor or organization ids during
+  acceptance because the secret selects both.
+- A non-admin cannot mint or unlink through the portable surface; an operator
+  path requires OPS_TOKEN and is not publicly routed in production.
+- Concurrent subjects and organizations cannot defeat one-subject/one-actor;
+  the shared guard is part of the security invariant, not an optimization.
+- Unlink revokes refresh authority but intentionally does not promise
+  immediate invalidation of live envelopes.
+
+No new dependency, provider integration, browser route, cookie, address, or
+personal-data field enters org-hats.
+
+### Revocation act
+
+One consumer requirement is not representable by the accepted three
+mutations: the office wants to revoke an unclaimed request while leaving its
+actor enabled. Reissue rotates rather than revokes, unlink requires a link,
+and disable is offboarding. Minting and discarding a replacement would leave
+an active request and is not an honest revocation.
+
+Add an idempotent `revoke-activation` organization command,
+authorized by fresh administrator evidence with an operator equivalent. It
+revokes every active request for the actor and changes nothing else.
+
+### Approval record
+
+Rick approved these six decisions on 2026-10-28:
+
+1. three additive activation methods; unlink stays a command;
+2. inspection reveals only usability and uses one uniform unusable result;
+3. request retry means rotate-and-return, with no idempotency key;
+4. all Cloudflare binding writers share a deterministic subject guard;
+5. unlink removes every link to the actor and revokes refresh, not grants; and
+6. add `revoke-activation` to close the standalone-revocation gap.
 
 ## Work plan
 
 ### 1. Specify the portable contract and invariants
 
-Create the normative activation contract and amend A10 and the identity
-boundary. Settle the five decisions above, the typed refusal taxonomy, audit
-facts, state transitions, and interface-version consequence before changing
-runtime code.
+Review the proposed activation contract, then amend A10 and the identity
+boundary with the implementation. Settle the six approval decisions, the
+typed refusal taxonomy, audit facts, state transitions, and interface-version
+consequence before changing runtime code.
 
-**Likely paths:** `specs/activation.md`, `specs/authority.md`,
+**Likely paths:** `docs/activation.md`, `specs/authority.md`,
 `docs/authority_redesign.md`, `docs/cloudflare.md`, `src/authority/types.ts`.
 
 **Done when:**

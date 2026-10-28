@@ -51,7 +51,7 @@ export const deliverPending = async (state) => {
                 }
             }
         }
-        if (message.kind === "actor-disabled" && message.operationId !== undefined) {
+        if ((message.kind === "actor-disabled" || message.kind === "actor-unlinked") && message.operationId !== undefined) {
             const op = state.ops.get(operationId(message.target));
             if (op !== undefined) {
                 for (const record of op.refreshRecords) {
