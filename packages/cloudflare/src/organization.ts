@@ -111,6 +111,28 @@ interface RecoveryInput {
   readonly operator?: boolean;
 }
 
+interface CreateActorInput {
+  readonly actorId: string;
+  readonly displayName?: string;
+  readonly byActorId: string;
+  readonly idempotencyKey: string;
+}
+
+interface UpdateActorInput {
+  readonly actorId: string;
+  /** `null` clears the display name; the field is required so a retry cannot
+   * change shape between absent and null. */
+  readonly displayName: string | null;
+  readonly byActorId: string;
+  readonly idempotencyKey: string;
+}
+
+interface AdministratorInput {
+  readonly actorId: string;
+  readonly byActorId: string;
+  readonly idempotencyKey: string;
+}
+
 export class OrganizationAuthority extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -256,6 +278,13 @@ export class OrganizationAuthority extends DurableObject<Env> {
       return failure("invalid-command", "idempotency key reused with a different payload");
     }
     return value({ applied: false });
+  }
+
+  private displayNameFailure(value: string | null | undefined): Result<never> | undefined {
+    if (value === undefined || value === null) return undefined;
+    if (value.trim().length === 0) return failure("invalid-command", "display name is empty");
+    if (value.length > 200) return failure("invalid-command", "display name is too long");
+    return undefined;
   }
 
   private isAdmin(actorId: string): boolean {
@@ -781,6 +810,131 @@ export class OrganizationAuthority extends DurableObject<Env> {
     });
   }
 
+  private createActor(input: CreateActorInput): Result<{ applied: boolean }> {
+    const at = now();
+    const payload = payloadOf({
+      kind: "create-actor",
+      actorId: input.actorId,
+      ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
+      byActorId: input.byActorId,
+    });
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replay(input.idempotencyKey, payload);
+      if (replay !== undefined) return replay;
+      if (!this.isAdmin(input.byActorId)) return failure("denied", "the caller does not administer this organization");
+      if (input.actorId.trim().length === 0) return failure("invalid-command", "actor id is empty");
+      if (input.actorId.length > 128) return failure("invalid-command", "actor id is too long");
+      const nameFailure = this.displayNameFailure(input.displayName);
+      if (nameFailure !== undefined) return nameFailure;
+      if (this.actor(input.actorId) !== undefined) return failure("invalid-command", "actor already exists");
+      this.ctx.storage.sql.exec(
+        "INSERT INTO actors (actor_id, display_name, disabled, created_at, updated_at) VALUES (?, ?, 0, ?, ?)",
+        input.actorId,
+        input.displayName ?? null,
+        at,
+        at,
+      );
+      // the operation projection decides with existence and disabled state, so
+      // a new actor must reach it; no display name travels in the roster
+      this.pushRoster(at);
+      this.audit(input.byActorId, `actor ${input.actorId} created`, at);
+      this.claim(input.idempotencyKey, payload, at);
+      return value({ applied: true });
+    });
+  }
+
+  private updateActor(input: UpdateActorInput): Result<{ applied: boolean }> {
+    const at = now();
+    const payload = payloadOf({
+      kind: "update-actor",
+      actorId: input.actorId,
+      displayName: input.displayName,
+      byActorId: input.byActorId,
+    });
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replay(input.idempotencyKey, payload);
+      if (replay !== undefined) return replay;
+      if (!this.isAdmin(input.byActorId)) return failure("denied", "the caller does not administer this organization");
+      const nameFailure = this.displayNameFailure(input.displayName);
+      if (nameFailure !== undefined) return nameFailure;
+      const target = this.actor(input.actorId);
+      if (target === undefined) return failure("invalid-command", "unknown actor");
+      const changed = (target.displayName ?? null) !== input.displayName;
+      if (changed) {
+        this.ctx.storage.sql.exec(
+          "UPDATE actors SET display_name = ?, updated_at = ? WHERE actor_id = ?",
+          input.displayName,
+          at,
+          input.actorId,
+        );
+        this.audit(input.byActorId, `actor ${input.actorId} display name updated`, at);
+      }
+      this.claim(input.idempotencyKey, payload, at);
+      return value({ applied: true });
+    });
+  }
+
+  private appointAdministrator(input: AdministratorInput): Result<{ applied: boolean }> {
+    const at = now();
+    const payload = payloadOf({
+      kind: "appoint-administrator",
+      actorId: input.actorId,
+      byActorId: input.byActorId,
+    });
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replay(input.idempotencyKey, payload);
+      if (replay !== undefined) return replay;
+      if (!this.isAdmin(input.byActorId)) return failure("denied", "the caller does not administer this organization");
+      const target = this.actor(input.actorId);
+      if (target === undefined) return failure("invalid-command", "unknown actor");
+      if (target.disabled) return failure("not-admitted", "actor disabled");
+      if (!this.isAdmin(input.actorId)) {
+        this.ctx.storage.sql.exec(
+          "INSERT OR IGNORE INTO org_admins (actor_id, created_at) VALUES (?, ?)",
+          input.actorId,
+          at,
+        );
+        this.audit(input.byActorId, `actor ${input.actorId} appointed administrator`, at);
+      }
+      this.claim(input.idempotencyKey, payload, at);
+      return value({ applied: true });
+    });
+  }
+
+  private retireAdministrator(input: AdministratorInput): Result<{ applied: boolean }> {
+    const at = now();
+    const payload = payloadOf({
+      kind: "retire-administrator",
+      actorId: input.actorId,
+      byActorId: input.byActorId,
+    });
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replay(input.idempotencyKey, payload);
+      if (replay !== undefined) return replay;
+      if (!this.isAdmin(input.byActorId)) return failure("denied", "the caller does not administer this organization");
+      const target = this.actor(input.actorId);
+      if (target === undefined) return failure("invalid-command", "unknown actor");
+      if (!this.isAdmin(input.actorId)) {
+        this.claim(input.idempotencyKey, payload, at);
+        return value({ applied: true });
+      }
+      // the usable successor: another administrator, enabled, and linked —
+      // checked inside the same transaction as the removal
+      const usable = this.one(
+        `SELECT o.actor_id FROM org_admins o JOIN actors a ON a.actor_id = o.actor_id
+          WHERE o.actor_id <> ? AND a.disabled = 0
+            AND EXISTS (SELECT 1 FROM principal_links l WHERE l.actor_id = o.actor_id)
+          LIMIT 1`,
+        input.actorId,
+      );
+      if (usable === undefined) return failure("denied", "no other usable administrator remains");
+      this.ctx.storage.sql.exec("DELETE FROM org_admins WHERE actor_id = ?", input.actorId);
+      this.audit(input.byActorId, `actor ${input.actorId} retired as administrator`, at);
+      this.claim(input.idempotencyKey, payload, at);
+      return value({ applied: true });
+    });
+  }
+
   private status(): Record<string, unknown> {
     const organizationId = this.organizationId();
     const organization = organizationId === undefined
@@ -1058,6 +1212,38 @@ export class OrganizationAuthority extends DurableObject<Env> {
           byActorId: asString(body["byActorId"], "byActorId"),
           idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
         }));
+      }
+
+      if (request.method === "POST" && url.pathname === "/create-actor") {
+        const body = await readBody();
+        return json(this.createActor({
+          actorId: asString(body["actorId"], "actorId"),
+          ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
+          byActorId: asString(body["byActorId"], "byActorId"),
+          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
+        }));
+      }
+
+      if (request.method === "POST" && url.pathname === "/update-actor") {
+        const body = await readBody();
+        return json(this.updateActor({
+          actorId: asString(body["actorId"], "actorId"),
+          displayName: body["displayName"] === null ? null : asString(body["displayName"], "displayName"),
+          byActorId: asString(body["byActorId"], "byActorId"),
+          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
+        }));
+      }
+
+      if (request.method === "POST" && (url.pathname === "/appoint-administrator" || url.pathname === "/retire-administrator")) {
+        const body = await readBody();
+        const input: AdministratorInput = {
+          actorId: asString(body["actorId"], "actorId"),
+          byActorId: asString(body["byActorId"], "byActorId"),
+          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
+        };
+        return json(url.pathname === "/appoint-administrator"
+          ? this.appointAdministrator(input)
+          : this.retireAdministrator(input));
       }
 
       if (request.method === "GET" && url.pathname === "/admin") {

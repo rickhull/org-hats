@@ -49,7 +49,7 @@ accepted, and what remains deferred. The normative vocabulary is
   administrative role is configuration rather than a built-in title; renaming
   it would change what the fixture tests. The actor ids and roster constants
   are renamed — see Resolved.
-- `adminRoles` / `orgAdmins` remain declared configuration fields, not
+- `adminRoles` remains a declared configuration field, not
   built-in role titles.
 
 ## Accepted exemptions

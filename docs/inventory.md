@@ -33,6 +33,11 @@ write the story, replace it.*
 | OH-ACT-02 | every unusable secret reports the same failure | [activation](activation.md) § Refusals |
 | OH-ACT-03 | a subject linked elsewhere is refused without consuming the claim | [activation](activation.md) § Refusals |
 | OH-ACT-04 | unlink ends issuance and a fresh subject can take the actor | [activation](activation.md) § Recovery commands |
+| OH-ROSTER-01 | an administrator creates an actor once, without a link | [roster](roster.md) § Commands |
+| OH-ROSTER-02 | a display name is presentation: set, visible, cleared | [roster](roster.md) § Display names |
+| OH-ROSTER-03 | an unclaimed successor does not permit retirement | [roster](roster.md) § The usable successor |
+| OH-ROSTER-04 | a linked successor takes over and the retired caller loses standing | [roster](roster.md) § The usable successor |
+| OH-ROSTER-05 | disable remains the departing administrator's offboarding act | [roster](roster.md) § The usable successor |
 | OH-PART-01 | invite, accept, admit: an invited organization receives a hat | — |
 | OH-PART-02 | revoke is terminal: new issuance stops, the live envelope survives | [walkthrough](walkthrough.md) §9 |
 | OH-CMD-01 | idempotent retry: a denial does not poison the key | [tutorial](tutorial.md) Case 4 · [walkthrough](walkthrough.md) §8 |

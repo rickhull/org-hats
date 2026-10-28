@@ -178,6 +178,29 @@ export type OrganizationCommand = {
     readonly kind: "revoke-activation";
     readonly organizationId: Unbranded<OrganizationId>;
     readonly actorId: Unbranded<ActorId>;
+}
+/** The id is caller-supplied, opaque, and scoped to this organization. */
+ | {
+    readonly kind: "create-actor";
+    readonly organizationId: Unbranded<OrganizationId>;
+    readonly actorId: Unbranded<ActorId>;
+    readonly displayName?: string;
+}
+/** `null` clears the display name; the field is required so a retry cannot
+ * change shape between absent and null. */
+ | {
+    readonly kind: "update-actor";
+    readonly organizationId: Unbranded<OrganizationId>;
+    readonly actorId: Unbranded<ActorId>;
+    readonly displayName: string | null;
+} | {
+    readonly kind: "appoint-administrator";
+    readonly organizationId: Unbranded<OrganizationId>;
+    readonly actorId: Unbranded<ActorId>;
+} | {
+    readonly kind: "retire-administrator";
+    readonly organizationId: Unbranded<OrganizationId>;
+    readonly actorId: Unbranded<ActorId>;
 };
 export type AuthorityCommandBody = ParticipationCommand | AdmissionCommand | GrantCommand | OrganizationCommand;
 /** A complete business act, validated as a whole before any adapter commits

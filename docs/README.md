@@ -37,6 +37,9 @@ public `org-hats` docs are normative for the seam.
 - [`activation.md`](activation.md) — claiming a pre-provisioned actor,
   return-once secret rotation, global subject serialization, revocation, and
   principal recovery.
+- [`roster.md`](roster.md) — actor creation and renaming, organization-owned
+  administrator standing, the usable-successor rule, and the actor-id and
+  display-name boundaries.
 - [`binding-conformance.md`](binding-conformance.md) — the documented
   service-binding smoke subset and what it does not claim.
 - [`inventory.md`](inventory.md) — the story index: every conformance case

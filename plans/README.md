@@ -9,10 +9,8 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-- [`actor_lifecycle_and_administration.md`](actor_lifecycle_and_administration.md) —
-  Tier 2, slice 1: create and rename actors, and move administrator standing
-  into organization data with appointment, usable-successor retirement, and
-  the last-administrator rule. Design decisions pending.
+No active plans. The activation and roster slices landed on 2026-10-28; their
+durable facts are in `docs/activation.md`, `docs/roster.md`, and `specs/`.
 
 Durable decisions live in `docs/` and `specs/`; the lexicon register is
 [`docs/lexicon_use_concerns.md`](../docs/lexicon_use_concerns.md).

@@ -206,6 +206,100 @@ describe("OrganizationAuthority", () => {
     expect(trail.body.value?.some((entry) => entry.fact.includes("participation in op-revoke revoked"))).toBe(true);
   });
 
+  it("creates, renames, appoints, and retires administrators without a deployment", async () => {
+    const stub = organization("org-roster");
+    expect((await call(stub, "POST", "/bootstrap", organizationBootstrap("org/roster"))).body.ok).toBe(true);
+
+    const created = await call<{ applied: boolean }>(stub, "POST", "/create-actor", {
+      actorId: "actor-new",
+      displayName: "New Person",
+      byActorId: "actor-lead",
+      idempotencyKey: "create-1",
+    });
+    expect(created.body.ok).toBe(true);
+    const replay = await call<{ applied: boolean }>(stub, "POST", "/create-actor", {
+      actorId: "actor-new",
+      displayName: "New Person",
+      byActorId: "actor-lead",
+      idempotencyKey: "create-1",
+    });
+    expect(replay.body.value).toEqual({ applied: false });
+    const duplicate = await call(stub, "POST", "/create-actor", {
+      actorId: "actor-new",
+      byActorId: "actor-lead",
+      idempotencyKey: "create-2",
+    });
+    expect(duplicate.body.failure?.kind).toBe("invalid-command");
+
+    // the roster image is what lets an operation decide about the new actor,
+    // and it deliberately carries no display name
+    const messages = await outbox(stub);
+    const rosters = messages.body.value?.filter((message) => message.kind === "roster") ?? [];
+    expect(rosters.some((message) => JSON.stringify(message.payload).includes("actor-new"))).toBe(true);
+    expect(rosters.every((message) => !JSON.stringify(message.payload).includes("New Person"))).toBe(true);
+
+    const renamed = await call(stub, "POST", "/update-actor", {
+      actorId: "actor-new",
+      displayName: "Renamed Person",
+      byActorId: "actor-lead",
+      idempotencyKey: "rename-1",
+    });
+    expect(renamed.body.ok).toBe(true);
+    const cleared = await call(stub, "POST", "/update-actor", {
+      actorId: "actor-new",
+      displayName: null,
+      byActorId: "actor-lead",
+      idempotencyKey: "rename-2",
+    });
+    expect(cleared.body.ok).toBe(true);
+    const empty = await call(stub, "POST", "/update-actor", {
+      actorId: "actor-new",
+      displayName: "",
+      byActorId: "actor-lead",
+      idempotencyKey: "rename-3",
+    });
+    expect(empty.body.failure?.kind).toBe("invalid-command");
+
+    // an unclaimed successor may be appointed but is not usable, so the last
+    // linked administrator cannot retire yet
+    expect((await call(stub, "POST", "/appoint-administrator", {
+      actorId: "actor-new",
+      byActorId: "actor-lead",
+      idempotencyKey: "appoint-1",
+    })).body.ok).toBe(true);
+    const refused = await call(stub, "POST", "/retire-administrator", {
+      actorId: "actor-lead",
+      byActorId: "actor-lead",
+      idempotencyKey: "retire-1",
+    });
+    expect(refused.body.failure?.kind).toBe("denied");
+    expect(refused.body.failure?.detail).toMatch(/no other usable administrator/);
+
+    // a linked, enabled successor takes over
+    expect((await call(stub, "POST", "/appoint-administrator", {
+      actorId: "actor-crew",
+      byActorId: "actor-lead",
+      idempotencyKey: "appoint-2",
+    })).body.ok).toBe(true);
+    expect((await call(stub, "POST", "/retire-administrator", {
+      actorId: "actor-lead",
+      byActorId: "actor-lead",
+      idempotencyKey: "retire-2",
+    })).body.ok).toBe(true);
+    const retired = await call(stub, "POST", "/create-actor", {
+      actorId: "actor-after",
+      byActorId: "actor-lead",
+      idempotencyKey: "create-after",
+    });
+    expect(retired.body.failure?.kind).toBe("denied");
+    const successor = await call(stub, "POST", "/create-actor", {
+      actorId: "actor-after",
+      byActorId: "actor-crew",
+      idempotencyKey: "create-after",
+    });
+    expect(successor.body.ok).toBe(true);
+  });
+
   it("refuses a principal link that would make one identity two actors", async () => {
     const stub = organization("org-links");
     const first = await call(stub, "POST", "/bootstrap", {

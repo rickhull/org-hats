@@ -22,13 +22,16 @@ export const principalKey = (provider, subject) => JSON.stringify([provider, sub
  * caller's to hold and mutate, and a shared array would make engine state
  * the caller's to corrupt. `readonly` on the type says the same thing; this
  * is the runtime half. */
-export const snapshotOf = (ops, allOrganizations, allActors, operationId) => {
+export const snapshotOf = (ops, orgs, operationId) => {
     const op = ops.get(operationId);
     if (op === undefined)
         return undefined;
     return {
-        organizations: [...allOrganizations],
-        actors: [...allActors],
+        organizations: [...orgs.values()].map((org) => ({
+            organizationId: org.organizationId,
+            ...(org.displayName !== undefined ? { displayName: org.displayName } : {}),
+        })),
+        actors: [...orgs.values()].flatMap((org) => org.actors.map((actor) => ({ ...actor }))),
         operations: [...ops.values()].map((o) => ({
             operationId: o.operationId,
             ...(o.displayName !== undefined ? { displayName: o.displayName } : {}),

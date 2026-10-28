@@ -14,7 +14,7 @@ import { sha256Hex } from "./internal.js";
 import { principalKey, revokeParticipation, checkClaim, commitClaim, } from "./state.js";
 import { fail, ok } from "./result.js";
 export const createOrganizationCoordinator = (deps) => {
-    const { orgs, ops, principalLinks, outbox, clock, signer, nextId, adminRoles, orgAdmins, configureActions, activationLifetime, activationSecret, } = deps;
+    const { orgs, ops, principalLinks, outbox, clock, signer, nextId, adminRoles, configureActions, activationLifetime, activationSecret, } = deps;
     const unusableActivation = () => ({
         failure: { kind: "unauthenticated", detail: "activation is not usable" },
     });
@@ -44,7 +44,7 @@ export const createOrganizationCoordinator = (deps) => {
                 organizationId: link.organizationId,
                 actorId: link.actorId,
                 adminOfOperation: false,
-                adminOfOrganization: (orgAdmins[link.organizationId] ?? []).includes(link.actorId),
+                adminOfOrganization: org.admins.includes(link.actorId),
             };
         }
         const claims = authorization.envelope.claims;
@@ -74,7 +74,7 @@ export const createOrganizationCoordinator = (deps) => {
             organizationId: claimedOrganization,
             actorId: claimedActor,
             adminOfOperation: adminHat,
-            adminOfOrganization: (orgAdmins[claimedOrganization] ?? []).includes(claimedActor),
+            adminOfOrganization: orgs.get(claimedOrganization)?.admins.includes(claimedActor) ?? false,
         };
     };
     const acceptParticipation = (input, principal) => {
@@ -229,6 +229,161 @@ export const createOrganizationCoordinator = (deps) => {
         });
         return ok(input.idempotencyKey, true);
     };
+    // A roster or standing command is an organization-scoped write authorized
+    // by fresh evidence from one of that organization's administrators. An
+    // access envelope belongs to an operation and cannot carry it.
+    const rosterAuthority = (authorization, organization, principal) => {
+        const org = orgs.get(organizationId(organization));
+        if (org === undefined)
+            return { failure: { kind: "wrong-binding", detail: "unknown organization" } };
+        if (authorization.kind !== "fresh-evidence") {
+            return { failure: { kind: "denied", detail: "roster changes require fresh evidence" } };
+        }
+        if (principal.organizationId !== org.organizationId)
+            return { failure: { kind: "wrong-binding" } };
+        if (!principal.adminOfOrganization) {
+            return { failure: { kind: "denied", detail: "the caller does not administer this organization" } };
+        }
+        return org;
+    };
+    const actorIdFailure = (value) => {
+        if (value.trim().length === 0)
+            return { kind: "invalid-command", detail: "actor id is empty" };
+        if (value.length > 128)
+            return { kind: "invalid-command", detail: "actor id is too long" };
+        return undefined;
+    };
+    const displayNameFailure = (value) => {
+        if (value === null)
+            return undefined;
+        if (value.trim().length === 0)
+            return { kind: "invalid-command", detail: "display name is empty" };
+        if (value.length > 200)
+            return { kind: "invalid-command", detail: "display name is too long" };
+        return undefined;
+    };
+    const createActor = (input, principal) => {
+        if (input.kind !== "create-actor")
+            return fail("invalid-command", "wrong coordinator");
+        const org = rosterAuthority(input.authorization, input.organizationId, principal);
+        if ("failure" in org)
+            return { ok: false, failure: org.failure };
+        const replay = checkClaim(org.claims, input);
+        if (replay !== undefined)
+            return replay;
+        const idFailure = actorIdFailure(input.actorId);
+        if (idFailure !== undefined)
+            return { ok: false, failure: idFailure };
+        if (input.displayName !== undefined) {
+            const nameFailure = displayNameFailure(input.displayName);
+            if (nameFailure !== undefined)
+                return { ok: false, failure: nameFailure };
+        }
+        if (org.actors.some((actor) => actor.actorId === input.actorId)) {
+            return fail("invalid-command", "actor already exists");
+        }
+        org.actors.push({
+            organizationId: org.organizationId,
+            actorId: actorId(input.actorId),
+            ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+        });
+        commitClaim(org.claims, input);
+        org.audit.push({
+            at: clock.now(),
+            by: `${org.organizationId}/${principal.actorId}`,
+            fact: `actor ${input.actorId} created`,
+        });
+        return ok(input.idempotencyKey, true);
+    };
+    const updateActor = (input, principal) => {
+        if (input.kind !== "update-actor")
+            return fail("invalid-command", "wrong coordinator");
+        const org = rosterAuthority(input.authorization, input.organizationId, principal);
+        if ("failure" in org)
+            return { ok: false, failure: org.failure };
+        const replay = checkClaim(org.claims, input);
+        if (replay !== undefined)
+            return replay;
+        const nameFailure = displayNameFailure(input.displayName);
+        if (nameFailure !== undefined)
+            return { ok: false, failure: nameFailure };
+        const target = org.actors.find((candidate) => candidate.actorId === input.actorId);
+        if (target === undefined)
+            return fail("invalid-command", "unknown actor");
+        const changed = (target.displayName ?? null) !== input.displayName;
+        if (changed) {
+            if (input.displayName === null)
+                delete target.displayName;
+            else
+                target.displayName = input.displayName;
+        }
+        commitClaim(org.claims, input);
+        if (changed) {
+            org.audit.push({
+                at: clock.now(),
+                by: `${org.organizationId}/${principal.actorId}`,
+                fact: `actor ${input.actorId} display name updated`,
+            });
+        }
+        return ok(input.idempotencyKey, true);
+    };
+    const appointAdministrator = (input, principal) => {
+        if (input.kind !== "appoint-administrator")
+            return fail("invalid-command", "wrong coordinator");
+        const org = rosterAuthority(input.authorization, input.organizationId, principal);
+        if ("failure" in org)
+            return { ok: false, failure: org.failure };
+        const replay = checkClaim(org.claims, input);
+        if (replay !== undefined)
+            return replay;
+        const target = org.actors.find((candidate) => candidate.actorId === input.actorId);
+        if (target === undefined)
+            return fail("invalid-command", "unknown actor");
+        if (target.disabled)
+            return fail("not-admitted", "actor disabled");
+        if (!org.admins.includes(target.actorId)) {
+            org.admins.push(target.actorId);
+            org.audit.push({
+                at: clock.now(),
+                by: `${org.organizationId}/${principal.actorId}`,
+                fact: `actor ${target.actorId} appointed administrator`,
+            });
+        }
+        commitClaim(org.claims, input);
+        return ok(input.idempotencyKey, true);
+    };
+    const retireAdministrator = (input, principal) => {
+        if (input.kind !== "retire-administrator")
+            return fail("invalid-command", "wrong coordinator");
+        const org = rosterAuthority(input.authorization, input.organizationId, principal);
+        if ("failure" in org)
+            return { ok: false, failure: org.failure };
+        const replay = checkClaim(org.claims, input);
+        if (replay !== undefined)
+            return replay;
+        const target = org.actors.find((candidate) => candidate.actorId === input.actorId);
+        if (target === undefined)
+            return fail("invalid-command", "unknown actor");
+        if (!org.admins.includes(target.actorId)) {
+            commitClaim(org.claims, input);
+            return ok(input.idempotencyKey, true);
+        }
+        const remaining = org.admins.filter((id) => id !== target.actorId);
+        const usable = remaining.some((id) => {
+            const actor = org.actors.find((candidate) => candidate.actorId === id);
+            return actor !== undefined && !actor.disabled && linksTo(org.organizationId, id).length > 0;
+        });
+        if (!usable)
+            return fail("denied", "no other usable administrator remains");
+        org.admins = remaining;
+        commitClaim(org.claims, input);
+        org.audit.push({
+            at: clock.now(),
+            by: `${org.organizationId}/${principal.actorId}`,
+            fact: `actor ${target.actorId} retired as administrator`,
+        });
+        return ok(input.idempotencyKey, true);
+    };
     const activationRequest = async (input) => {
         const principal = await resolvePrincipal({ kind: "fresh-evidence", evidence: input.evidence, operationId: "" });
         if ("kind" in principal)
@@ -320,6 +475,10 @@ export const createOrganizationCoordinator = (deps) => {
                 case "disable-actor": return disableActor(input, principal);
                 case "unlink-principal": return unlinkPrincipal(input, principal);
                 case "revoke-activation": return revokeActivation(input, principal);
+                case "create-actor": return createActor(input, principal);
+                case "update-actor": return updateActor(input, principal);
+                case "appoint-administrator": return appointAdministrator(input, principal);
+                case "retire-administrator": return retireAdministrator(input, principal);
                 default: return fail("invalid-command", "not an organization command");
             }
         },

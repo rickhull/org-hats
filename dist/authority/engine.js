@@ -12,7 +12,7 @@
 // Determinism: the clock and signer are injected; a fixed clock plus a
 // fresh signer gives reproducible behavior (ids, failure kinds, receipts)
 // without pinning signature bytes.
-import { AUTHORITY_INTERFACE_VERSION, operationId, } from "../contract.js";
+import { AUTHORITY_INTERFACE_VERSION, operationId, organizationId, } from "../contract.js";
 import { counter, randomActivationSecret, systemClock, webCryptoSigner } from "./internal.js";
 import { createOperationCoordinator } from "./operation.js";
 import { createOrganizationCoordinator } from "./organization.js";
@@ -40,8 +40,6 @@ export const createInMemoryAuthority = async (config = {}) => {
     const outbox = [];
     const delivered = new Set();
     const nextId = counter();
-    const allOrganizations = [];
-    const allActors = [];
     for (const fixture of config.fixtures ?? []) {
         const op = fixture.snapshot.operations[0];
         if (op === undefined)
@@ -68,21 +66,18 @@ export const createInMemoryAuthority = async (config = {}) => {
                     organizationId: organization.organizationId,
                     ...(organization.displayName !== undefined ? { displayName: organization.displayName } : {}),
                     actors: [],
+                    admins: [],
                     invitations: new Map(),
                     audit: [{ at: clock.now(), by: "bootstrap", fact: `organization ${organization.organizationId} created` }],
                     claims: new Map(),
                     activationRequests: [],
                 });
-                allOrganizations.push({ organizationId: organization.organizationId, ...(organization.displayName !== undefined ? { displayName: organization.displayName } : {}) });
             }
         }
         for (const actor of fixture.snapshot.actors) {
             const org = orgs.get(actor.organizationId);
             if (org !== undefined && !org.actors.some((a) => a.actorId === actor.actorId)) {
                 org.actors.push({ ...actor });
-                if (!allActors.some((a) => a.organizationId === actor.organizationId && a.actorId === actor.actorId)) {
-                    allActors.push({ ...actor });
-                }
             }
         }
     }
@@ -105,7 +100,21 @@ export const createInMemoryAuthority = async (config = {}) => {
             actorId: link.actorId,
         });
     }
-    const snapshotOf = (operationOf) => snapshotFrom(ops, allOrganizations, allActors, operationOf);
+    // Administrator standing is organization data from here on. The configured
+    // record is a bootstrap seed, not a live writer: an organization appoints
+    // and retires its own administrators through the typed commands.
+    for (const [key, admins] of Object.entries(orgAdmins)) {
+        const org = orgs.get(organizationId(key));
+        if (org === undefined)
+            throw new Error(`orgAdmins names an unknown organization: ${key}`);
+        for (const admin of admins) {
+            if (!org.actors.some((actor) => actor.actorId === admin)) {
+                throw new Error(`orgAdmins names an unknown actor: ${key}/${admin}`);
+            }
+        }
+        org.admins = [...admins];
+    }
+    const snapshotOf = (operationOf) => snapshotFrom(ops, orgs, operationOf);
     const operations = createOperationCoordinator({
         orgs,
         ops,
@@ -127,7 +136,6 @@ export const createInMemoryAuthority = async (config = {}) => {
         signer,
         nextId,
         adminRoles,
-        orgAdmins,
         configureActions,
         activationLifetime,
         activationSecret,
@@ -209,7 +217,11 @@ export const createInMemoryAuthority = async (config = {}) => {
             // organization-scoped and binds to none
             const boundOperation = inputCommand.kind === "disable-actor" ||
                 inputCommand.kind === "unlink-principal" ||
-                inputCommand.kind === "revoke-activation"
+                inputCommand.kind === "revoke-activation" ||
+                inputCommand.kind === "create-actor" ||
+                inputCommand.kind === "update-actor" ||
+                inputCommand.kind === "appoint-administrator" ||
+                inputCommand.kind === "retire-administrator"
                 ? undefined
                 : "operationId" in inputCommand
                     ? operationId(inputCommand.operationId)
@@ -222,6 +234,10 @@ export const createInMemoryAuthority = async (config = {}) => {
                 case "disable-actor":
                 case "unlink-principal":
                 case "revoke-activation":
+                case "create-actor":
+                case "update-actor":
+                case "appoint-administrator":
+                case "retire-administrator":
                     return organizations.command(inputCommand, principalOrFailure);
                 case "participation-revoke":
                     return inputCommand.by === "operation"

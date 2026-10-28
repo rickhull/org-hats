@@ -48,6 +48,9 @@ export interface OrgState {
   readonly organizationId: OrganizationId;
   readonly displayName?: string;
   actors: { organizationId: OrganizationId; actorId: ActorId; displayName?: string; disabled?: boolean }[];
+  /** Administrator standing, seeded at bootstrap and changed only by the
+   * organization's own appoint/retire commands. */
+  admins: ActorId[];
   /** Org-side invitations received from operations, by invitation id. */
   invitations: Map<string, { operationId: OperationId; status: "pending" | "accepted" }>;
   audit: AuditEvent[];
@@ -138,15 +141,17 @@ export const principalKey = (provider: string, subject: string): string => JSON.
  * is the runtime half. */
 export const snapshotOf = (
   ops: ReadonlyMap<OperationId, OpState>,
-  allOrganizations: readonly { organizationId: OrganizationId; displayName?: string }[],
-  allActors: readonly { organizationId: OrganizationId; actorId: ActorId; displayName?: string; disabled?: boolean }[],
+  orgs: ReadonlyMap<OrganizationId, OrgState>,
   operationId: OperationId,
 ): Snapshot | undefined => {
   const op = ops.get(operationId);
   if (op === undefined) return undefined;
   return {
-    organizations: [...allOrganizations],
-    actors: [...allActors],
+    organizations: [...orgs.values()].map((org) => ({
+      organizationId: org.organizationId,
+      ...(org.displayName !== undefined ? { displayName: org.displayName } : {}),
+    })),
+    actors: [...orgs.values()].flatMap((org) => org.actors.map((actor) => ({ ...actor }))),
     operations: [...ops.values()].map((o) => ({
       operationId: o.operationId,
       ...(o.displayName !== undefined ? { displayName: o.displayName } : {}),

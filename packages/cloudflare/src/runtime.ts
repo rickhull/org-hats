@@ -379,7 +379,13 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         claims,
       };
     }
-    const preferred = command.kind === "disable-actor" || command.kind === "unlink-principal" || command.kind === "revoke-activation"
+    const preferred = command.kind === "disable-actor" ||
+      command.kind === "unlink-principal" ||
+      command.kind === "revoke-activation" ||
+      command.kind === "create-actor" ||
+      command.kind === "update-actor" ||
+      command.kind === "appoint-administrator" ||
+      command.kind === "retire-administrator"
       ? command.organizationId
       : undefined;
     const resolved = await resolve(command.authorization.evidence, preferred);
@@ -699,6 +705,28 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
           { actorId: input.actorId, byActorId: authorized.actorId },
         );
         break;
+      case "create-actor":
+      case "update-actor":
+      case "appoint-administrator":
+      case "retire-administrator": {
+        if (input.authorization.kind !== "fresh-evidence") {
+          return deny({ kind: "denied", detail: "roster changes require fresh evidence" });
+        }
+        if (authorized.organizationId !== input.organizationId) return deny({ kind: "wrong-binding" });
+        if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
+        const path = input.kind === "create-actor" ? "/create-actor"
+          : input.kind === "update-actor" ? "/update-actor"
+            : input.kind === "appoint-administrator" ? "/appoint-administrator"
+              : "/retire-administrator";
+        result = await route(organization(input.organizationId), path, {
+          actorId: input.actorId,
+          ...(input.kind === "create-actor" && input.displayName !== undefined ? { displayName: input.displayName } : {}),
+          ...(input.kind === "update-actor" ? { displayName: input.displayName } : {}),
+          byActorId: authorized.actorId,
+          idempotencyKey: input.idempotencyKey,
+        });
+        break;
+      }
       default: {
         // The exhaustiveness witness: this arm is `never` when every command
         // kind has a case, so adding one fails the build here instead of

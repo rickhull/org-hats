@@ -20,6 +20,9 @@ export interface OrgState {
         displayName?: string;
         disabled?: boolean;
     }[];
+    /** Administrator standing, seeded at bootstrap and changed only by the
+     * organization's own appoint/retire commands. */
+    admins: ActorId[];
     /** Org-side invitations received from operations, by invitation id. */
     invitations: Map<string, {
         operationId: OperationId;
@@ -121,15 +124,7 @@ export declare const principalKey: (provider: string, subject: string) => string
  * caller's to hold and mutate, and a shared array would make engine state
  * the caller's to corrupt. `readonly` on the type says the same thing; this
  * is the runtime half. */
-export declare const snapshotOf: (ops: ReadonlyMap<OperationId, OpState>, allOrganizations: readonly {
-    organizationId: OrganizationId;
-    displayName?: string;
-}[], allActors: readonly {
-    organizationId: OrganizationId;
-    actorId: ActorId;
-    displayName?: string;
-    disabled?: boolean;
-}[], operationId: OperationId) => Snapshot | undefined;
+export declare const snapshotOf: (ops: ReadonlyMap<OperationId, OpState>, orgs: ReadonlyMap<OrganizationId, OrgState>, operationId: OperationId) => Snapshot | undefined;
 export declare const payloadHash: (command: AuthorityCommand) => string;
 /** A retry claims its earlier result; the same key with a different payload
  * is a misuse, not a retry. Checking is pure — the claim is committed with

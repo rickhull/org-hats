@@ -114,14 +114,17 @@ idempotency keys; safe retry stops being a property of the seam.
 
 ### A9 — Administration is declared policy, never a hardcoded title
 
-Which role titles administer an operation and which actors administer an
-organization are runtime configuration, not code.
+Which role titles administer an operation is runtime configuration. Which
+actors administer an organization is organization data: the configured
+record seeds standing at bootstrap, and from then on the organization
+appoints and retires its own administrators through typed commands.
 
-*Held by:* `adminRoles`/`orgAdmins` on the engine, `/config` on the
-coordinator; the authorization cases assert denials for non-administrators.
-*If it breaks:* an operation cannot appoint or retire an administrator
-without a release, and the grant/revoke workflow's own gate becomes
-unmovable.
+*Held by:* `adminRoles` for operation titles; administrator standing in
+organization state, written by `appoint-administrator` and
+`retire-administrator` under fresh administrator evidence; the authorization
+cases assert denials for non-administrators.
+*If it breaks:* administration becomes a hardcoded title, or an organization
+cannot appoint or retire its own administrator without a deployment.
 
 ### A10 — Evidence is never a roster
 
@@ -129,7 +132,9 @@ A principal link resolves one `(organizationId, actorId)`; no provider
 claim links two actors, and equal mail-shaped subjects never merge them.
 
 Links enter through explicit bootstrap, activation acceptance, or the typed
-organization-authority ops surface. Every Cloudflare writer passes through a
+organization-authority ops surface; roster commands name an actor explicitly
+and create no link, so a created actor stays unlinked until evidence is
+accepted. Every Cloudflare writer passes through a
 deterministic subject guard whose scan-and-bind critical section stays
 exclusive across organization calls. A bind that would resolve the subject
 to a different actor is refused, and a cross-organization ambiguity fails
