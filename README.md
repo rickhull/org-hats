@@ -30,11 +30,25 @@ calls: `accessFromEvidence`, `refresh`, `context`, and `command`.
 > currently unions over every wearable grant — the
 > [current limits](docs/positioning.md#current-limits) say where that is
 > going. Admission is documented, but the grant is the operative admission.
-> Production is the Cloudflare reference runtime; the in-memory engine is
-> for tests and examples. The envelope is not a JWT: every downstream
-> service needs `org-hats/access` and the distributed key set. If one
-> application and one role per person is the whole problem, a role column is
-> simpler.
+> Production is the Cloudflare reference runtime, where a real downstream
+> host runs it today; the in-memory engine is for tests and examples. The
+> envelope is not a JWT: every downstream service needs `org-hats/access`
+> and the distributed key set. There is no support contract — issues and
+> security reports go through this repository, see
+> [`SECURITY.md`](SECURITY.md). If one application and one role per person
+> is the whole problem, a role column is simpler.
+
+## Who this is for
+
+- **Evaluating this against an AD/LDAP-shaped problem?** Keep reading, then
+  [`docs/personas/practitioner.md`](docs/personas/practitioner.md).
+- **Checking where this sits in the access-control literature?**
+  [`docs/personas/academic.md`](docs/personas/academic.md).
+- **Deciding whether this is worth a meeting, not an afternoon?**
+  [`docs/personas/onlooker.md`](docs/personas/onlooker.md) is the one-pager.
+- **Running an organization with no engineering staff?**
+  [`docs/personas/nonprofit.md`](docs/personas/nonprofit.md) is written for
+  you; nothing below this line is.
 
 ## Run the examples
 
@@ -297,19 +311,31 @@ Distribution is git tags only; no registry publication. Codeberg is
 canonical; GitHub is a release mirror. The v0.4 surface lives at its tags and
 is not copied forward.
 
+## What isn't written yet
+
+Real gaps, not a roadmap:
+
+- **Migrating from AD/LDAP.** [`docs/personas/practitioner.md`](docs/personas/practitioner.md)
+  says what transfers; there is no bulk-import or phased-cutover runbook.
+- **Operating a live deployment.** Bootstrap, key rotation, and ops routes
+  exist in the Cloudflare package; rotation cadence and an incident runbook
+  for a compromised key are not written up.
+- **Authoring your own policy bundle.** `own-world.ts` is the only worked
+  example; there is no schema document, and no worked example of a breaking
+  policy change.
+- **A threat model.** Not claimed, and not yet even informally sketched.
+- **Numbers.** No published envelope size, verification latency, or
+  comparison to JWT/JWKS at scale.
+- **Cost and adoption time.** Nobody has written down what a real pilot
+  takes to run.
+
 ## Read next
 
 - **First:** [`docs/tutorial.md`](docs/tutorial.md) — the longer walkthrough:
   commands, refresh, a lost disable, a crossed grant, and the objections each
   shape answers.
-- **Audience:** [`docs/personas/README.md`](docs/personas/README.md) — who
-  this message is for. [`docs/personas/practitioner.md`](docs/personas/practitioner.md)
-  for the AD/LDAP practitioner; [`docs/personas/academic.md`](docs/personas/academic.md),
-  [`specs/authority.md`](specs/authority.md), and
-  [`specs/envelope.md`](specs/envelope.md) for the access-control academic;
-  [`docs/personas/nonprofit.md`](docs/personas/nonprofit.md) for a
-  non-technical reader deciding whether to trust this with their
-  organization.
+- **Audience:** [`docs/personas/README.md`](docs/personas/README.md) — the
+  index behind "Who this is for" above, and what not to claim to each.
 - **Reference:** [`docs/authority_redesign.md`](docs/authority_redesign.md) ·
   [`docs/envelope.md`](docs/envelope.md) · [`docs/types.md`](docs/types.md) ·
   [`docs/lexicon.md`](docs/lexicon.md) · [`docs/README.md`](docs/README.md)

@@ -8,7 +8,7 @@ read the model to do so. Current claims and limits are in
 [`../positioning.md`](../positioning.md); this document is audience
 guidance, not a roadmap.*
 
-## The one-sentence position
+## The one-paragraph position
 
 > A portable authority core for organizations that work across many
 > operations and sites: one identity, one active hat per session, grants over

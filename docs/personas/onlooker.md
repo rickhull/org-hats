@@ -42,6 +42,10 @@ organization that works in more than one place at once. If your whole
 problem is one application with one role per person, this is more machinery
 than you need.
 
+One thing to know before, not after, a pilot: the production runtime today
+is Cloudflare only. If your infrastructure requirements rule that out, that's
+worth surfacing in the same meeting, not the next one.
+
 ## Read next
 
 - The root `README.md` — the opening and a runnable example.
