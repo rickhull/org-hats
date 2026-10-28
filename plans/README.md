@@ -9,9 +9,10 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-- [`activation_and_recovery.md`](activation_and_recovery.md) — add the
-  authority-owned claim and principal-recovery lifecycle, beginning with the
-  public seam and global subject-uniqueness decision.
+- [`actor_lifecycle_and_administration.md`](actor_lifecycle_and_administration.md) —
+  Tier 2, slice 1: create and rename actors, and move administrator standing
+  into organization data with appointment, usable-successor retirement, and
+  the last-administrator rule. Design decisions pending.
 
 Durable decisions live in `docs/` and `specs/`; the lexicon register is
 [`docs/lexicon_use_concerns.md`](../docs/lexicon_use_concerns.md).
