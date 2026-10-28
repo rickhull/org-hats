@@ -35,6 +35,24 @@ unknown-outcome secret and returns a replacement. Hosts must not apply generic
 automatic POST retries, and delivery may present an older invalid link after a
 newer one if notification ordering is not preserved.
 
+## Refusals
+
+Acceptance reports through the closed failure taxonomy, and the kind never
+varies with why a secret is unusable:
+
+- An unknown, expired, spent by a different subject, or revoked secret, and
+  an actor that is missing, disabled, or linked since the request was minted,
+  all return `unauthenticated` with the one detail `activation is not
+  usable`. The uniformity is the invariant: a caller cannot learn which
+  condition fired, and a second claimant learns only that the claim is gone.
+- A verified subject already linked to a different actor returns `denied`
+  with detail `the principal is already linked to another actor`. That is
+  the one deliberate non-uniform refusal, because the person's next step
+  differs: use another account, or ask the administrator to reclaim.
+- Repeating a spent secret with the subject that consumed it is success,
+  `{ applied: false }` naming the actor. A different subject reusing that
+  spent secret is unusable, never `denied`.
+
 ## Recovery commands
 
 Two fresh-evidence organization commands complete the lifecycle:

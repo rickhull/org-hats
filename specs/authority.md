@@ -48,6 +48,14 @@ Nine kinds, enumerated once in `src/contract.ts`. A new kind is an
 interface-version change, and the product response to every kind belongs
 to the deploying host.
 
+The call boundary carries one distinction the kinds do not: provider
+verification is the host's own step, and the authority is called only after
+it succeeds. `unauthenticated` from `accessFromEvidence` therefore means
+verified evidence that resolves to no principal link; a failure before that
+call means nothing was verified. Hosts distinguish the two by which step
+failed, not by reading `detail`; `detail` is a human sentence, not a second
+taxonomy.
+
 *Held by:* the closed `FailureKind` union shared by both surfaces; the
 consumer maps every kind or fails its contract test.
 *If it breaks:* a release introduces a failure no consumer has a response
