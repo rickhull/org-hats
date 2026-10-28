@@ -29,6 +29,10 @@ write the story, replace it.*
 | OH-AUTH-05 | refresh rotates the handle; a superseded handle is dead | [tutorial](tutorial.md) Case 5 · [walkthrough](walkthrough.md) §4 |
 | OH-AUTH-06 | authentication method references ride the envelope and survive refresh | [tutorial](tutorial.md) Case 5 · [envelope](envelope.md) |
 | OH-AUTH-07 | wearable hats carry the grant id select-hat takes | [tutorial](tutorial.md) Case 1 · [walkthrough](walkthrough.md) §7 |
+| OH-ACT-01 | an unclaimed actor is claimed once and its subject then issues | [activation](activation.md) § Portable lifecycle |
+| OH-ACT-02 | every unusable secret reports the same failure | [activation](activation.md) § Refusals |
+| OH-ACT-03 | a subject linked elsewhere is refused without consuming the claim | [activation](activation.md) § Refusals |
+| OH-ACT-04 | unlink ends issuance and a fresh subject can take the actor | [activation](activation.md) § Recovery commands |
 | OH-PART-01 | invite, accept, admit: an invited organization receives a hat | — |
 | OH-PART-02 | revoke is terminal: new issuance stops, the live envelope survives | [walkthrough](walkthrough.md) §9 |
 | OH-CMD-01 | idempotent retry: a denial does not poison the key | [tutorial](tutorial.md) Case 4 · [walkthrough](walkthrough.md) §8 |
