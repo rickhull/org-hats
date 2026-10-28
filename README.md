@@ -173,8 +173,8 @@ role column is simpler.
 
 In the literature's terms, this is target-scoped RBAC with a signed bearer
 authorization projection — not a new RBAC variant, not ABAC, and not
-Zanzibar/ReBAC. See [`docs/model_mapping.md`](docs/model_mapping.md) for the
-full mapping.
+Zanzibar/ReBAC. See [`docs/personas/academic.md`](docs/personas/academic.md)
+for the full mapping.
 
 ## The four calls
 
@@ -302,11 +302,14 @@ is not copied forward.
 - **First:** [`docs/tutorial.md`](docs/tutorial.md) — the longer walkthrough:
   commands, refresh, a lost disable, a crossed grant, and the objections each
   shape answers.
-- **Audience:** [`docs/personas.md`](docs/personas.md) — who this message is
-  for. [`docs/from_ldap.md`](docs/from_ldap.md) for the AD/LDAP practitioner;
-  [`docs/model_mapping.md`](docs/model_mapping.md), [`specs/authority.md`](specs/authority.md),
-  and [`specs/envelope.md`](specs/envelope.md) for the access-control
-  academic.
+- **Audience:** [`docs/personas/README.md`](docs/personas/README.md) — who
+  this message is for. [`docs/personas/practitioner.md`](docs/personas/practitioner.md)
+  for the AD/LDAP practitioner; [`docs/personas/academic.md`](docs/personas/academic.md),
+  [`specs/authority.md`](specs/authority.md), and
+  [`specs/envelope.md`](specs/envelope.md) for the access-control academic;
+  [`docs/personas/nonprofit.md`](docs/personas/nonprofit.md) for a
+  non-technical reader deciding whether to trust this with their
+  organization.
 - **Reference:** [`docs/authority_redesign.md`](docs/authority_redesign.md) ·
   [`docs/envelope.md`](docs/envelope.md) · [`docs/types.md`](docs/types.md) ·
   [`docs/lexicon.md`](docs/lexicon.md) · [`docs/README.md`](docs/README.md)

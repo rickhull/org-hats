@@ -204,9 +204,9 @@ From a clean `main`:
    Docs that name the artifacts move with the window: the README version table
    and the additive note in `migration-v2.md` move before the root tag; the
    live-deployment references in `cloudflare.md`, `binding-conformance.md`,
-   the deployment paragraph in this file, `positioning.md`, `from_ldap.md`,
-   and `migration-v2.md` move after the host deploy, because they describe
-   what is running.
+   the deployment paragraph in this file, `positioning.md`,
+   `personas/practitioner.md`, and `migration-v2.md` move after the host
+   deploy, because they describe what is running.
 2. If the release was cut without `--push`, send it to both hosts:
    ```sh
    git push origin HEAD

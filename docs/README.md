@@ -55,19 +55,25 @@ public `org-hats` docs are normative for the seam.
 
 ## Audience guides
 
-- [`personas.md`](personas.md) — the practitioner, the academic, and the
-  onlooker: what to show each, and what not to claim.
-- [`from_ldap.md`](from_ldap.md) — the Active Directory/LDAP practitioner's
-  map: what transfers, what does not, and why ids beat DNs.
-- [`model_mapping.md`](model_mapping.md) — the access-control literature
-  mapping: scoped RBAC0, PDP/PEP/PIP, ABAC/ReBAC/capability non-claims, and
-  the path to a citable model.
+- [`personas/README.md`](personas/README.md) — the practitioner, the
+  academic, the onlooker, and the nonprofit director: what to show each, and
+  what not to claim.
+- [`personas/practitioner.md`](personas/practitioner.md) — the Active
+  Directory/LDAP practitioner's map: what transfers, what does not, and why
+  ids beat DNs.
+- [`personas/academic.md`](personas/academic.md) — the access-control
+  literature mapping: scoped RBAC0, PDP/PEP/PIP, ABAC/ReBAC/capability
+  non-claims, and the path to a citable model.
+- [`personas/onlooker.md`](personas/onlooker.md) — the one-pager for someone
+  deciding whether this is worth a meeting.
+- [`personas/nonprofit.md`](personas/nonprofit.md) — the plain-language
+  version, for an organization's leadership with no engineering staff.
 
 ## Tutorial
 
 - [`walkthrough.md`](walkthrough.md) — the layperson's first read: the
   same story as the tutorial in plain English, every term glossed, each
-  section closed by the three personas from `personas.md`.
+  section closed by three of the four personas from `personas/README.md`.
 - [`tutorial.md`](tutorial.md) — a longer, concrete walkthrough through the
   synthetic example worlds: one actor in two operations, the decisions each
   hat produces, commands and denial, refresh rotation, a lost disable message,

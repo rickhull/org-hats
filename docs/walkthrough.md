@@ -6,8 +6,8 @@ reader needs. Every example is synthetic design data. When this page and a
 test disagree, the test is right; when a word needs precision,
 [`lexicon.md`](lexicon.md) wins.*
 
-Three short comments close every section — one from each reader in
-[`personas.md`](personas.md): **the practitioner** (runs directories and
+Three short comments close every section — one from each of three readers in
+[`personas/README.md`](personas/README.md): **the practitioner** (runs directories and
 servers for a living), **the academic** (studies access control), and **the
 onlooker** (a junior developer or a manager deciding whether to spend a
 meeting on this). Their voices are the reader's three instincts, not
@@ -299,8 +299,8 @@ authorization.
   `node examples/own-world.ts`.
 - Want the real walkthrough with code and every id?
   [`tutorial.md`](tutorial.md).
-- Coming from Active Directory or LDAP? [`from_ldap.md`](from_ldap.md).
-- Want the model mapped to the literature? [`model_mapping.md`](model_mapping.md).
+- Coming from Active Directory or LDAP? [`personas/practitioner.md`](personas/practitioner.md).
+- Want the model mapped to the literature? [`personas/academic.md`](personas/academic.md).
 - Want the architecture and the invariants?
   [`authority_redesign.md`](authority_redesign.md), then
   [`../specs/`](../specs/).

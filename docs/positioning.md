@@ -1,8 +1,8 @@
 # Positioning — what org-hats is, and what it is not
 
 *The current positioning reference. Audience guidance is in
-[`personas.md`](personas.md); the model posture and non-goals are in
-[`authority_redesign.md`](authority_redesign.md) § Access.*
+[`personas/README.md`](personas/README.md); the model posture and non-goals
+are in [`authority_redesign.md`](authority_redesign.md) § Access.*
 
 ## One paragraph
 
@@ -21,7 +21,8 @@ reference; the Cloudflare runtime is the production reference.
 It is best read as **target-scoped RBAC with a signed bearer authorization
 projection**, wrapped in a multi-organization participation lifecycle — not as
 a new RBAC variant, not as ABAC, not as Zanzibar/ReBAC, and not as a policy
-engine. The full mapping is in [`model_mapping.md`](model_mapping.md).
+engine. The full mapping is in
+[`personas/academic.md`](personas/academic.md).
 
 - Roles are flat action sets; a grant pairs one role with one target.
 - A site grant reaches the site and its teams; there is no role hierarchy,
@@ -162,14 +163,15 @@ policy; a directory remains the identity source.
 
 ## Read next
 
-- [`from_ldap.md`](from_ldap.md) — the AD/LDAP practitioner's map.
-- [`model_mapping.md`](model_mapping.md) — the NIST/XACML/ABAC/ReBAC mapping
-  and non-claims.
+- [`personas/practitioner.md`](personas/practitioner.md) — the AD/LDAP
+  practitioner's map.
+- [`personas/academic.md`](personas/academic.md) — the NIST/XACML/ABAC/ReBAC
+  mapping and non-claims.
 - [`authority_redesign.md`](authority_redesign.md) — the architecture and
   state ownership.
 - [`cloudflare.md`](cloudflare.md) — the reference runtime and the deployment
   contract.
 - [`binding-conformance.md`](binding-conformance.md) — what a deployed binding
   proves, and what it does not.
-- [`personas.md`](personas.md) — who the message is for, and what to show
-  each audience.
+- [`personas/README.md`](personas/README.md) — who the message is for, and
+  what to show each audience.

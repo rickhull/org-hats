@@ -1,9 +1,12 @@
 # Personas — who the message is for
 
-*Three audiences. The first two evaluate the model; the third is not deciding
-— the goal is that they keep reading, or fund the next conversation. Current
-claims and limits are in [`positioning.md`](positioning.md); this document is
-audience guidance, not a roadmap.*
+*Four audiences. The first two evaluate the model; the third is not deciding
+— the goal is that they keep reading, or fund the next conversation. The
+fourth is not deciding the model either — they are deciding whether to trust
+it with an organization they run, in language that never requires them to
+read the model to do so. Current claims and limits are in
+[`positioning.md`](positioning.md); this document is audience guidance, not a
+roadmap.*
 
 ## The one-sentence position
 
@@ -88,6 +91,38 @@ example, and [`positioning.md`](positioning.md) § Current limits. For a
 manager, the one-paragraph position and the non-claims are the page; specs are
 appendix material.
 
+## 4. The nonprofit executive director — runs the organization, not the stack
+
+**Profile.** Runs a real organization: program sites, seasonal or volunteer
+staff, grant-funded initiatives that start and end, and turnover that
+regularly outlasts any one person's institutional knowledge. Has no
+engineering staff and no plan to hire one. Is not evaluating "the authority
+layer" and may not know the phrase exists — thinks in terms of "our shelter,"
+"our chapter," "who's allowed to approve a disbursement."
+
+**Job to be done.** "When our coordinator leaves, the next person shouldn't
+inherit access to everything by accident. Someone from another chapter
+shouldn't be able to touch our site's records just because we're part of the
+same organization. I can't hire a security consultant, and I don't want a
+meeting about authorization models — I want to know this is handled."
+
+**What intrigues them:** the Dana story retold without the vocabulary — the
+same volunteer helps two programs and doesn't carry the same keys to both; a
+plain statement that removing someone's access takes effect quickly and that
+nothing lingers past its window; that this doesn't require buying an identity
+system they don't have.
+
+**What loses them:** any engineering term shown before its plain-language
+translation (`envelope`, `grant`, `hat`, `principal`, `admission`); code
+shown before the guarantee is stated; an implication that adopting this
+requires hiring a developer; a pitch that assumes they already run SSO.
+
+**Show them:** one paragraph, not the README: *"Everyone who helps your
+organization gets exactly the access their current role needs, nothing more
+— checked automatically, not by someone remembering to update a list."* Then
+stop. If they want more, hand them to the onlooker's materials, not the
+model.
+
 ## What to show each
 
 | Audience | First artifact | Next | Avoid |
@@ -95,6 +130,7 @@ appendix material.
 | Practitioner | README, `examples/pilot.ts` | `own-world.ts`, `from_ldap.md` | “Twin,” unglossed `grant`/`envelope` |
 | Academic | `model_mapping.md`, `specs/authority.md` | conformance inventory, envelope spec | Marketing claims, “foundational” |
 | Onlooker | README opening, pilot output | positioning’s limits, own-world | Engine internals, standards claims |
+| Nonprofit director | the one-paragraph guarantee, spoken | README opening, *if* they ask for more | Any code, jargon, “you need a developer” |
 
 ## Claims and guardrails
 
@@ -108,3 +144,7 @@ appendix material.
   not a stored relation.
 - Formal and threat models are not claimed; this line stays a reference
   architecture.
+- A plain-language translation is still a claim. "Checked automatically" and
+  "takes effect quickly" are fine; "immediately," "secure," or "nothing to
+  manage" are not — the window is bounded, not instant, and the deploying
+  host still owns secrets, versions, and operations.
