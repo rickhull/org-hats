@@ -9,7 +9,9 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-No active plans.
+- [`activation_and_recovery.md`](activation_and_recovery.md) — add the
+  authority-owned claim and principal-recovery lifecycle, beginning with the
+  public seam and global subject-uniqueness decision.
 
 Durable decisions live in `docs/` and `specs/`; the lexicon register is
 [`docs/lexicon_use_concerns.md`](../docs/lexicon_use_concerns.md).
