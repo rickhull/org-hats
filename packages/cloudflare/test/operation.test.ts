@@ -629,4 +629,32 @@ describe("OperationAuthority", () => {
     });
     expect(reuse.body.failure?.kind).toBe("invalid-command");
   });
+
+  it("restores a schema-4 export whose teams carry no status", async () => {
+    const current = world("restore-legacy-teams");
+    await bootstrapOrganization(current);
+    await bootstrapOperation(current, true);
+    const exported = await call<{
+      readonly schemaVersion: string;
+      readonly coordinator: string;
+      readonly tables: Readonly<Record<string, readonly Record<string, unknown>[]>>;
+    }>(current.op, "GET", "/export");
+    const snapshot = exported.body.value;
+    expect(snapshot).toBeDefined();
+    if (snapshot === undefined) return;
+    const teams = (snapshot.tables["teams"] ?? []).map((row) => {
+      const rest = { ...row };
+      delete rest["status"];
+      return rest;
+    });
+    const legacy = { ...snapshot, schemaVersion: "4", tables: { ...snapshot.tables, teams } };
+    expect((await call(current.op, "POST", "/reset")).body.ok).toBe(true);
+    expect((await call(current.op, "POST", "/restore", legacy)).body.ok).toBe(true);
+    const restored = await call<{ readonly teams: readonly { readonly team_id: string; readonly status: string }[] }>(
+      current.op,
+      "GET",
+      "/snapshot",
+    );
+    expect(restored.body.value?.teams.find((team) => team.team_id === TEAM)?.status).toBe("active");
+  });
 });

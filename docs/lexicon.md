@@ -104,7 +104,7 @@ _Avoid_: configuration (unqualified), rules (unqualified)
 
 **Read policy** — A structure of independent reach axes. v1 has the
 organization axis (`granted-teams` or `all-participating`); a team-read
-axis is additive later.
+axis is additive later, as a scope rather than an expanded team list.
 _Avoid_: read mode (as a scalar)
 
 **Administration** — Acting with a policy action that configures the

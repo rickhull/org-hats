@@ -135,6 +135,10 @@ export type ParticipationCommand = {
     readonly organizationId: Unbranded<OrganizationId>;
     readonly by: "operation" | "organization";
 };
+/** `admit` keeps an ignored `teamId` field from the pre-team shape: neither
+ * runtime reads it, and team placement is the grant target plus
+ * `request-team`/`admit-team`. Deprecated: remove it at the next interface
+ * bump or with the consumer's explicit review. */
 export type AdmissionCommand = {
     readonly kind: "request-access";
     readonly operationId: Unbranded<OperationId>;

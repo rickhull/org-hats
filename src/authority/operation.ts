@@ -64,6 +64,7 @@ import {
   type PrincipalLink,
 } from "./state.ts";
 import { fail, ok } from "./result.ts";
+import { displayNameFailure, identifierFailure } from "./validation.ts";
 
 export interface OperationDeps {
   readonly orgs: Map<OrganizationId, OrgState>;
@@ -457,19 +458,6 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     return ok(input.idempotencyKey, true);
   };
 
-  const teamIdFailure = (value: string): Failure | undefined => {
-    if (value.trim().length === 0) return { kind: "invalid-command", detail: "team id is empty" };
-    if (value.length > 128) return { kind: "invalid-command", detail: "team id is too long" };
-    return undefined;
-  };
-
-  const teamNameFailure = (value: string | null): Failure | undefined => {
-    if (value === null) return undefined;
-    if (value.trim().length === 0) return { kind: "invalid-command", detail: "team display name is empty" };
-    if (value.length > 200) return { kind: "invalid-command", detail: "team display name is too long" };
-    return undefined;
-  };
-
   const requestTeam = (input: AuthorityCommand, principal: Principal): CommandResult => {
     if (input.kind !== "request-team") return fail("invalid-command", "wrong coordinator");
     const op = ops.get(operationId(input.operationId));
@@ -483,10 +471,10 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     if (principal.organizationId !== organizationId(input.organizationId)) return fail("wrong-binding");
     const replay = checkClaim(op.claims, input);
     if (replay !== undefined) return replay;
-    const idFailure = teamIdFailure(input.teamId);
+    const idFailure = identifierFailure(input.teamId, "team id");
     if (idFailure !== undefined) return { ok: false, failure: idFailure };
     if (input.displayName !== undefined) {
-      const nameFailure = teamNameFailure(input.displayName);
+      const nameFailure = displayNameFailure(input.displayName, "team display name");
       if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
     }
     const organization = organizationId(input.organizationId);
@@ -554,7 +542,7 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     }
     const replay = checkClaim(op.claims, input);
     if (replay !== undefined) return replay;
-    const nameFailure = teamNameFailure(input.displayName);
+    const nameFailure = displayNameFailure(input.displayName, "team display name");
     if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
     if (team.status === "retired") return fail("invalid-command", "team is retired");
     const changed = (team.displayName ?? null) !== input.displayName;

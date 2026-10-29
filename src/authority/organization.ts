@@ -48,6 +48,7 @@ import {
   type PrincipalLink,
 } from "./state.ts";
 import { fail, ok } from "./result.ts";
+import { displayNameFailure, identifierFailure } from "./validation.ts";
 
 export interface OrganizationDeps {
   readonly orgs: Map<OrganizationId, OrgState>;
@@ -292,29 +293,16 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
     return org;
   };
 
-  const actorIdFailure = (value: string): Failure | undefined => {
-    if (value.trim().length === 0) return { kind: "invalid-command", detail: "actor id is empty" };
-    if (value.length > 128) return { kind: "invalid-command", detail: "actor id is too long" };
-    return undefined;
-  };
-
-  const displayNameFailure = (value: string | null): Failure | undefined => {
-    if (value === null) return undefined;
-    if (value.trim().length === 0) return { kind: "invalid-command", detail: "display name is empty" };
-    if (value.length > 200) return { kind: "invalid-command", detail: "display name is too long" };
-    return undefined;
-  };
-
   const createActor = (input: AuthorityCommand, principal: Principal): CommandResult => {
     if (input.kind !== "create-actor") return fail("invalid-command", "wrong coordinator");
     const org = rosterAuthority(input.authorization, input.organizationId, principal);
     if ("failure" in org) return { ok: false, failure: org.failure };
     const replay = checkClaim(org.claims, input);
     if (replay !== undefined) return replay;
-    const idFailure = actorIdFailure(input.actorId);
+    const idFailure = identifierFailure(input.actorId, "actor id");
     if (idFailure !== undefined) return { ok: false, failure: idFailure };
     if (input.displayName !== undefined) {
-      const nameFailure = displayNameFailure(input.displayName);
+      const nameFailure = displayNameFailure(input.displayName, "display name");
       if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
     }
     if (org.actors.some((actor) => actor.actorId === input.actorId)) {
@@ -340,7 +328,7 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
     if ("failure" in org) return { ok: false, failure: org.failure };
     const replay = checkClaim(org.claims, input);
     if (replay !== undefined) return replay;
-    const nameFailure = displayNameFailure(input.displayName);
+    const nameFailure = displayNameFailure(input.displayName, "display name");
     if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
     const target = org.actors.find((candidate) => candidate.actorId === input.actorId);
     if (target === undefined) return fail("invalid-command", "unknown actor");

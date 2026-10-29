@@ -13,6 +13,7 @@ import { actorId, asJson, canonicalJson, envelopeVersionFailure, operationId, or
 import { sha256Hex } from "./internal.js";
 import { principalKey, revokeParticipation, checkClaim, commitClaim, } from "./state.js";
 import { fail, ok } from "./result.js";
+import { displayNameFailure, identifierFailure } from "./validation.js";
 export const createOrganizationCoordinator = (deps) => {
     const { orgs, ops, principalLinks, outbox, clock, signer, nextId, adminRoles, configureActions, activationLifetime, activationSecret, } = deps;
     const unusableActivation = () => ({
@@ -246,22 +247,6 @@ export const createOrganizationCoordinator = (deps) => {
         }
         return org;
     };
-    const actorIdFailure = (value) => {
-        if (value.trim().length === 0)
-            return { kind: "invalid-command", detail: "actor id is empty" };
-        if (value.length > 128)
-            return { kind: "invalid-command", detail: "actor id is too long" };
-        return undefined;
-    };
-    const displayNameFailure = (value) => {
-        if (value === null)
-            return undefined;
-        if (value.trim().length === 0)
-            return { kind: "invalid-command", detail: "display name is empty" };
-        if (value.length > 200)
-            return { kind: "invalid-command", detail: "display name is too long" };
-        return undefined;
-    };
     const createActor = (input, principal) => {
         if (input.kind !== "create-actor")
             return fail("invalid-command", "wrong coordinator");
@@ -271,11 +256,11 @@ export const createOrganizationCoordinator = (deps) => {
         const replay = checkClaim(org.claims, input);
         if (replay !== undefined)
             return replay;
-        const idFailure = actorIdFailure(input.actorId);
+        const idFailure = identifierFailure(input.actorId, "actor id");
         if (idFailure !== undefined)
             return { ok: false, failure: idFailure };
         if (input.displayName !== undefined) {
-            const nameFailure = displayNameFailure(input.displayName);
+            const nameFailure = displayNameFailure(input.displayName, "display name");
             if (nameFailure !== undefined)
                 return { ok: false, failure: nameFailure };
         }
@@ -304,7 +289,7 @@ export const createOrganizationCoordinator = (deps) => {
         const replay = checkClaim(org.claims, input);
         if (replay !== undefined)
             return replay;
-        const nameFailure = displayNameFailure(input.displayName);
+        const nameFailure = displayNameFailure(input.displayName, "display name");
         if (nameFailure !== undefined)
             return { ok: false, failure: nameFailure };
         const target = org.actors.find((candidate) => candidate.actorId === input.actorId);

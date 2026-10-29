@@ -54,6 +54,11 @@ layers over the actor's wearable grants; the verifier compares each layer's
 ids and never derives one from another. The `memberTeamIds` claim keeps its
 historical name; neutral access exposes the same set as `teamReach()`.
 
+`context()` is an authority call, not a verification: it re-reads current
+organization state, so a disabled actor's context lists no wearable hats
+while the signed envelope still verifies to its expiry. Verification reads the
+signed claims; context asks the authority what is true now.
+
 `amr` and `auth_time` are the OIDC claim names (`amr` from RFC 8176,
 `auth_time` from OpenID Connect Core), carried verbatim the way `iat` and
 `exp` are. They describe the authentication event the evidence recorded,

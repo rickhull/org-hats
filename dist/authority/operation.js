@@ -18,6 +18,7 @@ import { sha256Hex } from "./internal.js";
 import { assembleAccessClaims, authenticationFactsOf } from "./claims.js";
 import { checkClaim, commitClaim, principalKey, revokeParticipation, revokeRefreshRecords, } from "./state.js";
 import { fail, ok } from "./result.js";
+import { displayNameFailure, identifierFailure } from "./validation.js";
 export const createOperationCoordinator = (deps) => {
     const { orgs, ops, principalLinks, outbox, clock, signer, nextId, lifetime, configureActions, snapshotOf } = deps;
     // --- issuance -----------------------------------------------------------------------
@@ -399,22 +400,6 @@ export const createOperationCoordinator = (deps) => {
         op.audit.push({ at: clock.now(), by: `${principal.organizationId}/${principal.actorId}`, fact: `primary hat set to grant ${input.grantId}` });
         return ok(input.idempotencyKey, true);
     };
-    const teamIdFailure = (value) => {
-        if (value.trim().length === 0)
-            return { kind: "invalid-command", detail: "team id is empty" };
-        if (value.length > 128)
-            return { kind: "invalid-command", detail: "team id is too long" };
-        return undefined;
-    };
-    const teamNameFailure = (value) => {
-        if (value === null)
-            return undefined;
-        if (value.trim().length === 0)
-            return { kind: "invalid-command", detail: "team display name is empty" };
-        if (value.length > 200)
-            return { kind: "invalid-command", detail: "team display name is too long" };
-        return undefined;
-    };
     const requestTeam = (input, principal) => {
         if (input.kind !== "request-team")
             return fail("invalid-command", "wrong coordinator");
@@ -432,11 +417,11 @@ export const createOperationCoordinator = (deps) => {
         const replay = checkClaim(op.claims, input);
         if (replay !== undefined)
             return replay;
-        const idFailure = teamIdFailure(input.teamId);
+        const idFailure = identifierFailure(input.teamId, "team id");
         if (idFailure !== undefined)
             return { ok: false, failure: idFailure };
         if (input.displayName !== undefined) {
-            const nameFailure = teamNameFailure(input.displayName);
+            const nameFailure = displayNameFailure(input.displayName, "team display name");
             if (nameFailure !== undefined)
                 return { ok: false, failure: nameFailure };
         }
@@ -513,7 +498,7 @@ export const createOperationCoordinator = (deps) => {
         const replay = checkClaim(op.claims, input);
         if (replay !== undefined)
             return replay;
-        const nameFailure = teamNameFailure(input.displayName);
+        const nameFailure = displayNameFailure(input.displayName, "team display name");
         if (nameFailure !== undefined)
             return { ok: false, failure: nameFailure };
         if (team.status === "retired")

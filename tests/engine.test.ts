@@ -239,6 +239,14 @@ test("disable-actor: issuance stops immediately; the outbox revokes refresh reco
   okOf(disable);
   const blocked = await engine.runtime.accessFromEvidence(evidence(DANA));
   assert.equal(failureOf(blocked).kind, "not-admitted");
+  // Context is a fresh authority read, not verification: the disabled actor's
+  // context lists no wearable hats, while the envelope still verifies.
+  const context = successOf(await engine.runtime.context({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    envelope: danaIssue.envelope,
+  }));
+  assert.equal(context.wearableHats.length, 0);
+  assert.equal(context.selectedHat, undefined);
   const dead = await engine.runtime.refresh({
     interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle: handleOf(danaIssue.refresh),
   });
