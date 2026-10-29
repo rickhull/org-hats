@@ -9,9 +9,13 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-No active plans. The activation, roster, and team slices landed on
-2026-10-28 and 2026-10-29; their durable facts are in `docs/activation.md`,
-`docs/roster.md`, `docs/teams.md`, and `specs/`.
+- [`refactor.md`](refactor.md) — feature-complete quality program: reliability
+  guards, test-coverage expansion, measured performance work, structural
+  extraction, and the documentation/invariant pass.
+
+The activation, roster, and team slices landed on 2026-10-28 and 2026-10-29;
+their durable facts are in `docs/activation.md`, `docs/roster.md`,
+`docs/teams.md`, and `specs/`.
 
 Durable decisions live in `docs/` and `specs/`; the lexicon register is
 [`docs/lexicon_use_concerns.md`](../docs/lexicon_use_concerns.md).
