@@ -12,6 +12,9 @@ a miscellaneous file, or keep a plan alive to justify work.
 - [`refactor.md`](refactor.md) — feature-complete quality program: reliability
   guards, test-coverage expansion, measured performance work, structural
   extraction, and the documentation/invariant pass.
+- [`spec_testing.md`](spec_testing.md) — the specs-driven witness suite: a
+  spec-to-test link gate, portable unit/smoke witnesses, and segmented
+  integration coverage.
 
 The activation, roster, and team slices landed on 2026-10-28 and 2026-10-29;
 their durable facts are in `docs/activation.md`, `docs/roster.md`,
