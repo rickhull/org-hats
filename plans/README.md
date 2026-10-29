@@ -9,8 +9,13 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-No active plans. The activation and roster slices landed on 2026-10-28; their
-durable facts are in `docs/activation.md`, `docs/roster.md`, and `specs/`.
+- [`team_lifecycle.md`](team_lifecycle.md) — Tier 2, slice 2: organization
+  requests a team, the operation admits it, and retirement revokes the grants
+  and refresh authority that stood on it. Decisions proposed; Quartermaster
+  must accept the write shape.
+
+The activation and roster slices landed on 2026-10-28; their durable facts are
+in `docs/activation.md`, `docs/roster.md`, and `specs/`.
 
 Durable decisions live in `docs/` and `specs/`; the lexicon register is
 [`docs/lexicon_use_concerns.md`](../docs/lexicon_use_concerns.md).
