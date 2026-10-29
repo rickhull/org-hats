@@ -248,6 +248,14 @@ another. A host reads the layer its decision belongs to. The grant is the
 operation's operative admission; access requests are a review queue, not a
 stored relation. Formal and threat models are not claims in this line.
 
+The hat is not the authority for an authority command. It is the local check
+for a host's own product mutations; the runtime's commands declare their own
+authorization — fresh evidence for organizational acts, standing for operation
+administration — and none reads the selected hat. Administrator standing is
+not a claim in the envelope or the context, so a host discovers it by calling
+the runtime and handling `denied`, never by inferring it from a hat or its
+actions.
+
 The module uses portable cryptographic interfaces or Web Platform primitives.
 It does not know how sessions are transported and does not import Cloudflare
 bindings.
@@ -546,6 +554,13 @@ runtime implements them. The consumer's selected-team workbench reads the
 worn hat's team today; if a team-read axis is added later it is a **scope**,
 not an expanded team enumeration, because an operation with 100–150 teams
 cannot carry that list in the envelope.
+
+Under `granted-teams`, read reach follows the actor's grants rather than the
+selected hat: a grant on one team makes that team's organization readable in
+full, and a site grant reaches every organization with a team at the site.
+Under `all-participating`, every hat reads the whole operation. The selected
+hat narrows the actions `mayAct` evaluates; it does not narrow reads. A team-
+or site-scoped read is the team-read axis above, not a property of the hat.
 
 The distinction between platform and deployed configuration is explicit:
 

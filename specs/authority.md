@@ -223,13 +223,17 @@ The envelope's selected action hat bounds the actions `mayAct` evaluates.
 Read reach, configuration reach, and member reach are separate, issuer-computed
 layers over the actor's wearable grants; the verifier compares each layer's
 ids and never derives one layer from another. The hat is not claimed to bound
-all authority.
+all authority, and it authorizes no authority command: commands are checked
+at the runtime against standing and their declared fresh-evidence or envelope
+mode, never against the hat's actions.
 
 *Held by:* the claims shape (`hat`, `readableOrganizationIds`,
 `readableTeamIds`, `configurableSiteIds`, `memberTeamIds`),
-`assembleAccessClaims`, `NeutralAccess`, and the access/claims suites.
-*If it breaks:* "one hat at a time" becomes an overclaim, and a host cannot
-name the layer a decision came from.
+`assembleAccessClaims`, `NeutralAccess`, the access/claims suites, and the
+command handlers' standing and fresh-evidence checks (A9).
+*If it breaks:* "one hat at a time" becomes an overclaim, a host cannot
+name the layer a decision came from, or a host treats a product action as
+permission to mutate authority.
 
 ### A15 — Access requests are a queue, not an admission relation
 

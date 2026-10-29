@@ -46,8 +46,9 @@ Make drift fail before moving any code.
    `teams.status` need edits in two places.
 2. **Command inventory.** Every `AuthorityCommand` kind resolves to exactly
    one coordinator, one operation-binding rule, and one authorization mode
-   (fresh, envelope, or either) plus its required standing. The compiler
-   proves switch exhaustiveness today; this makes the policy explicit.
+   (fresh, envelope, or either) plus its required standing; none consults the
+   selected hat. The compiler proves switch exhaustiveness today; this makes
+   the policy explicit.
 3. **Failure mapping.** Every closed `FailureKind` has a consumer/product
    mapping in the example and a test that it is not dropped.
 4. **Restore matrix.** Organization and operation exports at each supported
@@ -115,6 +116,7 @@ Behavior-identical, in the schema-first order below.
 4. **Command descriptor** — one module states owner, operation binding,
    authorization mode, and required standing per kind; `engine.ts` and
    `runtime.ts` consume it instead of parallel switches and the binding list.
+   No kind carries a hat action as its authorization.
 5. **Portable authorization preamble** consolidated where the rules agree;
    disable's envelope path, fresh-evidence recovery, and roster writes keep
    their distinct modes.
@@ -123,8 +125,9 @@ Behavior-identical, in the schema-first order below.
    list.
 7. **Portable test harness** extracted for fixtures, engine setup, command and
    envelope builders, shared by the domain suites.
-8. **`docs/commands.md`** — kind → owner, scope, authorization, effects —
-   checked against the descriptor.
+8. **`docs/commands.md`** — kind → owner, scope, authorization mode,
+   required standing, effects — checked against the descriptor; the table
+   states that the selected hat authorizes no authority command.
 
 **Done when:** the largest files are navigable in one read, the duplicated
 policy lives in one place, and the suites still pass unchanged.
