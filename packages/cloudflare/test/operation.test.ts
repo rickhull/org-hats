@@ -125,7 +125,7 @@ describe("OperationAuthority", () => {
       schemaVersion: string;
       tables: { operation: Record<string, unknown>[]; sites: Record<string, unknown>[] };
     }>(current.op, "GET", "/export");
-    expect(exported.body.value?.schemaVersion).toBe("4");
+    expect(exported.body.value?.schemaVersion).toBe("5");
     expect(exported.body.value?.tables.operation[0]?.["slug"]).toBe("routing-op");
     expect(exported.body.value?.tables.sites[0]?.["path"]).toBe("site");
     const status = await call<{ routingFactsComplete: boolean }>(current.op, "GET", "/status");
@@ -538,5 +538,95 @@ describe("OperationAuthority", () => {
     const refreshed = await call<{ refresh: { kind: string } }>(current.op, "POST", "/refresh", { handle });
     expect(refreshed.body.ok).toBe(true);
     expect(refreshed.body.value?.refresh.kind).toBe("rotated");
+  });
+
+  it("requests, admits, renames, and retires a team; retirement revokes its grants", async () => {
+    const current = world("teams");
+    await bootstrapOrganization(current);
+    await bootstrapOperation(current, true);
+
+    const requested = await call(current.op, "POST", "/request-team", {
+      teamId: "team-new",
+      siteId: SITE,
+      organizationId: current.orgId,
+      displayName: "New Crew",
+      byActorId: LEAD,
+      byOrganizationId: current.orgId,
+      idempotencyKey: "team-request",
+    });
+    expect(requested.body.ok).toBe(true);
+
+    interface SnapshotRows {
+      readonly teams: readonly { readonly team_id: string; readonly status: string; readonly display_name: string | null }[];
+      readonly grants: readonly { readonly grantId: string; readonly revoked: boolean }[];
+    }
+    const pending = await call<SnapshotRows>(current.op, "GET", "/snapshot");
+    expect(pending.body.value?.teams.find((team) => team.team_id === "team-new")?.status).toBe("pending");
+
+    const early = await call(current.op, "POST", "/grant", {
+      organizationId: current.orgId,
+      actorId: CREW,
+      role: "field",
+      target: { kind: "team", teamId: "team-new" },
+      byActorId: LEAD,
+      idempotencyKey: "team-early-grant",
+    });
+    expect(early.body.failure?.kind).toBe("invalid-command");
+
+    expect((await call(current.op, "POST", "/admit-team", {
+      teamId: "team-new",
+      byActorId: LEAD,
+      idempotencyKey: "team-admit",
+    })).body.ok).toBe(true);
+    const admitted = await call<SnapshotRows>(current.op, "GET", "/snapshot");
+    expect(admitted.body.value?.teams.find((team) => team.team_id === "team-new")?.status).toBe("active");
+
+    expect((await call(current.op, "POST", "/update-team", {
+      teamId: "team-new",
+      displayName: "Renamed Crew",
+      byActorId: LEAD,
+      byOrganizationId: current.orgId,
+      idempotencyKey: "team-rename",
+    })).body.ok).toBe(true);
+
+    expect((await call(current.op, "POST", "/grant", {
+      organizationId: current.orgId,
+      actorId: CREW,
+      role: "field",
+      target: { kind: "team", teamId: "team-new" },
+      byActorId: LEAD,
+      idempotencyKey: "team-grant",
+    })).body.ok).toBe(true);
+
+    const foreign = await call(current.op, "POST", "/retire-team", {
+      teamId: "team-new",
+      byActorId: LEAD,
+      byOrganizationId: "org-someone-else",
+      asOperationAdmin: false,
+      idempotencyKey: "team-retire-foreign",
+    });
+    expect(foreign.body.failure?.kind).toBe("denied");
+
+    expect((await call(current.op, "POST", "/retire-team", {
+      teamId: "team-new",
+      byActorId: LEAD,
+      byOrganizationId: current.orgId,
+      asOperationAdmin: false,
+      idempotencyKey: "team-retire",
+    })).body.ok).toBe(true);
+
+    const retired = await call<SnapshotRows>(current.op, "GET", "/snapshot");
+    expect(retired.body.value?.teams.find((team) => team.team_id === "team-new")?.status).toBe("retired");
+    expect(retired.body.value?.grants.find((grant) => grant.grantId !== "g-field" && grant.revoked === true)).toBeDefined();
+
+    const reuse = await call(current.op, "POST", "/request-team", {
+      teamId: "team-new",
+      siteId: SITE,
+      organizationId: current.orgId,
+      byActorId: LEAD,
+      byOrganizationId: current.orgId,
+      idempotencyKey: "team-reuse",
+    });
+    expect(reuse.body.failure?.kind).toBe("invalid-command");
   });
 });

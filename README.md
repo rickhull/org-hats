@@ -291,7 +291,7 @@ full inventory.
 | `org-hats` | 3.2.0 |
 | Authority interface | 3 |
 | Access envelope | 1 |
-| Cloudflare runtime | separate `0.x` on `cloudflare-v*` tags; operation schema 4 |
+| Cloudflare runtime | separate `0.x` on `cloudflare-v*` tags; operation schema 5 |
 
 The interface version and the envelope version move for different reasons. A
 command-surface break moves the interface; a change to what the claims mean

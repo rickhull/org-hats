@@ -39,7 +39,14 @@ export const snapshotOf = (ops, orgs, operationId) => {
             ...(o.bounded !== undefined ? { bounded: o.bounded } : {}),
         })),
         sites: [...op.sites],
-        teams: [...op.teams],
+        teams: op.teams
+            .filter((team) => team.status === "active")
+            .map((team) => ({
+            teamId: team.teamId,
+            siteId: team.siteId,
+            organizationId: team.organizationId,
+            ...(team.displayName !== undefined ? { displayName: team.displayName } : {}),
+        })),
         grants: [...op.grants],
         participations: [...op.participations],
     };

@@ -1,4 +1,4 @@
-import type { Failed, ActorId, GrantTarget, Unbranded, AuthorityInterfaceVersion, Failure, IdempotencyKey, OperationId, OrganizationId, RefreshHandle, RefreshHandleOutcome, SignedAccessEnvelope, SiteBinding, TeamId } from "../contract.js";
+import type { Failed, ActorId, GrantTarget, Unbranded, AuthorityInterfaceVersion, Failure, IdempotencyKey, OperationId, OrganizationId, RefreshHandle, RefreshHandleOutcome, SignedAccessEnvelope, SiteBinding, SiteId, TeamId } from "../contract.js";
 export { AUTHORITY_INTERFACE_VERSION } from "../contract.js";
 /** Typed, verified principal evidence — what an identity adapter (or a host
  * that verified evidence itself) supplies to authority. Authority resolves
@@ -166,6 +166,27 @@ export type GrantCommand = {
     readonly operationId: Unbranded<OperationId>;
     readonly grantId: string;
 };
+export type TeamCommand = {
+    readonly kind: "request-team";
+    readonly operationId: Unbranded<OperationId>;
+    readonly organizationId: Unbranded<OrganizationId>;
+    readonly teamId: Unbranded<TeamId>;
+    readonly siteId: Unbranded<SiteId>;
+    readonly displayName?: string;
+} | {
+    readonly kind: "admit-team";
+    readonly operationId: Unbranded<OperationId>;
+    readonly teamId: Unbranded<TeamId>;
+} | {
+    readonly kind: "update-team";
+    readonly operationId: Unbranded<OperationId>;
+    readonly teamId: Unbranded<TeamId>;
+    readonly displayName: string | null;
+} | {
+    readonly kind: "retire-team";
+    readonly operationId: Unbranded<OperationId>;
+    readonly teamId: Unbranded<TeamId>;
+};
 export type OrganizationCommand = {
     readonly kind: "disable-actor";
     readonly organizationId: Unbranded<OrganizationId>;
@@ -202,7 +223,7 @@ export type OrganizationCommand = {
     readonly organizationId: Unbranded<OrganizationId>;
     readonly actorId: Unbranded<ActorId>;
 };
-export type AuthorityCommandBody = ParticipationCommand | AdmissionCommand | GrantCommand | OrganizationCommand;
+export type AuthorityCommandBody = ParticipationCommand | AdmissionCommand | GrantCommand | TeamCommand | OrganizationCommand;
 /** A complete business act, validated as a whole before any adapter commits
  * it. */
 export type AuthorityCommand = CommandShell & AuthorityCommandBody;

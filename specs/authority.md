@@ -238,3 +238,18 @@ activation-request storage; `tests/activation.test.ts` and the Cloudflare
 organization/runtime cases.
 *If it breaks:* activation becomes self-registration, a roster oracle, or a
 plaintext-secret recovery store.
+
+### A17 — Teams are operation data fielded by one organization
+
+A team is anchored to exactly one site and one organization, and operation
+authority is its only writer. An organization requests a team; an operation
+administrator admits it. Retirement tombstones the team and revokes the grants
+and refresh authority that stood on it; a snapshot only ever sees active
+teams.
+
+*Held by:* team status in operation state, the active-only projection, and
+the four team commands' authorization split (`request`/`update` by the owning
+organization's fresh evidence, `admit`/operation retirement by an operation
+administrator).
+*If it breaks:* an organization fields teams without the operation's
+admission, or a retired team keeps granting reach.

@@ -57,7 +57,7 @@ import {
 /** One operation authority. The object owns operation-local facts: sites,
  * teams, grants, participation, policy, refresh records, audit, claims, and
  * the outbox that carries invitations to organization authority. */
-const SCHEMA_VERSION = "4";
+const SCHEMA_VERSION = "5";
 
 /** How stale the org-actor projection may get before reconciliation pulls it
  * again. The push channel carries a change immediately; this interval bounds
@@ -157,6 +157,38 @@ interface GrantInput {
   readonly target: Unbranded<GrantTarget>;
   readonly primary?: boolean;
   readonly revoked?: boolean;
+}
+
+interface TeamRequestInput {
+  readonly teamId: string;
+  readonly siteId: string;
+  readonly organizationId: string;
+  readonly displayName?: string;
+  readonly byActorId: string;
+  readonly byOrganizationId: string;
+  readonly idempotencyKey: string;
+}
+
+interface TeamAdmitInput {
+  readonly teamId: string;
+  readonly byActorId: string;
+  readonly idempotencyKey: string;
+}
+
+interface TeamUpdateInput {
+  readonly teamId: string;
+  readonly displayName: string | null;
+  readonly byActorId: string;
+  readonly byOrganizationId: string;
+  readonly idempotencyKey: string;
+}
+
+interface TeamRetireInput {
+  readonly teamId: string;
+  readonly byActorId: string;
+  readonly byOrganizationId: string;
+  readonly asOperationAdmin: boolean;
+  readonly idempotencyKey: string;
 }
 
 interface ParticipationInput {
@@ -298,6 +330,7 @@ export class OperationAuthority extends DurableObject<Env> {
         site_id TEXT NOT NULL,
         organization_id TEXT NOT NULL,
         display_name TEXT,
+        status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('pending', 'active', 'retired')),
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )`,
@@ -404,6 +437,12 @@ export class OperationAuthority extends DurableObject<Env> {
     );
     if (!refreshColumns.has("amr_json")) sql.exec("ALTER TABLE refresh_records ADD COLUMN amr_json TEXT");
     if (!refreshColumns.has("auth_time")) sql.exec("ALTER TABLE refresh_records ADD COLUMN auth_time INTEGER");
+    const teamColumns = new Set(
+      sql.exec<{ readonly name: string }>("PRAGMA table_info(teams)").toArray().map((row) => row.name),
+    );
+    if (!teamColumns.has("status")) {
+      sql.exec("ALTER TABLE teams ADD COLUMN status TEXT NOT NULL DEFAULT 'active'");
+    }
     // schema 4: operation routing facts (slug and site paths)
     const operationColumns = new Set(
       this.ctx.storage.sql.exec<{ readonly name: string }>("PRAGMA table_info(operation)")
@@ -707,15 +746,14 @@ export class OperationAuthority extends DurableObject<Env> {
           at,
         );
       }
+      // Bootstrap seeds teams as active and never overwrites an existing
+      // team: a retired id stays retired, and a later rename survives a
+      // re-bootstrap.
       for (const team of input.teams) {
         this.ctx.storage.sql.exec(
-          `INSERT INTO teams (team_id, site_id, organization_id, display_name, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)
-           ON CONFLICT(team_id) DO UPDATE SET
-             site_id = excluded.site_id,
-             organization_id = excluded.organization_id,
-             display_name = excluded.display_name,
-             updated_at = excluded.updated_at`,
+          `INSERT INTO teams (team_id, site_id, organization_id, display_name, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 'active', ?, ?)
+           ON CONFLICT(team_id) DO NOTHING`,
           team.teamId,
           team.siteId,
           team.organizationId,
@@ -956,7 +994,7 @@ export class OperationAuthority extends DurableObject<Env> {
       // left is existence.
       if (
         input.target.kind === "team" &&
-        this.one("SELECT 1 AS present FROM teams WHERE team_id = ?", input.target.teamId) === undefined
+        this.one("SELECT 1 AS present FROM teams WHERE team_id = ? AND status = 'active'", input.target.teamId) === undefined
       ) {
         return failure("invalid-command", "unknown team");
       }
@@ -990,6 +1028,170 @@ export class OperationAuthority extends DurableObject<Env> {
       this.audit(input.byActorId, `grant ${grantId} (${input.role}) to ${input.organizationId}/${input.actorId}`, at);
       this.claim(input.idempotencyKey, payload, at);
       return value({ applied: true, grantId });
+    });
+  }
+
+  private teamIdFailure(value: string): Result<never> | undefined {
+    if (value.trim().length === 0) return failure("invalid-command", "team id is empty");
+    if (value.length > 128) return failure("invalid-command", "team id is too long");
+    return undefined;
+  }
+
+  private teamNameFailure(value: string | null | undefined): Result<never> | undefined {
+    if (value === undefined || value === null) return undefined;
+    if (value.trim().length === 0) return failure("invalid-command", "team display name is empty");
+    if (value.length > 200) return failure("invalid-command", "team display name is too long");
+    return undefined;
+  }
+
+  private requestTeam(input: TeamRequestInput): Result<{ applied: boolean }> {
+    const at = now();
+    const payload = payloadOf({
+      kind: "request-team",
+      teamId: input.teamId,
+      siteId: input.siteId,
+      organizationId: input.organizationId,
+      ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
+      byActorId: input.byActorId,
+    });
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replay(input.idempotencyKey, payload);
+      if (replay !== undefined) return replay;
+      const idFailure = this.teamIdFailure(input.teamId);
+      if (idFailure !== undefined) return idFailure;
+      const nameFailure = this.teamNameFailure(input.displayName);
+      if (nameFailure !== undefined) return nameFailure;
+      const standing = this.one("SELECT status FROM participations WHERE organization_id = ?", input.organizationId);
+      if (standing === undefined || String(standing["status"]) !== "active") {
+        return failure("denied", "the organization does not actively participate in this operation");
+      }
+      if (this.one("SELECT 1 AS present FROM sites WHERE site_id = ?", input.siteId) === undefined) {
+        return failure("invalid-command", "unknown site");
+      }
+      if (this.one("SELECT 1 AS present FROM teams WHERE team_id = ?", input.teamId) !== undefined) {
+        return failure("invalid-command", "team id already exists");
+      }
+      this.ctx.storage.sql.exec(
+        `INSERT INTO teams (team_id, site_id, organization_id, display_name, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'pending', ?, ?)`,
+        input.teamId,
+        input.siteId,
+        input.organizationId,
+        input.displayName ?? null,
+        at,
+        at,
+      );
+      this.audit(input.byActorId, `team ${input.teamId} requested by ${input.organizationId}`, at);
+      this.claim(input.idempotencyKey, payload, at);
+      return value({ applied: true });
+    });
+  }
+
+  private admitTeam(input: TeamAdmitInput): Result<{ applied: boolean }> {
+    const at = now();
+    const payload = payloadOf({ kind: "admit-team", teamId: input.teamId, byActorId: input.byActorId });
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replay(input.idempotencyKey, payload);
+      if (replay !== undefined) return replay;
+      const team = this.one("SELECT organization_id, status FROM teams WHERE team_id = ?", input.teamId);
+      if (team === undefined) return failure("invalid-command", "unknown team");
+      if (String(team["status"]) === "retired") return failure("invalid-command", "team is retired");
+      if (String(team["status"]) === "pending") {
+        this.ctx.storage.sql.exec(
+          "UPDATE teams SET status = 'active', updated_at = ? WHERE team_id = ?",
+          at,
+          input.teamId,
+        );
+        this.audit(input.byActorId, `team ${input.teamId} admitted by ${String(team["organization_id"])}`, at);
+      }
+      this.claim(input.idempotencyKey, payload, at);
+      return value({ applied: true });
+    });
+  }
+
+  private updateTeam(input: TeamUpdateInput): Result<{ applied: boolean }> {
+    const at = now();
+    const payload = payloadOf({
+      kind: "update-team",
+      teamId: input.teamId,
+      displayName: input.displayName,
+      byActorId: input.byActorId,
+    });
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replay(input.idempotencyKey, payload);
+      if (replay !== undefined) return replay;
+      const team = this.one(
+        "SELECT organization_id, status, display_name FROM teams WHERE team_id = ?",
+        input.teamId,
+      );
+      if (team === undefined) return failure("invalid-command", "unknown team");
+      if (String(team["organization_id"]) !== input.byOrganizationId) {
+        return failure("denied", "the caller does not administer this team's organization");
+      }
+      const nameFailure = this.teamNameFailure(input.displayName);
+      if (nameFailure !== undefined) return nameFailure;
+      if (String(team["status"]) === "retired") return failure("invalid-command", "team is retired");
+      const current = team["display_name"] === null ? null : String(team["display_name"]);
+      if (current !== input.displayName) {
+        this.ctx.storage.sql.exec(
+          "UPDATE teams SET display_name = ?, updated_at = ? WHERE team_id = ?",
+          input.displayName,
+          at,
+          input.teamId,
+        );
+        this.audit(input.byActorId, `team ${input.teamId} display name updated`, at);
+      }
+      this.claim(input.idempotencyKey, payload, at);
+      return value({ applied: true });
+    });
+  }
+
+  private retireTeam(input: TeamRetireInput): Result<{ applied: boolean }> {
+    const at = now();
+    const payload = payloadOf({
+      kind: "retire-team",
+      teamId: input.teamId,
+      byActorId: input.byActorId,
+      asOperationAdmin: input.asOperationAdmin,
+    });
+    return this.ctx.storage.transactionSync(() => {
+      const replay = this.replay(input.idempotencyKey, payload);
+      if (replay !== undefined) return replay;
+      const team = this.one("SELECT organization_id, status FROM teams WHERE team_id = ?", input.teamId);
+      if (team === undefined) return failure("invalid-command", "unknown team");
+      if (!input.asOperationAdmin && String(team["organization_id"]) !== input.byOrganizationId) {
+        return failure("denied", "the caller does not administer this team's organization");
+      }
+      if (String(team["status"]) !== "retired") {
+        const affected = this.rows(
+          "SELECT organization_id, actor_id FROM grants WHERE target_kind = 'team' AND team_id = ? AND revoked = 0",
+          input.teamId,
+        );
+        this.ctx.storage.sql.exec(
+          "UPDATE teams SET status = 'retired', updated_at = ? WHERE team_id = ?",
+          at,
+          input.teamId,
+        );
+        this.ctx.storage.sql.exec(
+          "UPDATE grants SET revoked = 1, updated_at = ? WHERE target_kind = 'team' AND team_id = ? AND revoked = 0",
+          at,
+          input.teamId,
+        );
+        const actors = new Set(affected.map((row) => `${String(row["organization_id"])}/${String(row["actor_id"])}`));
+        for (const entry of actors) {
+          const [organizationId_, actorId_] = entry.split("/");
+          if (organizationId_ !== undefined && actorId_ !== undefined) {
+            this.revokeRefreshRecords(organizationId_, actorId_);
+          }
+        }
+        this.audit(
+          input.byActorId,
+          `team ${input.teamId} retired; ${affected.length} grants revoked for ${actors.size} actors`,
+          at,
+        );
+      }
+      this.claim(input.idempotencyKey, payload, at);
+      return value({ applied: true });
     });
   }
 
@@ -1180,7 +1382,7 @@ export class OperationAuthority extends DurableObject<Env> {
         path: row["path"],
         aliases: JSON.parse(String(row["aliases_json"])) as unknown,
       })),
-      teams: this.rows("SELECT team_id, site_id, organization_id, display_name FROM teams ORDER BY team_id"),
+      teams: this.rows("SELECT team_id, site_id, organization_id, display_name, status FROM teams ORDER BY team_id"),
       grants: this.rows("SELECT * FROM grants ORDER BY grant_id").map((row) => ({
         grantId: String(row["grant_id"]),
         organizationId: String(row["organization_id"]),
@@ -1229,7 +1431,7 @@ export class OperationAuthority extends DurableObject<Env> {
       ...(row["path"] === null ? {} : { path: rowText(row, "path") }),
       aliases: JSON.parse(rowText(row, "aliases_json")) as string[],
     }));
-    const teams = this.rows("SELECT team_id, site_id, organization_id, display_name FROM teams").map((row) => ({
+    const teams = this.rows("SELECT team_id, site_id, organization_id, display_name FROM teams WHERE status = 'active'").map((row) => ({
       teamId: rowTeamId(row),
       siteId: rowSiteId(row),
       organizationId: rowOrganizationId(row),
@@ -1489,16 +1691,23 @@ export class OperationAuthority extends DurableObject<Env> {
     // current columns and fills columns the older snapshot did not carry with
     // null, so the schema-2 → accepted-schema drill is a restore, not a
     // second bootstrap. An unknown or future version is still refused.
-    const supported = new Set(["2", "3", "4"]);
+    const supported = new Set(["2", "3", "4", "5"]);
     if (!supported.has(String(snapshot.schemaVersion))) {
       return failure("invalid-command", "snapshot schema version is not supported");
     }
     if (typeof snapshot.tables !== "object" || snapshot.tables === null) return failure("invalid-command", "snapshot has no tables");
+    const tables = snapshot.tables as Readonly<Record<string, readonly StateRow[]>>;
+    // Schema 5 added the team status column. A restored older export has no
+    // status for its teams; those teams were all active by definition.
+    const normalized = {
+      ...tables,
+      teams: (tables.teams ?? []).map((row) => ({ status: "active", ...row })),
+    };
     this.ctx.storage.transactionSync(() => {
       restoreTables(
         this.ctx.storage.sql,
         operationTables,
-        snapshot.tables as Readonly<Record<string, readonly StateRow[]>>,
+        normalized,
       );
       // the projection is derived, so it is dropped rather than restored,
       // along with the stamps that would make a later image look stale
@@ -1744,6 +1953,50 @@ export class OperationAuthority extends DurableObject<Env> {
           organizationId: asString(body["organizationId"], "organizationId"),
           actorId: asString(body["actorId"], "actorId"),
           byActorId: asString(body["byActorId"], "byActorId"),
+          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
+        }));
+      }
+
+      if (request.method === "POST" && url.pathname === "/request-team") {
+        const body = await readBody();
+        return json(this.requestTeam({
+          teamId: asString(body["teamId"], "teamId"),
+          siteId: asString(body["siteId"], "siteId"),
+          organizationId: asString(body["organizationId"], "organizationId"),
+          ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
+          byActorId: asString(body["byActorId"], "byActorId"),
+          byOrganizationId: asString(body["byOrganizationId"], "byOrganizationId"),
+          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
+        }));
+      }
+
+      if (request.method === "POST" && url.pathname === "/admit-team") {
+        const body = await readBody();
+        return json(this.admitTeam({
+          teamId: asString(body["teamId"], "teamId"),
+          byActorId: asString(body["byActorId"], "byActorId"),
+          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
+        }));
+      }
+
+      if (request.method === "POST" && url.pathname === "/update-team") {
+        const body = await readBody();
+        return json(this.updateTeam({
+          teamId: asString(body["teamId"], "teamId"),
+          displayName: body["displayName"] === null ? null : asString(body["displayName"], "displayName"),
+          byActorId: asString(body["byActorId"], "byActorId"),
+          byOrganizationId: asString(body["byOrganizationId"], "byOrganizationId"),
+          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
+        }));
+      }
+
+      if (request.method === "POST" && url.pathname === "/retire-team") {
+        const body = await readBody();
+        return json(this.retireTeam({
+          teamId: asString(body["teamId"], "teamId"),
+          byActorId: asString(body["byActorId"], "byActorId"),
+          byOrganizationId: asString(body["byOrganizationId"], "byOrganizationId"),
+          asOperationAdmin: body["asOperationAdmin"] === true,
           idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
         }));
       }

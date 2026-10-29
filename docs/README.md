@@ -40,6 +40,9 @@ public `org-hats` docs are normative for the seam.
 - [`roster.md`](roster.md) — actor creation and renaming, organization-owned
   administrator standing, the usable-successor rule, and the actor-id and
   display-name boundaries.
+- [`teams.md`](teams.md) — team requests, operation admission, the
+  pending/active/retired lifecycle, and retirement's grant and refresh
+  effects.
 - [`binding-conformance.md`](binding-conformance.md) — the documented
   service-binding smoke subset and what it does not claim.
 - [`inventory.md`](inventory.md) — the story index: every conformance case

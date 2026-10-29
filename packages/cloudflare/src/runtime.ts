@@ -685,6 +685,61 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
           byActorId: authorized.actorId,
         });
         break;
+      case "request-team": {
+        if (input.authorization.kind !== "fresh-evidence") {
+          return deny({ kind: "denied", detail: "team changes require fresh evidence" });
+        }
+        if (authorized.organizationId !== input.organizationId) return deny({ kind: "wrong-binding" });
+        if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
+        result = await route(operation(input.operationId), "/request-team", {
+          teamId: input.teamId,
+          siteId: input.siteId,
+          organizationId: input.organizationId,
+          ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
+          byActorId: authorized.actorId,
+          byOrganizationId: authorized.organizationId,
+          idempotencyKey: input.idempotencyKey,
+        });
+        break;
+      }
+      case "admit-team":
+        if (!authorized.adminOfOperation) return deny({ kind: "denied", detail: "the caller does not administer this operation" });
+        result = await route(operation(input.operationId), "/admit-team", {
+          teamId: input.teamId,
+          byActorId: authorized.actorId,
+          idempotencyKey: input.idempotencyKey,
+        });
+        break;
+      case "update-team":
+        if (input.authorization.kind !== "fresh-evidence") {
+          return deny({ kind: "denied", detail: "team changes require fresh evidence" });
+        }
+        if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
+        result = await route(operation(input.operationId), "/update-team", {
+          teamId: input.teamId,
+          displayName: input.displayName,
+          byActorId: authorized.actorId,
+          byOrganizationId: authorized.organizationId,
+          idempotencyKey: input.idempotencyKey,
+        });
+        break;
+      case "retire-team": {
+        const asOperationAdmin = authorized.adminOfOperation;
+        if (!asOperationAdmin) {
+          if (input.authorization.kind !== "fresh-evidence") {
+            return deny({ kind: "denied", detail: "owner retirement requires fresh evidence" });
+          }
+          if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
+        }
+        result = await route(operation(input.operationId), "/retire-team", {
+          teamId: input.teamId,
+          byActorId: authorized.actorId,
+          byOrganizationId: authorized.organizationId,
+          asOperationAdmin,
+          idempotencyKey: input.idempotencyKey,
+        });
+        break;
+      }
       case "disable-actor":
         if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
         result = await route(organization(input.organizationId), "/disable", {

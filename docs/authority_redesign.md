@@ -375,7 +375,10 @@ One operation-authority instance owns operation-local authority:
 - participating organization identifiers and participation status;
 - the operation's hostname slug;
 - sites, their permanent identifiers, canonical paths, and alias labels;
-- teams, roles, policy version, hats, and grants;
+- teams, roles, policy version, hats, and grants — a team is operation data
+  fielded by one organization: the organization requests it, an operation
+  administrator admits it, and retirement tombstones it and revokes the
+  grants and refresh records that stood on it (see [teams.md](teams.md));
 - operation-local access requests (a review queue) and grants;
 - refresh/session authority and access-projection issuance; and
 - operation-administration audit events.

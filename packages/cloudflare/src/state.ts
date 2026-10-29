@@ -74,7 +74,7 @@ export const organizationTables: readonly TableSpec[] = [
 export const operationTables: readonly TableSpec[] = [
   { name: "operation", columns: ["operation_id", "display_name", "slug", "bounded", "policy_json", "admin_roles_json", "configure_actions_json", "envelope_lifetime_seconds", "created_at", "updated_at"], orderBy: "operation_id" },
   { name: "sites", columns: ["site_id", "display_name", "path", "aliases_json", "created_at", "updated_at"], orderBy: "site_id" },
-  { name: "teams", columns: ["team_id", "site_id", "organization_id", "display_name", "created_at", "updated_at"], orderBy: "team_id" },
+  { name: "teams", columns: ["team_id", "site_id", "organization_id", "display_name", "status", "created_at", "updated_at"], orderBy: "team_id" },
   { name: "participations", columns: ["organization_id", "status", "created_at", "updated_at"], orderBy: "organization_id" },
   { name: "invitations", columns: ["invitation_id", "organization_id", "status", "created_at", "updated_at"], orderBy: "invitation_id" },
   { name: "grants", columns: ["grant_id", "organization_id", "actor_id", "role", "target_kind", "team_id", "site_id", "is_primary", "revoked", "created_at", "updated_at"], orderBy: "grant_id" },

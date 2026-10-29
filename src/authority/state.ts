@@ -89,7 +89,15 @@ export interface OpState {
   readonly bounded?: boolean;
   policy: PolicyBundle;
   sites: { siteId: SiteId; operationId: OperationId; displayName?: string; path?: string; aliases: readonly string[] }[];
-  teams: { teamId: TeamId; siteId: SiteId; organizationId: OrganizationId; displayName?: string }[];
+  teams: {
+    teamId: TeamId;
+    siteId: SiteId;
+    organizationId: OrganizationId;
+    displayName?: string;
+    /** Only `active` teams enter a snapshot; pending and retired stay in
+     * operation state for audit, idempotency, and id-reuse refusal. */
+    status: "pending" | "active" | "retired";
+  }[];
   grants: Grant[];
   participations: Participation[];
   /** Op-side invitation records, by invitation id. */
@@ -159,7 +167,14 @@ export const snapshotOf = (
       ...(o.bounded !== undefined ? { bounded: o.bounded } : {}),
     })),
     sites: [...op.sites],
-    teams: [...op.teams],
+    teams: op.teams
+      .filter((team) => team.status === "active")
+      .map((team) => ({
+        teamId: team.teamId,
+        siteId: team.siteId,
+        organizationId: team.organizationId,
+        ...(team.displayName !== undefined ? { displayName: team.displayName } : {}),
+      })),
     grants: [...op.grants],
     participations: [...op.participations],
   };

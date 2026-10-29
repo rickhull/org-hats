@@ -160,7 +160,7 @@ export const createInMemoryAuthority = async (
       ...(op.bounded !== undefined ? { bounded: op.bounded } : {}),
       policy: fixture.policy,
       sites: fixture.snapshot.sites.map((s) => ({ ...s })),
-      teams: fixture.snapshot.teams.map((t) => ({ ...t })),
+      teams: fixture.snapshot.teams.map((t) => ({ ...t, status: "active" as const })),
       grants: fixture.snapshot.grants.map((g) => ({ ...g })),
       participations: fixture.snapshot.participations.map((p) => ({ ...p })),
       invitations: new Map(),
@@ -370,6 +370,10 @@ export const createInMemoryAuthority = async (
         case "grant-hat":
         case "revoke-grant":
         case "select-hat":
+        case "request-team":
+        case "admit-team":
+        case "update-team":
+        case "retire-team":
           return operations.command(inputCommand, principalOrFailure);
         default: {
           // The exhaustiveness witness: this arm is `never` when every

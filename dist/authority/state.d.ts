@@ -72,6 +72,9 @@ export interface OpState {
         siteId: SiteId;
         organizationId: OrganizationId;
         displayName?: string;
+        /** Only `active` teams enter a snapshot; pending and retired stay in
+         * operation state for audit, idempotency, and id-reuse refusal. */
+        status: "pending" | "active" | "retired";
     }[];
     grants: Grant[];
     participations: Participation[];

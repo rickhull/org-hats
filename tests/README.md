@@ -90,6 +90,8 @@ public types fails the gate instead of failing at runtime.
   and refresh revocation at the portable seam.
 - `roster.test.ts` — actor creation and renaming, administrator appointment,
   the usable-successor retirement rule, and the unguarded offboarding disable.
+- `teams.test.ts` — request/admit, active-only projection, authorization
+  split, and retirement's grant and refresh effects.
 - `conformance.test.ts` — runs the public inventory from `src/conformance.ts`.
 - `docs.test.ts` — the documentation fence: links resolve, every cited
   case id ships, every case has an inventory row with its title verbatim,

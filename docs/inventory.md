@@ -38,6 +38,9 @@ write the story, replace it.*
 | OH-ROSTER-03 | an unclaimed successor does not permit retirement | [roster](roster.md) § The usable successor |
 | OH-ROSTER-04 | a linked successor takes over and the retired caller loses standing | [roster](roster.md) § The usable successor |
 | OH-ROSTER-05 | disable remains the departing administrator's offboarding act | [roster](roster.md) § The usable successor |
+| OH-TEAM-01 | an organization requests and the operation admits a team; grants can target it | [teams](teams.md) § Lifecycle |
+| OH-TEAM-02 | retirement revokes the team's grants and refresh, and keeps the envelope window | [teams](teams.md) § Retirement |
+| OH-TEAM-03 | the team authorization split holds | [teams](teams.md) § Commands |
 | OH-PART-01 | invite, accept, admit: an invited organization receives a hat | — |
 | OH-PART-02 | revoke is terminal: new issuance stops, the live envelope survives | [walkthrough](walkthrough.md) §9 |
 | OH-CMD-01 | idempotent retry: a denial does not poison the key | [tutorial](tutorial.md) Case 4 · [walkthrough](walkthrough.md) §8 |

@@ -373,7 +373,10 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     const grantTarget: Grant["target"] = input.target.kind === "team"
       ? { kind: "team", teamId: teamId(input.target.teamId) }
       : { kind: "site", siteId: siteId(input.target.siteId) };
-    if (grantTarget.kind === "team" && !op.teams.some((t) => t.teamId === grantTarget.teamId)) {
+    if (
+      grantTarget.kind === "team" &&
+      !op.teams.some((t) => t.teamId === grantTarget.teamId && t.status === "active")
+    ) {
       return fail("invalid-command", "unknown team");
     }
     if (grantTarget.kind === "site" && !op.sites.some((s) => s.siteId === grantTarget.siteId)) {
@@ -454,6 +457,157 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     return ok(input.idempotencyKey, true);
   };
 
+  const teamIdFailure = (value: string): Failure | undefined => {
+    if (value.trim().length === 0) return { kind: "invalid-command", detail: "team id is empty" };
+    if (value.length > 128) return { kind: "invalid-command", detail: "team id is too long" };
+    return undefined;
+  };
+
+  const teamNameFailure = (value: string | null): Failure | undefined => {
+    if (value === null) return undefined;
+    if (value.trim().length === 0) return { kind: "invalid-command", detail: "team display name is empty" };
+    if (value.length > 200) return { kind: "invalid-command", detail: "team display name is too long" };
+    return undefined;
+  };
+
+  const requestTeam = (input: AuthorityCommand, principal: Principal): CommandResult => {
+    if (input.kind !== "request-team") return fail("invalid-command", "wrong coordinator");
+    const op = ops.get(operationId(input.operationId));
+    if (op === undefined) return fail("wrong-binding", "unknown operation");
+    if (input.authorization.kind !== "fresh-evidence") {
+      return fail("denied", "team changes require fresh evidence");
+    }
+    if (!principal.adminOfOrganization) {
+      return fail("denied", "the caller does not administer this organization");
+    }
+    if (principal.organizationId !== organizationId(input.organizationId)) return fail("wrong-binding");
+    const replay = checkClaim(op.claims, input);
+    if (replay !== undefined) return replay;
+    const idFailure = teamIdFailure(input.teamId);
+    if (idFailure !== undefined) return { ok: false, failure: idFailure };
+    if (input.displayName !== undefined) {
+      const nameFailure = teamNameFailure(input.displayName);
+      if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
+    }
+    const organization = organizationId(input.organizationId);
+    if (!op.participations.some((p) => p.organizationId === organization && p.status === "active")) {
+      return fail("denied", "the organization does not actively participate in this operation");
+    }
+    if (!op.sites.some((s) => s.siteId === siteId(input.siteId))) {
+      return fail("invalid-command", "unknown site");
+    }
+    if (op.teams.some((t) => t.teamId === input.teamId)) {
+      return fail("invalid-command", "team id already exists");
+    }
+    op.teams.push({
+      teamId: teamId(input.teamId),
+      siteId: siteId(input.siteId),
+      organizationId: organization,
+      ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+      status: "pending",
+    });
+    commitClaim(op.claims, input);
+    op.audit.push({
+      at: clock.now(),
+      by: `${principal.organizationId}/${principal.actorId}`,
+      fact: `team ${input.teamId} requested by ${organization}`,
+    });
+    return ok(input.idempotencyKey, true);
+  };
+
+  const admitTeam = (input: AuthorityCommand, principal: Principal): CommandResult => {
+    if (input.kind !== "admit-team") return fail("invalid-command", "wrong coordinator");
+    const op = ops.get(operationId(input.operationId));
+    if (op === undefined) return fail("wrong-binding", "unknown operation");
+    if (!principal.adminOfOperation) return fail("denied", "the caller does not administer this operation");
+    const replay = checkClaim(op.claims, input);
+    if (replay !== undefined) return replay;
+    const team = op.teams.find((candidate) => candidate.teamId === input.teamId);
+    if (team === undefined) return fail("invalid-command", "unknown team");
+    if (team.status === "retired") return fail("invalid-command", "team is retired");
+    if (team.status === "pending") {
+      team.status = "active";
+      op.audit.push({
+        at: clock.now(),
+        by: `${principal.organizationId}/${principal.actorId}`,
+        fact: `team ${team.teamId} admitted by ${team.organizationId}`,
+      });
+    }
+    commitClaim(op.claims, input);
+    return ok(input.idempotencyKey, true);
+  };
+
+  const updateTeam = (input: AuthorityCommand, principal: Principal): CommandResult => {
+    if (input.kind !== "update-team") return fail("invalid-command", "wrong coordinator");
+    const op = ops.get(operationId(input.operationId));
+    if (op === undefined) return fail("wrong-binding", "unknown operation");
+    if (input.authorization.kind !== "fresh-evidence") {
+      return fail("denied", "team changes require fresh evidence");
+    }
+    if (!principal.adminOfOrganization) {
+      return fail("denied", "the caller does not administer this organization");
+    }
+    const team = op.teams.find((candidate) => candidate.teamId === input.teamId);
+    if (team === undefined) return fail("invalid-command", "unknown team");
+    if (principal.organizationId !== team.organizationId) {
+      return fail("denied", "the caller does not administer this team's organization");
+    }
+    const replay = checkClaim(op.claims, input);
+    if (replay !== undefined) return replay;
+    const nameFailure = teamNameFailure(input.displayName);
+    if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
+    if (team.status === "retired") return fail("invalid-command", "team is retired");
+    const changed = (team.displayName ?? null) !== input.displayName;
+    if (changed) {
+      if (input.displayName === null) delete team.displayName;
+      else team.displayName = input.displayName;
+      op.audit.push({
+        at: clock.now(),
+        by: `${principal.organizationId}/${principal.actorId}`,
+        fact: `team ${team.teamId} display name updated`,
+      });
+    }
+    commitClaim(op.claims, input);
+    return ok(input.idempotencyKey, true);
+  };
+
+  const retireTeam = (input: AuthorityCommand, principal: Principal): CommandResult => {
+    if (input.kind !== "retire-team") return fail("invalid-command", "wrong coordinator");
+    const op = ops.get(operationId(input.operationId));
+    if (op === undefined) return fail("wrong-binding", "unknown operation");
+    const team = op.teams.find((candidate) => candidate.teamId === input.teamId);
+    if (team === undefined) return fail("invalid-command", "unknown team");
+    const owner = input.authorization.kind === "fresh-evidence" &&
+      principal.adminOfOrganization &&
+      principal.organizationId === team.organizationId;
+    if (!principal.adminOfOperation && !owner) {
+      if (principal.adminOfOrganization && principal.organizationId === team.organizationId) {
+        return fail("denied", "owner retirement requires fresh evidence");
+      }
+      return fail("denied", "the caller does not administer this team");
+    }
+    const replay = checkClaim(op.claims, input);
+    if (replay !== undefined) return replay;
+    if (team.status !== "retired") {
+      const affected = op.grants.filter(
+        (grant) => grant.revoked !== true && grant.target.kind === "team" && grant.target.teamId === team.teamId,
+      );
+      team.status = "retired";
+      op.grants = op.grants.map((grant) =>
+        affected.includes(grant) ? { ...grant, revoked: true } : grant,
+      );
+      const grantees = new Set(affected.map((grant) => `${grant.organizationId}/${grant.actorId}`));
+      for (const grant of affected) revokeRefreshRecords(op, grant.organizationId, grant.actorId);
+      op.audit.push({
+        at: clock.now(),
+        by: `${principal.organizationId}/${principal.actorId}`,
+        fact: `team ${team.teamId} retired; ${affected.length} grants revoked for ${grantees.size} actors`,
+      });
+    }
+    commitClaim(op.claims, input);
+    return ok(input.idempotencyKey, true);
+  };
+
   return {
     accessFromEvidence,
     refresh,
@@ -467,6 +621,10 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
         case "grant-hat": return grantHat(input, principal);
         case "revoke-grant": return revokeGrant(input, principal);
         case "select-hat": return selectHat(input, principal);
+        case "request-team": return requestTeam(input, principal);
+        case "admit-team": return admitTeam(input, principal);
+        case "update-team": return updateTeam(input, principal);
+        case "retire-team": return retireTeam(input, principal);
         default: return fail("invalid-command", "not an operation command");
       }
     },

@@ -198,6 +198,24 @@ export type GrantCommand =
   | { readonly kind: "revoke-grant"; readonly operationId: Unbranded<OperationId>; readonly grantId: string }
   | { readonly kind: "select-hat"; readonly operationId: Unbranded<OperationId>; readonly grantId: string };
 
+export type TeamCommand =
+  | {
+      readonly kind: "request-team";
+      readonly operationId: Unbranded<OperationId>;
+      readonly organizationId: Unbranded<OrganizationId>;
+      readonly teamId: Unbranded<TeamId>;
+      readonly siteId: Unbranded<SiteId>;
+      readonly displayName?: string;
+    }
+  | { readonly kind: "admit-team"; readonly operationId: Unbranded<OperationId>; readonly teamId: Unbranded<TeamId> }
+  | {
+      readonly kind: "update-team";
+      readonly operationId: Unbranded<OperationId>;
+      readonly teamId: Unbranded<TeamId>;
+      readonly displayName: string | null;
+    }
+  | { readonly kind: "retire-team"; readonly operationId: Unbranded<OperationId>; readonly teamId: Unbranded<TeamId> };
+
 export type OrganizationCommand =
   | { readonly kind: "disable-actor"; readonly organizationId: Unbranded<OrganizationId>; readonly actorId: Unbranded<ActorId> }
   | { readonly kind: "unlink-principal"; readonly organizationId: Unbranded<OrganizationId>; readonly actorId: Unbranded<ActorId> }
@@ -214,6 +232,7 @@ export type AuthorityCommandBody =
   | ParticipationCommand
   | AdmissionCommand
   | GrantCommand
+  | TeamCommand
   | OrganizationCommand;
 
 /** A complete business act, validated as a whole before any adapter commits
