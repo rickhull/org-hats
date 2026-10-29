@@ -8,7 +8,14 @@ binding and entrypoint preserve the public runtime behaviour for a dedicated,
 pre-bootstrapped operation without resetting it.*
 
 *The reference runtime is deployed by the consuming host. The live
-deployment is `cloudflare-v0.6.1` (Worker Version
+deployment is `cloudflare-v0.7.0` (Worker Version
+`1a3995a2-56d6-4576-91ca-5b3c8520a05f`, tagged
+`da57a467c772f30124dcf52cb53fedf0e840fa0a`), deployed on 2026-10-29. Its
+deployment post-checks passed — six secret names, the unchanged signing key
+id, and schema status — but the six-group binding smoke has not been rerun on
+it: the dedicated smoke organization is spent and needs fresh fixture ids.
+
+The last full acceptance remains `cloudflare-v0.6.1` (Worker Version
 `fc3d9e1d-651e-4e40-bc6c-1f2152db288b`, tagged
 `a020ed6f81a9e4b64c57d0f7ff0f345f4c64cd1a`), accepted on 2026-10-27 with
 fresh fixture `org-authority-smoke-20261027b`; the subset passed all six
@@ -16,8 +23,13 @@ groups, and `exec authority verify` and schema status passed. The previous
 accepted code release, `cloudflare-v0.6.0`, passed with fresh fixture
 `org-authority-smoke-20261027a`; its last configuration,
 `e4940c33-e8d1-43c2-9d45-4333d0de3287`, tagged
-`2720efd9478b7cc609f0155f49f0b33459cf94d9-config-2cdcb1368840`, is the
-rollback target. `cloudflare-v0.5.0` (configuration
+`2720efd9478b7cc609f0155f49f0b33459cf94d9-config-2cdcb1368840`, was the
+rollback target before the migration.
+
+`cloudflare-v0.7.0` carries the `v2` Durable Object migration, which is
+one-way: a version from before it cannot be activated across it, so
+`cloudflare-v0.6.1` and `cloudflare-v0.6.0` are not rollback targets for the
+live deployment. The next deployment is. `cloudflare-v0.5.0` (configuration
 `e7b4529…-config-627ee8a6f000`, fresh fixture
 `org-authority-smoke-20261026c`) also passed all six groups on 2026-10-26;
 `cloudflare-v0.4.0` (configuration
@@ -46,8 +58,8 @@ it only after the host has deployed and accepted the version.*
 
 ## Claim
 
-Through the service binding, with interface version `3`, carried by both the
-live `cloudflare-v0.6.1` and the `cloudflare-v0.6.0` rollback target:
+Through the service binding, with interface version `3`, carried by the live
+`cloudflare-v0.7.0`:
 
 1. `accessFromEvidence` for the linked evidence returns a signed envelope and
    a refresh handle.

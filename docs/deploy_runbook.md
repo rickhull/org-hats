@@ -58,7 +58,31 @@ the same contract:
 
 A first deploy of a Worker that does not exist collapses upload and
 activation; there is no traffic to split. Every later deploy uses the two-step
-form.
+form, except a tag that carries a Durable Object migration.
+
+## Durable Object migrations
+
+A tag that declares a new Durable Object class, or moves one, carries a
+Durable Object migration. `wrangler versions upload` refuses a pending
+migration, because a version upload cannot apply one. The host's path for such
+a tag is:
+
+1. **Snapshot.** Export every coordinator. The preflight snapshot is not
+   optional here: the migration applies with the deploy, before any canary.
+2. **Deploy the migration.** Run `wrangler deploy` with the production config
+   and the host's own Worker name applied. This is the one case where the
+   upload-and-activate split does not apply, because the migration is part of
+   the deploy. The reference host wraps this as
+   `qm ops authority migrate`.
+3. **Tag and activate.** Tag the resulting Worker Version with the full
+   upstream commit, activate it at 100%, and run the post-checks.
+4. **Record the migration.** Put the migration tag in the deployment witness.
+
+Treat the migration as one-way unless the configuration declares a reversible
+one. A version from before the migration cannot be activated across it, so the
+rollback target is the next deployment, not the previous tag; record that the
+prior version is not a cutback target. A migration is a deploy, not an
+acceptance.
 
 ## Configuration-only versions
 
@@ -106,6 +130,9 @@ Activate the previous tagged version at 100%:
 qm ops authority promote <previous-tag> --percentage 100
 ```
 
+A version from before a one-way Durable Object migration is not a rollback
+target; the next deployment is (see § Durable Object migrations).
+
 Never delete a Worker Version. If the upload failed, the old version is still
 serving. A failed post-activation check is an operator rollback or a snapshot
 restore, not an automatic one.
@@ -130,7 +157,8 @@ rollback tag
 
 - Do not deploy from a working tree instead of the tag.
 - Do not use `wrangler deploy` for an existing Worker; upload a version and
-  activate it.
+  activate it — except a tag that carries a Durable Object migration, which
+  only `wrangler deploy` applies (see § Durable Object migrations).
 - Do not put a secret in a note, a plan, or this repository.
 - Do not call the binding smoke the full `OH-*` inventory.
 - Do not treat a successful deploy as acceptance.

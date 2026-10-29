@@ -141,8 +141,9 @@ Two Wrangler configs, two purposes:
   harness `Counter`, a local-only `OPS_TOKEN` var, and the incremental
   migrations history.
 - `wrangler.production.jsonc` — the deploying operator's Worker: both
-  coordinators, one fresh migration declaring both classes, no `Counter`,
-  no committed token, `workers_dev: false`, no routes. Its `name` is a
+  coordinators plus the subject guard, the full migration history (`v1`
+  coordinators, `v2` guard), no `Counter`, no committed token,
+  `workers_dev: false`, no routes. Its `name` is a
   neutral default (`org-hats-authority`), because Wrangler requires one; the
   host supplies its own with `wrangler versions upload --name`, and the
   Worker name is the host's fact, not the tag's. The Worker is
@@ -165,7 +166,7 @@ is in [deploy_runbook.md](deploy_runbook.md#configuration-only-versions).
 Upstream's release act ends at an immutable `cloudflare-v*` tag and its
 publication. Deploying that tag — the host's Cloudflare account, Worker
 Versions, secrets, traffic, and service binding — is the consuming host's
-act. The live deployment is the consuming host's `cloudflare-v0.6.1`; the
+act. The live deployment is the consuming host's `cloudflare-v0.7.0`; the
 host's ops porcelain owns the deploy verbs. A deployed tag can lag `main`;
 the tag is the deployment unit.
 
@@ -182,14 +183,17 @@ The host-side shape the runtime supports:
 - export every named coordinator before upload; a failed export aborts;
 - upload a Worker Version tagged with the full upstream commit, serving no
   traffic; activate it with `wrangler versions deploy`, never
-  `wrangler deploy`;
+  `wrangler deploy` — except a tag carrying a Durable Object migration,
+  which only `wrangler deploy` applies (see
+  [deploy_runbook.md](deploy_runbook.md#durable-object-migrations));
 - carry `AUTHORITY_ORGANIZATION_IDS` and `AUTHORITY_VERIFICATION_KEYS` as
   the additive secrets; `OPS_TOKEN` and the signing trio survive a version
   upload;
 - a configuration-only version changes only those two values and is tagged
   with the code commit plus a digest of them;
 - activate at 100%, canary by percentage, and roll back by releasing the
-  previous tagged version; never delete a version.
+  previous tagged version when no one-way migration separates them; never
+  delete a version.
 
 State restore, roster rebuild, routing-facts backfill, policy application,
 and the binding smoke are separate acceptance acts, not deploy steps. They

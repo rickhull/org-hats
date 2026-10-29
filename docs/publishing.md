@@ -172,7 +172,7 @@ The shape is in
 
 Upstream provides no deploy porcelain: the Cloudflare account, Worker,
 secrets, traffic, and service binding belong to the deploying host. The
-live deployment is the consuming host's `cloudflare-v0.6.1`; the host's ops
+live deployment is the consuming host's `cloudflare-v0.7.0`; the host's ops
 porcelain owns `publish` / `promote` / `configure` / `smoke`, with its
 one-step form as the host's *deploy*; in the shared lexicon
 ([lexicon.md](lexicon.md) § Delivery) that verb is not this repository's.
