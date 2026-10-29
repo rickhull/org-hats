@@ -1500,20 +1500,34 @@ export class OperationAuthority extends DurableObject<Env> {
     return "kind" in claims ? failure(claims.kind, claims.detail) : value({ claims });
   }
 
-  private async newRefresh(organizationId: string, actorId: string, auth?: AuthenticationFacts): Promise<{ handle: string; at: number }> {
+  private async mintRefresh(): Promise<{ handle: string; handleHash: string; at: number }> {
     const handle = `rh-${crypto.randomUUID()}`;
-    const at = now();
+    return { handle, handleHash: await sha256Hex(handle), at: now() };
+  }
+
+  private insertRefresh(
+    handleHash: string,
+    organizationId: string,
+    actorId: string,
+    auth: AuthenticationFacts | undefined,
+    at: number,
+  ): void {
     this.ctx.storage.sql.exec(
       `INSERT INTO refresh_records (handle_hash, organization_id, actor_id, revoked, superseded, amr_json, auth_time, created_at)
        VALUES (?, ?, ?, 0, 0, ?, ?, ?)`,
-      await sha256Hex(handle),
+      handleHash,
       organizationId,
       actorId,
       auth?.amr === undefined ? null : canonicalJson(auth.amr as unknown as JsonValue),
       auth?.authTime ?? null,
       at,
     );
-    return { handle, at };
+  }
+
+  private async newRefresh(organizationId: string, actorId: string, auth?: AuthenticationFacts): Promise<{ handle: string; at: number }> {
+    const next = await this.mintRefresh();
+    this.insertRefresh(next.handleHash, organizationId, actorId, auth, next.at);
+    return { handle: next.handle, at: next.at };
   }
 
   private async issue(organizationId: OrganizationId, actorId: ActorId, auth?: AuthenticationFacts): Promise<Result<{
@@ -1590,11 +1604,31 @@ export class OperationAuthority extends DurableObject<Env> {
     if (!live.linked) return failure("unauthenticated", "actor has no principal link");
     const built = this.buildClaims(organization, actor, auth);
     if (!built.ok) return built;
-    this.ctx.storage.sql.exec(
-      "UPDATE refresh_records SET superseded = 1 WHERE handle_hash = ?",
-      hash,
-    );
-    const next = await this.newRefresh(organization, actor, auth);
+    // Mint outside the transaction; hash work has no place in a synchronous
+    // commit. The transaction then re-reads the handle it is about to consume:
+    // a concurrent refresh, a revoke, or a disable that applied while this
+    // request awaited the organization must not leave a live second handle.
+    const next = await this.mintRefresh();
+    const rotated = this.ctx.storage.transactionSync(() => {
+      const current = this.one(
+        "SELECT revoked, superseded FROM refresh_records WHERE handle_hash = ?",
+        hash,
+      );
+      if (
+        current === undefined ||
+        Number(current["revoked"]) === 1 ||
+        Number(current["superseded"]) === 1
+      ) {
+        return false;
+      }
+      this.ctx.storage.sql.exec(
+        "UPDATE refresh_records SET superseded = 1 WHERE handle_hash = ?",
+        hash,
+      );
+      this.insertRefresh(next.handleHash, organization, actor, auth, next.at);
+      return true;
+    });
+    if (!rotated) return failure("unauthenticated", "refresh handle is no longer live");
     return value({ claims: built.value.claims, refresh: { kind: "rotated", handle: next.handle } });
   }
 

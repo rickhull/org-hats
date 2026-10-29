@@ -167,7 +167,9 @@ it. The properties that matter:
   explicit refresh-handle outcome (kept, rotated, revoked) together, so a
   host never infers session state;
 - `refresh` returns the same pair and revokes affected refresh records in
-  the same commit as a grant change;
+  the same commit as a grant change; rotation consumes its handle and
+  installs the replacement in one transaction, so one handle cannot rotate
+  twice under concurrent requests;
 - `context` yields presentation facts for the envelope's actor;
 - `command` executes a typed, idempotent command — "access request" keeps
   its organizational meaning and is never an issuance input's name.

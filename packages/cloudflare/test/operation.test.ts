@@ -432,6 +432,29 @@ describe("OperationAuthority", () => {
     expect(records.find((record) => record.handle_hash === "hash-1")?.revoked).toBe(1);
   });
 
+  it("rotates one handle at most once under concurrent refresh", async () => {
+    const current = world("refresh-race");
+    await bootstrapOrganization(current);
+    await bootstrapOperation(current, true);
+
+    const issued = await call<{ refresh: { kind: string; handle?: string } }>(current.op, "POST", "/issue", {
+      organizationId: current.orgId,
+      actorId: CREW,
+    });
+    expect(issued.body.ok).toBe(true);
+    const handle = issued.body.value?.refresh.handle;
+    expect(handle).toBeDefined();
+
+    // The organization read suspends the first request; the second must not
+    // pass the same superseded check and rotate the same handle again.
+    const results = await Promise.all([
+      call(current.op, "POST", "/refresh", { handle }),
+      call(current.op, "POST", "/refresh", { handle }),
+    ]);
+    expect(results.filter((result) => result.body.ok)).toHaveLength(1);
+    expect(results.find((result) => !result.body.ok)?.body.failure?.kind).toBe("unauthenticated");
+  });
+
   it("carries actor-disable from organization authority to operation refresh records", async () => {
     const current = world("disable-flow");
     await bootstrapOrganization(current);

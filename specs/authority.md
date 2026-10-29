@@ -99,7 +99,9 @@ extend a session past an envelope already issued. Issuance always states
 the handle outcome; a host never infers session state.
 
 *Held by:* revoke/disable/participation-revoke paths in both runtimes;
-`OH-AUTH-04`, `OH-AUTH-05`, the participation cases; the A13 refresh gate.
+`OH-AUTH-04`, `OH-AUTH-05`, the participation cases; the A13 refresh gate;
+the Cloudflare refresh's transactional consume-and-install, with the
+concurrent-refresh case pinning one winner.
 *If it breaks:* a revoked actor keeps an endless session and the bounded
 revocation window of E7 becomes an unbounded one.
 
