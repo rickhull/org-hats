@@ -8,7 +8,9 @@ export type OrganizationReadPolicy = "granted-teams" | "all-participating";
  * v1 defines only the organization axis. A future team-read axis is an
  * additive optional property on this interface, not a change to the shape of
  * `readPolicy` or to what the organization axis means; no code may assume
- * organization-level reach is the only axis. */
+ * organization-level reach is the only axis. It is a scope, not an expanded
+ * team list: a festival-sized operation cannot carry every team id in the
+ * envelope. */
 export interface ReadPolicy {
     readonly organizations: OrganizationReadPolicy;
 }

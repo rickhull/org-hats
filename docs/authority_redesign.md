@@ -522,7 +522,10 @@ reach — not a scalar enum. v1 defines the organization axis
 (`granted-teams` or `all-participating`). A team-read axis is an additive
 property of the same structure: it changes neither the bundle format nor the
 meaning of the organization axis, and unknown axes fail closed until the
-runtime implements them.
+runtime implements them. The consumer's selected-team workbench reads the
+worn hat's team today; if a team-read axis is added later it is a **scope**,
+not an expanded team enumeration, because an operation with 100–150 teams
+cannot carry that list in the envelope.
 
 The distinction between platform and deployed configuration is explicit:
 
@@ -749,11 +752,13 @@ open:
 - the production access lifetime and which privileged commands require live
   authority or fresh authentication — the engine defaults to 900 seconds,
   configurable; the consumer's security review owns the number; and
-- a read-only hat: `validatePolicyBundle` rejects a role with zero
-  actions, so an auditor (read reach, no action-bearing hat) has no natural
-  carrier in v1. It arrives with the team-read axis — the consumer's
-  team-read requirement — not by weakening bundle validation ahead of
-  the consumer that needs it.
+- team-read and read-only hats are settled for now by the consumer's
+  selected-team workbench: it reads the worn hat's team, so no new axis is
+  required. If a team-read axis is added later it is a **scope** — narrower
+  than organization reach, never an expanded team enumeration, because an
+  operation with 100–150 teams cannot fit that list in a 3,800-byte
+  envelope. An auditor, if one is ever required, carries `observe`;
+  zero-action roles stay refused.
 
 Those decisions should be made against concrete product flows. They should not
 weaken the central shape: a portable, deep authority module with Cloudflare as
