@@ -300,6 +300,34 @@ describe("OrganizationAuthority", () => {
     expect(successor.body.ok).toBe(true);
   });
 
+  it("a re-bootstrap cannot revert a rename or re-enable a disabled actor", async () => {
+    const stub = organization("org-rebootstrap");
+    expect((await call(stub, "POST", "/bootstrap", organizationBootstrap("org/rebootstrap"))).body.ok).toBe(true);
+
+    expect((await call(stub, "POST", "/update-actor", {
+      actorId: "actor-crew",
+      displayName: "Renamed Crew",
+      byActorId: "actor-lead",
+      idempotencyKey: "rebootstrap-rename",
+    })).body.ok).toBe(true);
+    expect((await call(stub, "POST", "/disable", {
+      actorId: "actor-crew",
+      byActorId: "actor-lead",
+      idempotencyKey: "rebootstrap-disable",
+    })).body.ok).toBe(true);
+
+    // the operator re-runs the same bootstrap payload
+    expect((await call(stub, "POST", "/bootstrap", organizationBootstrap("org/rebootstrap"))).body.ok).toBe(true);
+
+    const crew = await call<{ actorId: string; displayName?: string; disabled: boolean }>(
+      stub,
+      "GET",
+      "/actor?actorId=actor-crew",
+    );
+    expect(crew.body.value?.displayName).toBe("Renamed Crew");
+    expect(crew.body.value?.disabled).toBe(true);
+  });
+
   it("refuses a principal link that would make one identity two actors", async () => {
     const stub = organization("org-links");
     const first = await call(stub, "POST", "/bootstrap", {

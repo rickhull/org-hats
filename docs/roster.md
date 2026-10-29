@@ -62,6 +62,11 @@ the organization appoints and retires its own administrators. Operation
 administration is separate: `adminRoles` remains runtime configuration, and no
 command here appoints an operation administrator.
 
+Bootstrap seeds actors the same way it seeds standing: it adds an actor the
+organization does not know, and leaves a known actor's name and enabled state
+alone. A re-bootstrap therefore cannot revert a rename, re-enable a disabled
+actor, or drop standing — those are the organization's facts once it exists.
+
 An unclaimed actor may be appointed. That is the normal state between
 provisioning and claiming, and it keeps the at-rest invariant — an organization
 always has at least one administrator — true while a person has not yet signed

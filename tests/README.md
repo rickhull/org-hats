@@ -83,7 +83,13 @@ public types fails the gate instead of failing at runtime.
   fail `tsconfig.tests.json` in `bin/check`.
 - `keyset.test.ts` — verification-key set parsing, serialization, rotation.
 - `vertical.test.ts` — evidence → issuance → key distribution → verification.
+- `envelope-size.test.ts` — the carriage boundary: encoded envelope sizes
+  against the host's stated budget in `docs/consumer-session.md`.
 - `scenarios.test.ts` — the twin scenarios end-to-end.
+- `activation.test.ts` — request, inspect, accept, rotation, expiry, unlink,
+  and refresh revocation at the portable seam.
+- `roster.test.ts` — actor creation and renaming, administrator appointment,
+  the usable-successor retirement rule, and the unguarded offboarding disable.
 - `conformance.test.ts` — runs the public inventory from `src/conformance.ts`.
 - `docs.test.ts` — the documentation fence: links resolve, every cited
   case id ships, every case has an inventory row with its title verbatim,

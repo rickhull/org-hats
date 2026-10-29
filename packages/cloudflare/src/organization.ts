@@ -379,13 +379,15 @@ export class OrganizationAuthority extends DurableObject<Env> {
         at,
         at,
       );
+      // Bootstrap seeds; it does not overwrite a roster fact the organization
+      // now owns. A re-bootstrap adds unknown actors and leaves known ones
+      // alone: it cannot revert a rename, re-enable a disabled actor, or
+      // change standing (standing is INSERT OR IGNORE below as well).
       for (const actor of input.actors) {
         this.ctx.storage.sql.exec(
           `INSERT INTO actors (actor_id, display_name, disabled, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT(actor_id) DO UPDATE SET
-             display_name = excluded.display_name,
-             updated_at = excluded.updated_at`,
+           ON CONFLICT(actor_id) DO NOTHING`,
           actor.actorId,
           actor.displayName ?? null,
           actor.disabled === true ? 1 : 0,
@@ -415,9 +417,9 @@ export class OrganizationAuthority extends DurableObject<Env> {
       }
       // A bootstrap before any invitation has no operation to notify; the
       // operations populate themselves at their own bootstrap and reconcile
-      // afterwards. This push is what carries a re-bootstrap that adds or
-      // re-enables an actor to operations that already know this
-      // organization.
+      // afterwards. This push is what carries a re-bootstrap that adds an
+      // actor to operations that already know this organization; a disable
+      // reaches them through its own message and roster push.
       this.pushRoster(at);
       return value({ organizationId: input.organizationId });
     });

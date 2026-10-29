@@ -62,11 +62,13 @@ import type {
 export type SignerLike = Signer;
 export type ClockLike = Clock;
 
-/** Administration is deployment policy, never a hardcoded role title: the
- * host states which role titles administer an operation and which actors
- * administer an organization. An operation with no declared `adminRoles` has
- * no administering role title — administration then rests solely on holding
- * a hat that carries one of `configureActions`. */
+/** Administration is declared policy, never a hardcoded role title. The
+ * host states which role titles administer an operation; those titles stay
+ * configuration, and an operation with none has no administering role title
+ * — administration then rests solely on holding a hat that carries one of
+ * `configureActions`. Organization administrator standing is different: the
+ * configured `orgAdmins` record seeds it at bootstrap, and the organization
+ * then appoints and retires its own administrators through its commands. */
 export interface InMemoryAuthorityConfig {
   readonly fixtures?: readonly WorldFixture[];
   /** Verified-principal links created at bootstrap: evidence resolution
@@ -93,6 +95,9 @@ export interface InMemoryAuthorityConfig {
   /** Actions that confer site-configuration reach (default `["configure"]`). */
   readonly configureActions?: readonly string[];
   readonly adminRoles?: Readonly<Record<OperationId, readonly string[]>>;
+  /** Seeds organization administrator standing at bootstrap. It names actors
+   * the fixtures already declare, and it is not a live writer: the
+   * organization's appoint/retire commands own standing afterwards. */
   readonly orgAdmins?: Readonly<Record<OrganizationId, readonly ActorId[]>>;
   /** Fault injection: the first N outbox deliveries fail and stay pending. */
   readonly transportFailures?: number;
