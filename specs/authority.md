@@ -97,10 +97,12 @@ host reads a fresh envelope as fresh authentication.
 
 A revoking command kills the refresh records it affects: in the same commit
 within one coordinator, or through the durable outbox across coordinators.
-The outbox is durable but not instantaneous; until its message applies,
-A13's live organization read is the gate, so a delayed revocation cannot
-extend a session past an envelope already issued. Issuance always states
-the handle outcome; a host never infers session state.
+The outbox is durable but not instantaneous: a refresh already in flight when
+a revocation commits may issue one further envelope. The resulting authority
+remains bounded by E7, and the next refresh observes the revocation —
+through A13's live organization read for a disable, and the revoked record
+otherwise — so the chain does not continue. Issuance always states the
+handle outcome; a host never infers session state.
 
 *Held by:* revoke/disable/participation-revoke paths in both runtimes;
 `OH-AUTH-04`, `OH-AUTH-05`, the participation cases; the A13 refresh gate;

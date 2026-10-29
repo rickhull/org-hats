@@ -101,14 +101,20 @@ authority interface issued them and is never compared with the verifier's,
 so a command-vocabulary break cannot strand a live envelope. A change to
 what the claims mean moves the envelope version instead.
 
+The version pair is also the rollout contract: a verifier deployed ahead of
+an issuer accepts both versions live during the transition, and the old
+version retires only after its last issued envelope has expired. A new
+verifier that accepts only the new version interrupts live sessions even
+when the deployment order was otherwise correct.
+
 The failure taxonomy is one closed list shared by the session and command
 surfaces (`src/contract.ts`): a `FailureKind` means the same thing wherever
 it appears, and adding one is an interface-version change for both
 surfaces at once — never a verifier-only or issuer-only addition.
 
 *Held by:* `verify`'s gate on the format and both `v` fields and its
-deliberate non-check of `interfaceVersion`; `OH-ACCESS-04`; the provenance
-vector.
+deliberate non-check of `interfaceVersion`; the verifier-first rollout order
+in `docs/envelope.md`; `OH-ACCESS-04`; the provenance vector.
 *If it breaks:* a call-signature change strands still-valid envelopes — or
 a format change strands still-valid callers — and rolling upgrades lose
 their ordering.

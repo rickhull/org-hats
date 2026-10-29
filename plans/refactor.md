@@ -76,11 +76,16 @@ Make drift fail before moving any code.
    commands and to restore round-trips.
 5. **Determinism audit.** Repeat the suites to catch clock/outbox/DO ordering
    flakes; fix or record each.
-6. **Revocation/refresh interleaving.** Pin the disable-while-refreshing
-   case: once the revoke applies, a concurrent refresh must not leave a
-   usable handle. The finalize transaction and A13 gate are the answer; the
-   test needs a controllable pause at the organization read. Add such a seam
-   only if the case cannot be written without it.
+6. **Adversarial concurrency review.** Test the stated bounds against
+   interleavings, not only the sequential cases: disable, unlink, grant
+   revoke, and participation revoke against refresh; two refreshes of one
+   handle; issuance racing a revocation; a delayed outbox. Pin the
+   disable-while-refreshing case first: once the revoke applies, a concurrent
+   refresh must not leave a usable handle. The finalize transaction and A13
+   gate are the answer; the test needs a controllable pause at the
+   organization read. Add such a seam only if the case cannot be written
+   without it. Record the expected bound for each scenario; a new authority
+   feature is not the fix.
 
 **Done when:** coverage is measured, the gap list is closed or explicitly
 deferred, and any threshold is stable across repeated runs.
