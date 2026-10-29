@@ -288,7 +288,7 @@ full inventory.
 
 | What | Version |
 | --- | --- |
-| `org-hats` | 3.2.0 |
+| `org-hats` | 3.3.0 |
 | Authority interface | 3 |
 | Access envelope | 1 |
 | Cloudflare runtime | separate `0.x` on `cloudflare-v*` tags; operation schema 5 |
