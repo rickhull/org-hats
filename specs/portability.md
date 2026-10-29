@@ -66,16 +66,20 @@ exists before production data.
 *If it breaks:* it is an incident, not a bug — exposure cannot be un-pushed
 from a public mirror.
 
-### P6 — Releases are immutable tags, and the manifest is the single pin
+### P6 — Release tags never move, and the manifest is the single pin
 
 Distribution is by git tag only; `bin/release` takes the tag from the
 selected package's manifest (root `package.json` or the Cloudflare
 manifest), so manifest and tag cannot disagree; consumers pin tags, never
 ranges, because a pin that moves under a verifier changes what a signature
-means.
+means. Git does not make a tag immutable: a tag is a name, not a commit
+hash, so immutability here is repository policy backed by verification,
+never a property of the remote.
 
-*Held by:* the release script's single source of truth; the consumer's
-re-recorded acceptance at each move.
+*Held by:* the release script's single source of truth; `bin/check-version`
+matching each release tag to its manifest; the git policy that forbids
+moving, forcing, or deleting a tag; the consumer's re-recorded acceptance at
+each move.
 *If it breaks:* a moved or floating pin silently redefines the seam under
 every consumer at once.
 

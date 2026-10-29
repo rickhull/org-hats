@@ -77,23 +77,29 @@ and issuer/verifier drift becomes a per-deployment property.
 
 `amr` and `auth_time` are copied from evidence at issuance, preserved
 unchanged through refresh while `iat` moves, surfaced on the context, and
-never interpreted by authority. Absence is carried as absence.
+never interpreted by authority. Absence is carried as absence. Refresh
+establishes current authorization eligibility (A13), not a renewed
+authentication event; neither `iat` nor refresh time is evidence about
+`auth_time`.
 
 *Held by:* both engines copy the facts without reading their values;
 refresh records carry them through the chain; `OH-AUTH-06`.
 *If it breaks:* either authority starts interpreting host vocabulary —
 step-up policy forks per issuer — or the facts go stale across refresh,
-which is precisely the silent failure `auth_time` exists to close.
+which is precisely the silent failure `auth_time` exists to close, or a
+host reads a fresh envelope as fresh authentication.
 
 ### A7 — Refresh handles die with the authority that issued them
 
 A revoking command kills the refresh records it affects: in the same commit
 within one coordinator, or through the durable outbox across coordinators.
-Issuance always states the handle outcome; a host never infers session
-state.
+The outbox is durable but not instantaneous; until its message applies,
+A13's live organization read is the gate, so a delayed revocation cannot
+extend a session past an envelope already issued. Issuance always states
+the handle outcome; a host never infers session state.
 
 *Held by:* revoke/disable/participation-revoke paths in both runtimes;
-`OH-AUTH-04`, `OH-AUTH-05`, the participation cases.
+`OH-AUTH-04`, `OH-AUTH-05`, the participation cases; the A13 refresh gate.
 *If it breaks:* a revoked actor keeps an endless session and the bounded
 revocation window of E7 becomes an unbounded one.
 
@@ -192,6 +198,12 @@ replacement, the runtime resolves the actor's existence and disabled flag at
 the organization; missing or disabled fails closed, and an organization that
 cannot answer fails closed. The roster projection is not the revocation
 promise.
+
+Disable and refresh share no transaction and have no global linearization
+point: a refresh that read the organization before a disable commits may
+issue another envelope, and the next refresh is refused. The guarantee is
+envelope expiry (E7) plus this read on every refresh, not an atomic ordering
+of the two coordinators.
 
 *Held by:* the Cloudflare operation refresh's organization read; the
 in-memory engine's live organization lookup; the lost-disable refresh case in

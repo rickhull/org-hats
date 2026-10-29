@@ -109,9 +109,13 @@ in v1; another is a format-version change, not a bundle option.
   `invalid-signature`); the deploying host owns the product response to
   each.
 - Additive optional claims (v1 gained `amr` and `auth_time` this way) need
-  no format-version bump: canonical serialization covers whatever claims
-  exist, so an older verifier accepts a newer issuer's envelope and
-  ignores what it does not read.
+  no format-version bump only when ignoring them cannot widen effective
+  authority or weaken a required check: canonical serialization covers
+  whatever claims exist, so an older verifier accepts a newer issuer's
+  envelope and ignores what it does not read, which is safe for descriptive
+  facts and not for a restriction the verifier must enforce. A claim whose
+  absence would widen authority, and any removal or reinterpretation of an
+  existing claim, is a version change with a verifier-first rollout.
 
 ## Fixed vectors
 

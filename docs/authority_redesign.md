@@ -320,7 +320,9 @@ and the authentication timestamp, under the OIDC claim spellings — and
 authority carries them opaquely from `PrincipalEvidence` into the signed
 envelope claims (`amr`, `auth_time`) and `AuthorityContext`, preserving
 them through refresh while envelope `iat` moves. What the values mean and
-when they suffice is host step-up policy, never an authority rule.
+when they suffice is host step-up policy, never an authority rule. Refresh
+preserves these facts rather than renewing them: a refreshed envelope says
+the actor is still eligible, not that the authentication is recent.
 
 Authentication never creates participation or a hat implicitly. The grant is
 the operation's operative admission; access requests and granting remain
@@ -435,7 +437,9 @@ monotonically, because the outbox may deliver a delayed message after a
 newer one and an older image must not resurrect a disabled actor. Revocation
 of issued access stays what it was: the actor-disabled message revokes
 refresh records, refresh itself re-resolves the actor at the organization,
-and an envelope's lifetime bounds the rest.
+and an envelope's lifetime bounds the rest. Disable and refresh share no
+transaction: a refresh that read the organization before a disable commits
+may issue another envelope, and the next refresh is refused.
 
 The projection is derived, so it is not state to back up: a coordinator
 export carries the operation's own facts and leaves the projection out, and a

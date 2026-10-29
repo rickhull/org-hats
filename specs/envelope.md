@@ -25,18 +25,24 @@ bytes; `OH-ACCESS-03` fails tampered claims.
 *If it breaks:* signatures cross implementations only by coincidence, and
 every host that reimplemented the encoding owns a private format.
 
-### E3 — Claims grow additively within a version
+### E3 — Only authority-neutral claims grow additively
 
-An optional claim joins the format without a version bump, because
-canonical serialization covers whatever claims exist: an older verifier
-accepts a newer issuer's envelope and ignores what it does not read.
-Removing or reinterpreting a claim is a version change with a
-verifier-first rollout.
+An optional claim joins the format without a version bump only when
+ignoring it cannot widen effective authority or weaken a required check.
+Canonical serialization covers whatever claims exist, so an older verifier
+accepts a newer issuer's envelope and ignores what it does not read; that is
+safe for descriptive facts such as `amr` and `auth_time`, not for a
+restriction the verifier must enforce. A claim whose absence would widen
+authority, and any removal or reinterpretation of an existing claim, is a
+version change with a verifier-first rollout.
 
-*Held by:* proven by `1.2.0` — `amr` and `auth_time` landed with the
-format still `1` — and stated in `docs/envelope.md`.
-*If it breaks:* every additive change drags a paired consumer rollout, and
-the cheap window for growth closes.
+*Held by:* proven for the descriptive claims by `1.2.0` — `amr` and
+`auth_time` landed with the format still `1`; every claim addition is
+reviewed against this boundary, and a semantic change moves
+`ACCESS_ENVELOPE_VERSION` (E8).
+*If it breaks:* every additive change drags a paired consumer rollout and
+the cheap window for growth closes — or, worse, an older verifier ignores a
+restriction and grants authority the issuer meant to withhold.
 
 ### E4 — Verification fails closed, in a fixed order
 

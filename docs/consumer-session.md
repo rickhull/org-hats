@@ -36,6 +36,9 @@ choose a hat.
 - A refresh handle is written only when issuance says it **rotated**.  A
   `kept` handle is not re-sent: the browser already holds it, and rewriting
   it would hide a host bug.
+- Refresh renews eligibility, not authentication: `amr` and `auth_time`
+  travel unchanged while `iat` moves.  Step-up policy reads those two and
+  never `iat` or the time of the refresh.
 - A refused refresh, a revoked handle, and a logout all end the same way:
   both cookies are cleared.
 
