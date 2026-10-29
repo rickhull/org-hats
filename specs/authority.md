@@ -66,12 +66,16 @@ for — an unnamed failure becomes a product decision nobody made.
 The issuer computes read reach under the active policy bundle before
 signing; the verifier compares ids and evaluates the selected hat locally,
 and never rebuilds organization unions, peer reach, fallback, or worn-hat
-rules.
+rules. A verifier that accepts a key is trusting that issuer's computation:
+the signature proves provenance and integrity, not that policy was
+independently re-derived.
 
 *Held by:* the access module's shape — `NeutralAccess` offers predicates
-over signed facts and nothing else; `OH-AUTH-01`.
+over signed facts and nothing else; the signature gate and key set;
+`OH-AUTH-01`.
 *If it breaks:* every verifier becomes a second implementation of policy,
-and issuer/verifier drift becomes a per-deployment property.
+and issuer/verifier drift becomes a per-deployment property — or a verifier
+believes it validated policy it never computed.
 
 ### A6 — Authentication facts travel opaquely
 

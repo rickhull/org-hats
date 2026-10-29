@@ -223,7 +223,9 @@ important properties are:
   because the envelope outlives the interface that issued it;
 - read reach is computed by authority from the active policy bundle before
   issuance; the verifier evaluates binding and the selected hat locally and
-  never rebuilds organization unions, peer reach, fallback, or worn-hat rules;
+  never rebuilds organization unions, peer reach, fallback, or worn-hat rules
+  — accepting the issuer's key is trusting that computation
+  ([envelope.md § Trust boundary](envelope.md#trust-boundary));
 - the projection contains permanent identifiers and only the compact facts
   needed for local product decisions; and
 - an unsupported envelope version fails closed.
@@ -464,6 +466,18 @@ distributed transaction. The organization owns whether its administrator
 accepted an invitation; the operation's participation status is canonical for
 whether that organization may receive operation authority.
 
+### Audit attribution
+
+An audit fact records the coordinator that owns it, the acting principal
+where there is one, and the fact; outbox-applied changes are attributed to
+the outbox. It does not encode which layer authorized a consequential act —
+organization-administrator standing, operation-administrator standing, the
+selected hat's actions, or the fresh-evidence requirement of the command. A
+host that needs that attribution derives it from the command it invoked and
+the evidence it presented; an audit reader alone sees the actor, not the
+authority path. Recording the layer would be a schema and audit-contract
+change, taken only with a concrete consumer need.
+
 ## Quartermaster integration
 
 Quartermaster owns reporting behavior and depends only on the authority
@@ -579,7 +593,9 @@ One hypothetical adapter is not a reason to introduce another public seam.
 The honest positioning is "portable semantics, one reference runtime": a
 non-Cloudflare host inherits the obligations above with a single reference
 implementation to study, and packaging and documentation must not imply
-drop-in portability.
+drop-in portability. The fence and the shared conformance inventory are
+evidence that the portable modules are well-defined, not proof that another
+runtime exists; only a committed adapter would demonstrate that generally.
 
 ## Stewardship
 

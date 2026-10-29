@@ -31,13 +31,16 @@ loses its cheapest enforcement.
 The Cloudflare package is the reference runtime with first-class tooling, not a
 requirement; a second runtime adapter appears only when a real consumer
 commits to it, and no adapter SPI or pairing matrix is published ahead of
-that.
+that. The fence and the shared conformance inventory are evidence that the
+portable semantics are well-defined; they do not prove a second runtime,
+which only a committed adapter can.
 
 *Held by:* the in-memory and Cloudflare adapters sharing one internal
-conformance inventory in this repository, and nothing published between
-them.
+conformance inventory in this repository, `bin/check`'s fence (P1), and
+nothing published between them.
 *If it breaks:* "portable" erodes into marketing — speculative adapters
-and compatibility matrices appear without an author who needs them.
+and compatibility matrices appear without an author who needs them, or the
+docs imply a drop-in portability no second implementation has shown.
 
 ### P4 — The reference runtime stays on the standard surface
 

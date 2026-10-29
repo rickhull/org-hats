@@ -117,6 +117,28 @@ in v1; another is a format-version change, not a bundle option.
   absence would widen authority, and any removal or reinterpretation of an
   existing claim, is a version change with a verifier-first rollout.
 
+## Trust boundary
+
+The verifier's guarantee is the envelope's: the format and version pair, the
+signature against a known key id, expiry, and the caller's bindings are
+checked, then the signed layers are exposed for local comparison. Accepting a
+key is trusting the issuer's computation: the verifier does not re-derive
+policy, read reach, or hat selection, so a valid signature proves provenance
+and integrity, not that the issuer applied the right policy. Key custody and
+rotation are the trust anchor; an unknown key id fails closed.
+
+The issuer's guarantee is narrower than a session. Issuance and refresh say
+the actor was eligible when the claims were built; they do not renew
+authentication (`amr` and `auth_time` are copied, A6) and they do not make an
+already-issued envelope reflect later authority. `context()` and privileged
+runtime calls are for current facts, and revocation is bounded by `exp` plus
+the organization read on refresh (A7, A13).
+
+The guarantees compose only where both sides keep their parts: a verifier
+cannot make a claim mean something the issuer did not compute, and an issuer
+cannot make a host enforce a layer the host ignores. Hosts own carriage,
+step-up policy, and the product response to each closed failure kind.
+
 ## Fixed vectors
 
 Committed as data at `tests/fixtures/envelope-vectors.json` (a clearly
