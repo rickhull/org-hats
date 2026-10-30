@@ -11,20 +11,32 @@
 //   spec.expect(disabled.ok, "disable applies");
 //   spec.expectFailure(await s.refresh(issued), "unauthenticated");
 //
+// Envelope-layer examples verify against the world's key set with an
+// injected clock, and a newer issuer's envelope carries a claim this
+// verifier does not read:
+//
+//   const live = await s.verifyAt(issued.envelope, issued.envelope.claims.exp - 1);
+//   const newer = await s.withExtraClaim(issued, "riskTier", "routine");
+//
 // `spec.world()` creates an isolated in-memory world. Labels are the
 // conformance principals ("dana", "sam", "len", …); `disable` uses "dana" as
 // the Harbor administrator. This is a prototype surface, not a public API.
 
 import {
+  asJson,
   AUTHORITY_INTERFACE_VERSION,
+  canonicalJson,
   isFailed,
   type FailureKind,
+  type SignedAccessEnvelope,
 } from "../src/contract.ts";
+import { ed25519VerifyKey, verify, type Verified } from "../src/access/verify.ts";
 import {
   CONFORMANCE_PRINCIPALS,
   createInMemoryConformanceWorld,
 } from "../src/conformance.ts";
 import { PROFESSIONAL_OPERATION } from "../src/authority/twins.ts";
+import { webCryptoSigner } from "../src/authority/internal.ts";
 import type {
   AccessIssue,
   AuthorityCommand,
@@ -54,6 +66,18 @@ export interface SpecWorld {
   readonly issue: (label: string) => Promise<AccessIssue>;
   readonly refresh: (issued: AccessIssue) => Promise<AccessIssue | Failed>;
   readonly disable: (label: string) => Promise<CommandResult>;
+  /** Verify an issued envelope against the world's key set with an injected clock. */
+  readonly verifyAt: (
+    envelope: SignedAccessEnvelope,
+    nowSeconds: number,
+  ) => Promise<Verified | Failed>;
+  /** A newer issuer's envelope: the same claims plus one this verifier does
+   * not read, re-signed by a key distributed before it signs (E5's order). */
+  readonly withExtraClaim: (
+    issued: AccessIssue,
+    claim: string,
+    value: unknown,
+  ) => Promise<SignedAccessEnvelope>;
 }
 
 export interface SpecHarness {
@@ -74,7 +98,10 @@ export const createSpecHarness = async (): Promise<SpecHarness> => {
   };
 
   const world = async (): Promise<SpecWorld> => {
-    const runtime = (await createInMemoryConformanceWorld()).runtime;
+    const { runtime, keys } = await createInMemoryConformanceWorld();
+    // The world starts with the engine's key; every newer issuer's key is
+    // distributed into this set before its envelopes verify against it.
+    const verifyKeys = new Map(keys);
 
     const issue = async (label: string): Promise<AccessIssue> => {
       const entry = principal(label);
@@ -110,7 +137,32 @@ export const createSpecHarness = async (): Promise<SpecHarness> => {
       return runtime.command(command);
     };
 
-    return { issue, refresh, disable };
+    const verifyAt = (
+      envelope: SignedAccessEnvelope,
+      nowSeconds: number,
+    ): Promise<Verified | Failed> => verify(envelope, verifyKeys, { now: nowSeconds });
+
+    const withExtraClaim = async (
+      issued: AccessIssue,
+      claim: string,
+      value: unknown,
+    ): Promise<SignedAccessEnvelope> => {
+      const signer = await webCryptoSigner(`spec-newer-${claim}-${verifyKeys.size}`);
+      const claims = {
+        ...issued.envelope.claims,
+        [claim]: value,
+      } as unknown as SignedAccessEnvelope["claims"];
+      const envelope: SignedAccessEnvelope = {
+        ...issued.envelope,
+        keyId: signer.keyId,
+        claims,
+        signature: await signer.sign(canonicalJson(asJson(claims))),
+      };
+      verifyKeys.set(signer.keyId, await ed25519VerifyKey(signer.keyId, await signer.publicKey()));
+      return envelope;
+    };
+
+    return { issue, refresh, disable, verifyAt, withExtraClaim };
   };
 
   return { world, expect, expectFailure };

@@ -36,10 +36,21 @@ restriction the verifier must enforce. A claim whose absence would widen
 authority, and any removal or reinterpretation of an existing claim, is a
 version change with a verifier-first rollout.
 
+```js spec=E3 traits=portable,unit
+// len's envelope, re-signed by a newer issuer of the same format version
+// carrying a claim this verifier does not read.
+const s = await spec.world();
+const older = await s.issue("len");
+const newer = await s.withExtraClaim(older, "riskTier", "routine");
+const read = await s.verifyAt(newer, older.envelope.claims.iat + 1);
+spec.expect(read.access !== undefined, "the unknown optional claim still verifies");
+spec.expect(read.claims.operationId === older.envelope.claims.operationId, "the claims it knows read unchanged");
+```
+
 *Held by:* proven for the descriptive claims by `1.2.0` — `amr` and
 `auth_time` landed with the format still `1`; every claim addition is
 reviewed against this boundary, and a semantic change moves
-`ACCESS_ENVELOPE_VERSION` (E8).
+`ACCESS_ENVELOPE_VERSION` (E8); the E3 executable example.
 *If it breaks:* every additive change drags a paired consumer rollout and
 the cheap window for growth closes — or, worse, an older verifier ignores a
 restriction and grants authority the issuer meant to withhold.
@@ -87,8 +98,17 @@ land no later than expiry, and privileged acts that need fresher authority
 call the runtime directly. The number itself is the consumer's security
 review's to own.
 
+```js spec=E7 traits=portable,unit
+// The clock is injected: the same envelope one second before exp, then at it.
+const s = await spec.world();
+const envelope = (await s.issue("len")).envelope;
+const stillLive = await s.verifyAt(envelope, envelope.claims.exp - 1);
+spec.expect(stillLive.access !== undefined, "one second before exp the envelope verifies");
+spec.expectFailure(await s.verifyAt(envelope, envelope.claims.exp), "expired", "at exp it is dead");
+```
+
 *Held by:* issuance and verification on both engines; `OH-ACCESS-02`; the
-engine default is 900 seconds, configurable.
+engine default is 900 seconds, configurable; the E7 executable example.
 *If it breaks:* revocation latency becomes unbounded, or ordinary reads
 regain a control-plane dependency the projection exists to remove.
 
