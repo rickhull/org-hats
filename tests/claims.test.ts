@@ -55,7 +55,7 @@ const failureOf = (value: AccessEnvelopeClaimsV1 | Failure): Failure => {
   return value;
 };
 
-test("claims: the actor, wearable hat, reach, and lifetime in one shape", () => {
+test("[A5][A14][E6] claims: the actor, wearable hat, reach, and lifetime in one shape", () => {
   const claims = claimsFor(DANA_OKAFOR, HARBOR_LOGISTICS);
   assert.ok(!("kind" in claims));
   assert.equal(claims.v, 1);
@@ -80,7 +80,7 @@ test("claims: the actor, wearable hat, reach, and lifetime in one shape", () => 
   assert.equal(claims.exp, IAT + 900);
 });
 
-test("claims: a site hat reaches every team at the site and configures it", () => {
+test("[A14] claims: a site hat reaches every team at the site and configures it", () => {
   const claims = claimsFor(LEN, LEN_ORG);
   assert.ok(!("kind" in claims));
   assert.deepEqual(claims.hat, {
@@ -95,7 +95,7 @@ test("claims: a site hat reaches every team at the site and configures it", () =
   assert.deepEqual(claims.configurableSiteIds, [WEST]);
 });
 
-test("claims: absent authentication facts stay absent; present ones are copied", () => {
+test("[A6] claims: absent authentication facts stay absent; present ones are copied", () => {
   const bare = claimsFor(DANA_OKAFOR, HARBOR_LOGISTICS);
   assert.ok(!("kind" in bare));
   assert.equal("amr" in bare, false);

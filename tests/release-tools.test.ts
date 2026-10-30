@@ -60,7 +60,7 @@ const run = (root: string, ...args: string[]) =>
     encoding: "utf8",
   });
 
-test("both release-tag families are validated against their own manifest", () => {
+test("[P6] both release-tag families are validated against their own manifest", () => {
   const root = repo();
   try {
     git(root, "tag", "-a", "v1.2.3", "-m", "v1.2.3");

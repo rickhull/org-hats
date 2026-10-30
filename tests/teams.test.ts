@@ -148,7 +148,7 @@ const requestFor = (organizationIdValue: typeof ORG, teamId: string) => ({
 const snapshotTeam = (engine: Awaited<ReturnType<typeof createInMemoryAuthority>>, teamId: string) =>
   engine.snapshotOf(OP)?.teams.find((team) => team.teamId === teamId);
 
-test("a team is pending until the operation admits it, then grants can target it", async () => {
+test("[A17] a team is pending until the operation admits it, then grants can target it", async () => {
   const { engine } = await setup();
   okOf(await engine.runtime.command(cmd(request("team-one", SITE_ONE, "Crew One"), fresh(ADMIN_EVIDENCE), "req-1")));
   assert.equal(snapshotTeam(engine, "team-one"), undefined, "a pending team is not in the snapshot");
@@ -195,7 +195,7 @@ test("request refuses a non-administrator, an inactive organization, an unknown 
   assert.match(failureOf(duplicate).detail ?? "", /already exists/);
 });
 
-test("only an operation administrator admits", async () => {
+test("[A9] only an operation administrator admits", async () => {
   const { engine } = await setup();
   okOf(await engine.runtime.command(cmd(request("team-one"), fresh(ADMIN_EVIDENCE), "req-1")));
   const ownerFresh = await engine.runtime.command(cmd(
@@ -250,7 +250,7 @@ test("the owning organization renames its team; another organization cannot", as
   assert.equal(failureOf(foreign).kind, "denied");
 });
 
-test("retirement revokes the team's grants and refresh, while issued envelopes survive to expiry", async () => {
+test("[A17] retirement revokes the team's grants and refresh, while issued envelopes survive to expiry", async () => {
   const { engine, keys } = await setup();
   okOf(await engine.runtime.command(cmd(request("team-one"), fresh(ADMIN_EVIDENCE), "req-1")));
   okOf(await engine.runtime.command(cmd({ kind: "admit-team", operationId: OP, teamId: "team-one" }, await envelope(engine.runtime, ADMIN_EVIDENCE), "admit-1")));

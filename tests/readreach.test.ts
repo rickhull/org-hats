@@ -23,13 +23,13 @@ test("granted-teams: Dana reads Harbor, the org of her reached team", () => {
   assert.deepEqual(r.readableTeamIds, []);
 });
 
-test("granted-teams: a site grant reaches every team's organization at the site", () => {
+test("[A5] granted-teams: a site grant reaches every team's organization at the site", () => {
   // Len's admin hat is site-scoped at West Yard, where Atlas and Harbor keep teams
   const r = readReach(PROFESSIONAL_OPERATION.snapshot, PROFESSIONAL_OPERATION.policy, LEN_ORG, LEN, MERIDIAN_OP);
   assert.deepEqual([...r.readableOrganizationIds].sort(), ["org-4c1f9a2e", "org-a53e90f7"]);
 });
 
-test("all-participating: festival-wide read, no exceptional teams", () => {
+test("[A5] all-participating: festival-wide read, no exceptional teams", () => {
   const r = readReach(FESTIVAL.snapshot, FESTIVAL.policy, HARBOR_LOGISTICS, DANA_OKAFOR, FESTIVAL_OP);
   assert.deepEqual(
     [...r.readableOrganizationIds].sort(),

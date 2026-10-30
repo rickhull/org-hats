@@ -90,7 +90,7 @@ const cmd = (
   idempotencyKey: string,
 ): AuthorityCommand => ({ interfaceVersion: AUTHORITY_INTERFACE_VERSION, idempotencyKey, authorization, ...body });
 
-test("activation request returns a secret once; inspection discloses only usability", async () => {
+test("[A16] activation request returns a secret once; inspection discloses only usability", async () => {
   const { engine } = await setup();
   const issued = await engine.runtime.activationRequest(request());
   assert.ok(!isFailed(issued));
@@ -123,7 +123,7 @@ test("request retry rotates instead of replaying plaintext", async () => {
   }), { usable: true });
 });
 
-test("accept binds the verified subject atomically and replays for that subject only", async () => {
+test("[A16] accept binds the verified subject atomically and replays for that subject only", async () => {
   const { engine } = await setup();
   const issued = await engine.runtime.activationRequest(request());
   assert.ok(!isFailed(issued));
@@ -208,7 +208,7 @@ test("revocation is idempotent and leaves the actor enabled and unlinked", async
   })).kind, "unauthenticated");
 });
 
-test("unlink preserves grants and refresh fails even when outbox delivery is lost", async () => {
+test("[A13] unlink preserves grants and refresh fails even when outbox delivery is lost", async () => {
   const { engine } = await setup(1);
   const issued = await engine.runtime.activationRequest(request());
   assert.ok(!isFailed(issued));

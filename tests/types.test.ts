@@ -145,7 +145,7 @@ type _UnbrandedEpochIsPlain = Expect<Equal<Unbranded<EpochSeconds>, number>>;
 type _VerifyNowStaysPlain = Expect<Equal<NonNullable<VerifyContext["now"]>, number>>;
 type _ClaimsIatStaysPlain = Expect<Equal<AccessEnvelopeClaimsV1["iat"], number>>;
 
-test("public-surface type assertions are compile-time only", () => {
+test("[A3][P7] public-surface type assertions are compile-time only", () => {
   // The assertions are the type aliases above; they fail `tsc -p
   // tsconfig.tests.json` in bin/check. This test exists so the runtime
   // suite has something green to run in this file.

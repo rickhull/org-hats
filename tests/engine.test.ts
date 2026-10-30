@@ -100,7 +100,7 @@ test("issuance: evidence resolves the actor, computes reach, and signs", async (
   assert.ok(await signer.verify(canonicalJson(asJson(envelope.claims)), envelope.signature));
 });
 
-test("issuance failures: unknown evidence, actor without admission", async () => {
+test("[A1] issuance failures: unknown evidence, actor without admission", async () => {
   const { engine } = await setup();
   const unknown = await engine.runtime.accessFromEvidence(evidence({ provider: "test-idp", subject: "nobody" }));
   assert.equal(failureOf(unknown).kind, "unauthenticated");
@@ -111,7 +111,7 @@ test("issuance failures: unknown evidence, actor without admission", async () =>
   assert.equal(failureOf(wrongOp).kind, "wrong-binding");
 });
 
-test("refresh: rotation with explicit outcomes; a superseded handle is dead", async () => {
+test("[A7] refresh: rotation with explicit outcomes; a superseded handle is dead", async () => {
   const { engine } = await setup();
   const first = await engine.runtime.accessFromEvidence(evidence(DANA));
   assert.ok(!isFailed(first));
@@ -135,7 +135,7 @@ test("the envelope lifetime is configuration, not a constant", async () => {
   assert.equal(issue.envelope.claims.exp - issue.envelope.claims.iat, 60);
 });
 
-test("amr and auth_time: copied from evidence, preserved through refresh, surfaced in context", async () => {
+test("[A6] amr and auth_time: copied from evidence, preserved through refresh, surfaced in context", async () => {
   const { engine, signer } = await setup();
   const authenticated: PrincipalEvidence = { ...DANA, amr: ["hwk", "otp"], authTime: 1_699_999_000 };
   const first = await engine.runtime.accessFromEvidence(evidence(authenticated));
@@ -204,7 +204,7 @@ test("context: wearable hats carry the grant id select-hat takes", async () => {
   assert.equal(worn.envelope.claims.hat.role, "reviewer", "the next envelope wears the selected hat");
 });
 
-test("the bounded window: a revoked grant kills refresh, not the live envelope", async () => {
+test("[A7][E7] the bounded window: a revoked grant kills refresh, not the live envelope", async () => {
   const { engine } = await setup();
   const danaIssue = await engine.runtime.accessFromEvidence(evidence(DANA));
   const lenIssue = await engine.runtime.accessFromEvidence(evidence(LEN));
@@ -226,7 +226,7 @@ test("the bounded window: a revoked grant kills refresh, not the live envelope",
   assert.match(failureOf(dead).detail ?? "", /revoked/);
 });
 
-test("disable-actor: issuance stops immediately; the outbox revokes refresh records", async () => {
+test("[A7][A13] disable-actor: issuance stops immediately; the outbox revokes refresh records", async () => {
   const { engine } = await setup();
   const danaIssue = await engine.runtime.accessFromEvidence(evidence(DANA));
   assert.ok(!isFailed(danaIssue));
@@ -339,7 +339,7 @@ test("a wrong-version call mutates nothing — not even the outbox drain", async
   assert.equal(engine.invitationsOf(INVITEE_ORG).size, 1);
 });
 
-test("principal link keys cannot collide across provider/subject splits", async () => {
+test("[A10] principal link keys cannot collide across provider/subject splits", async () => {
   // "a:b"/"c" and "a"/"b:c" concatenated with ":" are the same string. The
   // link key must encode the pair, not concatenate it — otherwise bootstrap
   // refuses one of two legitimate links, or worse, one evidence resolves
@@ -479,7 +479,7 @@ test("participation: invite → accept → active, with a visible partial state 
   assert.ok(!secondInvite.ok);
 });
 
-test("idempotency: retries claim their result; misuse and denials do not poison", async () => {
+test("[A8] idempotency: retries claim their result; misuse and denials do not poison", async () => {
   const { engine } = await setup();
   const len = await engine.runtime.accessFromEvidence(evidence(LEN));
   assert.ok(!isFailed(len));
@@ -509,7 +509,7 @@ test("idempotency: retries claim their result; misuse and denials do not poison"
   assert.equal(failureOf(misuse).kind, "invalid-command");
 });
 
-test("authorization: administration is policy, not a hardcoded role", async () => {
+test("[A9] authorization: administration is policy, not a hardcoded role", async () => {
   const { engine } = await setup();
   const dana = await engine.runtime.accessFromEvidence(evidence(DANA));
   assert.ok(!isFailed(dana));
@@ -591,7 +591,7 @@ test("authorization: an undeclared admin role grants nothing by default", async 
   assert.equal(failureOf(attempt).kind, "denied");
 });
 
-test("request-access and admit: asking is not being admitted", async () => {
+test("[A15] request-access and admit: asking is not being admitted", async () => {
   const { engine } = await setup();
   const len = await engine.runtime.accessFromEvidence(evidence(LEN));
   assert.ok(!isFailed(len));
@@ -702,7 +702,7 @@ test("select-hat: a revoked or non-wearable grant cannot be selected", async () 
   okOf(active);
 });
 
-test("command and context use the envelope version gate, not just the signature", async () => {
+test("[E8] command and context use the envelope version gate, not just the signature", async () => {
   const { engine } = await setup();
   const issued = await engine.runtime.accessFromEvidence(evidence(DANA));
   assert.ok(!isFailed(issued));

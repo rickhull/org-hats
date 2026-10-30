@@ -23,7 +23,7 @@ test("the twins exercise both read policies", () => {
 
 const base: PolicyBundle = PROFESSIONAL_OPERATION.policy;
 
-test("an unknown read policy axis fails closed", () => {
+test("[P9] an unknown read policy axis fails closed", () => {
   const bundle = {
     ...base,
     readPolicy: { organizations: "granted-teams", teams: "audiences" },

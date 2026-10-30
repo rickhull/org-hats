@@ -13,7 +13,7 @@ const pair = async () => {
 };
 
 describe("configured signing keys", () => {
-  it("imports the signing key and exposes both rotation keys", async () => {
+  it("[E5] imports the signing key and exposes both rotation keys", async () => {
     const a = await pair();
     const b = await pair();
     const configured = {

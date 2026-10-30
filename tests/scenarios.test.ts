@@ -281,7 +281,7 @@ test("the shift change: the worn hat turns over at the next issuance, never mid-
   assert.deepEqual(after.envelope.claims.hat.teamIds, [NORTH_FLOOR]);
 });
 
-test("one identity is never two actors: a conflicting principal link is refused at both bootstrap layers", async () => {
+test("[A10] one identity is never two actors: a conflicting principal link is refused at both bootstrap layers", async () => {
   const base = {
     clock: fixedClock(1_700_000_000),
     signer: await webCryptoSigner("key-identity"),

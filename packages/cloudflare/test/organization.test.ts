@@ -328,7 +328,7 @@ describe("OrganizationAuthority", () => {
     expect(crew.body.value?.disabled).toBe(true);
   });
 
-  it("refuses a principal link that would make one identity two actors", async () => {
+  it("[A10] refuses a principal link that would make one identity two actors", async () => {
     const stub = organization("org-links");
     const first = await call(stub, "POST", "/bootstrap", {
       organizationId: "org/links",

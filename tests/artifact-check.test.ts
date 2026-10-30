@@ -114,7 +114,7 @@ for (const [label, config, expected] of [
   });
 }
 
-test("a matching annotated tag passes; a mismatched one is refused", () => {
+test("[P6] a matching annotated tag passes; a mismatched one is refused", () => {
   const root = repo();
   try {
     git(root, "init", "-q");

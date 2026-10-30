@@ -15,7 +15,7 @@ import {
   type FailureKind,
 } from "../src/contract.ts";
 
-test("the failure taxonomy is closed at nine kinds", () => {
+test("[A4] the failure taxonomy is closed at nine kinds", () => {
   // Record<FailureKind, true> makes this a compile-time exhaustiveness pin:
   // a tenth kind fails typecheck here — the interface-version change A4
   // demands — before any runtime assertion matters.
@@ -33,7 +33,7 @@ test("the failure taxonomy is closed at nine kinds", () => {
   assert.equal(Object.keys(taxonomy).length, 9);
 });
 
-test("canonicalJson is independent of key order, recursively", () => {
+test("[E2] canonicalJson is independent of key order, recursively", () => {
   const a = canonicalJson({ b: 1, a: { d: [3, { z: null, c: true }], e: "x" } });
   const b = canonicalJson({ a: { e: "x", d: [3, { z: null, c: true }] }, b: 1 });
   assert.equal(a, b);
@@ -63,7 +63,7 @@ test("canonicalJson escapes controls and orders non-ASCII by code unit", () => {
   assert.equal(text, '{"a":"line\\n\\u0001","é":1,"😀":true}');
 });
 
-test("the interface version names the call surface, not the wire format", () => {
+test("[E8] the interface version names the call surface, not the wire format", () => {
   // 1.x callers used the two-optional grant shape; 2 carries GrantTarget.
   // Envelope readability does not move with it — claims record the issuing
   // interface as provenance, and the format pair above gates.

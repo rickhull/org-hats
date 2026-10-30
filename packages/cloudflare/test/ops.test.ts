@@ -117,7 +117,7 @@ describe("typed ops routes", () => {
     expect(opStatus.value["grants"]).toBe(1);
   });
 
-  it("exports canonical state and restores it into fresh coordinators", async () => {
+  it("[A2] exports canonical state and restores it into fresh coordinators", async () => {
     const operationExport = await ops(`/ops/export?coordinator=operation&id=${OP}`);
     expect(operationExport.status).toBe(200);
     const operationSnapshot = await operationExport.json() as {
@@ -228,7 +228,7 @@ describe("typed ops routes", () => {
     expect(complete.value?.["routingFactsComplete"]).toBe(true);
   });
 
-  it("lists and binds principal links, refusing a conflicting actor", async () => {
+  it("[A10] lists and binds principal links, refusing a conflicting actor", async () => {
     const organizationId = "org-ops-links";
     expect((await jsonPost("/ops/organization/bootstrap", orgBootstrap(organizationId))).status).toBe(200);
 

@@ -375,7 +375,7 @@ const applyTwice = async (
   assert.ok(retry.ok && !retry.receipt.applied, `${body.kind}: retry claims the result`);
 };
 
-test("duplicate commands: every mutating command claims its key", async () => {
+test("[A8] duplicate commands: every mutating command claims its key", async () => {
   const len = async (engine: Awaited<ReturnType<typeof setup>>) => envelopeAuth((await issue(engine, CONFORMANCE_PRINCIPALS.len)).envelope);
   const dana = async (engine: Awaited<ReturnType<typeof setup>>) => envelopeAuth((await issue(engine, CONFORMANCE_PRINCIPALS.dana)).envelope);
   const marco = async (engine: Awaited<ReturnType<typeof setup>>) => envelopeAuth((await issue(engine, CONFORMANCE_PRINCIPALS.marco)).envelope);
@@ -490,7 +490,7 @@ test("idempotency misuse: the same key with a different payload is invalid", asy
   assert.ok(!changed.ok && changed.failure.kind === "invalid-command");
 });
 
-test("partial workflow failure: retries converge, replays are no-ops, and state stays visible", async () => {
+test("[A2] partial workflow failure: retries converge, replays are no-ops, and state stays visible", async () => {
   const engine = await setup(2);
   const admin = envelopeAuth((await issue(engine, CONFORMANCE_PRINCIPALS.len)).envelope);
   const invite = await command(

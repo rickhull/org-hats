@@ -41,6 +41,26 @@ Pre-push and the Codeberg per-push CI run the portable gate. The workerd
 suite runs in ring 2, `pnpm verify`, `bin/release`, and the GitHub mirror job;
 it is not part of per-push Codeberg CI.
 
+## Spec witnesses
+
+Every invariant in `specs/` has at least one named witness. A witness is:
+
+- a test title carrying the id in brackets, `test("[A7] …")` or
+  `it("[A13] …")`;
+- a conformance case, static gate, or review claim in
+  `tests/spec-witnesses.ts`; or
+- the same tag in a `packages/cloudflare/test/*.test.ts` title.
+
+`tests/specs.test.ts` is the gate. It parses `### A#`/`E#`/`P#` headings and
+tagged titles, checks the supplementary table, and fails on an unwitnessed
+spec, an unknown tag, a stale static/review path, or an integration-only id
+without a reason. `SPEC_REPORT=1 node --test tests/specs.test.ts` prints the
+matrix on success.
+
+The tiers are **P** portable (`tests/spec-*.test.ts`), **S** in-memory smoke,
+**I1/I2/I3** workerd, **X** static/tool, and **R** review. Tag the test that
+would fail if the invariant broke; do not tag for coverage.
+
 ## Smoke
 
 `pnpm test:smoke` (`pnpm typecheck && pnpm test`, about five seconds) is the
@@ -93,6 +113,8 @@ public types fails the gate instead of failing at runtime.
 - `teams.test.ts` — request/admit, active-only projection, authorization
   split, and retirement's grant and refresh effects.
 - `conformance.test.ts` — runs the public inventory from `src/conformance.ts`.
+- `specs.test.ts` — the spec-witness gate: every published invariant has a
+  tagged test or a table witness, and every witness names a live spec.
 - `docs.test.ts` — the documentation fence: links resolve, every cited
   case id ships, every case has an inventory row with its title verbatim,
   and every twin id cited in the story docs exists in a fixture.

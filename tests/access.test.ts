@@ -41,11 +41,11 @@ const envelopeOf = (claims: AccessEnvelopeClaimsV1, signature = vectors.signatur
 const key = await ed25519VerifyKey(vectors.keyId, vectors.publicKeyBase64);
 const keys = new Map<string, VerifyKey>([[key.keyId, key]]);
 
-test("vector: the canonical serialization is byte-exact", () => {
+test("[E2] vector: the canonical serialization is byte-exact", () => {
   assert.equal(canonicalJson(asJson(vectors.claims)), vectors.canonical);
 });
 
-test("vector: the committed signature verifies with the committed public key", async () => {
+test("[E1] vector: the committed signature verifies with the committed public key", async () => {
   const result = await verify(envelopeOf(vectors.claims), keys, { now: vectors.claims.iat + 1 });
   assert.ok(!isFailed(result), "expected success");
 });
@@ -79,14 +79,14 @@ test("an unknown key id cannot verify", async () => {
   assert.match(result.detail ?? "", /unknown key id/);
 });
 
-test("expiry: the envelope dies at exp, verified one second before", async () => {
+test("[E7] expiry: the envelope dies at exp, verified one second before", async () => {
   const at = vectors.claims.exp - 1;
   assert.ok(!isFailed(await verify(envelopeOf(vectors.claims), keys, { now: at })));
   const dead = failureOf(await verify(envelopeOf(vectors.claims), keys, { now: vectors.claims.exp }));
   assert.equal(dead.kind, "expired");
 });
 
-test("verification fails closed in a fixed order when faults combine", async () => {
+test("[E4] verification fails closed in a fixed order when faults combine", async () => {
   // versions before the signature: a wrong version with a forged signature
   // is a version failure, not a signature failure
   const wrongVersionForged = {
@@ -115,7 +115,7 @@ test("verification fails closed in a fixed order when faults combine", async () 
   );
 });
 
-test("wrong versions fail closed, never reinterpreted", async () => {
+test("[E8] wrong versions fail closed, never reinterpreted", async () => {
   const now = vectors.claims.iat + 1;
   const badFormat = { ...envelopeOf(vectors.claims), format: "something.else" as never };
   assert.equal(failureOf(await verify(badFormat, keys, { now })).kind, "wrong-interface-version");
@@ -131,7 +131,7 @@ test("wrong versions fail closed, never reinterpreted", async () => {
   assert.match(disagreement.detail ?? "", /disagree on the version/);
 });
 
-test("the issuing interface version is provenance, not a gate on reading", async () => {
+test("[E8] the issuing interface version is provenance, not a gate on reading", async () => {
   // An envelope outlives the call signatures that produced it. The claims
   // record which runtime interface issued them, but a verifier must not
   // reject live sessions because the issuer has since moved to a new command
@@ -161,7 +161,7 @@ test("the issuing interface version is provenance, not a gate on reading", async
   assert.equal(verified.claims.interfaceVersion, differentInterface, "and is reported unchanged");
 });
 
-test("an unrecognized optional claim is additive and does not gate reading", async () => {
+test("[E3] an unrecognized optional claim is additive and does not gate reading", async () => {
   // E3: claims grow additively within a format version. A newer issuer may
   // carry a claim an older verifier does not know; canonical serialization
   // covers it, and the verifier reads the claims it does know.
@@ -197,7 +197,7 @@ test("wrong-binding: another operation, or a site the envelope is not admitted t
   assert.ok(!isFailed(rightSite));
 });
 
-test("key rotation: two keys live during rollout, then the old retires", async () => {
+test("[E5] key rotation: two keys live during rollout, then the old retires", async () => {
   const claims = vectors.claims;
   const now = claims.iat + 1;
 
@@ -223,7 +223,7 @@ test("key rotation: two keys live during rollout, then the old retires", async (
   assert.ok(!isFailed(await verify(newEnvelope, newOnly, { now })));
 });
 
-test("neutral access: a host maps product facts onto neutral targets", async () => {
+test("[A5] neutral access: a host maps product facts onto neutral targets", async () => {
   const { access } = successOf(await verify(envelopeOf(vectors.claims), keys, { now: vectors.claims.iat + 1 }));
   // the worn hat carries the action and reaches its team
   assert.equal(access.mayAct("resolve", { kind: "team", teamId: "team-2e8c64b9" }), true);

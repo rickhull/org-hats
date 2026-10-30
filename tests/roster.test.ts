@@ -119,7 +119,7 @@ const create = (actor: string, displayName?: string) =>
     ...(displayName === undefined ? {} : { displayName }),
   });
 
-test("create-actor adds an enabled, unlinked actor the operation projection sees", async () => {
+test("[A10] create-actor adds an enabled, unlinked actor the operation projection sees", async () => {
   const { engine } = await setup();
   const result = okOf(await engine.runtime.command(cmd(create("actor-new", "New Person"), fresh(ADMIN_EVIDENCE), "create-1")));
   assert.equal(result.receipt.applied, true);
@@ -160,7 +160,7 @@ test("create-actor validates the caller-supplied id and refuses an envelope", as
   assert.match(failureOf(viaEnvelope).detail ?? "", /fresh evidence/);
 });
 
-test("only an administrator of that organization may change its roster", async () => {
+test("[A9] only an administrator of that organization may change its roster", async () => {
   const { engine } = await setup();
   const nonAdmin = await engine.runtime.command(cmd(create("actor-non-admin"), fresh(TARGET_EVIDENCE), "create-non-admin"));
   assert.equal(failureOf(nonAdmin).kind, "denied");
@@ -206,7 +206,7 @@ test("update-actor sets, clears, and refuses an empty name", async () => {
   assert.equal(failureOf(unknown).kind, "invalid-command");
 });
 
-test("appointment grants standing; disabled actors cannot be appointed", async () => {
+test("[A9] appointment grants standing; disabled actors cannot be appointed", async () => {
   const { engine } = await setup();
   // TARGET is linked but not an administrator
   assert.equal(

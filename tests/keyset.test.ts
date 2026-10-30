@@ -81,7 +81,7 @@ test("duplicate key ids are refused", () => {
   assert.throws(() => serializeVerifyKeySet([material, material]), /duplicate keyId/);
 });
 
-test("malformed JSON, format, version, algorithm, and key material fail closed", () => {
+test("[P9][E5] malformed JSON, format, version, algorithm, and key material fail closed", () => {
   assert.throws(() => parseVerifyKeySet("not json"), /invalid JSON/);
   assert.throws(() => parseVerifyKeySet(JSON.stringify({ format: "other", v: 1, keys: [material] })), /format/);
   assert.throws(() => parseVerifyKeySet(JSON.stringify({ format: VERIFY_KEY_SET_FORMAT, v: 2, keys: [material] })), /version/);

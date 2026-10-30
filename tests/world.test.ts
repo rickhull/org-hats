@@ -34,7 +34,7 @@ const ownWorld = (): WorldDefinition => ({
   },
 });
 
-test("defineWorld accepts a coherent own world", () => {
+test("[P10] defineWorld accepts a coherent own world", () => {
   const world = defineWorld(ownWorld());
   assert.equal(world.name, "own");
   assert.equal(world.snapshot.teams.length, 1);
@@ -52,7 +52,7 @@ test("defineWorld refuses a snapshot whose grant names an unknown team", () => {
   );
 });
 
-test("defineWorld refuses an invalid policy bundle", () => {
+test("[P9][P10] defineWorld refuses an invalid policy bundle", () => {
   const definition = ownWorld();
   assert.throws(
     () =>

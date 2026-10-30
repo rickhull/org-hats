@@ -107,7 +107,7 @@ const drain = async (stub: DurableObjectStub) =>
   call<{ delivered: number; pending: number }>(stub, "POST", "/drain");
 
 describe("OperationAuthority", () => {
-  it("stores and exports routing facts, and replaces them as a full set", async () => {
+  it("[A12] stores and exports routing facts, and replaces them as a full set", async () => {
     const current = world("routing-facts");
     await bootstrapOrganization(current);
     const bootstrapped = await call(current.op, "POST", "/bootstrap", routingBootstrap(current.opId));
@@ -293,7 +293,7 @@ describe("OperationAuthority", () => {
     expect(retry.body.value?.applied).toBe(false);
   });
 
-  it("retries a delivery through the alarm when the organization is not ready", async () => {
+  it("[A2] retries a delivery through the alarm when the organization is not ready", async () => {
     const current = world("retry");
     await bootstrapOperation(current);
     await invite(current, "invite-retry");
@@ -432,7 +432,7 @@ describe("OperationAuthority", () => {
     expect(records.find((record) => record.handle_hash === "hash-1")?.revoked).toBe(1);
   });
 
-  it("rotates one handle at most once under concurrent refresh", async () => {
+  it("[A7] rotates one handle at most once under concurrent refresh", async () => {
     const current = world("refresh-race");
     await bootstrapOrganization(current);
     await bootstrapOperation(current, true);
@@ -455,7 +455,7 @@ describe("OperationAuthority", () => {
     expect(results.find((result) => !result.body.ok)?.body.failure?.kind).toBe("unauthenticated");
   });
 
-  it("carries actor-disable from organization authority to operation refresh records", async () => {
+  it("[A7] carries actor-disable from organization authority to operation refresh records", async () => {
     const current = world("disable-flow");
     await bootstrapOrganization(current);
     await bootstrapOperation(current);
@@ -563,7 +563,7 @@ describe("OperationAuthority", () => {
     expect(refreshed.body.value?.refresh.kind).toBe("rotated");
   });
 
-  it("requests, admits, renames, and retires a team; retirement revokes its grants", async () => {
+  it("[A17] requests, admits, renames, and retires a team; retirement revokes its grants", async () => {
     const current = world("teams");
     await bootstrapOrganization(current);
     await bootstrapOperation(current, true);

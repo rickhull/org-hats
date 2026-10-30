@@ -59,7 +59,7 @@ const conformanceOrganizationIds = (): readonly string[] => [...new Set(
 )];
 
 describe("the Cloudflare runtime's cross-coordinator rules", () => {
-  it("fails refresh after unlink even when the revocation outbox has not drained", async () => {
+  it("[A13] fails refresh after unlink even when the revocation outbox has not drained", async () => {
     const world = await createCloudflareConformanceWorld(env);
     const dana = CONFORMANCE_PRINCIPALS.dana;
     const issued = await world.runtime.accessFromEvidence({
@@ -85,7 +85,7 @@ describe("the Cloudflare runtime's cross-coordinator rules", () => {
     if (isFailed(refreshed)) expect(refreshed.failure.kind).toBe("unauthenticated");
   }, 30_000);
 
-  it("serializes one provider subject across concurrent organization claims", async () => {
+  it("[A10] serializes one provider subject across concurrent organization claims", async () => {
     const firstId = "org-activation-race-a";
     const secondId = "org-activation-race-b";
     for (const organizationId of [firstId, secondId]) {

@@ -52,7 +52,7 @@ test("the twins pass invariantProblems unchanged", () => {
   assert.deepEqual(invariantProblems(FESTIVAL.snapshot, FESTIVAL.policy), []);
 });
 
-test("routing facts are complete, unique, and valid labels", () => {
+test("[A12] routing facts are complete, unique, and valid labels", () => {
   const base = PROFESSIONAL_OPERATION.snapshot;
   const operation = base.operations[0]!;
   const problems = (snapshot: Snapshot): string => invariantProblems(snapshot, PROFESSIONAL_OPERATION.policy).join("; ");

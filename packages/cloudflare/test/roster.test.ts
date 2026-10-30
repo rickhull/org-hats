@@ -237,7 +237,7 @@ describe("the org-actor projection", () => {
     expect(refused.body.failure?.kind).toBe("not-admitted");
   });
 
-  it("is load-bearing: refresh denies a disabled actor whose disable message was lost", async () => {
+  it("[A13] is load-bearing: refresh denies a disabled actor whose disable message was lost", async () => {
     const current = world("roster-refresh");
     await participate(current);
 
