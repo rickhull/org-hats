@@ -11,6 +11,12 @@ on:
   push:
   workflow_dispatch:
 
+# One witness per ref: a newer push supersedes its queued or running run
+# instead of stacking on the shared pool (docs/forgejo_actions.md).
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: codeberg-small
