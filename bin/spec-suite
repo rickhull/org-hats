@@ -1,0 +1,38 @@
+#!/usr/bin/env node
+// Print the test files a spec suite selects, one per line, for command
+// substitution: `node --test $(bin/spec-suite smoke)`. The suites are views
+// over witness traits (tests/spec-index.ts), not rings — `pnpm check` and
+// `pnpm check:cloudflare` remain the gates.
+//
+//   bin/spec-suite <unit|smoke|integration|static> [--from <dir>]
+//
+// `--from <dir>` re-relativizes the paths against <dir>, so the workerd
+// package can run its vitest selection from its own directory. Notes about
+// selections the suite names but does not run go to stderr; a suite that
+// selects nothing exits nonzero.
+
+import { join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { suiteSelection, SPEC_SUITES } from "../tests/spec-index.ts";
+
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
+
+const args = process.argv.slice(2);
+const name = args[0];
+const fromFlag = args.indexOf("--from");
+const from = fromFlag !== -1 ? args[fromFlag + 1] : undefined;
+
+if (name === undefined || !(name in SPEC_SUITES) || (fromFlag !== -1 && from === undefined)) {
+  const suites = Object.keys(SPEC_SUITES).join(", ");
+  console.error(`usage: bin/spec-suite <${suites}> [--from <dir>]`);
+  process.exit(2);
+}
+
+const selection = suiteSelection(name);
+for (const note of selection.notes) {
+  console.error(`# ${name}: ${note} (named, not run)`);
+}
+for (const file of selection.files) {
+  console.log(from === undefined ? file : relative(resolve(ROOT, from), join(ROOT, file)));
+}

@@ -68,6 +68,29 @@ The tiers are **P** portable (`tests/spec-*.test.ts`), **S** in-memory smoke,
 **I1/I2/I3** workerd, **X** static/tool, and **R** review. Tag the test that
 would fail if the invariant broke; do not tag for coverage.
 
+### Spec suites
+
+Witness traits also select focused loops — views over the witness index, not
+rings; `pnpm check` and `pnpm check:cloudflare` remain the gates:
+
+- `pnpm spec:unit` — unit witnesses; today the gate file executing the unit
+  blocks. Pure-function layers witnessed from S-tier files join when
+  `tests/spec-*.test.ts` files exist.
+- `pnpm spec:smoke` — the in-memory domain suites, the conformance
+  inventory, and the portable executable blocks.
+- `pnpm spec:integration` — the workerd files carrying tagged witnesses
+  (vitest, inside the Cloudflare package).
+- `pnpm spec:static` — the runnable side of the static witnesses (the tool
+  and docs fences); commands and review documents it names but does not
+  run are printed to stderr by the selector.
+
+`bin/spec-suite <name>` (`tests/spec-index.ts`) prints a suite's files from
+the same discovery the gate uses, so the index and the selectors cannot
+drift. Traits come from the tier (`P→unit`, `S→smoke`, `I1/I2→integration`,
+`I3→concurrency`, `X→static`, `R→review`) or, for executable blocks, from
+the fence info string, where `portable` names the ring, not a suite. A
+suite that selects nothing or mixes node and vitest files fails closed.
+
 ## Smoke
 
 `pnpm test:smoke` (`pnpm typecheck && pnpm test`, about five seconds) is the
@@ -122,9 +145,11 @@ public types fails the gate instead of failing at runtime.
 - `conformance.test.ts` — runs the public inventory from `src/conformance.ts`.
 - `specs.test.ts` — the spec-witness gate: every published invariant has an
   executable block, a tagged test, or a table witness, and every witness
-  names a live spec.
+  names a live spec; every spec suite resolves to files that exist.
 - `spec-runtime.ts` — the injected harness for portable `spec` blocks; it
   calls the public runtime and does not reimplement policy.
+- `spec-index.ts` — discovery shared by the gate and `bin/spec-suite`: spec
+  headings, blocks, tagged titles, and the tier→trait suite selection.
 - `docs.test.ts` — the documentation fence: links resolve, every cited
   case id ships, every case has an inventory row with its title verbatim,
   and every twin id cited in the story docs exists in a fixture.

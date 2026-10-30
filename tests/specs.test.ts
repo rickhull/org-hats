@@ -4,41 +4,31 @@
 // this gate makes an orphaned invariant or a stale tag fail loudly.
 //
 // Run with `SPEC_REPORT=1 node --test tests/specs.test.ts` to print the
-// matrix on success.
+// matrix on success. Discovery lives in `tests/spec-index.ts`, shared with
+// `bin/spec-suite`, so the index and the suite selectors cannot drift.
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { CONFORMANCE_CASES } from "../src/conformance.ts";
 import { createSpecHarness, type SpecHarness } from "./spec-runtime.ts";
 import {
-  INTEGRATION_ONLY,
-  SUPPLEMENTARY_WITNESSES,
+  readSpecs,
+  SPEC_SUITES,
+  suiteSelection,
+  taggedTitles,
+  tierOf,
+  TRAITS,
   type SpecId,
+  type SuiteName,
   type Tier,
-} from "./spec-witnesses.ts";
+} from "./spec-index.ts";
+import { INTEGRATION_ONLY, SUPPLEMENTARY_WITNESSES } from "./spec-witnesses.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const SPECS = join(ROOT, "specs");
-const TESTS = join(ROOT, "tests");
-const WORKERD_TESTS = join(ROOT, "packages", "cloudflare", "test");
-
-interface SpecEntry {
-  readonly id: SpecId;
-  readonly title: string;
-  readonly file: string;
-}
-
-interface SpecBlock {
-  readonly id: SpecId;
-  readonly file: string;
-  readonly line: number;
-  readonly traits: readonly string[];
-  readonly code: string;
-}
 
 interface Witness {
   readonly id: SpecId;
@@ -47,102 +37,6 @@ interface Witness {
   readonly label: string;
   readonly executed?: boolean;
 }
-
-const rel = (path: string): string => relative(ROOT, path).split(sep).join("/");
-
-const walk = (dir: string): string[] => {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === "node_modules") continue;
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...walk(full));
-    else out.push(full);
-  }
-  return out;
-};
-
-const readSpecs = (): {
-  entries: Map<SpecId, SpecEntry>;
-  blocks: SpecBlock[];
-  problems: string[];
-} => {
-  const entries = new Map<SpecId, SpecEntry>();
-  const blocks: SpecBlock[] = [];
-  const problems: string[] = [];
-  for (const name of readdirSync(SPECS).filter((entry) => entry.endsWith(".md")).sort()) {
-    const file = `specs/${name}`;
-    const source = readFileSync(join(SPECS, name), "utf8");
-    const lines = source.split(/\r?\n/);
-    lines.forEach((line, index) => {
-      if (!line.startsWith("### ")) return;
-      const match = /^### ([AEP]\d+)\s+—\s+(.+)$/.exec(line);
-      if (match === null) {
-        problems.push(`${file}:${index + 1}: unparseable spec heading`);
-        return;
-      }
-      const id = match[1] as SpecId;
-      if (entries.has(id)) {
-        problems.push(`${file}:${index + 1}: duplicate spec id ${id}`);
-        return;
-      }
-      entries.set(id, { id, title: match[2] ?? "", file });
-    });
-    for (const match of source.matchAll(SPEC_BLOCK)) {
-      const id = match[1] as SpecId;
-      const info = match[2] ?? "";
-      const traits = (/(?:^|\s)traits=([^\s]+)/.exec(info)?.[1] ?? "")
-        .split(",")
-        .filter((trait) => trait.length > 0);
-      blocks.push({
-        id,
-        file,
-        line: source.slice(0, match.index ?? 0).split("\n").length,
-        traits,
-        code: match[3] ?? "",
-      });
-    }
-  }
-  return { entries, blocks, problems };
-};
-
-const TEST_TITLE = /\b(?:test|it)\(\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|`([^`]*)`)/g;
-const TAG = /\[([AEP]\d+)\]/g;
-const SPEC_BLOCK = /^```[^\n]*\bspec=([AEP]\d+)\b([^\n]*)\n([\s\S]*?)^```[ \t]*$/gm;
-const TRAITS = new Set(["portable", "unit", "smoke", "integration", "concurrency", "static", "review"]);
-
-const STATIC_TEST_FILES = new Set([
-  "tests/docs.test.ts",
-  "tests/types.test.ts",
-  "tests/release-tools.test.ts",
-  "tests/artifact-check.test.ts",
-  "tests/ci-run.test.ts",
-  "tests/gate-cache.test.ts",
-  "tests/tooling-policy.test.ts",
-  "tests/git-guards.test.ts",
-]);
-
-// The workerd suites are split in the plan; the gate needs only the ring, and
-// these are the two boundaries a tagged witness can come from today.
-const WORKERD_TIERS: Readonly<Record<string, Tier>> = {
-  "packages/cloudflare/test/operation.test.ts": "I2",
-  "packages/cloudflare/test/organization.test.ts": "I1",
-  "packages/cloudflare/test/ops.test.ts": "I2",
-  "packages/cloudflare/test/keys.test.ts": "I1",
-  "packages/cloudflare/test/exchange.test.ts": "I1",
-  "packages/cloudflare/test/exchange-devidp.test.ts": "I1",
-  "packages/cloudflare/test/roster.test.ts": "I2",
-  "packages/cloudflare/test/runtime.test.ts": "I2",
-  "packages/cloudflare/test/context.test.ts": "I2",
-  "packages/cloudflare/test/conformance.test.ts": "I2",
-  "packages/cloudflare/test/binding-smoke.test.ts": "I2",
-};
-
-const tierOf = (file: string): Tier => {
-  if (file.startsWith("packages/cloudflare/test/")) return WORKERD_TIERS[file] ?? "I2";
-  if (/^tests\/spec-.*\.test\.ts$/.test(file)) return "P";
-  if (STATIC_TEST_FILES.has(file)) return "X";
-  return "S";
-};
 
 test("every spec has a witness and every witness names a spec", async () => {
   const { entries: specs, blocks, problems: specProblems } = readSpecs();
@@ -155,16 +49,10 @@ test("every spec has a witness and every witness names a spec", async () => {
   };
 
   // Tagged test titles are the primary witnesses.
-  for (const file of [...walk(TESTS), ...walk(WORKERD_TESTS)].filter((path) => path.endsWith(".test.ts"))) {
-    const relFile = rel(file);
-    const source = readFileSync(file, "utf8");
-    for (const title of source.matchAll(TEST_TITLE)) {
-      const text = title[1] ?? title[2] ?? title[3] ?? "";
-      const tags = new Set([...text.matchAll(TAG)].map((match) => match[1] as SpecId));
-      for (const id of tags) {
-        if (!specs.has(id)) problems.push(`${relFile}: test tag ${id} names no spec: ${text}`);
-        add({ id, kind: "test", tier: tierOf(relFile), label: `${relFile}: ${text}` });
-      }
+  for (const { file, title, tags } of taggedTitles()) {
+    for (const id of tags) {
+      if (!specs.has(id)) problems.push(`${file}: test tag ${id} names no spec: ${title}`);
+      add({ id, kind: "test", tier: tierOf(file), label: `${file}: ${title}` });
     }
   }
 
@@ -209,7 +97,7 @@ test("every spec has a witness and every witness names a spec", async () => {
   }
 
   // Supplementary witnesses cover conformance cases, static gates, and the
-  // two claims that are reviewed rather than executed.
+  // two claims that are reviewed rather than executed
   const cases = new Set(CONFORMANCE_CASES.map((entry) => entry.id));
   for (const witness of SUPPLEMENTARY_WITNESSES) {
     if (!specs.has(witness.id)) {
@@ -272,4 +160,23 @@ test("every spec has a witness and every witness names a spec", async () => {
   }
 
   assert.deepEqual(problems, [], problems.join("\n"));
+});
+
+test("every spec suite resolves to files that exist", () => {
+  // The selectors are views, not rings, but a view that points at a missing
+  // file is stale. `suiteSelection` fails closed on an empty or mixed-runner
+  // selection; this test adds the existence check.
+  for (const [name] of Object.entries(SPEC_SUITES) as readonly [SuiteName, ...unknown[]][]) {
+    const selection = suiteSelection(name);
+    assert.ok(selection.files.length > 0, `${name} selects nothing`);
+    for (const file of selection.files) {
+      assert.ok(existsSync(join(ROOT, file)), `suite ${name} selects a missing file: ${file}`);
+      const underWorkerd = file.startsWith("packages/cloudflare/");
+      assert.equal(
+        underWorkerd ? "vitest" : "node",
+        selection.runner,
+        `suite ${name} mislabels the runner for ${file}`,
+      );
+    }
+  }
 });
