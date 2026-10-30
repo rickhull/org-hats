@@ -247,8 +247,9 @@ export type CommandResult = {
 };
 /**
  * The external seam. Application callers receive use cases, not a grant
- * repository; implementors receive the same four methods whether they are
- * the in-memory adapter or the Cloudflare reference runtime.
+ * repository; implementors receive the same session, command, and activation
+ * methods whether they are the in-memory adapter or the Cloudflare reference
+ * runtime.
  */
 export interface AuthorityRuntime {
     /** Verified evidence → organization actor, participation, wearable hats,

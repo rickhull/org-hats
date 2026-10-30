@@ -6,17 +6,17 @@
 
 A person may work for an organization across several operations, sites, and teams, with different responsibilities in each. `org-hats` models that authority separately from login identity and issues signed **access envelopes** that other services can verify locally, without querying the authority database.
 
-It is **target-scoped RBAC with a signed bearer authorization projection**—not an identity provider, a general policy engine, or a Zanzibar-style relationship database.
+In the literature's terms, it is best read as **target-scoped RBAC with a signed bearer authorization projection**—not an identity provider, a general policy engine, or a Zanzibar-style relationship database.
 
 > **Core action rule:** An action is permitted when the **selected hat's role** carries that action **and** its grant reaches the target.
 >
-> **Important qualification:** The selected hat bounds `mayAct`, **not every form of authority**. Read, configuration, and member reach are separately computed from the union of wearable grants. Consumers must choose the appropriate accessor and should attribute consequential changes to the authority that permitted them.
+> **Important qualification:** The selected hat bounds `mayAct`, **not every form of authority**. Read reach is issuer-computed under the active read policy; configuration and member reach are issuer-computed over wearable grants. Consumers must choose the appropriate accessor. Hosts must keep their own attribution where it matters; audit facts name the actor, not the authorizing layer (see [Audit attribution](docs/authority_redesign.md#audit-attribution)).
 
 ## When to use it
 
 Consider `org-hats` if you need:
 
-- Actors belonging to distinct organizations, participating in distinct operations.
+- Multiple organizations participating in overlapping operations, with actors scoped to one organization.
 - Operation-local grants scoped to a site or team, with an explicitly selected acting capacity.
 - Authorization decisions in downstream services without a live authority lookup on each request.
 - A small, typed authority interface and a verifier that does not need organizational database access.
@@ -46,14 +46,15 @@ A grant is wearable only when it is not revoked, the actor is enabled, and the o
 
 ### Distinguish the authority layers
 
-| Question | Source of authority |
+| Accessor | Source of authority |
 | --- | --- |
 | `mayAct(action, target)` | Selected hat's role and target reach |
-| Readable organizations and teams | Issuer-computed read policy across wearable grants |
-| `mayConfigure(siteId)` | Issuer-computed configuration reach across wearable grants |
-| `teamReach()` | Issuer-computed member reach across wearable grants |
+| `readableOrganizationIds()` | Issuer-computed organization read reach under the active policy |
+| `readableTeamIds()` | Exceptional team ids only — a reached team whose organization is not already readable |
+| `mayConfigure(siteId)` | Issuer-computed configuration reach over wearable grants |
+| `teamReach()` | Issuer-computed member reach over wearable grants |
 
-**Do not infer from the selected hat that all other authority is limited to that hat.** An actor may be selected as an operator while also holding a separate administrative grant that contributes configuration reach. Hosts must use the accessor appropriate to the operation and maintain suitable audit attribution.
+**Do not infer from the selected hat that all other authority is limited to that hat.** An actor may wear one hat while another wearable grant contributes configuration reach. Hosts must use the accessor appropriate to the decision and keep their own attribution where it matters; audit facts name the actor, not the authorizing layer.
 
 ## Try the examples
 
@@ -83,10 +84,10 @@ The full verification gate checks the portable suites, type and import boundarie
 There is no package-registry publication. Pin a release tag (or, for stronger reproducibility, an exact commit). For example:
 
 ```sh
-pnpm add "git+https://codeberg.org/rickhull/org-hats.git#v3.0.0"
+pnpm add "git+https://codeberg.org/rickhull/org-hats.git#v3.3.0"
 ```
 
-The authority side exposes four calls:
+The authority side exposes four session and command calls, plus the three activation lifecycle calls:
 
 | Call | Purpose |
 | --- | --- |
@@ -94,8 +95,11 @@ The authority side exposes four calls:
 | `refresh` | Continue a session and report whether the handle was kept, rotated, or revoked |
 | `context` | Read presentation facts, not an authorization decision |
 | `command` | Execute typed, idempotent authority mutations |
+| `activationRequest` | Mint a return-once activation secret for an existing, unlinked actor |
+| `activationInspect` | Disclose only whether an activation secret is usable |
+| `activationAccept` | Bind verified evidence to the named actor and consume the activation |
 
-The consumer imports only the verifier:
+The consumer uses only the verifier. A verifier needs the `org-hats/access` package and the issuer's distributed `VerifyKeySet`; standard JWT/JWKS middleware will not verify these envelopes:
 
 ```ts
 import { isFailed, verify } from "org-hats/access";
@@ -112,32 +116,32 @@ const team = { kind: "team", teamId: "team-2e8c64b9" } as const;
 const allowed = result.access.mayAct("review", team);
 ```
 
-This is an illustrative local verification with an intentionally fixed time inside the token's validity window. In production, supply a trusted current time and validate the expected operation/site against the request context.
+This is an illustrative local verification with an intentionally fixed time inside the token's lifetime, before `exp`. In production, supply a trusted current time and validate the expected operation/site against the request context.
 
 See [publishing](docs/publishing.md), [Cloudflare deployment](docs/cloudflare.md), and [the tutorial](docs/tutorial.md).
 
 ## Security and trust boundaries
 
-An access envelope is **Ed25519-signed canonical JSON**, not a JWT. It contains the actor and operation binding, selected action authority, separately computed reach, issuance and expiry times, and version information. The verifier checks the signature, version, time window, and caller-supplied binding, then answers locally from signed claims.
+An access envelope is **Ed25519-signed canonical JSON**, not a JWT. It contains the actor and operation binding, selected action authority, separately computed reach, issuance and expiry times, and version information. The verifier checks the signature, version pair, expiry, and any caller-supplied operation or site binding, then answers locally from signed claims. `expectedOperationId` and `expectedSiteId` are optional; omitting them accepts any binding. There is no not-before check: `iat` is issuance time, not a validity start.
 
-**What this guarantees:** The envelope's claims were signed by a trusted issuer and are valid for the checked binding and time window.
+**What this guarantees:** The envelope's claims were signed by a key in the verifier's trusted set, have not expired, and match any operation or site binding the caller supplied.
 
 **What this does not guarantee:** That the issuer's policy or underlying data were correct; that the actor remains enabled after issuance; that the bearer is the original human; or that authentication is recent enough for a sensitive action. The host must protect bearer credentials and enforce its own authentication-assurance requirements.
 
-Revocation is **bounded, not instantaneous**. Existing envelopes may remain usable until `exp` (default lifetime: 900 seconds). Refresh rechecks authoritative actor state and fails closed when it cannot obtain the required state. A refresh racing with a disable may have read the pre-disable state and issue another bounded envelope. The specification does not promise a globally linearized disable/refresh boundary. See [authority invariants](specs/authority.md) and [envelope invariants](specs/envelope.md).
+Revocation is **bounded, not instantaneous**. Existing envelopes may remain usable until `exp` (default lifetime: 900 seconds). Refresh rechecks authoritative actor state and fails closed when it cannot obtain the required state. A refresh racing with a disable may have read the pre-disable state and issue one further bounded envelope; the next refresh observes the disable. The specification does not promise a globally linearized disable/refresh boundary. See [authority invariants](specs/authority.md) and [envelope invariants](specs/envelope.md).
 
 Authentication method and authentication time (`amr`, `auth_time`) are carried through refresh; issuing a fresh envelope **does not** constitute fresh authentication. Sensitive operations may require a fresh runtime authorization decision or step-up authentication.
 
-**Envelope evolution:** Older verifiers may ignore optional claims only when ignoring them cannot increase effective authority or bypass a required restriction. Security-significant changes require an explicitly compatible versioned rollout. See [envelope invariants](specs/envelope.md).
+**Envelope evolution:** A new optional claim may skip a version bump only when ignoring it cannot widen effective authority or weaken a required check. Security-significant changes require an explicitly compatible versioned rollout. See [envelope invariants](specs/envelope.md).
 
-The project does not yet publish a full threat model or independent security audit. See [security reporting](SECURITY.md).
+No formal threat model or independent security audit is published yet; see [Known gaps](#known-gaps) and [security reporting](SECURITY.md).
 
 ## Implementation and verification boundaries
 
 | Package | Responsibility |
 | --- | --- |
 | `org-hats` | Pure organizational model, policy vocabulary, reach and invariants |
-| `org-hats/authority` | Portable four-call runtime, in-memory engine, fixtures |
+| `org-hats/authority` | Portable authority runtime, in-memory engine, fixtures |
 | `org-hats/access` | Local verification and neutral access API |
 | `org-hats/conformance` | Executable `OH-*` public-interface conformance inventory |
 | `org-hats-cloudflare` | Reference runtime with SQLite-backed coordinators and service bindings |
@@ -151,13 +155,13 @@ The portable `src/` modules avoid Cloudflare imports and ambient runtime types. 
 | `org-hats` | 3.3.0 |
 | Authority interface | 3 |
 | Access envelope format | 1 |
-| Cloudflare runtime | Separate `0.x` series (`cloudflare-v*` tags); operation schema 5 |
+| Cloudflare runtime | 0.9.0 (`cloudflare-v*` tags); operation schema 5 |
 
-Interface and envelope versions advance independently. See [v2 migration](docs/migration-v2.md), [v3 migration](docs/migration-v3.md), and [publishing](docs/publishing.md). Codeberg is canonical; GitHub is a release mirror. Git tag immutability depends on repository governance; verify an exact commit or signed release where supply-chain reproducibility matters.
+Interface and envelope versions advance independently. See [v2 migration](docs/migration-v2.md), [v3 migration](docs/migration-v3.md), and [publishing](docs/publishing.md). Codeberg is canonical; GitHub is a release mirror. Git tag immutability depends on repository governance; verify an exact commit (and its `dist/`) where supply-chain reproducibility matters.
 
 ## Known gaps
 
-There is no AD/LDAP cutover runbook, formal policy-bundle authoring guide, published threat model, compromised-key incident runbook, performance benchmark, or documented deployment-cost estimate. These are **current limitations**, not promises of future features.
+There is no AD/LDAP bulk-import or phased-cutover runbook (the mapping guide is [From Active Directory and LDAP](docs/from_ldap.md)), formal policy-bundle authoring guide, published threat model, compromised-key incident runbook, performance benchmark, or documented deployment-cost estimate. These are **current limitations**, not promises of future features.
 
 ## Documentation
 

@@ -112,8 +112,8 @@ async function check() { show(await api("/demo/access", { envelope })); }
 
 
 /** The service-binding surface. A consumer holding this binding holds the
- * same four methods the in-memory engine implements, plus the runtime-only
- * provider-callback exchange. */
+ * same session, command, and activation methods the in-memory engine
+ * implements, plus the runtime-only provider-callback exchange. */
 export class AuthorityRuntimeEntrypoint extends WorkerEntrypoint<Env> implements AuthorityRuntime {
   activationRequest(input: ActivationRequestInput): Promise<ActivationRequestResult | Failed> {
     return runtime(this.env).then((value) => value.activationRequest(input));
