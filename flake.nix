@@ -51,6 +51,16 @@
         };
       });
 
-      formatter = forAllSystems (pkgs: pkgs.nixfmt);
+      # nix fmt passes no arguments, and nixfmt's bare invocation is
+      # deprecated upstream; the wrapper names the file instead.
+      formatter = forAllSystems (
+        pkgs:
+        pkgs.writeShellScriptBin "formatter" ''
+          if [ "$#" -eq 0 ]; then
+            set -- flake.nix
+          fi
+          exec ${pkgs.lib.getExe pkgs.nixfmt} "$@"
+        ''
+      );
     };
 }
