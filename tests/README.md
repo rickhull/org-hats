@@ -153,6 +153,10 @@ public types fails the gate instead of failing at runtime.
 - `docs.test.ts` — the documentation fence: links resolve, every cited
   case id ships, every case has an inventory row with its title verbatim,
   and every twin id cited in the story docs exists in a fixture.
+- `schema-parity.test.ts` — the schema/spec guard: every coordinator
+  table's CREATE TABLE columns equal its export spec, and every table is
+  exported or on a recorded allowance; fails naming the column and the
+  direction of the drift.
 - `generative.test.ts` — 100 seeded states, duplicate commands, partial
   failure and outbox replay.
 - `release-tools.test.ts` — the release-tag guard against throwaway

@@ -41,20 +41,17 @@ seam (A3), or merging the portable and Durable Object state models.
 
 Make drift fail before moving any code.
 
-1. **Schema/spec parity.** For every coordinator table, `PRAGMA table_info`
-   equals its export/restore column list. This is the gap that let
-   `teams.status` need edits in two places.
-2. **Command inventory.** Every `AuthorityCommand` kind resolves to exactly
+1. **Command inventory.** Every `AuthorityCommand` kind resolves to exactly
    one coordinator, one operation-binding rule, and one authorization mode
    (fresh, envelope, or either) plus its required standing; none consults the
    selected hat. The compiler proves switch exhaustiveness today; this makes
    the policy explicit.
-3. **Failure mapping.** Every closed `FailureKind` has a consumer/product
+2. **Failure mapping.** Every closed `FailureKind` has a consumer/product
    mapping in the example and a test that it is not dropped.
-4. **Restore matrix.** Organization and operation exports at each supported
+3. **Restore matrix.** Organization and operation exports at each supported
    schema restore; teams without status default active; older columns read
    null; an unsupported future version is refused.
-5. **Dead surface.** The ignored `admit.teamId` is documented as deprecated;
+4. **Dead surface.** The ignored `admit.teamId` is documented as deprecated;
    removal is an interface-bump item, not a quiet deletion.
 
 **Done when:** each guard is a test that fails on the drift it names.
