@@ -104,10 +104,19 @@ through A13's live organization read for a disable, and the revoked record
 otherwise — so the chain does not continue. Issuance always states the
 handle outcome; a host never infers session state.
 
+```js spec=A7 traits=portable,smoke
+// sam is the Harbor crew actor; the harness disables with the Harbor administrator.
+const s = await spec.world();
+const issued = await s.issue("sam");
+const disabled = await s.disable("sam");
+spec.expect(disabled.ok, "disable applies");
+spec.expectFailure(await s.refresh(issued), "unauthenticated", "the revoked handle is dead");
+```
+
 *Held by:* revoke/disable/participation-revoke paths in both runtimes;
 `OH-AUTH-04`, `OH-AUTH-05`, the participation cases; the A13 refresh gate;
 the Cloudflare refresh's transactional consume-and-install, with the
-concurrent-refresh case pinning one winner.
+concurrent-refresh case pinning one winner; the A7 executable example.
 *If it breaks:* a revoked actor keeps an endless session and the bounded
 revocation window of E7 becomes an unbounded one.
 

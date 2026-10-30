@@ -27,8 +27,9 @@ The split, one line each:
   enforcement is named. An invariant nothing enforces is a hope; write it
   in `plans/` instead.
 - Every id has a test-side witness. `tests/specs.test.ts` parses these
-  headings and the tagged tests; a new id without a witness fails the
-  portable ring. The convention and tiers are in `tests/README.md`.
+  headings, tagged tests, and executable `spec=` blocks; a new id without a
+  witness fails the portable ring. The convention and traits are in
+  `tests/README.md`.
 
 ## The files
 

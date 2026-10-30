@@ -13,6 +13,7 @@ import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { CONFORMANCE_CASES } from "../src/conformance.ts";
+import { createSpecHarness, type SpecHarness } from "./spec-runtime.ts";
 import {
   INTEGRATION_ONLY,
   SUPPLEMENTARY_WITNESSES,
@@ -31,11 +32,20 @@ interface SpecEntry {
   readonly file: string;
 }
 
+interface SpecBlock {
+  readonly id: SpecId;
+  readonly file: string;
+  readonly line: number;
+  readonly traits: readonly string[];
+  readonly code: string;
+}
+
 interface Witness {
   readonly id: SpecId;
-  readonly kind: "test" | "conformance" | "static" | "review";
+  readonly kind: "test" | "block" | "conformance" | "static" | "review";
   readonly tier: Tier;
   readonly label: string;
+  readonly executed?: boolean;
 }
 
 const rel = (path: string): string => relative(ROOT, path).split(sep).join("/");
@@ -51,12 +61,18 @@ const walk = (dir: string): string[] => {
   return out;
 };
 
-const readSpecs = (): { entries: Map<SpecId, SpecEntry>; problems: string[] } => {
+const readSpecs = (): {
+  entries: Map<SpecId, SpecEntry>;
+  blocks: SpecBlock[];
+  problems: string[];
+} => {
   const entries = new Map<SpecId, SpecEntry>();
+  const blocks: SpecBlock[] = [];
   const problems: string[] = [];
   for (const name of readdirSync(SPECS).filter((entry) => entry.endsWith(".md")).sort()) {
     const file = `specs/${name}`;
-    const lines = readFileSync(join(SPECS, name), "utf8").split(/\r?\n/);
+    const source = readFileSync(join(SPECS, name), "utf8");
+    const lines = source.split(/\r?\n/);
     lines.forEach((line, index) => {
       if (!line.startsWith("### ")) return;
       const match = /^### ([AEP]\d+)\s+—\s+(.+)$/.exec(line);
@@ -71,12 +87,28 @@ const readSpecs = (): { entries: Map<SpecId, SpecEntry>; problems: string[] } =>
       }
       entries.set(id, { id, title: match[2] ?? "", file });
     });
+    for (const match of source.matchAll(SPEC_BLOCK)) {
+      const id = match[1] as SpecId;
+      const info = match[2] ?? "";
+      const traits = (/(?:^|\s)traits=([^\s]+)/.exec(info)?.[1] ?? "")
+        .split(",")
+        .filter((trait) => trait.length > 0);
+      blocks.push({
+        id,
+        file,
+        line: source.slice(0, match.index ?? 0).split("\n").length,
+        traits,
+        code: match[3] ?? "",
+      });
+    }
   }
-  return { entries, problems };
+  return { entries, blocks, problems };
 };
 
 const TEST_TITLE = /\b(?:test|it)\(\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|`([^`]*)`)/g;
 const TAG = /\[([AEP]\d+)\]/g;
+const SPEC_BLOCK = /^```[^\n]*\bspec=([AEP]\d+)\b([^\n]*)\n([\s\S]*?)^```[ \t]*$/gm;
+const TRAITS = new Set(["portable", "unit", "smoke", "integration", "concurrency", "static", "review"]);
 
 const STATIC_TEST_FILES = new Set([
   "tests/docs.test.ts",
@@ -112,8 +144,8 @@ const tierOf = (file: string): Tier => {
   return "S";
 };
 
-test("every spec has a witness and every witness names a spec", () => {
-  const { entries: specs, problems: specProblems } = readSpecs();
+test("every spec has a witness and every witness names a spec", async () => {
+  const { entries: specs, blocks, problems: specProblems } = readSpecs();
   const problems = [...specProblems];
   const byId = new Map<SpecId, Witness[]>();
   const add = (witness: Witness): void => {
@@ -134,6 +166,46 @@ test("every spec has a witness and every witness names a spec", () => {
         add({ id, kind: "test", tier: tierOf(relFile), label: `${relFile}: ${text}` });
       }
     }
+  }
+
+  // Executable blocks are stronger than tags when they are portable. An
+  // integration block is recorded but not run here; it must not be reported
+  // as executable until the workerd runner exists.
+  for (const block of blocks) {
+    const where = `${block.file}:${block.line}`;
+    if (!specs.has(block.id)) problems.push(`${where}: spec block names no spec: ${block.id}`);
+    if (block.traits.length === 0) problems.push(`${where}: spec block ${block.id} has no traits`);
+    const unknownTraits = block.traits.filter((trait) => !TRAITS.has(trait));
+    if (unknownTraits.length > 0) {
+      problems.push(`${where}: spec block ${block.id} has unknown traits: ${unknownTraits.join(", ")}`);
+    }
+    const integration = block.traits.includes("integration") || block.traits.includes("concurrency");
+    const portable = block.traits.includes("portable");
+    if (portable && integration) problems.push(`${where}: spec block ${block.id} is both portable and integration`);
+    if (!portable && !integration) {
+      problems.push(`${where}: spec block ${block.id} needs a portable or integration trait`);
+    }
+    const shouldRun = portable && !integration;
+    let executed = false;
+    if (shouldRun) {
+      try {
+        const harness = await createSpecHarness();
+        const run = new Function("spec", `return (async () => {\n${block.code}\n})();`) as (
+          spec: SpecHarness,
+        ) => Promise<unknown>;
+        await run(harness);
+        executed = true;
+      } catch (error) {
+        problems.push(`${where}: spec block ${block.id} failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    add({
+      id: block.id,
+      kind: "block",
+      tier: shouldRun ? "P" : "I2",
+      label: `${where}: spec=${block.id} traits=${block.traits.join(",")}${executed ? " (executed)" : ""}`,
+      executed,
+    });
   }
 
   // Supplementary witnesses cover conformance cases, static gates, and the
