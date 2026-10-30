@@ -16,10 +16,10 @@ case "$1" in
   *) usage ;;
 esac
 
-# The fence names the tools the modes below actually invoke. The base
-# images on every backend ship grep; anything beyond node, pnpm, and git
-# belongs in the workflow's runner setup, not in this contract.
-for tool in node pnpm git; do
+# The fence names the tools the modes below actually invoke. node, pnpm,
+# and git come from the base image or the setup actions; rg is installed by
+# the workflows' pinned step (docs/forgejo_actions.md).
+for tool in node pnpm git rg; do
   command -v "$tool" >/dev/null 2>&1 || {
     printf 'ci: %s is required\n' "$tool" >&2
     exit 2

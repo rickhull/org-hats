@@ -61,6 +61,10 @@ public `org-hats` docs are normative for the seam.
   format 1 keeps reading.
 - [`publishing.md`](publishing.md) — canonical host, mirror, CI, the
   release ritual, and why deployment is the consuming host's act.
+- [`forgejo_actions.md`](forgejo_actions.md) — the Codeberg-hosted Forgejo
+  Actions witness: the runner environment and its real tool inventory, the
+  CI tool contract, the pinned ripgrep install and the fences' totality
+  flags, and the incident that fixed the fence.
 
 ## Audience guides
 

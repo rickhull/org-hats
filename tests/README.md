@@ -34,7 +34,7 @@ and the annotated-tag repair imposed by checkout actions.
 `pnpm test:tools` runs the release and harness suites alone
 (`release-tools.test.ts`, `gate-cache.test.ts`, `artifact-check.test.ts`,
 `tooling-policy.test.ts`, `git-guards.test.ts`, and `ci-run.test.ts`); they
-use Node, bash, and git from the project shell. Use it alone for a
+use Node, bash, git, and rg from the project shell. Use it alone for a
 fast loop; ring 1 runs them too.
 
 Pre-push and the Codeberg per-push CI run the portable gate. The workerd

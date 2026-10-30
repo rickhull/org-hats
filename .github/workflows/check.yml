@@ -39,6 +39,19 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Install ripgrep (pinned)
+        # The ubuntu-24.04 runner image does not ship rg (jq is listed,
+        # ripgrep is not) and bin/check's fences use it. These runners need
+        # sudo for /usr/local/bin; Codeberg's root jobs do not.
+        run: |
+          curl -fsSL -o /tmp/rg.tar.gz \
+            https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz
+          echo "33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c  /tmp/rg.tar.gz" | sha256sum -c -
+          tar xzf /tmp/rg.tar.gz -C /tmp
+          SUDO=""
+          [ -w /usr/local/bin ] || SUDO="sudo"
+          $SUDO install -m 0755 /tmp/ripgrep-15.2.0-x86_64-unknown-linux-musl/rg /usr/local/bin/rg
+
       - name: Portable CI contract
         run: CI=1 ci/run portable
 
@@ -60,6 +73,18 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+
+      - name: Install ripgrep (pinned)
+        # Same pinned install as the portable job: the runner image does not
+        # ship rg and the ci/run fence names it in both modes.
+        run: |
+          curl -fsSL -o /tmp/rg.tar.gz \
+            https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz
+          echo "33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c  /tmp/rg.tar.gz" | sha256sum -c -
+          tar xzf /tmp/rg.tar.gz -C /tmp
+          SUDO=""
+          [ -w /usr/local/bin ] || SUDO="sudo"
+          $SUDO install -m 0755 /tmp/ripgrep-15.2.0-x86_64-unknown-linux-musl/rg /usr/local/bin/rg
 
       - name: Cloudflare CI contract
         run: CI=1 ci/run cloudflare
