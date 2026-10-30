@@ -16,7 +16,10 @@ case "$1" in
   *) usage ;;
 esac
 
-for tool in node pnpm git rg jq python3; do
+# The fence names the tools the modes below actually invoke. The base
+# images on every backend ship grep; anything beyond node, pnpm, and git
+# belongs in the workflow's runner setup, not in this contract.
+for tool in node pnpm git; do
   command -v "$tool" >/dev/null 2>&1 || {
     printf 'ci: %s is required\n' "$tool" >&2
     exit 2

@@ -25,7 +25,7 @@ echo "ok — contract, authority, and access compile with types: []"
 
 echo
 echo "== fence: no cloudflare imports anywhere in src =="
-if rg -n -e "cloudflare:" -e "@cloudflare/" src; then
+if grep -Rn -e "cloudflare:" -e "@cloudflare/" src; then
   echo "fail — src must not import cloudflare" >&2
   exit 1
 fi
@@ -33,7 +33,7 @@ echo "ok — no cloudflare imports"
 
 echo
 echo "== fence: published declarations use runtime specifiers =="
-if rg -n -g '*.d.ts' 'from "\.{1,2}/[^"]+\.ts"' dist; then
+if grep -RIn --include='*.d.ts' -E 'from "\.{1,2}/[^"]+\.ts"' dist; then
   echo "fail — a .d.ts imports a .ts specifier; consumers without skipLibCheck break" >&2
   exit 1
 fi
