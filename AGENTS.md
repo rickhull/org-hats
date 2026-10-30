@@ -117,7 +117,10 @@ and only after the entry test passes; a failing test means no questionnaire.
   `direnv allow` once per clone.  Never install pnpm through corepack or npm.
 - `rg` searches recursively by default.  Never pass its short `-r` flag:
   it means output replacement, not recursion.  Spell a real replacement as
-  `--replace`; ordinary recursive searches need no recursion flag.
+  `--replace`; ordinary recursive searches need no recursion flag.  The
+  devshell's `rg` refuses the short flag outright, and
+  `tests/tooling-policy.test.ts` lints every committed invocation in
+  `bin/`, `ci/`, `.githooks/`, `tests/`, and `examples/`.
 - CI still uses the workflow's pinned pnpm and Node; the flake is the local
   development shell, not a second release path.  `flake.lock` is tracked and
   updated deliberately with the change that needs it.

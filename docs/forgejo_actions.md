@@ -140,6 +140,10 @@ short `-r` pitfall (see `AGENTS.md`) the moment they exist.
   `/api/v1/repos/<owner>/<repo>/actions/runs` (list; note the `id`) →
   `/actions/runs/<id>/jobs` (job id) → `/actions/jobs/<job id>/logs`,
   authenticated with the `fj` token.
+- After changing either workflow, validate the mirror with a one-shot
+  `gh workflow run check --ref main` on `rickhull/org-hats`: a release push
+  is the only other thing that triggers it, and the wrong time to learn a
+  step is broken.
 - A red remote with a green local ring means the environment changed:
   suspect the moving `act-latest` tag first, then a missing tool, then the
   runner fleet's status page referenced from

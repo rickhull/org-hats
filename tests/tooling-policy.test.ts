@@ -61,7 +61,7 @@ const filesUnder = (path: string): readonly string[] =>
   });
 
 test("operational scripts never use rg's short replacement flag", () => {
-  const files = ["bin", "ci", ".githooks"].flatMap((directory) => filesUnder(join(projectRoot, directory)));
+  const files = ["bin", "ci", ".githooks", "tests", "examples"].flatMap((directory) => filesUnder(join(projectRoot, directory)));
   for (const file of files) {
     const lines = readFileSync(file, "utf8").split("\n");
     for (const line of lines) {
