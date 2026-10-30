@@ -140,10 +140,15 @@ short `-r` pitfall (see `AGENTS.md`) the moment they exist.
   `/api/v1/repos/<owner>/<repo>/actions/runs` (list; note the `id`) →
   `/actions/runs/<id>/jobs` (job id) → `/actions/jobs/<job id>/logs`,
   authenticated with the `fj` token.
-- After changing either workflow, validate the mirror with a one-shot
-  `gh workflow run check --ref main` on `rickhull/org-hats`: a release push
-  is the only other thing that triggers it, and the wrong time to learn a
-  step is broken.
+- The mirror is release-driven: its workflows are the copy from the last
+  `bin/release --push`, so a dispatch validates that snapshot, not a
+  just-written change — a new workflow reaches GitHub only with the next
+  release. `gh workflow run check --ref main` is still the pre-release
+  canary: it fails in seconds when the mirror's tree can no longer satisfy
+  its own CI contract (runner-image drift, a fence change not yet
+  released). After a release, read the triggered mirror runs — the
+  `cloudflare-v0.9.0` release shipped with both mirror runs red and no one
+  watching, which is the gap this canary closes.
 - A red remote with a green local ring means the environment changed:
   suspect the moving `act-latest` tag first, then a missing tool, then the
   runner fleet's status page referenced from
