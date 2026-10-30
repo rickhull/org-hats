@@ -130,7 +130,10 @@ short `-r` pitfall (see `AGENTS.md`) the moment they exist.
   `cancel-in-progress`, so a burst of pushes collapses to one witness per
   ref — the last push's run — instead of stacking queued runs. What was
   considered and rejected: `codeberg-tiny` (its two-minute cap leaves no
-  headroom over the observed 1m44s worst run), `-lazy` labels (deferred
+  headroom: observed runs are 1m6s–1m44s on **two** CPUs, median ~1m15s,
+  and tiny is a one-CPU label — the median already flirts with the cap and
+  the worst case exceeds it; a cap-killed run is a red witness, worse than
+  a queued one), `-lazy` labels (deferred
   scheduling defeats push-blocking assurance), `paths` filters (Forgejo
   does not intend them combined with `tags`, and skipping pushes weakens
   the witness), and caching the 2.3 MB rg fetch (not worth a cache action).
