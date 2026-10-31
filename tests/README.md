@@ -157,6 +157,11 @@ public types fails the gate instead of failing at runtime.
   table's CREATE TABLE columns equal its export spec, and every table is
   exported or on a recorded allowance; fails naming the column and the
   direction of the drift.
+- `command-inventory.test.ts` — the command policy guard: one row per
+  `AuthorityCommand` kind (coordinator, operation binding, authorization
+  mode, required standing), verified against the type union, both dispatch
+  switches, the coordinators' standing checks, and a behavioral denial
+  matrix on the in-memory engine.
 - `generative.test.ts` — 100 seeded states, duplicate commands, partial
   failure and outbox replay.
 - `release-tools.test.ts` — the release-tag guard against throwaway
