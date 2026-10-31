@@ -34,6 +34,10 @@ Every production principal-link writer uses it, including bootstrap binds,
 manual operator binds, and activation acceptance. The target organization
 remains the durable owner of the link and audit.
 
+The coordinators' table declarations and additive migration chain live
+together in `src/schema/`; each step is named and tested against an older
+coordinator shape.
+
 Every mutation commits with its audit event, idempotency claim, and outbox
 rows inside one `transactionSync`. Work spanning the two coordinators is a
 durable outbox message with a visible partial state and an alarm-driven

@@ -23,6 +23,8 @@ pnpm --filter org-hats-cloudflare demo    # self-contained: bootstrap, dev login
   links, org administrators, invitations, sealed IdP configuration
 - `src/operation.ts` — `OperationAuthority`: sites, teams, grants,
   participation, policy, refresh records
+- `src/schema/` — the coordinator table declarations and the named
+  additive migration chain
 - `src/runtime.ts` — the portable `AuthorityRuntime` over both, plus
   `evidenceFromProviderCode`
 - `src/subject-guard.ts` — per-provider-subject serialization for every

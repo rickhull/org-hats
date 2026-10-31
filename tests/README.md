@@ -119,7 +119,7 @@ The portable suite is already smoke-sized: all of it runs in ~2.5 s, and a
 single file costs ~0.3 s of Node startup, so a subset saves pennies while
 dropping a domain — run it whole or not at all. The workerd side is the
 opposite trade: the vitest harness floor is ~4–5 s and marginal files are
-cheap (all thirteen files run in ~14 s; the conformance file alone, which
+cheap (all fifteen files run in ~28 s; the conformance file alone, which
 runs the full public inventory through the deployed coordinators, in
 ~12 s), so a workerd subset buys almost nothing. Either skip ring 2 or run
 it whole.
@@ -170,8 +170,8 @@ public types fails the gate instead of failing at runtime.
   case id ships, every case has an inventory row with its title verbatim,
   and every twin id cited in the story docs exists in a fixture.
 - `schema-parity.test.ts` — the schema/spec guard: every coordinator
-  table's CREATE TABLE columns equal its export spec, and every table is
-  exported or on a recorded allowance; fails naming the column and the
+  schema module's CREATE TABLE columns equal its export spec, and every table
+  is exported or on a recorded allowance; fails naming the column and the
   direction of the drift.
 - `command-inventory.test.ts` — the command policy guard: one row per
   `AuthorityCommand` kind (coordinator, operation binding, authorization

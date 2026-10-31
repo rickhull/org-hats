@@ -44,6 +44,7 @@ import {
   type ExportSnapshot,
   type StateRow,
 } from "./state";
+import { initializeOperationSchema } from "./schema/operation";
 import {
   rowActorId,
   rowFlag,
@@ -57,8 +58,6 @@ import {
 /** One operation authority. The object owns operation-local facts: sites,
  * teams, grants, participation, policy, refresh records, audit, claims, and
  * the outbox that carries invitations to organization authority. */
-const SCHEMA_VERSION = "5";
-
 /** How stale the org-actor projection may get before reconciliation pulls it
  * again. The push channel carries a change immediately; this interval bounds
  * only how long a *dropped* message can go unrepaired, so it is a
@@ -294,174 +293,7 @@ interface RoutingFactsInput {
 export class OperationAuthority extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.initialize();
-  }
-
-  private initialize(): void {
-    const sql = this.ctx.storage.sql;
-    sql.exec("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS operation (
-        operation_id TEXT PRIMARY KEY,
-        display_name TEXT,
-        slug TEXT,
-        bounded INTEGER NOT NULL DEFAULT 0,
-        policy_json TEXT NOT NULL,
-        admin_roles_json TEXT NOT NULL,
-        configure_actions_json TEXT NOT NULL,
-        envelope_lifetime_seconds INTEGER NOT NULL DEFAULT 900,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS sites (
-        site_id TEXT PRIMARY KEY,
-        display_name TEXT,
-        path TEXT,
-        aliases_json TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS teams (
-        team_id TEXT PRIMARY KEY,
-        site_id TEXT NOT NULL,
-        organization_id TEXT NOT NULL,
-        display_name TEXT,
-        status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('pending', 'active', 'retired')),
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS participations (
-        organization_id TEXT PRIMARY KEY,
-        status TEXT NOT NULL CHECK (status IN ('invited', 'accepted', 'active', 'revoked')),
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS invitations (
-        invitation_id TEXT PRIMARY KEY,
-        organization_id TEXT NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('invited', 'accepted', 'active', 'revoked')),
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )`,
-    );
-    // The org-actor projection: the authority-relevant tuple of a
-    // participating organization's roster, and nothing more. Display names,
-    // principal links, and provider configuration stay in the organization
-    // object, which is the only writer of any of it — this operation holds a
-    // copy solely so a decision it must make is a local, atomic read.
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS org_actors (
-        organization_id TEXT NOT NULL,
-        actor_id TEXT NOT NULL,
-        disabled INTEGER NOT NULL DEFAULT 0,
-        synced_at INTEGER NOT NULL,
-        PRIMARY KEY (organization_id, actor_id)
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS grants (
-        grant_id TEXT PRIMARY KEY,
-        organization_id TEXT NOT NULL,
-        actor_id TEXT NOT NULL,
-        role TEXT NOT NULL,
-        target_kind TEXT NOT NULL CHECK (target_kind IN ('team', 'site')),
-        team_id TEXT,
-        site_id TEXT,
-        is_primary INTEGER NOT NULL DEFAULT 0,
-        revoked INTEGER NOT NULL DEFAULT 0,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS refresh_records (
-        handle_hash TEXT PRIMARY KEY,
-        organization_id TEXT NOT NULL,
-        actor_id TEXT NOT NULL,
-        revoked INTEGER NOT NULL DEFAULT 0,
-        superseded INTEGER NOT NULL DEFAULT 0,
-        amr_json TEXT,
-        auth_time INTEGER,
-        created_at INTEGER NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS access_requests (
-        request_id TEXT PRIMARY KEY,
-        organization_id TEXT NOT NULL,
-        actor_id TEXT NOT NULL,
-        note TEXT,
-        created_at INTEGER NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS audit (
-        seq INTEGER PRIMARY KEY AUTOINCREMENT,
-        at INTEGER NOT NULL,
-        actor TEXT NOT NULL,
-        fact TEXT NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS claims (
-        idempotency_key TEXT PRIMARY KEY,
-        payload TEXT NOT NULL,
-        created_at INTEGER NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS outbox (
-        id TEXT PRIMARY KEY,
-        kind TEXT NOT NULL,
-        target TEXT NOT NULL,
-        payload TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        delivered_at INTEGER
-      )`,
-    );
-    sql.exec("INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', ?)", SCHEMA_VERSION);
-    // additive migration: an object created before schema 2 lacks the
-    // authentication columns on refresh_records
-    const refreshColumns = new Set(
-      this.ctx.storage.sql.exec<{ readonly name: string }>("PRAGMA table_info(refresh_records)")
-        .toArray()
-        .map((column) => String(column.name)),
-    );
-    if (!refreshColumns.has("amr_json")) sql.exec("ALTER TABLE refresh_records ADD COLUMN amr_json TEXT");
-    if (!refreshColumns.has("auth_time")) sql.exec("ALTER TABLE refresh_records ADD COLUMN auth_time INTEGER");
-    const teamColumns = new Set(
-      sql.exec<{ readonly name: string }>("PRAGMA table_info(teams)").toArray().map((row) => row.name),
-    );
-    if (!teamColumns.has("status")) {
-      sql.exec("ALTER TABLE teams ADD COLUMN status TEXT NOT NULL DEFAULT 'active'");
-    }
-    // schema 4: operation routing facts (slug and site paths)
-    const operationColumns = new Set(
-      this.ctx.storage.sql.exec<{ readonly name: string }>("PRAGMA table_info(operation)")
-        .toArray()
-        .map((column) => String(column.name)),
-    );
-    if (!operationColumns.has("slug")) sql.exec("ALTER TABLE operation ADD COLUMN slug TEXT");
-    const siteColumns = new Set(
-      this.ctx.storage.sql.exec<{ readonly name: string }>("PRAGMA table_info(sites)")
-        .toArray()
-        .map((column) => String(column.name)),
-    );
-    if (!siteColumns.has("path")) sql.exec("ALTER TABLE sites ADD COLUMN path TEXT");
-    // Every migration above is additive and runs unconditionally, so after
-    // this constructor the object *is* at the current schema: the recorded
-    // version must say so. `INSERT OR IGNORE` alone would leave an object
-    // created at an earlier version reporting that version forever while
-    // carrying the newer tables and columns.
-    sql.exec("UPDATE meta SET value = ? WHERE key = 'schema_version'", SCHEMA_VERSION);
+    initializeOperationSchema(this.ctx.storage.sql);
   }
 
   private rows(query: string, ...bindings: (string | number | null)[]): Row[] {

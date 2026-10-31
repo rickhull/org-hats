@@ -47,8 +47,8 @@ interface Table {
   readonly columns: readonly string[];
 }
 
-/** Extract every CREATE TABLE's column names from a coordinator source
- * file. Lines inside a table that yield no column name are recorded as
+/** Extract every CREATE TABLE's column names from a coordinator schema
+ * module. Lines inside a table that yield no column name are recorded as
  * problems; the parser never silently skips. */
 const readDdl = (file: string, problems: string[]): Map<string, Table> => {
   const tables = new Map<string, Table>();
@@ -143,13 +143,22 @@ const readSpecs = (problems: string[]): Record<"organization" | "operation", Map
 test("every coordinator table's schema equals its export spec", () => {
   const problems: string[] = [];
   const files = {
-    organization: "packages/cloudflare/src/organization.ts",
-    operation: "packages/cloudflare/src/operation.ts",
+    organization: [
+      "packages/cloudflare/src/schema/organization.ts",
+      "packages/cloudflare/src/schema/sql.ts",
+    ],
+    operation: [
+      "packages/cloudflare/src/schema/operation.ts",
+      "packages/cloudflare/src/schema/sql.ts",
+    ],
   } as const;
   const specs = readSpecs(problems);
 
   for (const coordinator of ["organization", "operation"] as const) {
-    const ddl = readDdl(files[coordinator], problems);
+    const ddl = new Map<string, Table>();
+    for (const file of files[coordinator]) {
+      for (const [name, table] of readDdl(file, problems)) ddl.set(name, table);
+    }
     // Parser sanity: a reformat that hides the DDL from this guard must
     // fail it, not pass vacuously.
     const minimum = coordinator === "organization" ? 9 : 11;

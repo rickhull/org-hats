@@ -13,12 +13,12 @@ import {
   type ExportSnapshot,
   type StateRow,
 } from "./state";
+import { initializeOrganizationSchema } from "./schema/organization";
 
 /** One organization authority. The object owns the facts that stay stable
  * while the organization participates in several operations: actors,
  * verified-principal links, organization administrators, the organization's
  * side of invitations, audit, idempotency claims, and its outbox. */
-const SCHEMA_VERSION = "2";
 
 type Row = Record<string, string | number | null>;
 
@@ -136,95 +136,7 @@ interface AdministratorInput {
 export class OrganizationAuthority extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.initialize();
-  }
-
-  private initialize(): void {
-    const sql = this.ctx.storage.sql;
-    sql.exec(
-      "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS organization (
-        organization_id TEXT PRIMARY KEY,
-        display_name TEXT,
-        sealed_idp_config TEXT,
-        sealed_idp_config_updated_at INTEGER,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS actors (
-        actor_id TEXT PRIMARY KEY,
-        display_name TEXT,
-        disabled INTEGER NOT NULL DEFAULT 0,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS principal_links (
-        provider TEXT NOT NULL,
-        subject TEXT NOT NULL,
-        actor_id TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        PRIMARY KEY (provider, subject)
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS activation_requests (
-        request_id TEXT PRIMARY KEY,
-        actor_id TEXT NOT NULL,
-        secret_hash TEXT NOT NULL UNIQUE,
-        issued_at INTEGER NOT NULL,
-        expires_at INTEGER NOT NULL,
-        consumed_at INTEGER,
-        revoked_at INTEGER
-      )`,
-    );
-    sql.exec(
-      "CREATE TABLE IF NOT EXISTS org_admins (actor_id TEXT PRIMARY KEY, created_at INTEGER NOT NULL)",
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS invitations (
-        invitation_id TEXT PRIMARY KEY,
-        operation_id TEXT NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'revoked')),
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS audit (
-        seq INTEGER PRIMARY KEY AUTOINCREMENT,
-        at INTEGER NOT NULL,
-        actor TEXT NOT NULL,
-        fact TEXT NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS claims (
-        idempotency_key TEXT PRIMARY KEY,
-        payload TEXT NOT NULL,
-        created_at INTEGER NOT NULL
-      )`,
-    );
-    sql.exec(
-      `CREATE TABLE IF NOT EXISTS outbox (
-        id TEXT PRIMARY KEY,
-        kind TEXT NOT NULL,
-        target TEXT NOT NULL,
-        payload TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        delivered_at INTEGER
-      )`,
-    );
-    sql.exec(
-      "INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', ?)",
-      SCHEMA_VERSION,
-    );
-    sql.exec("UPDATE meta SET value = ? WHERE key = 'schema_version'", SCHEMA_VERSION);
+    initializeOrganizationSchema(this.ctx.storage.sql);
   }
 
   private rows(query: string, ...bindings: (string | number | null)[]): Row[] {
