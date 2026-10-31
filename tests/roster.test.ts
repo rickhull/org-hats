@@ -311,3 +311,19 @@ test("caller-supplied ids and names have enforced ceilings", async () => {
   assert.equal(failureOf(longName).kind, "invalid-command");
   assert.match(failureOf(longName).detail ?? "", /display name is too long/);
 });
+
+test("an organization command refuses a forged envelope before reading its claims", async () => {
+  const { engine } = await setup();
+  const issued = successOf(await engine.runtime.accessFromEvidence({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    operationId: OP,
+    evidence: ADMIN_EVIDENCE,
+  }));
+  const forged = { ...issued.envelope, signature: issued.envelope.signature.slice(0, -4) + "AAAA" };
+  const result = await engine.runtime.command(cmd(
+    create("actor-forged"),
+    { kind: "access-envelope", envelope: forged },
+    "create-forged",
+  ));
+  assert.equal(failureOf(result).kind, "invalid-signature");
+});

@@ -52,27 +52,25 @@ the fifth, a standing rule rather than a test.
 
 1. **Baseline measurement.** Done, 2026-10-31: `pnpm coverage` runs Node's
    built-in coverage over the portable suites (opt-in; no gate, no
-   threshold). Baseline after the first gap-closing tests: 99.22% lines /
-   86.32% branches / 99.36% functions over `src/`. The workerd provider is
+   threshold). Baseline after the gap-closing tests: 99.58% lines / 87.50%
+   branches / 99.68% functions over `src/`. The workerd provider is
    deferred: Cloudflare's vitest-plugin coverage documentation was a 404 when
    evaluated, no threshold exists to enforce, and a dev dependency would buy
    numbers without a role; the named workerd suites cover those branches.
-2. **Gap list.** The first sweep closed the world cross-reference refusals,
+2. **Gap list.** Closed 2026-10-31: world cross-reference refusals,
    multi-byte canonical bytes, organization-side participation revoke, the
-   untyped-host command arm, and the roster ceilings. Remaining named gaps,
-   from the same report:
-   - Behavior to close next: context and command `invalid-signature`; a grant
-     targeting an unknown site; `revoke-activation` and `unlink-principal`
-     refused on envelope authorization; activation request refused for the
-     wrong organization, a non-administrator, and an already-linked actor;
-     boot refused for a principal link to an unknown actor; the refresh arm
-     for an actor whose principal link is gone.
-   - Defensive adapter paths, deferred: `verifyKeyOf`, the platform-crypto
-     `catch` in both verifiers, and the conformance harness's own failure
-     messages (a broken case, not behavior).
-   - Unreachable by contract, deferred: the `firstByRank` final tie when role,
-     target, and grant id all match (`model.ts:289`); the context's stale-role
-     branch needs a snapshot the public boundary rejects.
+   untyped-host command arm, roster ceilings, context and command
+   `invalid-signature`, a grant targeting an unknown site, envelope refusal
+   for `revoke-activation` and `unlink-principal`, the activation-request
+   refusals (wrong organization, non-administrator, already linked), boot
+   refusal for a principal link to an unknown actor, and refresh with no
+   principal link. Remaining, deferred:
+   - Defensive adapter paths: `verifyKeyOf`, the platform-crypto `catch` in
+     both verifiers, and the conformance harness's own failure messages (a
+     broken case, not behavior).
+   - Unreachable by contract: the `firstByRank` final tie when role, target,
+     and grant id all match (`model.ts:289`); the context's stale-role branch
+     needs a snapshot the public boundary rejects (`operation.ts:221-222`).
 3. **Targeted suites.** Close gaps that represent real behavior, not vanity
    lines. Where a threshold helps, apply it to `src/authority`, `src/access`,
    and the Cloudflare coordinators, excluding conformance fixture data.
@@ -152,7 +150,7 @@ suite references current; add the command table; record adapter-only behavior
 ## Sequencing
 
 1. ~~Guards (phase 1)~~ — done, 2026-10-30.
-2. Coverage baseline — done, 2026-10-31; the gap list is open.
+2. ~~Coverage baseline and gap list~~ — done, 2026-10-31.
 3. Mechanical extractions (schema, routes, conformance split, test harness)
    interleaved with the targeted tests they enable.
 4. Benchmarks and measured performance work.

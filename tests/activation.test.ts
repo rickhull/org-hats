@@ -21,6 +21,7 @@ const SITE = siteId("site-activation");
 const TEAM = teamId("team-activation");
 const ADMIN_EVIDENCE = { provider: "idp", subject: "admin" } as const;
 const TARGET_EVIDENCE = { provider: "idp", subject: "target" } as const;
+const OTHER_EVIDENCE = { provider: "idp", subject: "other" } as const;
 
 const fixture: TwinFixture = {
   name: "invitee",
@@ -244,4 +245,96 @@ test("[A13] unlink preserves grants and refresh fails even when outbox delivery 
 
   const replacement = await engine.runtime.activationRequest(request());
   assert.ok(!isFailed(replacement), "the enabled, unlinked actor can be activated again");
+});
+
+test("activation request refuses the wrong organization, a non-administrator, and a linked actor", async () => {
+  const { engine } = await setup();
+
+  const wrongOrg = await engine.runtime.activationRequest(request(OTHER_EVIDENCE));
+  assert.equal(failureOf(wrongOrg).kind, "wrong-binding");
+
+  const issued = await engine.runtime.activationRequest(request());
+  assert.ok(!isFailed(issued));
+  const accepted = await engine.runtime.activationAccept({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    secret: issued.secret,
+    evidence: TARGET_EVIDENCE,
+  });
+  assert.ok(!isFailed(accepted));
+
+  const nonAdmin = await engine.runtime.activationRequest(request(TARGET_EVIDENCE));
+  assert.equal(failureOf(nonAdmin).kind, "denied");
+  assert.match(failureOf(nonAdmin).detail ?? "", /does not administer/);
+
+  const linked = await engine.runtime.activationRequest(request());
+  assert.equal(failureOf(linked).kind, "denied");
+  assert.match(failureOf(linked).detail ?? "", /already has a principal link/);
+});
+
+test("revoke-activation and unlink-principal refuse an access envelope", async () => {
+  const { engine } = await setup();
+  const issued = await engine.runtime.activationRequest(request());
+  assert.ok(!isFailed(issued));
+  const accepted = await engine.runtime.activationAccept({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    secret: issued.secret,
+    evidence: TARGET_EVIDENCE,
+  });
+  assert.ok(!isFailed(accepted));
+  const access = await engine.runtime.accessFromEvidence({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    operationId: OP,
+    evidence: TARGET_EVIDENCE,
+  });
+  assert.ok(!isFailed(access));
+  const envelope = { kind: "access-envelope" as const, envelope: access.envelope };
+
+  const revoke = await engine.runtime.command(cmd(
+    { kind: "revoke-activation", organizationId: ORG, actorId: TARGET },
+    envelope,
+    "revoke-via-envelope",
+  ));
+  assert.equal(failureOf(revoke).kind, "denied");
+  assert.match(failureOf(revoke).detail ?? "", /fresh evidence/);
+
+  const unlink = await engine.runtime.command(cmd(
+    { kind: "unlink-principal", organizationId: ORG, actorId: TARGET },
+    envelope,
+    "unlink-via-envelope",
+  ));
+  assert.equal(failureOf(unlink).kind, "denied");
+  assert.match(failureOf(unlink).detail ?? "", /fresh evidence/);
+});
+
+test("refresh fails closed on a missing principal link before delivery revokes the handle", async () => {
+  const { engine } = await setup(1);
+  const issued = await engine.runtime.activationRequest(request());
+  assert.ok(!isFailed(issued));
+  const accepted = await engine.runtime.activationAccept({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    secret: issued.secret,
+    evidence: TARGET_EVIDENCE,
+  });
+  assert.ok(!isFailed(accepted));
+  const access = await engine.runtime.accessFromEvidence({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    operationId: OP,
+    evidence: TARGET_EVIDENCE,
+  });
+  assert.ok(!isFailed(access));
+
+  okOf(await engine.runtime.command(cmd(
+    { kind: "unlink-principal", organizationId: ORG, actorId: TARGET },
+    { kind: "fresh-evidence", evidence: ADMIN_EVIDENCE, operationId: OP },
+    "unlink-before-refresh",
+  )));
+
+  const refreshed = await engine.runtime.refresh({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    operationId: OP,
+    handle: handleOf(access.refresh),
+  });
+  assert.equal(failureOf(refreshed).kind, "unauthenticated");
+  assert.match(failureOf(refreshed).detail ?? "", /actor has no principal link/);
+  assert.equal(engine.pendingOutbox(), 1, "the unlink notice is still waiting to revoke the handle");
 });

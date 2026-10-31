@@ -759,3 +759,20 @@ test("the closed taxonomy survives an untyped host", async () => {
   assert.ok(isFailed(result));
   assert.equal(failureOf(result).kind, "invalid-command", "an unknown kind fails closed, never throws");
 });
+
+test("boot refuses a principal link to an actor the fixtures do not declare", async () => {
+  await assert.rejects(
+    createInMemoryAuthority({
+      clock: fixedClock(1_700_000_000),
+      signer: await webCryptoSigner("unknown-link-test"),
+      fixtures: [PROFESSIONAL_OPERATION],
+      principalLinks: [{
+        provider: "idp",
+        subject: "ghost",
+        organizationId: HARBOR_LOGISTICS,
+        actorId: actorId("actor-ghost"),
+      }],
+    }),
+    /principal link names an unknown actor/,
+  );
+});

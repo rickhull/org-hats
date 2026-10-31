@@ -348,3 +348,21 @@ test("request and admit replay their claims, and a changed payload is refused", 
   )));
   assert.equal(admittedReplay.receipt.applied, false);
 });
+
+test("grant-hat refuses a site target the operation does not carry", async () => {
+  const { engine } = await setup();
+  const result = await engine.runtime.command(cmd(
+    {
+      kind: "grant-hat",
+      operationId: OP,
+      organizationId: ORG,
+      actorId: MEMBER,
+      role: "member",
+      target: { kind: "site", siteId: siteId("site-missing") },
+    },
+    await envelope(engine.runtime, ADMIN_EVIDENCE),
+    "grant-unknown-site",
+  ));
+  assert.equal(failureOf(result).kind, "invalid-command");
+  assert.match(failureOf(result).detail ?? "", /unknown site/);
+});

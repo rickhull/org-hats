@@ -47,10 +47,10 @@ it is not part of per-push Codeberg CI.
 portable suites as `pnpm test`. It is opt-in, not a gate; no threshold is
 enforced.
 
-Baseline, 2026-10-31, after the phase-1 guards and the first gap-closing
-tests: **99.22% lines / 86.32% branches / 99.36% functions** over `src/`.
-The remaining gaps are classified in `plans/refactor.md` phase 2 while that
-plan is open.
+Baseline, 2026-10-31, after the phase-1 guards and the gap-closing tests:
+**99.58% lines / 87.50% branches / 99.68% functions** over `src/`. The
+remaining gaps are classified in `plans/refactor.md` phase 2 while that plan
+is open.
 
 The workerd ring has no coverage provider. Cloudflare's vitest-plugin
 coverage documentation was unavailable when evaluated (404), and there is no

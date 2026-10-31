@@ -103,6 +103,21 @@ test("the context names the selected hat, not the first hat of its role", async 
   assert.equal(context.selectedHat?.primary, true);
 });
 
+test("[E8] the context refuses a forged envelope before it reads a hat", async () => {
+  const { engine, issue } = await setup();
+  const issued = await issue();
+  const forged = {
+    ...issued.envelope,
+    signature: issued.envelope.signature.slice(0, -4) + "AAAA",
+  };
+  const context = await engine.runtime.context({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    envelope: forged,
+  });
+  assert.ok(isFailed(context));
+  assert.equal(context.failure.kind, "invalid-signature");
+});
+
 test("the context still names a hat when nothing was explicitly selected", async () => {
   const { engine, issue } = await setup();
   const issued = await issue();
