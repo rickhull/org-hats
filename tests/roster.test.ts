@@ -292,3 +292,22 @@ test("a disabled successor is not usable", async () => {
   ));
   assert.equal(failureOf(refused).kind, "denied");
 });
+
+test("caller-supplied ids and names have enforced ceilings", async () => {
+  const { engine } = await setup({ secondLinked: false });
+  const longId = await engine.runtime.command(cmd(
+    { kind: "create-actor", organizationId: ORG, actorId: "a".repeat(129), displayName: "Too Long" },
+    fresh(ADMIN_EVIDENCE),
+    "ceiling-actor-id",
+  ));
+  assert.equal(failureOf(longId).kind, "invalid-command");
+  assert.match(failureOf(longId).detail ?? "", /actor id is too long/);
+
+  const longName = await engine.runtime.command(cmd(
+    { kind: "update-actor", organizationId: ORG, actorId: ADMIN, displayName: "x".repeat(201) },
+    fresh(ADMIN_EVIDENCE),
+    "ceiling-display-name",
+  ));
+  assert.equal(failureOf(longName).kind, "invalid-command");
+  assert.match(failureOf(longName).detail ?? "", /display name is too long/);
+});

@@ -12,6 +12,7 @@ import {
   base64UrlDecode,
   base64UrlEncode,
   canonicalJson,
+  utf8,
   type FailureKind,
 } from "../src/contract.ts";
 
@@ -75,4 +76,19 @@ test("signature transport is unpadded base64url and round-trips", () => {
   const encoded = base64UrlEncode(bytes);
   assert.doesNotMatch(encoded, /[+/=]/);
   assert.deepEqual(base64UrlDecode(encoded), bytes);
+});
+
+test("[E2] canonical bytes cover multi-byte code points exactly", () => {
+  // The wire format is UTF-8 of the canonical string; every code-point
+  // width is pinned against the platform encoder, never our own loop.
+  const value = { note: "Grüße 🎪 𝄞" };
+  const canonical = canonicalJson(value);
+  assert.equal(canonical, '{"note":"Grüße 🎪 𝄞"}');
+  assert.deepEqual(
+    [...utf8(canonical)],
+    [...new TextEncoder().encode(canonical)],
+    "canonical bytes equal the platform encoding",
+  );
+  // Key ordering is by code unit, so an ASCII key sorts before an accented one.
+  assert.equal(canonicalJson({ "á": 1, b: 2 }), '{"b":2,"á":1}');
 });

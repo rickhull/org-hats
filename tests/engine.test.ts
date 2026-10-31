@@ -726,3 +726,36 @@ test("[E8] command and context use the envelope version gate, not just the signa
   assert.ok(isFailed(context));
   assert.equal(failureOf(context).kind, "wrong-interface-version");
 });
+
+test("[A1] an organization revokes its own participation and its actors stop being admitted", async () => {
+  const { engine } = await setup();
+  const before = await engine.runtime.accessFromEvidence(evidence(DANA));
+  assert.ok(!isFailed(before), "Harbor's administrator is admitted while participating");
+
+  const revoked = await engine.runtime.command({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    idempotencyKey: "org-side-participation-revoke",
+    authorization: { kind: "fresh-evidence", ...evidence(DANA), },
+    kind: "participation-revoke",
+    operationId: OP,
+    organizationId: HARBOR_LOGISTICS,
+    by: "organization",
+  });
+  assert.ok(revoked.ok && revoked.receipt.applied, "the organization-side revoke succeeds");
+
+  const after = await engine.runtime.accessFromEvidence(evidence(DANA));
+  assert.ok(isFailed(after));
+  assert.equal(failureOf(after).kind, "not-admitted", "admission dies with the participation");
+});
+
+test("the closed taxonomy survives an untyped host", async () => {
+  const { engine } = await setup();
+  const result = await engine.runtime.command({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    idempotencyKey: "unknown-kind",
+    authorization: { kind: "fresh-evidence", ...evidence(DANA) },
+    kind: "merge-team",
+  } as never);
+  assert.ok(isFailed(result));
+  assert.equal(failureOf(result).kind, "invalid-command", "an unknown kind fails closed, never throws");
+});

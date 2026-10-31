@@ -52,6 +52,54 @@ test("defineWorld refuses a snapshot whose grant names an unknown team", () => {
   );
 });
 
+test("defineWorld names every cross-reference a snapshot may get wrong", () => {
+  // One mutation per refusal branch of the snapshot validator: each names
+  // the broken reference, not a generic "invalid world".
+  const broken: readonly [label: string, mutate: (snapshot: WorldDefinition["snapshot"]) => WorldDefinition["snapshot"], complaint: RegExp][] = [
+    ["an actor naming an unknown organization", (s) => ({
+      ...s,
+      actors: [{ ...s.actors[0]!, organizationId: "org-missing" }],
+    }), /actor actor-own names the unknown organization org-missing/],
+    ["a site naming an unknown operation", (s) => ({
+      ...s,
+      sites: [{ ...s.sites[0]!, operationId: "op-missing" }],
+    }), /site site-own names the unknown operation op-missing/],
+    ["a team naming an unknown site", (s) => ({
+      ...s,
+      teams: [{ ...s.teams[0]!, siteId: "site-missing" }],
+    }), /team team-own names the unknown site site-missing/],
+    ["a team naming an unknown organization", (s) => ({
+      ...s,
+      teams: [{ ...s.teams[0]!, organizationId: "org-missing" }],
+    }), /team team-own names the unknown organization org-missing/],
+    ["a grant naming an unknown operation", (s) => ({
+      ...s,
+      grants: [{ ...s.grants[0]!, operationId: "op-missing" }],
+    }), /grant g-own names an unknown operation/],
+    ["a grant naming an unknown actor", (s) => ({
+      ...s,
+      grants: [{ ...s.grants[0]!, actorId: "actor-missing" }],
+    }), /grant g-own names an unknown actor/],
+    ["a grant with no participation to stand on", (s) => ({ ...s, participations: [] }), /grant g-own has no participation to stand on/],
+    ["a grant naming an unknown role", (s) => ({
+      ...s,
+      grants: [{ ...s.grants[0]!, role: "no-such-role" }],
+    }), /grant g-own names the unknown role "no-such-role"/],
+    ["a grant reaching a site outside its operation", (s) => ({
+      ...s,
+      sites: [...s.sites, { siteId: "site-other-op", operationId: "op-missing", displayName: "Elsewhere", path: "elsewhere", aliases: [] }],
+      grants: [{ ...s.grants[0]!, target: { kind: "site" as const, siteId: "site-other-op" } }],
+    }), /grant g-own reaches a site outside its operation/],
+  ];
+  for (const [label, mutate, complaint] of broken) {
+    assert.throws(
+      () => defineWorld({ ...ownWorld(), snapshot: mutate(ownWorld().snapshot) }),
+      complaint,
+      label,
+    );
+  }
+});
+
 test("[P9][P10] defineWorld refuses an invalid policy bundle", () => {
   const definition = ownWorld();
   assert.throws(
