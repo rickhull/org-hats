@@ -147,9 +147,12 @@ Behavior-identical, in the schema-first order below.
    per kind. The portable engine dispatches on `policy.coordinator`; the
    Cloudflare runtime uses the table for authorization, binding, and standing
    enforcement, leaving only its per-kind transport switch.
-5. **Portable authorization preamble** consolidated where the rules agree;
-   disable's envelope path, fresh-evidence recovery, and roster writes keep
-   their distinct modes.
+5. ~~Portable authorization preamble~~ — done, 2026-10-31:
+   `organizationAuthority` consolidates the either/fresh, same-organization,
+   and administrator modes; `operationFor`/`operationAdmin` consolidate the
+   operation lookup and simple administrator gate. Disable's envelope path,
+   fresh-evidence recovery, roster writes, select-hat, and the team writes
+   keep their distinct rules.
 6. **Conformance inventory split** by family (`model`, `auth`, `participation`,
    `commands`, `activation`, `roster`, `team`, `access`) with one exported
    list.

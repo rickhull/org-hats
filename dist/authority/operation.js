@@ -183,6 +183,24 @@ export const createOperationCoordinator = (deps) => {
     };
     // --- operation commands -------------------------------------------------------------
     /** request-access needs no administrator: the evidence is the request. */
+    /** The operation-scoped preamble shared by the simple administered
+     * commands. Owner, fresh-evidence team writes and select-hat keep their
+     * own standing rules below. */
+    const operationFor = (operation) => {
+        const op = ops.get(operationId(operation));
+        return op === undefined
+            ? { failure: { kind: "wrong-binding", detail: "unknown operation" } }
+            : op;
+    };
+    const operationAdmin = (operation, principal) => {
+        const op = operationFor(operation);
+        if ("failure" in op)
+            return op;
+        if (!principal.adminOfOperation) {
+            return { failure: { kind: "denied", detail: "the caller does not administer this operation" } };
+        }
+        return op;
+    };
     const requestAccess = (input) => {
         if (input.kind !== "request-access")
             return fail("invalid-command", "wrong coordinator");
@@ -213,10 +231,10 @@ export const createOperationCoordinator = (deps) => {
     const invite = (input, principal) => {
         if (input.kind !== "participation-invite")
             return fail("invalid-command", "wrong coordinator");
-        const op = ops.get(operationId(input.operationId));
+        const op = operationFor(input.operationId);
+        if ("failure" in op)
+            return { ok: false, failure: op.failure };
         const org = orgs.get(organizationId(input.organizationId));
-        if (op === undefined)
-            return fail("wrong-binding", "unknown operation");
         if (org === undefined)
             return fail("wrong-binding", "unknown organization");
         if (!principal.adminOfOperation)
@@ -245,11 +263,9 @@ export const createOperationCoordinator = (deps) => {
             return fail("invalid-command", "wrong coordinator");
         if (input.by !== "operation")
             return fail("invalid-command", "wrong coordinator");
-        const op = ops.get(operationId(input.operationId));
-        if (op === undefined)
-            return fail("wrong-binding", "unknown operation");
-        if (!principal.adminOfOperation)
-            return fail("denied", "the caller does not administer this operation");
+        const op = operationAdmin(input.operationId, principal);
+        if ("failure" in op)
+            return { ok: false, failure: op.failure };
         const replay = checkClaim(op.claims, input);
         if (replay !== undefined)
             return replay;
@@ -267,11 +283,9 @@ export const createOperationCoordinator = (deps) => {
     const admit = (input, principal) => {
         if (input.kind !== "admit")
             return fail("invalid-command", "wrong coordinator");
-        const op = ops.get(operationId(input.operationId));
-        if (op === undefined)
-            return fail("wrong-binding", "unknown operation");
-        if (!principal.adminOfOperation)
-            return fail("denied", "the caller does not administer this operation");
+        const op = operationAdmin(input.operationId, principal);
+        if ("failure" in op)
+            return { ok: false, failure: op.failure };
         const replay = checkClaim(op.claims, input);
         if (replay !== undefined)
             return replay;
@@ -286,11 +300,9 @@ export const createOperationCoordinator = (deps) => {
     const grantHat = (input, principal) => {
         if (input.kind !== "grant-hat")
             return fail("invalid-command", "wrong coordinator");
-        const op = ops.get(operationId(input.operationId));
-        if (op === undefined)
-            return fail("wrong-binding", "unknown operation");
-        if (!principal.adminOfOperation)
-            return fail("denied", "the caller does not administer this operation");
+        const op = operationAdmin(input.operationId, principal);
+        if ("failure" in op)
+            return { ok: false, failure: op.failure };
         const replay = checkClaim(op.claims, input);
         if (replay !== undefined)
             return replay;
@@ -348,11 +360,9 @@ export const createOperationCoordinator = (deps) => {
     const revokeGrant = (input, principal) => {
         if (input.kind !== "revoke-grant")
             return fail("invalid-command", "wrong coordinator");
-        const op = ops.get(operationId(input.operationId));
-        if (op === undefined)
-            return fail("wrong-binding", "unknown operation");
-        if (!principal.adminOfOperation)
-            return fail("denied", "the caller does not administer this operation");
+        const op = operationAdmin(input.operationId, principal);
+        if ("failure" in op)
+            return { ok: false, failure: op.failure };
         const replay = checkClaim(op.claims, input);
         if (replay !== undefined)
             return replay;
@@ -368,9 +378,9 @@ export const createOperationCoordinator = (deps) => {
     const selectHat = (input, principal) => {
         if (input.kind !== "select-hat")
             return fail("invalid-command", "wrong coordinator");
-        const op = ops.get(operationId(input.operationId));
-        if (op === undefined)
-            return fail("wrong-binding", "unknown operation");
+        const op = operationFor(input.operationId);
+        if ("failure" in op)
+            return { ok: false, failure: op.failure };
         const selectsOwn = op.grants.some((g) => g.grantId === input.grantId &&
             g.organizationId === principal.organizationId &&
             g.actorId === principal.actorId);
@@ -406,9 +416,9 @@ export const createOperationCoordinator = (deps) => {
     const requestTeam = (input, principal) => {
         if (input.kind !== "request-team")
             return fail("invalid-command", "wrong coordinator");
-        const op = ops.get(operationId(input.operationId));
-        if (op === undefined)
-            return fail("wrong-binding", "unknown operation");
+        const op = operationFor(input.operationId);
+        if ("failure" in op)
+            return { ok: false, failure: op.failure };
         if (input.authorization.kind !== "fresh-evidence") {
             return fail("denied", "team changes require fresh evidence");
         }
@@ -456,11 +466,9 @@ export const createOperationCoordinator = (deps) => {
     const admitTeam = (input, principal) => {
         if (input.kind !== "admit-team")
             return fail("invalid-command", "wrong coordinator");
-        const op = ops.get(operationId(input.operationId));
-        if (op === undefined)
-            return fail("wrong-binding", "unknown operation");
-        if (!principal.adminOfOperation)
-            return fail("denied", "the caller does not administer this operation");
+        const op = operationAdmin(input.operationId, principal);
+        if ("failure" in op)
+            return { ok: false, failure: op.failure };
         const replay = checkClaim(op.claims, input);
         if (replay !== undefined)
             return replay;
@@ -483,9 +491,9 @@ export const createOperationCoordinator = (deps) => {
     const updateTeam = (input, principal) => {
         if (input.kind !== "update-team")
             return fail("invalid-command", "wrong coordinator");
-        const op = ops.get(operationId(input.operationId));
-        if (op === undefined)
-            return fail("wrong-binding", "unknown operation");
+        const op = operationFor(input.operationId);
+        if ("failure" in op)
+            return { ok: false, failure: op.failure };
         if (input.authorization.kind !== "fresh-evidence") {
             return fail("denied", "team changes require fresh evidence");
         }
@@ -524,9 +532,9 @@ export const createOperationCoordinator = (deps) => {
     const retireTeam = (input, principal) => {
         if (input.kind !== "retire-team")
             return fail("invalid-command", "wrong coordinator");
-        const op = ops.get(operationId(input.operationId));
-        if (op === undefined)
-            return fail("wrong-binding", "unknown operation");
+        const op = operationFor(input.operationId);
+        if ("failure" in op)
+            return { ok: false, failure: op.failure };
         const team = op.teams.find((candidate) => candidate.teamId === input.teamId);
         if (team === undefined)
             return fail("invalid-command", "unknown team");

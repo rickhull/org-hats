@@ -98,6 +98,8 @@ const coordinatorStanding = (): Map<string, Set<string>> => {
       const window = lines.slice(anchor.line, end).join("\n");
       const found = new Set<string>();
       if (/rosterAuthority\(input\.authorization/.test(window)) found.add("roster:fresh+organization-admin");
+      if (/organizationAuthority\(input\.authorization/.test(window)) found.add("organization-admin");
+      if (/operationAdmin\(input\.operationId/.test(window)) found.add("operation-admin");
       if (/if \(!principal\.adminOfOperation && !selectsOwn\)/.test(window)) found.add("operation-admin-or-owner");
       if (/owner retirement requires fresh evidence/.test(window)) found.add("operation-admin-or-org-owner");
       if (/if \(!principal\.adminOfOperation\)/.test(window)) found.add("operation-admin");

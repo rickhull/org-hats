@@ -146,11 +146,49 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
     };
   };
 
+  /** The organization-scoped authority preamble. The three modes are
+   * deliberately distinct: an envelope may carry disable, recovery and
+   * roster writes require fresh evidence, and a same-organization check is
+   * part of the recovery/roster modes but not disable's. */
+  const organizationAuthority = (
+    authorization: AuthorityCommand["authorization"],
+    principal: Principal,
+    organization: string,
+    options: {
+      readonly mode: "either" | "fresh";
+      readonly sameOrganization: boolean;
+      readonly freshDetail?: string;
+      readonly unknownDetail?: string;
+    },
+  ): OrgState | Failed => {
+    const org = orgs.get(organizationId(organization));
+    if (org === undefined) {
+      return {
+        failure: {
+          kind: "wrong-binding",
+          ...(options.unknownDetail !== undefined ? { detail: options.unknownDetail } : {}),
+        },
+      };
+    }
+    if (options.mode === "fresh" && authorization.kind !== "fresh-evidence") {
+      return { failure: { kind: "denied", detail: options.freshDetail ?? "fresh evidence is required" } };
+    }
+    if (options.sameOrganization && principal.organizationId !== org.organizationId) {
+      return { failure: { kind: "wrong-binding" } };
+    }
+    if (!principal.adminOfOrganization) {
+      return { failure: { kind: "denied", detail: "the caller does not administer this organization" } };
+    }
+    return org;
+  };
+
   const acceptParticipation = (input: AuthorityCommand, principal: Principal): CommandResult => {
     if (input.kind !== "participation-accept") return fail("invalid-command", "wrong coordinator");
-    const org = orgs.get(principal.organizationId);
-    if (org === undefined) return fail("wrong-binding");
-    if (!principal.adminOfOrganization) return fail("denied", "the caller does not administer this organization");
+    const org = organizationAuthority(input.authorization, principal, principal.organizationId, {
+      mode: "either",
+      sameOrganization: false,
+    });
+    if ("failure" in org) return { ok: false, failure: org.failure };
     const replay = checkClaim(org.claims, input);
     if (replay !== undefined) return replay;
     const found = [...org.invitations.entries()].find(
@@ -177,9 +215,12 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
   const revokeOrganizationParticipation = (input: AuthorityCommand, principal: Principal): CommandResult => {
     if (input.kind !== "participation-revoke") return fail("invalid-command", "wrong coordinator");
     if (input.by !== "organization") return fail("invalid-command", "wrong coordinator");
-    const org = orgs.get(organizationId(input.organizationId));
-    if (org === undefined) return fail("wrong-binding", "unknown organization");
-    if (!principal.adminOfOrganization) return fail("denied", "the caller does not administer this organization");
+    const org = organizationAuthority(input.authorization, principal, input.organizationId, {
+      mode: "either",
+      sameOrganization: false,
+      unknownDetail: "unknown organization",
+    });
+    if ("failure" in org) return { ok: false, failure: org.failure };
     const replay = checkClaim(org.claims, input);
     if (replay !== undefined) return replay;
     const op = ops.get(operationId(input.operationId));
@@ -196,9 +237,12 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
 
   const disableActor = (input: AuthorityCommand, principal: Principal): CommandResult => {
     if (input.kind !== "disable-actor") return fail("invalid-command", "wrong coordinator");
-    const org = orgs.get(organizationId(input.organizationId));
-    if (org === undefined) return fail("wrong-binding", "unknown organization");
-    if (!principal.adminOfOrganization) return fail("denied", "the caller does not administer this organization");
+    const org = organizationAuthority(input.authorization, principal, input.organizationId, {
+      mode: "either",
+      sameOrganization: false,
+      unknownDetail: "unknown organization",
+    });
+    if ("failure" in org) return { ok: false, failure: org.failure };
     const replay = checkClaim(org.claims, input);
     if (replay !== undefined) return replay;
     const actor = org.actors.find((a) => a.actorId === input.actorId);
@@ -218,13 +262,13 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
 
   const revokeActivation = (input: AuthorityCommand, principal: Principal): CommandResult => {
     if (input.kind !== "revoke-activation") return fail("invalid-command", "wrong coordinator");
-    const org = orgs.get(organizationId(input.organizationId));
-    if (org === undefined) return fail("wrong-binding", "unknown organization");
-    if (input.authorization.kind !== "fresh-evidence") {
-      return fail("denied", "activation recovery requires fresh evidence");
-    }
-    if (principal.organizationId !== org.organizationId) return fail("wrong-binding");
-    if (!principal.adminOfOrganization) return fail("denied", "the caller does not administer this organization");
+    const org = organizationAuthority(input.authorization, principal, input.organizationId, {
+      mode: "fresh",
+      sameOrganization: true,
+      freshDetail: "activation recovery requires fresh evidence",
+      unknownDetail: "unknown organization",
+    });
+    if ("failure" in org) return { ok: false, failure: org.failure };
     const replay = checkClaim(org.claims, input);
     if (replay !== undefined) return replay;
     const target = org.actors.find((candidate) => candidate.actorId === input.actorId);
@@ -241,13 +285,13 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
 
   const unlinkPrincipal = (input: AuthorityCommand, principal: Principal): CommandResult => {
     if (input.kind !== "unlink-principal") return fail("invalid-command", "wrong coordinator");
-    const org = orgs.get(organizationId(input.organizationId));
-    if (org === undefined) return fail("wrong-binding", "unknown organization");
-    if (input.authorization.kind !== "fresh-evidence") {
-      return fail("denied", "principal recovery requires fresh evidence");
-    }
-    if (principal.organizationId !== org.organizationId) return fail("wrong-binding");
-    if (!principal.adminOfOrganization) return fail("denied", "the caller does not administer this organization");
+    const org = organizationAuthority(input.authorization, principal, input.organizationId, {
+      mode: "fresh",
+      sameOrganization: true,
+      freshDetail: "principal recovery requires fresh evidence",
+      unknownDetail: "unknown organization",
+    });
+    if ("failure" in org) return { ok: false, failure: org.failure };
     const replay = checkClaim(org.claims, input);
     if (replay !== undefined) return replay;
     const target = org.actors.find((candidate) => candidate.actorId === input.actorId);
@@ -280,18 +324,12 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
     authorization: AuthorityCommand["authorization"],
     organization: string,
     principal: Principal,
-  ): OrgState | Failed => {
-    const org = orgs.get(organizationId(organization));
-    if (org === undefined) return { failure: { kind: "wrong-binding", detail: "unknown organization" } };
-    if (authorization.kind !== "fresh-evidence") {
-      return { failure: { kind: "denied", detail: "roster changes require fresh evidence" } };
-    }
-    if (principal.organizationId !== org.organizationId) return { failure: { kind: "wrong-binding" } };
-    if (!principal.adminOfOrganization) {
-      return { failure: { kind: "denied", detail: "the caller does not administer this organization" } };
-    }
-    return org;
-  };
+  ): OrgState | Failed => organizationAuthority(authorization, principal, organization, {
+    mode: "fresh",
+    sameOrganization: true,
+    freshDetail: "roster changes require fresh evidence",
+    unknownDetail: "unknown organization",
+  });
 
   const createActor = (input: AuthorityCommand, principal: Principal): CommandResult => {
     if (input.kind !== "create-actor") return fail("invalid-command", "wrong coordinator");
