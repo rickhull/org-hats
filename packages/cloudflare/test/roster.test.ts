@@ -237,6 +237,56 @@ describe("the org-actor projection", () => {
     expect(refused.body.failure?.kind).toBe("not-admitted");
   });
 
+  it("[A7] concurrent refreshes install exactly one replacement", async () => {
+    const current = world("roster-refresh-race");
+    await participate(current);
+    const issued = await call<{ refresh: { handle: string } }>(current.op, "POST", "/issue", {
+      organizationId: current.orgId,
+      actorId: CREW,
+    });
+    const handle = issued.body.value?.refresh.handle ?? "";
+
+    const [first, second] = await Promise.all([
+      call<{ refresh: { handle: string } }>(current.op, "POST", "/refresh", { handle }),
+      call<{ refresh: { handle: string } }>(current.op, "POST", "/refresh", { handle }),
+    ]);
+    const winners = [first, second].filter((result) => result.body.ok);
+    const losers = [first, second].filter((result) => !result.body.ok);
+    expect(winners).toHaveLength(1);
+    expect(losers).toHaveLength(1);
+    expect(losers[0]?.body.failure?.kind).toBe("unauthenticated");
+    expect(winners[0]?.body.value?.refresh.handle).toBeTruthy();
+  });
+
+  it("[A13] a disable racing a refresh leaves no usable handle", async () => {
+    const current = world("roster-refresh-disable-race");
+    await participate(current);
+    const issued = await call<{ refresh: { handle: string } }>(current.op, "POST", "/issue", {
+      organizationId: current.orgId,
+      actorId: CREW,
+    });
+    const handle = issued.body.value?.refresh.handle ?? "";
+
+    // Race the rotation against the disable. Whichever reaches the finalize
+    // transaction first, the handle left behind must not rotate after the
+    // disable has applied and its notice has drained.
+    const [refreshed, disabled] = await Promise.all([
+      call<{ refresh: { handle: string } }>(current.op, "POST", "/refresh", { handle }),
+      call(current.org, "POST", "/disable", {
+        actorId: CREW,
+        byActorId: LEAD,
+        idempotencyKey: "race-disable",
+      }),
+    ]);
+    expect(disabled.body.ok).toBe(true);
+    await drain(current.org);
+
+    const nextHandle = refreshed.body.ok ? refreshed.body.value?.refresh.handle : handle;
+    const next = await call(current.op, "POST", "/refresh", { handle: nextHandle ?? "" });
+    expect(next.body.ok).toBe(false);
+    expect(["not-admitted", "unauthenticated"]).toContain(next.body.failure?.kind);
+  });
+
   it("[A13] is load-bearing: refresh denies a disabled actor whose disable message was lost", async () => {
     const current = world("roster-refresh");
     await participate(current);

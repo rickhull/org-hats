@@ -50,9 +50,13 @@ the fifth, a standing rule rather than a test.
 
 ## 2. Coverage expansion
 
+**Done 2026-10-31.** The baseline, gap list, targeted suites, generative
+and restore round-trips, determinism audit, and concurrency review all hold;
+the remaining branches are classified as deferred above.
+
 1. **Baseline measurement.** Done, 2026-10-31: `pnpm coverage` runs Node's
    built-in coverage over the portable suites (opt-in; no gate, no
-   threshold). Baseline after the gap-closing tests: 99.58% lines / 87.80%
+   threshold). Baseline after the gap-closing tests: 99.58% lines / 87.93%
    branches / 99.68% functions over `src/`. The workerd provider is
    deferred: Cloudflare's vitest-plugin coverage documentation was a 404 when
    evaluated, no threshold exists to enforce, and a dev dependency would buy
@@ -79,18 +83,21 @@ the fifth, a standing rule rather than a test.
    request/admit/update/retire team; eight seeded command sequences re-check
    invariants after the roster and team writes; and the workerd restore matrix
    round-trips command-built roster and team state through export and restore.
-5. **Determinism audit.** Repeat the suites to catch clock/outbox/DO ordering
-   flakes; fix or record each.
-6. **Adversarial concurrency review.** Test the stated bounds against
-   interleavings, not only the sequential cases: disable, unlink, grant
-   revoke, and participation revoke against refresh; two refreshes of one
-   handle; issuance racing a revocation; a delayed outbox. Pin the
-   disable-while-refreshing case first: once the revoke applies, a concurrent
-   refresh must not leave a usable handle. The finalize transaction and A13
-   gate are the answer; the test needs a controllable pause at the
-   organization read. Add such a seam only if the case cannot be written
-   without it. Record the expected bound for each scenario; a new authority
-   feature is not the fix.
+5. **Determinism audit.** Done, 2026-10-31: the portable suite ran five
+   times (206 tests, 7.8–8.4 s each) and the workerd suite three times (14
+   files, 91 tests, 24.4–27.7 s each), all green. No clock, outbox, or DO
+   ordering flake appeared.
+6. **Adversarial concurrency review.** Done, 2026-10-31:
+   `tests/concurrency.test.ts` pauses the in-memory signer after the claims
+   are built to pin disable, unlink, participation revoke, and grant revoke
+   against refresh; issuance racing a revoke; a pending actor-disabled
+   notice; and two refreshes of one handle.
+   `packages/cloudflare/test/roster.test.ts` pins concurrent refreshes to one
+   winner and races a disable against a refresh. Bound: a revocation that lands after the claims are built may
+   let one envelope out; the replacement handle then fails closed through
+   the A13 organization read, the revoked record, or the finalize
+   transaction's re-read. No production seam was added: the portable signer
+   supplies the pause, and the workerd cases use the public request surface.
 
 **Done when:** coverage is measured, the gap list is closed or explicitly
 deferred, and any threshold is stable across repeated runs.
@@ -153,7 +160,7 @@ suite references current; add the command table; record adapter-only behavior
 ## Sequencing
 
 1. ~~Guards (phase 1)~~ — done, 2026-10-30.
-2. ~~Coverage baseline and gap list~~ — done, 2026-10-31.
+2. ~~Coverage expansion (phase 2)~~ — done, 2026-10-31.
 3. Mechanical extractions (schema, routes, conformance split, test harness)
    interleaved with the targeted tests they enable.
 4. Benchmarks and measured performance work.
