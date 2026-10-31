@@ -157,8 +157,10 @@ Behavior-identical, in the schema-first order below.
    under `src/conformance/` (`model`, `auth`, `activation`, `roster`, `team`,
    `participation`, `commands`, `access`); `src/conformance/cases.ts` exports
    the one ordered list, and `src/conformance.ts` keeps the public surface.
-7. **Portable test harness** extracted for fixtures, engine setup, command and
-   envelope builders, shared by the domain suites.
+7. ~~Portable test harness~~ — done, 2026-10-31: `tests/helpers.ts` now
+   owns the test engine, command shell, fresh-evidence and envelope builders,
+   and access issuance; the roster, team, activation, context, engine, and
+   concurrency suites consume them.
 8. **`docs/commands.md`** — kind → owner, scope, authorization mode,
    required standing, effects — checked against the descriptor; the table
    states that the selected hat authorizes no authority command.

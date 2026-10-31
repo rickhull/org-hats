@@ -5,12 +5,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { actorId, isFailed, operationId, organizationId, siteId, teamId } from "../src/contract.ts";
-import { createInMemoryAuthority } from "../src/authority/engine.ts";
-import { fixedClock, webCryptoSigner } from "../src/authority/internal.ts";
-import type { AuthorityCommand } from "../src/authority/types.ts";
 import { AUTHORITY_INTERFACE_VERSION } from "../src/authority/types.ts";
 import type { TwinFixture } from "../src/authority/twins.ts";
-import { failureOf, fixtureSnapshot, okOf, successOf, type CommandBody } from "./helpers.ts";
+import { buildCommand, createTestEngine, failureOf, fixtureSnapshot, okOf, successOf } from "./helpers.ts";
 
 const ORG = organizationId("org-roster");
 const OTHER_ORG = organizationId("org-roster-other");
@@ -80,9 +77,7 @@ const setup = async (options: SetupOptions = {}) => {
       ? [{ provider: "idp", subject: "roster-second", organizationId: ORG, actorId: SECOND }]
       : []),
   ];
-  const engine = await createInMemoryAuthority({
-    clock: fixedClock(1_700_000_000),
-    signer: await webCryptoSigner("roster-test"),
+  const engine = await createTestEngine({
     fixtures: [fixture],
     principalLinks: links,
     orgAdmins: { [ORG]: options.secondLinked === true ? [ADMIN, SECOND] : [ADMIN] },
@@ -99,11 +94,7 @@ const setup = async (options: SetupOptions = {}) => {
   return { engine };
 };
 
-const cmd = (
-  body: CommandBody,
-  authorization: AuthorityCommand["authorization"],
-  idempotencyKey: string,
-): AuthorityCommand => ({ interfaceVersion: AUTHORITY_INTERFACE_VERSION, idempotencyKey, authorization, ...body });
+const cmd = buildCommand;
 
 const fresh = (evidence: { readonly provider: string; readonly subject: string }) => ({
   kind: "fresh-evidence" as const,

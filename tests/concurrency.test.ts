@@ -8,10 +8,8 @@ import assert from "node:assert/strict";
 
 import { AUTHORITY_INTERFACE_VERSION, operationId } from "../src/contract.ts";
 import { CONFORMANCE_PRINCIPALS, CONFORMANCE_WORLD } from "../src/conformance.ts";
-import { createInMemoryAuthority } from "../src/authority/engine.ts";
 import { fixedClock, webCryptoSigner, type Signer } from "../src/authority/internal.ts";
-import type { AuthorityCommand } from "../src/authority/types.ts";
-import { failureOf, handleOf, okOf, successOf, type CommandBody } from "./helpers.ts";
+import { buildCommand, createTestEngine, failureOf, freshAuth, handleOf, okOf, successOf } from "./helpers.ts";
 
 const OP = operationId("op-9f2e6ad4");
 const HARBOR = CONFORMANCE_PRINCIPALS.dana.organizationId;
@@ -69,7 +67,7 @@ const gatedSigner = async (): Promise<SignGate> => {
 
 const setup = async () => {
   const gate = await gatedSigner();
-  const engine = await createInMemoryAuthority({
+  const engine = await createTestEngine({
     ...CONFORMANCE_WORLD,
     clock: fixedClock(1_700_000_000),
     signer: gate.signer,
@@ -97,17 +95,9 @@ const refresh = (
   handle: string,
 ) => engine.runtime.refresh({ interfaceVersion: AUTHORITY_INTERFACE_VERSION, operationId: OP, handle });
 
-const fresh = (): AuthorityCommand["authorization"] => ({
-  kind: "fresh-evidence",
-  evidence: ADMIN.evidence,
-  operationId: OP,
-});
+const fresh = () => freshAuth(ADMIN.evidence, OP);
 
-const cmd = (
-  body: CommandBody,
-  authorization: AuthorityCommand["authorization"],
-  key: string,
-): AuthorityCommand => ({ interfaceVersion: AUTHORITY_INTERFACE_VERSION, idempotencyKey: key, authorization, ...body });
+const cmd = buildCommand;
 
 test("[A13] a disable drained during refresh leaves no usable handle", async () => {
   const { engine, gate, handle } = await setup();

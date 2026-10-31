@@ -158,6 +158,8 @@ public types fails the gate instead of failing at runtime.
   the usable-successor retirement rule, and the unguarded offboarding disable.
 - `teams.test.ts` — request/admit, active-only projection, authorization
   split, and retirement's grant and refresh effects.
+- `helpers.ts` — shared fixture boundary, result narrowing, test engine,
+  command/authorization builders, and access issuance.
 - `conformance.test.ts` — runs the public inventory from `src/conformance.ts`;
   the cases live by family under `src/conformance/`, with one exported list.
 - `specs.test.ts` — the spec-witness gate: every published invariant has an

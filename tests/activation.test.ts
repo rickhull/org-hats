@@ -4,12 +4,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { actorId, isFailed, operationId, organizationId, siteId, teamId } from "../src/contract.ts";
-import { createInMemoryAuthority } from "../src/authority/engine.ts";
-import { fixedClock, webCryptoSigner } from "../src/authority/internal.ts";
-import type { AuthorityCommand, PrincipalEvidence } from "../src/authority/types.ts";
+import { fixedClock } from "../src/authority/internal.ts";
+import type { PrincipalEvidence } from "../src/authority/types.ts";
 import { AUTHORITY_INTERFACE_VERSION } from "../src/authority/types.ts";
 import type { TwinFixture } from "../src/authority/twins.ts";
-import { failureOf, fixtureSnapshot, handleOf, okOf, type CommandBody } from "./helpers.ts";
+import { buildCommand, createTestEngine, failureOf, fixtureSnapshot, handleOf, okOf } from "./helpers.ts";
 
 const ORG = organizationId("org-activation");
 const OTHER_ORG = organizationId("org-other");
@@ -62,9 +61,8 @@ const fixture: TwinFixture = {
 const setup = async (transportFailures = 0) => {
   const clock = fixedClock(1_700_000_000);
   const secrets = ["AAAAAAAAAAAAAAAAAAAAAA", "BBBBBBBBBBBBBBBBBBBBBB", "CCCCCCCCCCCCCCCCCCCCCC"];
-  const engine = await createInMemoryAuthority({
+  const engine = await createTestEngine({
     clock,
-    signer: await webCryptoSigner("activation-test"),
     activationLifetimeSeconds: 60,
     activationSecret: () => secrets.shift() ?? "DDDDDDDDDDDDDDDDDDDDDD",
     transportFailures,
@@ -85,11 +83,7 @@ const request = (evidence: PrincipalEvidence = ADMIN_EVIDENCE) => ({
   evidence,
 });
 
-const cmd = (
-  body: CommandBody,
-  authorization: AuthorityCommand["authorization"],
-  idempotencyKey: string,
-): AuthorityCommand => ({ interfaceVersion: AUTHORITY_INTERFACE_VERSION, idempotencyKey, authorization, ...body });
+const cmd = buildCommand;
 
 test("[A16] activation request returns a secret once; inspection discloses only usability", async () => {
   const { engine } = await setup();

@@ -10,9 +10,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { AUTHORITY_INTERFACE_VERSION, isFailed } from "../src/contract.ts";
-import { createInMemoryAuthority } from "../src/authority/engine.ts";
+import { AUTHORITY_INTERFACE_VERSION, isFailed, operationId } from "../src/contract.ts";
 import { defineWorld, type WorldDefinition } from "../src/authority/world.ts";
+import { createTestEngine, issueAccess } from "./helpers.ts";
 
 const twoHatsWorld = (): WorldDefinition => ({
   name: "two-hats",
@@ -50,22 +50,14 @@ const twoHatsWorld = (): WorldDefinition => ({
 });
 
 const setup = async () => {
-  const engine = await createInMemoryAuthority({
+  const engine = await createTestEngine({
     fixtures: [defineWorld(twoHatsWorld())],
     principalLinks: [
       { provider: "idp", subject: "two", organizationId: "org-two" as never, actorId: "actor-two" as never },
     ],
   });
-  const evidence = { provider: "idp", subject: "two" };
-  const issue = async () => {
-    const issued = await engine.runtime.accessFromEvidence({
-      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-      operationId: "op-two",
-      evidence,
-    });
-    if (isFailed(issued)) throw new Error(`issuance failed: ${issued.failure.kind}`);
-    return issued;
-  };
+  const evidence = { provider: "idp", subject: "two" } as const;
+  const issue = () => issueAccess(engine, evidence, operationId("op-two"));
   return { engine, evidence, issue };
 };
 

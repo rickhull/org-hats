@@ -5,13 +5,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { actorId, isFailed, operationId, organizationId, siteId } from "../src/contract.ts";
-import { createInMemoryAuthority } from "../src/authority/engine.ts";
-import { fixedClock, webCryptoSigner } from "../src/authority/internal.ts";
-import type { AuthorityCommand } from "../src/authority/types.ts";
 import { AUTHORITY_INTERFACE_VERSION } from "../src/authority/types.ts";
 import type { TwinFixture } from "../src/authority/twins.ts";
 import { ed25519VerifyKey, verify } from "../src/access/verify.ts";
-import { failureOf, fixtureSnapshot, handleOf, okOf, successOf, type CommandBody } from "./helpers.ts";
+import { buildCommand, createTestEngine, failureOf, fixtureSnapshot, handleOf, okOf, successOf, type TestEngine } from "./helpers.ts";
 
 const OP = operationId("op-teams");
 const ORG = organizationId("org-teams");
@@ -87,9 +84,7 @@ const fixture: TwinFixture = {
 };
 
 const setup = async () => {
-  const engine = await createInMemoryAuthority({
-    clock: fixedClock(1_700_000_000),
-    signer: await webCryptoSigner("teams-test"),
+  const engine = await createTestEngine({
     fixtures: [fixture],
     principalLinks: [
       { provider: "idp", subject: "teams-admin", organizationId: ORG, actorId: ADMIN },
@@ -104,11 +99,7 @@ const setup = async () => {
   return { engine, keys: new Map([[key.keyId, key]]) };
 };
 
-const cmd = (
-  body: CommandBody,
-  authorization: AuthorityCommand["authorization"],
-  idempotencyKey: string,
-): AuthorityCommand => ({ interfaceVersion: AUTHORITY_INTERFACE_VERSION, idempotencyKey, authorization, ...body });
+const cmd = buildCommand;
 
 const fresh = (evidence: { readonly provider: string; readonly subject: string }) => ({
   kind: "fresh-evidence" as const,
@@ -117,7 +108,7 @@ const fresh = (evidence: { readonly provider: string; readonly subject: string }
 });
 
 const envelope = async (
-  engine: Awaited<ReturnType<typeof createInMemoryAuthority>>["runtime"],
+  engine: TestEngine["runtime"],
   evidence: { readonly provider: string; readonly subject: string },
 ) => {
   const issued = successOf(await engine.accessFromEvidence({
@@ -145,7 +136,7 @@ const requestFor = (organizationIdValue: typeof ORG, teamId: string) => ({
   siteId: SITE_ONE,
 });
 
-const snapshotTeam = (engine: Awaited<ReturnType<typeof createInMemoryAuthority>>, teamId: string) =>
+const snapshotTeam = (engine: TestEngine, teamId: string) =>
   engine.snapshotOf(OP)?.teams.find((team) => team.teamId === teamId);
 
 test("[A17] a team is pending until the operation admits it, then grants can target it", async () => {

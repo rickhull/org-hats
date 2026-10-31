@@ -1,10 +1,22 @@
 // Shared helpers for the generative suites: the deterministic mulberry32
 // PRNG and a pick over its stream. Same seed, same world, in every suite.
 
-import { isFailed, type Failed, type Failure, type RefreshHandle, type RefreshHandleOutcome, type Unbranded } from "../src/contract.ts";
+import {
+  AUTHORITY_INTERFACE_VERSION,
+  isFailed,
+  type Failed,
+  type Failure,
+  type OperationId,
+  type RefreshHandle,
+  type RefreshHandleOutcome,
+  type SignedAccessEnvelope,
+  type Unbranded,
+} from "../src/contract.ts";
 import type { PolicyBundle } from "../src/policy.ts";
 import type { Snapshot } from "../src/model.ts";
-import type { AuthorityCommandBody, CommandResult } from "../src/authority/types.ts";
+import type { AccessIssue, AuthorityCommand, AuthorityCommandBody, CommandResult, PrincipalEvidence } from "../src/authority/types.ts";
+import { createInMemoryAuthority, type InMemoryAuthorityConfig } from "../src/authority/engine.ts";
+import { fixedClock, webCryptoSigner } from "../src/authority/internal.ts";
 
 export const mulberry32 = (seed: number) => () => {
   seed |= 0;
@@ -67,4 +79,57 @@ export const okOf = (result: CommandResult): Extract<CommandResult, { ok: true }
 export const handleOf = (outcome: RefreshHandleOutcome): RefreshHandle => {
   if (outcome.kind !== "rotated") throw new Error(`expected a rotated refresh handle, got ${outcome.kind}`);
   return outcome.handle;
+};
+
+// --- engine and command harness -------------------------------------------------
+
+export type TestEngine = Awaited<ReturnType<typeof createInMemoryAuthority>>;
+
+/** The fixed clock and fresh signer every domain suite starts from, with
+ * per-suite config layered over them. */
+export const createTestEngine = async (config: InMemoryAuthorityConfig = {}): Promise<TestEngine> => {
+  const clock = config.clock ?? fixedClock(1_700_000_000);
+  const signer = config.signer ?? await webCryptoSigner("test-engine");
+  return createInMemoryAuthority({ ...config, clock, signer });
+};
+
+/** A command shell around a typed body: the one shape every suite sends. */
+export const buildCommand = (
+  body: CommandBody,
+  authorization: AuthorityCommand["authorization"],
+  idempotencyKey: string,
+): AuthorityCommand => ({
+  interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+  idempotencyKey,
+  authorization,
+  ...body,
+});
+
+export const freshAuth = (
+  evidence: PrincipalEvidence,
+  operationId: OperationId,
+): AuthorityCommand["authorization"] => ({
+  kind: "fresh-evidence",
+  evidence,
+  operationId,
+});
+
+export const envelopeAuth = (envelope: SignedAccessEnvelope): AuthorityCommand["authorization"] => ({
+  kind: "access-envelope",
+  envelope,
+});
+
+/** Issue access from evidence, naming the failure instead of returning it. */
+export const issueAccess = async (
+  engine: TestEngine,
+  evidence: PrincipalEvidence,
+  operationId: OperationId,
+): Promise<AccessIssue> => {
+  const result = await engine.runtime.accessFromEvidence({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    operationId,
+    evidence,
+  });
+  if (isFailed(result)) throw new Error(`issuance failed: ${result.failure.kind}`);
+  return result;
 };

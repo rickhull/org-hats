@@ -14,11 +14,11 @@ import {
   HARBOR_LOGISTICS,
   PROFESSIONAL_OPERATION,
 } from "../src/authority/twins.ts";
-import type { AuthorityCommand, PrincipalEvidence } from "../src/authority/types.ts";
+import type { PrincipalEvidence } from "../src/authority/types.ts";
 import { AUTHORITY_INTERFACE_VERSION } from "../src/authority/types.ts";
 import { createInMemoryAuthority } from "../src/authority/engine.ts";
 import { fixedClock, webCryptoSigner } from "../src/authority/internal.ts";
-import { asJson, failureOf, fixtureSnapshot, successOf, handleOf, okOf, type CommandBody } from "./helpers.ts";
+import { asJson, buildCommand, failureOf, fixtureSnapshot, successOf, handleOf, okOf } from "./helpers.ts";
 
 const OP = operationId("op-9f2e6ad4"); // Meridian
 const LEN_ORG = organizationId("org-a53e90f7");
@@ -79,12 +79,7 @@ const evidence = (subject: PrincipalEvidence, operationId: string = OP) => ({
   evidence: subject,
 });
 
-const cmd = (body: CommandBody, authorization: AuthorityCommand["authorization"], key: string): AuthorityCommand => ({
-  interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-  idempotencyKey: key,
-  authorization,
-  ...body,
-});
+const cmd = buildCommand;
 
 test("issuance: evidence resolves the actor, computes reach, and signs", async () => {
   const { engine, signer } = await setup();
