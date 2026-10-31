@@ -1,5 +1,7 @@
 export type { AccessFromEvidenceInput, AccessIssue, ActivationAcceptInput, ActivationAcceptance, ActivationInspectInput, ActivationInspection, ActivationRequestInput, ActivationRequestResult, AdmissionCommand, AuthorityCommand, AuthorityCommandBody, AuthorityContext, AuthorityRuntime, CommandAuthorization, CommandReceipt, CommandResult, ContextRequest, GrantCommand, HatSummary, OrganizationCommand, ParticipationCommand, PrincipalEvidence, RefreshInput, } from "./types.js";
 export { AUTHORITY_INTERFACE_VERSION } from "./types.js";
+export { COMMAND_POLICY, commandPolicy } from "./commands.js";
+export type { CommandCoordinator, CommandMode, CommandPolicy, CommandStanding } from "./commands.js";
 export type { OrganizationReadPolicy, PolicyBundle, PolicyProblem, PolicyRole, ReadPolicy, } from "../policy.js";
 export { actionsOf, validatePolicyBundle } from "../policy.js";
 export type { TwinFixture } from "./twins.js";

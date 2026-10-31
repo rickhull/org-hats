@@ -20,66 +20,15 @@ import { dirname, join } from "node:path";
 
 import { AUTHORITY_INTERFACE_VERSION } from "../src/contract.ts";
 import { CONFORMANCE_PRINCIPALS, createInMemoryConformanceWorld } from "../src/conformance.ts";
+import { COMMAND_POLICY, type CommandPolicy } from "../src/authority/commands.ts";
 import type { AuthorityCommand } from "../src/authority/types.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path: string): string => readFileSync(join(root, path), "utf8");
 
-type Coordinator = "organization" | "operation" | "by-participation";
-type Standing =
-  | "none" // the evidence is the request; no administrator is involved
-  | "operation-admin"
-  | "organization-admin"
-  | "operation-admin-or-owner" // the grant's owner may select it
-  | "operation-admin-or-org-owner" // op admin, or the team's org admin on fresh evidence
-  | "by-participation"; // adminOfOperation or adminOfOrganization per `by`
-type Mode = "either" | "fresh" | "ignored";
-
-interface InventoryEntry {
-  readonly coordinator: Coordinator;
-  readonly operationBound: boolean;
-  readonly standing: Standing;
-  readonly mode: Mode;
-  /** Extra standing tokens this handler legitimately re-checks beyond its
-   * row's standing (e.g. retire-administrator's successor rule re-checks
-   * organization-admin after rosterAuthority). */
-  readonly also?: readonly string[];
-}
-
-/** The explicit policy. One row per command kind; nothing else. */
-const INVENTORY: Readonly<Record<string, InventoryEntry>> = {
-  "request-access": { coordinator: "operation", operationBound: true, standing: "none", mode: "ignored" },
-  "participation-invite": { coordinator: "operation", operationBound: true, standing: "operation-admin", mode: "either" },
-  "participation-accept": { coordinator: "organization", operationBound: true, standing: "organization-admin", mode: "either" },
-  "participation-revoke": { coordinator: "by-participation", operationBound: true, standing: "by-participation", mode: "either" },
-  admit: { coordinator: "operation", operationBound: true, standing: "operation-admin", mode: "either" },
-  "grant-hat": { coordinator: "operation", operationBound: true, standing: "operation-admin", mode: "either" },
-  "revoke-grant": { coordinator: "operation", operationBound: true, standing: "operation-admin", mode: "either" },
-  "select-hat": { coordinator: "operation", operationBound: true, standing: "operation-admin-or-owner", mode: "either" },
-  "request-team": { coordinator: "operation", operationBound: true, standing: "organization-admin", mode: "fresh" },
-  "admit-team": { coordinator: "operation", operationBound: true, standing: "operation-admin", mode: "either" },
-  "update-team": { coordinator: "operation", operationBound: true, standing: "organization-admin", mode: "fresh" },
-  "retire-team": {
-    coordinator: "operation",
-    operationBound: true,
-    standing: "operation-admin-or-org-owner",
-    mode: "either",
-  },
-  "disable-actor": { coordinator: "organization", operationBound: false, standing: "organization-admin", mode: "either" },
-  "unlink-principal": { coordinator: "organization", operationBound: false, standing: "organization-admin", mode: "either" },
-  "revoke-activation": { coordinator: "organization", operationBound: false, standing: "organization-admin", mode: "either" },
-  "create-actor": { coordinator: "organization", operationBound: false, standing: "organization-admin", mode: "fresh" },
-  "update-actor": { coordinator: "organization", operationBound: false, standing: "organization-admin", mode: "fresh" },
-  "appoint-administrator": { coordinator: "organization", operationBound: false, standing: "organization-admin", mode: "fresh" },
-  "retire-administrator": {
-    coordinator: "organization",
-    operationBound: false,
-    standing: "organization-admin",
-    mode: "fresh",
-    also: ["organization-admin"],
-  },
-};
-
+/** The policy table moved into source; this suite checks it against the
+ * command union, the two dispatches, and the coordinators. */
+const INVENTORY: Readonly<Record<string, CommandPolicy>> = COMMAND_POLICY;
 const KINDS = Object.keys(INVENTORY);
 
 // --- source facts ----------------------------------------------------------------
@@ -98,69 +47,11 @@ const unionKinds = (): string[] => {
   return kinds;
 };
 
-/** The portable dispatch: the unbound list and the switch arms. */
-const engineDispatch = (): { unbound: Set<string>; arms: Map<string, Coordinator> } => {
-  const lines = read("src/authority/engine.ts").split(/\r?\n/);
-  const problems: string[] = [];
-  const unbound = new Set<string>();
-  const arms = new Map<string, Coordinator>();
-
-  const boundStart = lines.findIndex((line) => /const boundOperation = /.test(line));
-  const switchStart = lines.findIndex((line) => /switch \(inputCommand\.kind\)/.test(line));
-  assert.ok(boundStart !== -1 && switchStart > boundStart, "engine.ts: cannot find the dispatch");
-  for (const line of lines.slice(boundStart, switchStart)) {
-    const match = /inputCommand\.kind === "([a-z-]+)"/.exec(line);
-    if (match !== null) unbound.add(match[1] ?? "");
-  }
-
-  let pending: string[] = [];
-  let split = false;
-  for (const line of lines.slice(switchStart)) {
-    const caseMatch = /case "([a-z-]+)":/.exec(line);
-    if (caseMatch !== null) {
-      pending.push(caseMatch[1] ?? "");
-      continue;
-    }
-    if (/inputCommand\.by === "operation"/.test(line)) {
-      split = true;
-      continue;
-    }
-    if (/organizations\.command\(/.test(line)) {
-      for (const kind of pending) arms.set(kind, "organization");
-      pending = [];
-      split = false;
-    } else if (/operations\.command\(/.test(line)) {
-      for (const kind of pending) arms.set(kind, split ? "by-participation" : "operation");
-      pending = [];
-      split = false;
-    } else if (/default:/.test(line) && pending.length > 0) {
-      problems.push(`engine.ts: cases without a return arm: ${pending.join(", ")}`);
-      break;
-    }
-    if (/inputCommand satisfies never/.test(line)) break;
-  }
-  assert.deepEqual(problems, [], problems.join("\n"));
-  return { unbound, arms };
-};
-
-/** The Cloudflare runtime dispatch: the unbound (`preferred`) list and each
- * case's route target. Standing is enforced partly here, partly in the
- * coordinators; this parse asserts routing parity, not standing. */
-const runtimeDispatch = (): {
-  unbound: Set<string>;
-  routes: Map<string, "organization" | "operation" | "by-participation">;
-} => {
+/** The Cloudflare runtime's transport switch: every kind still names its
+ * route target, but the binding and standing policy come from the descriptor. */
+const runtimeDispatch = (): Map<string, "organization" | "operation" | "by-participation"> => {
   const lines = read("packages/cloudflare/src/runtime.ts").split(/\r?\n/);
-  const unbound = new Set<string>();
   const routes = new Map<string, "organization" | "operation" | "by-participation">();
-
-  const preferredStart = lines.findIndex((line) => /const preferred = command\.kind ===/.test(line));
-  assert.ok(preferredStart !== -1, "runtime.ts: cannot find the preferred list");
-  for (const line of lines.slice(preferredStart, preferredStart + 12)) {
-    const match = /command\.kind === "([a-z-]+)"/.exec(line);
-    if (match !== null) unbound.add(match[1] ?? "");
-  }
-
   const switchStart = lines.findIndex((line) => /switch \(input\.kind\)/.test(line));
   assert.ok(switchStart !== -1, "runtime.ts: cannot find the dispatch switch");
   let pending: string[] = [];
@@ -187,7 +78,7 @@ const runtimeDispatch = (): {
     if (/input\.kind satisfies never|default:/.test(line)) break;
   }
   flush();
-  return { unbound, routes };
+  return routes;
 };
 
 /** Per-kind standing evidence inside the portable coordinators: each handler
@@ -212,6 +103,8 @@ const coordinatorStanding = (): Map<string, Set<string>> => {
       if (/if \(!principal\.adminOfOperation\)/.test(window)) found.add("operation-admin");
       if (/if \(!principal\.adminOfOrganization\)/.test(window)) found.add("organization-admin");
       if (/team changes require fresh evidence/.test(window)) found.add("mode:fresh");
+      if (/principal recovery requires fresh evidence/.test(window)) found.add("mode:fresh");
+      if (/activation recovery requires fresh evidence/.test(window)) found.add("mode:fresh");
       const existing = tokens.get(anchor.kind) ?? new Set<string>();
       for (const token of found) existing.add(token);
       if (found.size > 0 || !tokens.has(anchor.kind)) tokens.set(anchor.kind, existing);
@@ -220,7 +113,7 @@ const coordinatorStanding = (): Map<string, Set<string>> => {
   return tokens;
 };
 
-const standingTokensOf = (entry: InventoryEntry): Set<string> => {
+const standingTokensOf = (entry: CommandPolicy): Set<string> => {
   const tokens = new Set<string>();
   switch (entry.standing) {
     case "none":
@@ -229,8 +122,9 @@ const standingTokensOf = (entry: InventoryEntry): Set<string> => {
       tokens.add("operation-admin");
       break;
     case "organization-admin":
-      if (entry.mode === "fresh" && entry.coordinator === "organization") tokens.add("roster:fresh+organization-admin");
-      else {
+      if (entry.mode === "fresh" && entry.freshDetail === "roster changes require fresh evidence") {
+        tokens.add("roster:fresh+organization-admin");
+      } else {
         tokens.add("organization-admin");
         if (entry.mode === "fresh") tokens.add("mode:fresh");
       }
@@ -262,49 +156,49 @@ test("the command inventory matches the union, both dispatches, and the standing
   }
   assert.equal(kinds.length, new Set(kinds).size, "types.ts: a command kind is declared twice");
 
-  // 2. Portable dispatch: coordinator and operation binding per kind.
-  const { unbound, arms } = engineDispatch();
-  for (const kind of KINDS) {
-    const expected = INVENTORY[kind]!;
-    const arm = arms.get(kind);
-    if (expected.coordinator === "operation" && kind === "request-access") {
-      // request-access is dispatched before principal resolution; its
-      // special case is asserted below, not in the switch.
-      if (arms.has(kind)) problems.push("engine.ts: request-access appears in the dispatch switch");
-      continue;
-    }
-    if (arm === undefined) {
-      problems.push(`engine.ts: ${kind} has no dispatch arm`);
-      continue;
-    }
-    if (arm !== expected.coordinator) {
-      problems.push(`engine.ts: ${kind} dispatches to ${arm}, inventory says ${expected.coordinator}`);
-    }
-    const bound = !unbound.has(kind);
-    if (bound !== expected.operationBound) {
-      problems.push(`engine.ts: ${kind} binding is ${bound ? "bound" : "unbound"}, inventory says the opposite`);
-    }
+  // 2. The portable engine consumes the descriptor. Its dispatch is on the
+  // policy's coordinator, not a second kind list.
+  const engine = read("src/authority/engine.ts");
+  if (!/commandPolicy\(inputCommand\.kind\)/.test(engine)) {
+    problems.push("engine.ts: does not read the command policy");
   }
-  const unboundExpected = new Set(KINDS.filter((kind) => !INVENTORY[kind]!.operationBound));
-  for (const kind of unbound) {
-    if (!unboundExpected.has(kind)) problems.push(`engine.ts: ${kind} is unbound but the inventory binds it`);
+  if (!/switch \(policy\.coordinator\)/.test(engine)) {
+    problems.push("engine.ts: does not dispatch on the policy coordinator");
   }
-  for (const kind of unboundExpected) {
-    if (!unbound.has(kind)) problems.push(`engine.ts: ${kind} should be unbound but is not listed`);
+  if (/switch \(inputCommand\.kind\)/.test(engine)) {
+    problems.push("engine.ts: still has a per-kind dispatch switch");
   }
-  if (!/if \(inputCommand\.kind === "request-access"\) return operations\.requestAccess/.test(read("src/authority/engine.ts"))) {
+  if (/const boundOperation = inputCommand\.kind ===/.test(engine)) {
+    problems.push("engine.ts: still has a hand-written unbound list");
+  }
+  if (!/if \(inputCommand\.kind === "request-access"\) return operations\.requestAccess/.test(engine)) {
     problems.push("engine.ts: request-access is not dispatched before principal resolution");
   }
 
-  // 3. Cloudflare dispatch: same routing, same binding.
-  const runtime = runtimeDispatch();
+  // 3. The Cloudflare runtime consumes the descriptor for the preferred
+  // organization and standing, while its transport switch still names a route
+  // target per kind. Routing parity is checked against the same table.
+  const runtimeSource = read("packages/cloudflare/src/runtime.ts");
+  if (!/commandPolicy\(command\.kind\)/.test(runtimeSource)) {
+    problems.push("runtime.ts: authorize does not read the command policy");
+  }
+  if (!/commandPolicy\(input\.kind\)/.test(runtimeSource)) {
+    problems.push("runtime.ts: command does not read the command policy");
+  }
+  if (!/switch \(policy\.standing\)/.test(runtimeSource)) {
+    problems.push("runtime.ts: does not enforce the policy standing");
+  }
+  if (/const preferred = command\.kind ===/.test(runtimeSource)) {
+    problems.push("runtime.ts: still has a hand-written preferred list");
+  }
+  const routes = runtimeDispatch();
   for (const kind of KINDS) {
     const expected = INVENTORY[kind]!;
     if (kind === "request-access") {
-      if (runtime.routes.has(kind)) problems.push("runtime.ts: request-access appears in the dispatch switch");
+      if (routes.has(kind)) problems.push("runtime.ts: request-access appears in the dispatch switch");
       continue;
     }
-    const route = runtime.routes.get(kind);
+    const route = routes.get(kind);
     if (route === undefined) {
       problems.push(`runtime.ts: ${kind} has no dispatch case`);
       continue;
@@ -312,12 +206,6 @@ test("the command inventory matches the union, both dispatches, and the standing
     if (route !== expected.coordinator) {
       problems.push(`runtime.ts: ${kind} routes to ${route}, inventory says ${expected.coordinator}`);
     }
-  }
-  for (const kind of runtime.unbound) {
-    if (!unboundExpected.has(kind)) problems.push(`runtime.ts: ${kind} is preferred-unbound but the inventory binds it`);
-  }
-  for (const kind of unboundExpected) {
-    if (!runtime.unbound.has(kind)) problems.push(`runtime.ts: ${kind} should be preferred-unbound but is not listed`);
   }
 
   // 4. Standing and mode in the portable coordinators.

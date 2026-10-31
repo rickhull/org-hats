@@ -3,6 +3,7 @@ import {
   ACCESS_ENVELOPE_VERSION,
   AUTHORITY_INTERFACE_VERSION,
   canonicalJson,
+  commandPolicy,
   isFailed,
   type AccessEnvelopeClaimsV1,
   type AccessFromEvidenceInput,
@@ -380,13 +381,8 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         claims,
       };
     }
-    const preferred = command.kind === "disable-actor" ||
-      command.kind === "unlink-principal" ||
-      command.kind === "revoke-activation" ||
-      command.kind === "create-actor" ||
-      command.kind === "update-actor" ||
-      command.kind === "appoint-administrator" ||
-      command.kind === "retire-administrator"
+    const policy = commandPolicy(command.kind);
+    const preferred = policy !== undefined && !policy.operationBound && "organizationId" in command
       ? command.organizationId
       : undefined;
     const resolved = await resolve(command.authorization.evidence, preferred);
@@ -626,17 +622,61 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     if (isFailed(authorized)) return deny(authorized.failure);
     await drain(operationId, authorized.organizationId);
 
+    const policy = commandPolicy(input.kind);
+    if (policy === undefined) return deny({ kind: "invalid-command", detail: "unknown command kind" });
+    const denyOperation = (): CommandResult =>
+      deny({ kind: "denied", detail: "the caller does not administer this operation" });
+    const denyOrganization = (): CommandResult =>
+      deny({ kind: "denied", detail: "the caller does not administer this organization" });
+
+    if (policy.mode === "fresh" && input.authorization.kind !== "fresh-evidence") {
+      return deny({ kind: "denied", detail: policy.freshDetail ?? "fresh evidence is required" });
+    }
+    if (policy.sameOrganization && "organizationId" in input &&
+      authorized.organizationId !== input.organizationId) {
+      return deny({ kind: "wrong-binding" });
+    }
+    switch (policy.standing) {
+      case "none":
+        break;
+      case "operation-admin":
+        if (!authorized.adminOfOperation) return denyOperation();
+        break;
+      case "organization-admin":
+        if (!authorized.adminOfOrganization) return denyOrganization();
+        break;
+      case "by-participation":
+        if (input.kind !== "participation-revoke") {
+          return deny({ kind: "invalid-command", detail: "wrong coordinator" });
+        }
+        if (input.by === "operation" ? !authorized.adminOfOperation : !authorized.adminOfOrganization) {
+          return input.by === "operation" ? denyOperation() : denyOrganization();
+        }
+        break;
+      case "operation-admin-or-owner":
+        // The operation coordinator applies the owner arm for select-hat.
+        break;
+      case "operation-admin-or-org-owner":
+        if (!authorized.adminOfOperation) {
+          if (input.authorization.kind !== "fresh-evidence") {
+            return deny({ kind: "denied", detail: "owner retirement requires fresh evidence" });
+          }
+          if (!authorized.adminOfOrganization) return denyOrganization();
+        }
+        break;
+      default:
+        policy.standing satisfies never;
+    }
+
     let result: CommandResult;
     switch (input.kind) {
       case "participation-invite":
-        if (!authorized.adminOfOperation) return deny({ kind: "denied", detail: "the caller does not administer this operation" });
         result = await route(operation(input.operationId), "/invite", {
           organizationId: input.organizationId,
           byActorId: authorized.actorId,
         });
         break;
       case "participation-accept":
-        if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
         result = await route(organization(authorized.organizationId), "/accept", {
           operationId: input.operationId,
           actorId: authorized.actorId,
@@ -644,13 +684,11 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         break;
       case "participation-revoke":
         if (input.by === "operation") {
-          if (!authorized.adminOfOperation) return deny({ kind: "denied", detail: "the caller does not administer this operation" });
           result = await route(operation(input.operationId), "/revoke-participation", {
             organizationId: input.organizationId,
             byActorId: authorized.actorId,
           });
         } else {
-          if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
           result = await route(organization(input.organizationId), "/revoke", {
             operationId: input.operationId,
             actorId: authorized.actorId,
@@ -658,7 +696,6 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         }
         break;
       case "admit":
-        if (!authorized.adminOfOperation) return deny({ kind: "denied", detail: "the caller does not administer this operation" });
         result = await route(operation(input.operationId), "/admit", {
           organizationId: input.organizationId,
           actorId: input.actorId,
@@ -666,7 +703,6 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         });
         break;
       case "grant-hat":
-        if (!authorized.adminOfOperation) return deny({ kind: "denied", detail: "the caller does not administer this operation" });
         result = await route(operation(input.operationId), "/grant", {
           organizationId: input.organizationId,
           actorId: input.actorId,
@@ -677,7 +713,6 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         });
         break;
       case "revoke-grant":
-        if (!authorized.adminOfOperation) return deny({ kind: "denied", detail: "the caller does not administer this operation" });
         result = await route(operation(input.operationId), "/revoke-grant", {
           grantId: input.grantId,
           byActorId: authorized.actorId,
@@ -691,11 +726,6 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         });
         break;
       case "request-team": {
-        if (input.authorization.kind !== "fresh-evidence") {
-          return deny({ kind: "denied", detail: "team changes require fresh evidence" });
-        }
-        if (authorized.organizationId !== input.organizationId) return deny({ kind: "wrong-binding" });
-        if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
         result = await route(operation(input.operationId), "/request-team", {
           teamId: input.teamId,
           siteId: input.siteId,
@@ -708,7 +738,6 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         break;
       }
       case "admit-team":
-        if (!authorized.adminOfOperation) return deny({ kind: "denied", detail: "the caller does not administer this operation" });
         result = await route(operation(input.operationId), "/admit-team", {
           teamId: input.teamId,
           byActorId: authorized.actorId,
@@ -716,10 +745,6 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         });
         break;
       case "update-team":
-        if (input.authorization.kind !== "fresh-evidence") {
-          return deny({ kind: "denied", detail: "team changes require fresh evidence" });
-        }
-        if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
         result = await route(operation(input.operationId), "/update-team", {
           teamId: input.teamId,
           displayName: input.displayName,
@@ -730,12 +755,6 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         break;
       case "retire-team": {
         const asOperationAdmin = authorized.adminOfOperation;
-        if (!asOperationAdmin) {
-          if (input.authorization.kind !== "fresh-evidence") {
-            return deny({ kind: "denied", detail: "owner retirement requires fresh evidence" });
-          }
-          if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
-        }
         result = await route(operation(input.operationId), "/retire-team", {
           teamId: input.teamId,
           byActorId: authorized.actorId,
@@ -746,7 +765,6 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         break;
       }
       case "disable-actor":
-        if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
         result = await route(organization(input.organizationId), "/disable", {
           actorId: input.actorId,
           byActorId: authorized.actorId,
@@ -754,11 +772,6 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         break;
       case "unlink-principal":
       case "revoke-activation":
-        if (input.authorization.kind !== "fresh-evidence") {
-          return deny({ kind: "denied", detail: "principal recovery requires fresh evidence" });
-        }
-        if (authorized.organizationId !== input.organizationId) return deny({ kind: "wrong-binding" });
-        if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
         result = await route(
           organization(input.organizationId),
           input.kind === "unlink-principal" ? "/unlink-principal" : "/revoke-activation",
@@ -769,11 +782,6 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
       case "update-actor":
       case "appoint-administrator":
       case "retire-administrator": {
-        if (input.authorization.kind !== "fresh-evidence") {
-          return deny({ kind: "denied", detail: "roster changes require fresh evidence" });
-        }
-        if (authorized.organizationId !== input.organizationId) return deny({ kind: "wrong-binding" });
-        if (!authorized.adminOfOrganization) return deny({ kind: "denied", detail: "the caller does not administer this organization" });
         const path = input.kind === "create-actor" ? "/create-actor"
           : input.kind === "update-actor" ? "/update-actor"
             : input.kind === "appoint-administrator" ? "/appoint-administrator"

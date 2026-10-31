@@ -142,10 +142,11 @@ Behavior-identical, in the schema-first order below.
    validators are imported; the adapter-local actor/team id and display-name
    copies are consolidated in `src/validation.ts` and documented as the
    intentional exception in `docs/cloudflare.md`.
-4. **Command descriptor** — one module states owner, operation binding,
-   authorization mode, and required standing per kind; `engine.ts` and
-   `runtime.ts` consume it instead of parallel switches and the binding list.
-   No kind carries a hat action as its authorization.
+4. ~~Command descriptor~~ — done, 2026-10-31: `src/authority/commands.ts`
+   states owner, operation binding, authorization mode, and required standing
+   per kind. The portable engine dispatches on `policy.coordinator`; the
+   Cloudflare runtime uses the table for authorization, binding, and standing
+   enforcement, leaving only its per-kind transport switch.
 5. **Portable authorization preamble** consolidated where the rules agree;
    disable's envelope path, fresh-evidence recovery, and roster writes keep
    their distinct modes.
@@ -176,8 +177,8 @@ suite references current; add the command table; record adapter-only behavior
 3. Mechanical extractions (schema, routes, conformance split, test harness)
    interleaved with the targeted tests they enable.
 4. ~~Benchmarks and measured performance work~~ — done, 2026-10-31.
-5. Command descriptor and `docs/commands.md` last, once the guards and
-   parity tests are in place.
+5. `docs/commands.md` last, once the guards, descriptor, and parity tests
+   are in place.
 
 ## Exit criteria
 

@@ -14,6 +14,7 @@
 // without pinning signature bytes.
 import { AUTHORITY_INTERFACE_VERSION, operationId, organizationId, } from "../contract.js";
 import { counter, randomActivationSecret, systemClock, webCryptoSigner } from "./internal.js";
+import { commandPolicy } from "./commands.js";
 import { createOperationCoordinator } from "./operation.js";
 import { createOrganizationCoordinator } from "./organization.js";
 import { deliverPending } from "./outbox.js";
@@ -213,54 +214,30 @@ export const createInMemoryAuthority = async (config = {}) => {
             // request-access needs no administrator: the evidence is the request
             if (inputCommand.kind === "request-access")
                 return operations.requestAccess(inputCommand);
-            // which operation this command binds to, if any: `disable-actor` is
-            // organization-scoped and binds to none
-            const boundOperation = inputCommand.kind === "disable-actor" ||
-                inputCommand.kind === "unlink-principal" ||
-                inputCommand.kind === "revoke-activation" ||
-                inputCommand.kind === "create-actor" ||
-                inputCommand.kind === "update-actor" ||
-                inputCommand.kind === "appoint-administrator" ||
-                inputCommand.kind === "retire-administrator"
-                ? undefined
-                : "operationId" in inputCommand
-                    ? operationId(inputCommand.operationId)
-                    : undefined;
+            const policy = commandPolicy(inputCommand.kind);
+            if (policy === undefined)
+                return fail("invalid-command", "unknown command kind");
+            // The descriptor owns which coordinator receives the command and
+            // whether the caller's envelope must bind to an operation.
+            const boundOperation = policy.operationBound && "operationId" in inputCommand
+                ? operationId(inputCommand.operationId)
+                : undefined;
             const principalOrFailure = await organizations.resolvePrincipal(inputCommand.authorization, boundOperation);
             if ("kind" in principalOrFailure)
                 return fail(principalOrFailure.kind, principalOrFailure.detail);
-            switch (inputCommand.kind) {
-                case "participation-accept":
-                case "disable-actor":
-                case "unlink-principal":
-                case "revoke-activation":
-                case "create-actor":
-                case "update-actor":
-                case "appoint-administrator":
-                case "retire-administrator":
+            switch (policy.coordinator) {
+                case "organization":
                     return organizations.command(inputCommand, principalOrFailure);
-                case "participation-revoke":
-                    return inputCommand.by === "operation"
+                case "operation":
+                    return operations.command(inputCommand, principalOrFailure);
+                case "by-participation":
+                    return "by" in inputCommand && inputCommand.by === "operation"
                         ? operations.command(inputCommand, principalOrFailure)
                         : organizations.command(inputCommand, principalOrFailure);
-                case "participation-invite":
-                case "admit":
-                case "grant-hat":
-                case "revoke-grant":
-                case "select-hat":
-                case "request-team":
-                case "admit-team":
-                case "update-team":
-                case "retire-team":
-                    return operations.command(inputCommand, principalOrFailure);
                 default: {
-                    // The exhaustiveness witness: this arm is `never` when every
-                    // command kind has a case, so adding one fails the build here
-                    // instead of silently routing to invalid-command. The failure —
-                    // not a throw — stays: a caller that bypasses the types (an
-                    // untyped host, a structurally stale version) still gets the
-                    // closed taxonomy, never an exception.
-                    inputCommand;
+                    // A structurally unknown descriptor cannot route; the failure, not
+                    // a throw, keeps the closed taxonomy for an untyped host.
+                    policy.coordinator;
                     return fail("invalid-command", "unknown command kind");
                 }
             }

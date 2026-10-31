@@ -44,6 +44,8 @@ export type {
   RefreshInput,
 } from "./types.ts";
 export { AUTHORITY_INTERFACE_VERSION } from "./types.ts";
+export { COMMAND_POLICY, commandPolicy } from "./commands.ts";
+export type { CommandCoordinator, CommandMode, CommandPolicy, CommandStanding } from "./commands.ts";
 
 export type {
   OrganizationReadPolicy,

@@ -173,11 +173,12 @@ public types fails the gate instead of failing at runtime.
   schema module's CREATE TABLE columns equal its export spec, and every table
   is exported or on a recorded allowance; fails naming the column and the
   direction of the drift.
-- `command-inventory.test.ts` — the command policy guard: one row per
-  `AuthorityCommand` kind (coordinator, operation binding, authorization
-  mode, required standing), verified against the type union, both dispatch
-  switches, the coordinators' standing checks, and a behavioral denial
-  matrix on the in-memory engine.
+- `command-inventory.test.ts` — the command policy guard:
+  `src/authority/commands.ts` states one row per `AuthorityCommand` kind
+  (coordinator, operation binding, authorization mode, required standing);
+  the test verifies it against the type union, the portable dispatch, the
+  runtime's route table and standing enforcement, the coordinators' standing
+  checks, and a behavioral denial matrix on the in-memory engine.
 - `failure-mapping.test.ts` — the consumer mapping guard: the example's
   product response names exactly the closed failure taxonomy in both its
   switch and its run-time walk, every mapping a complete literal triple,
