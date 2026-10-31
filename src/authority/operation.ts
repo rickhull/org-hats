@@ -32,6 +32,7 @@ import {
 } from "../contract.ts";
 import {
   applyParticipationEvent,
+  firstByRank,
   wearableGrants,
   type Grant,
   type Snapshot,
@@ -205,9 +206,12 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     const actor = orgs.get(organizationId_)?.actors.find((a) => a.actorId === actorId_);
     const orgName = orgs.get(organizationId_)?.displayName;
     const participation = snapshot.participations.find((p) => p.organizationId === organizationId_);
-    // the grant the envelope's hat was selected from: its own target, not
-    // the expanded reach the claims carry
-    const selected = wearable.find((g) => g.role === envelope.claims.hat.role);
+    // the hat in force: the same ranking issuance used (primary, then
+    // role, target, grant id). The envelope cannot name the worn grant, so
+    // the context resolves it the way every default-hat chooser does —
+    // never by a role match, which is arbitrary when two grants share a
+    // role.
+    const selected = firstByRank(wearable);
     // Presentation still may not invent an action list. A grant naming a
     // role the bundle dropped makes the context unanswerable, not empty.
     const hats: HatSummary[] = [];

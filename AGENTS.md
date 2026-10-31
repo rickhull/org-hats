@@ -180,6 +180,10 @@ and only after the entry test passes; a failing test means no questionnaire.
   surface is frozen at its tags; post-alpha interface changes are
   additive-only or re-reviewed with the consumer.
 - Distribution stays on git tags; no registry publication.
+- Bugfixes land test-first: a test that reproduces the defect is written
+  and proven red against the current code before the fix, and both land in
+  the same change. A feature request with a crisp acceptance condition
+  takes the same order when one test can state it.
 - Commentary states the invariant that must hold, present tense; history
   stays in commit messages.
 - `plans/` is forward work: each plan names the work or decision, its

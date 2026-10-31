@@ -37,6 +37,7 @@ import {
   type VerifyKey,
   type VerifyKeySet,
 } from "org-hats/access";
+import { firstByRank, type ActiveGrant } from "org-hats";
 import type { Env } from "./env";
 import { subjectGuardName } from "./subject-guard";
 
@@ -470,7 +471,11 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
       role: claims.hat.role,
     });
     if (!op.ok || op.value === undefined) return failed(op.failure ?? { kind: "unavailable" });
-    const selected = op.value.wearableHats.find((hat) => hat.role === claims.hat.role);
+    // The hat in force by the issuance ranking, not a role match: with two
+    // grants of one role the first match is arbitrary. `HatSummary` carries
+    // everything `firstByRank` reads (primary, role, target, grant id) with
+    // unbranded ids, hence the structural cast.
+    const selected = firstByRank(op.value.wearableHats as unknown as readonly ActiveGrant[]);
     return {
       actor: {
         organizationId: claims.actor.organizationId,
@@ -491,7 +496,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
               role: claims.hat.role,
               actions: [...claims.hat.actions],
               target: selected.target,
-              primary: selected.primary,
+              primary: selected.primary === true,
               grantId: selected.grantId,
             },
           }),

@@ -12,7 +12,7 @@
 // process; the deployed shape projects those facts into the operation
 // instead (docs/authority_redesign.md § State ownership).
 import { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, actorId, asJson, canonicalJson, envelopeVersionFailure, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";
-import { applyParticipationEvent, wearableGrants, } from "../model.js";
+import { applyParticipationEvent, firstByRank, wearableGrants, } from "../model.js";
 import { actionsOf } from "../policy.js";
 import { sha256Hex } from "./internal.js";
 import { assembleAccessClaims, authenticationFactsOf } from "./claims.js";
@@ -130,9 +130,12 @@ export const createOperationCoordinator = (deps) => {
         const actor = orgs.get(organizationId_)?.actors.find((a) => a.actorId === actorId_);
         const orgName = orgs.get(organizationId_)?.displayName;
         const participation = snapshot.participations.find((p) => p.organizationId === organizationId_);
-        // the grant the envelope's hat was selected from: its own target, not
-        // the expanded reach the claims carry
-        const selected = wearable.find((g) => g.role === envelope.claims.hat.role);
+        // the hat in force: the same ranking issuance used (primary, then
+        // role, target, grant id). The envelope cannot name the worn grant, so
+        // the context resolves it the way every default-hat chooser does —
+        // never by a role match, which is arbitrary when two grants share a
+        // role.
+        const selected = firstByRank(wearable);
         // Presentation still may not invent an action list. A grant naming a
         // role the bundle dropped makes the context unanswerable, not empty.
         const hats = [];
