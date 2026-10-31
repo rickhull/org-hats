@@ -72,6 +72,14 @@ test("defineWorld names every cross-reference a snapshot may get wrong", () => {
       ...s,
       teams: [{ ...s.teams[0]!, organizationId: "org-missing" }],
     }), /team team-own names the unknown organization org-missing/],
+    ["a participation naming an unknown organization", (s) => ({
+      ...s,
+      participations: [{ ...s.participations[0]!, organizationId: "org-missing" }],
+    }), /a participation names the unknown organization org-missing/],
+    ["a participation naming an unknown operation", (s) => ({
+      ...s,
+      participations: [{ ...s.participations[0]!, operationId: "op-missing" }],
+    }), /a participation names the unknown operation op-missing/],
     ["a grant naming an unknown operation", (s) => ({
       ...s,
       grants: [{ ...s.grants[0]!, operationId: "op-missing" }],
@@ -80,6 +88,10 @@ test("defineWorld names every cross-reference a snapshot may get wrong", () => {
       ...s,
       grants: [{ ...s.grants[0]!, actorId: "actor-missing" }],
     }), /grant g-own names an unknown actor/],
+    ["a grant naming an unknown site", (s) => ({
+      ...s,
+      grants: [{ ...s.grants[0]!, target: { kind: "site" as const, siteId: "site-missing" } }],
+    }), /grant g-own names an unknown site/],
     ["a grant with no participation to stand on", (s) => ({ ...s, participations: [] }), /grant g-own has no participation to stand on/],
     ["a grant naming an unknown role", (s) => ({
       ...s,

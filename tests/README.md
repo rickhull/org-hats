@@ -41,6 +41,22 @@ Pre-push and the Codeberg per-push CI run the portable gate. The workerd
 suite runs in ring 2, `pnpm verify`, `bin/release`, and the GitHub mirror job;
 it is not part of per-push Codeberg CI.
 
+## Coverage
+
+`pnpm coverage` runs Node's built-in coverage over `src/` with the same
+portable suites as `pnpm test`. It is opt-in, not a gate; no threshold is
+enforced.
+
+Baseline, 2026-10-31, after the phase-1 guards and the first gap-closing
+tests: **99.22% lines / 86.32% branches / 99.36% functions** over `src/`.
+The remaining gaps are classified in `plans/refactor.md` phase 2 while that
+plan is open.
+
+The workerd ring has no coverage provider. Cloudflare's vitest-plugin
+coverage documentation was unavailable when evaluated (404), and there is no
+threshold to justify a dev dependency; the portable baseline plus the named
+workerd suites cover that seam for now.
+
 ## Spec witnesses
 
 Every invariant in `specs/` has at least one named witness. A witness is:
