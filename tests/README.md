@@ -162,6 +162,10 @@ public types fails the gate instead of failing at runtime.
   mode, required standing), verified against the type union, both dispatch
   switches, the coordinators' standing checks, and a behavioral denial
   matrix on the in-memory engine.
+- `failure-mapping.test.ts` — the consumer mapping guard: the example's
+  product response names exactly the closed failure taxonomy in both its
+  switch and its run-time walk, every mapping a complete literal triple,
+  the `never` default in place, and `detail` never read.
 - `generative.test.ts` — 100 seeded states, duplicate commands, partial
   failure and outbox replay.
 - `release-tools.test.ts` — the release-tag guard against throwaway

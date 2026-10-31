@@ -39,16 +39,15 @@ seam (A3), or merging the portable and Durable Object state models.
 
 ## 1. Guards before movement
 
-Make drift fail before moving any code. The schema/spec parity guard
-(2026-10-30, `tests/schema-parity.test.ts`) and the command inventory
-(2026-10-30, `tests/command-inventory.test.ts`) hold; the rest remain.
+Make drift fail before moving any code. Three of the five guards hold —
+schema/spec parity, the command inventory, and failure mapping (2026-10-30,
+`tests/schema-parity.test.ts`, `tests/command-inventory.test.ts`,
+`tests/failure-mapping.test.ts`); the rest remain.
 
-1. **Failure mapping.** Every closed `FailureKind` has a consumer/product
-   mapping in the example and a test that it is not dropped.
-2. **Restore matrix.** Organization and operation exports at each supported
+1. **Restore matrix.** Organization and operation exports at each supported
    schema restore; teams without status default active; older columns read
    null; an unsupported future version is refused.
-3. **Dead surface.** The ignored `admit.teamId` is documented as deprecated;
+2. **Dead surface.** The ignored `admit.teamId` is documented as deprecated;
    removal is an interface-bump item, not a quiet deletion.
 
 **Done when:** each guard is a test that fails on the drift it names.
