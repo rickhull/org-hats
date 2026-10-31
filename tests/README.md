@@ -48,7 +48,7 @@ portable suites as `pnpm test`. It is opt-in, not a gate; no threshold is
 enforced.
 
 Baseline, 2026-10-31, after the phase-1 guards and the gap-closing tests:
-**99.58% lines / 87.50% branches / 99.68% functions** over `src/`. The
+**99.58% lines / 87.80% branches / 99.68% functions** over `src/`. The
 remaining gaps are classified in `plans/refactor.md` phase 2 while that plan
 is open.
 
@@ -182,8 +182,8 @@ public types fails the gate instead of failing at runtime.
   product response names exactly the closed failure taxonomy in both its
   switch and its run-time walk, every mapping a complete literal triple,
   the `never` default in place, and `detail` never read.
-- `generative.test.ts` — 100 seeded states, duplicate commands, partial
-  failure and outbox replay.
+- `generative.test.ts` — 100 seeded states, seeded roster/team command
+  sequences, duplicate commands, partial failure and outbox replay.
 - `release-tools.test.ts` — the release-tag guard against throwaway
   repositories, both tag families.
 - `gate-cache.test.ts` — the local per-commit gate marker, and its

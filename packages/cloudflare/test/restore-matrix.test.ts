@@ -167,6 +167,86 @@ describe("the restore matrix", () => {
     }
   }, 60_000);
 
+  it("round-trips command-built roster and team state", async () => {
+    const world = await createCloudflareConformanceWorld(env);
+    const OP = "op-9f2e6ad4";
+    const HARBOR = "org-4c1f9a2e";
+    const FRESH = {
+      kind: "fresh-evidence" as const,
+      evidence: CONFORMANCE_PRINCIPALS.dana.evidence,
+      operationId: OP,
+    };
+    const run = async (body: Record<string, unknown>, authorization: unknown, key: string) => {
+      const result = await world.runtime.command({
+        interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+        idempotencyKey: key,
+        authorization,
+        ...body,
+      } as never);
+      expect(result.ok ?? false).toBe(true);
+    };
+
+    const admin = await world.runtime.accessFromEvidence({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      operationId: OP,
+      evidence: CONFORMANCE_PRINCIPALS.len.evidence,
+    });
+    if (isFailed(admin)) throw new Error(`admin issuance failed: ${admin.failure.kind}`);
+    const ADMIN = { kind: "access-envelope" as const, envelope: admin.envelope };
+
+    await run(
+      { kind: "create-actor", organizationId: HARBOR, actorId: "actor-restore-hand", displayName: "Restored Hand" },
+      FRESH,
+      "roundtrip-create",
+    );
+    await run(
+      { kind: "update-actor", organizationId: HARBOR, actorId: "actor-3a91c4d8", displayName: "Restored Sam" },
+      FRESH,
+      "roundtrip-update",
+    );
+    await run(
+      { kind: "appoint-administrator", organizationId: HARBOR, actorId: "actor-3a91c4d8" },
+      FRESH,
+      "roundtrip-appoint",
+    );
+    await run(
+      { kind: "request-team", operationId: OP, organizationId: HARBOR, teamId: "team-restore-roundtrip", siteId: "site-e4a1c9b3" },
+      FRESH,
+      "roundtrip-request-team",
+    );
+    await run(
+      { kind: "admit-team", operationId: OP, teamId: "team-restore-roundtrip" },
+      ADMIN,
+      "roundtrip-admit-team",
+    );
+    await run(
+      { kind: "update-team", operationId: OP, teamId: "team-restore-roundtrip", displayName: "Restored Crew" },
+      FRESH,
+      "roundtrip-update-team",
+    );
+
+    const sourceOperation = await exportCoordinator("operation", OP);
+    const sourceOrganization = await exportCoordinator("organization", HARBOR);
+    expect(sourceOrganization.tables["actors"]?.some((row) => row["actor_id"] === "actor-restore-hand")).toBe(true);
+    expect(sourceOperation.tables["teams"]?.some((row) =>
+      row["team_id"] === "team-restore-roundtrip" &&
+      row["display_name"] === "Restored Crew" &&
+      row["status"] === "active",
+    )).toBe(true);
+
+    const targetOperation = "op-restore-roundtrip";
+    const targetOrganization = "org-restore-roundtrip";
+    const restoredOperation = await restore("operation", targetOperation, sourceOperation);
+    expect(restoredOperation.status).toBe(200);
+    expect(restoredOperation.body.ok).toBe(true);
+    const restoredOrganization = await restore("organization", targetOrganization, sourceOrganization);
+    expect(restoredOrganization.status).toBe(200);
+    expect(restoredOrganization.body.ok).toBe(true);
+
+    expect(await exportCoordinator("operation", targetOperation)).toEqual(sourceOperation);
+    expect(await exportCoordinator("organization", targetOrganization)).toEqual(sourceOrganization);
+  }, 60_000);
+
   it("refuses a future schema version for both coordinators", async () => {
     const world = await createCloudflareConformanceWorld(env);
     const operationSnapshot = await exportCoordinator("operation", "op-9f2e6ad4");

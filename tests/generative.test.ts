@@ -25,6 +25,7 @@ import {
 } from "../src/model.ts";
 import type { PolicyBundle } from "../src/policy.ts";
 import { validatePolicyBundle } from "../src/policy.ts";
+import { PROFESSIONAL_OPERATION } from "../src/authority/twins.ts";
 import { fixedClock } from "../src/authority/internal.ts";
 import {
   CONFORMANCE_PRINCIPALS,
@@ -471,6 +472,68 @@ test("[A8] duplicate commands: every mutating command claims its key", async () 
       "dup-admit",
     );
   }
+  {
+    const engine = await setup();
+    const dana = freshAuth(CONFORMANCE_PRINCIPALS.dana);
+    await applyTwice(
+      engine,
+      { kind: "create-actor", organizationId: "org-4c1f9a2e", actorId: "actor-gen-created", displayName: "Generated Hand" },
+      dana,
+      "dup-create-actor",
+    );
+    await applyTwice(
+      engine,
+      { kind: "update-actor", organizationId: "org-4c1f9a2e", actorId: "actor-3a91c4d8", displayName: "Renamed Hand" },
+      dana,
+      "dup-update-actor",
+    );
+  }
+  {
+    const engine = await setup();
+    const dana = freshAuth(CONFORMANCE_PRINCIPALS.dana);
+    await applyTwice(
+      engine,
+      { kind: "appoint-administrator", organizationId: "org-4c1f9a2e", actorId: "actor-3a91c4d8" },
+      dana,
+      "dup-appoint-administrator",
+    );
+    await applyTwice(
+      engine,
+      { kind: "retire-administrator", organizationId: "org-4c1f9a2e", actorId: "actor-3a91c4d8" },
+      dana,
+      "dup-retire-administrator",
+    );
+  }
+  {
+    const engine = await setup();
+    const dana = freshAuth(CONFORMANCE_PRINCIPALS.dana);
+    const admin = envelopeAuth((await issue(engine, CONFORMANCE_PRINCIPALS.len)).envelope);
+    const teamId = "team-gen-lifecycle";
+    await applyTwice(
+      engine,
+      { kind: "request-team", operationId: OP, organizationId: "org-4c1f9a2e", teamId, siteId: "site-e4a1c9b3" },
+      dana,
+      "dup-request-team",
+    );
+    await applyTwice(
+      engine,
+      { kind: "admit-team", operationId: OP, teamId },
+      admin,
+      "dup-admit-team",
+    );
+    await applyTwice(
+      engine,
+      { kind: "update-team", operationId: OP, teamId, displayName: "Generated Crew" },
+      dana,
+      "dup-update-team",
+    );
+    await applyTwice(
+      engine,
+      { kind: "retire-team", operationId: OP, teamId },
+      dana,
+      "dup-retire-team",
+    );
+  }
 });
 
 test("idempotency misuse: the same key with a different payload is invalid", async () => {
@@ -488,6 +551,42 @@ test("idempotency misuse: the same key with a different payload is invalid", asy
   assert.ok(first.ok && first.receipt.applied);
   const changed = await command(engine, { ...body, role: "field" }, admin, "misuse-key");
   assert.ok(!changed.ok && changed.failure.kind === "invalid-command");
+});
+
+test("generated command sequences: roster and team commands preserve invariants", async () => {
+  for (let seed = 1; seed <= 8; seed++) {
+    const engine = await setup();
+    const dana = freshAuth(CONFORMANCE_PRINCIPALS.dana);
+    const admin = envelopeAuth((await issue(engine, CONFORMANCE_PRINCIPALS.len)).envelope);
+    const actor = `actor-gen-${seed}`;
+    const team = `team-gen-${seed}`;
+    const site = seed % 2 === 0 ? "site-e4a1c9b3" : "site-b8d620fa";
+    const run = async (body: CommandBody, authorization: AuthorityCommand["authorization"], key: string) => {
+      const result = await command(engine, body, authorization, key);
+      assert.ok(result.ok, `seed ${seed}: ${body.kind}`);
+    };
+
+    await run({ kind: "create-actor", organizationId: "org-4c1f9a2e", actorId: actor, displayName: `Generated ${seed}` }, dana, `gen-${seed}-create`);
+    await run({ kind: "update-actor", organizationId: "org-4c1f9a2e", actorId: actor, displayName: `Renamed ${seed}` }, dana, `gen-${seed}-update`);
+    await run({ kind: "appoint-administrator", organizationId: "org-4c1f9a2e", actorId: actor }, dana, `gen-${seed}-appoint`);
+    await run({ kind: "retire-administrator", organizationId: "org-4c1f9a2e", actorId: actor }, dana, `gen-${seed}-retire-admin`);
+    await run(
+      { kind: "request-team", operationId: OP, organizationId: "org-4c1f9a2e", teamId: team, siteId: site, displayName: `Crew ${seed}` },
+      dana,
+      `gen-${seed}-request-team`,
+    );
+    await run({ kind: "admit-team", operationId: OP, teamId: team }, admin, `gen-${seed}-admit-team`);
+    await run({ kind: "update-team", operationId: OP, teamId: team, displayName: `Renamed Crew ${seed}` }, dana, `gen-${seed}-update-team`);
+    await run({ kind: "retire-team", operationId: OP, teamId: team }, dana, `gen-${seed}-retire-team`);
+
+    const snapshot = engine.snapshotOf(OP);
+    assert.ok(snapshot !== undefined, `seed ${seed}: snapshot`);
+    assert.deepEqual(
+      invariantProblems(snapshot, PROFESSIONAL_OPERATION.policy),
+      [],
+      `seed ${seed}: invariants after roster and team commands`,
+    );
+  }
 });
 
 test("[A2] partial workflow failure: retries converge, replays are no-ops, and state stays visible", async () => {

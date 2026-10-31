@@ -52,7 +52,7 @@ the fifth, a standing rule rather than a test.
 
 1. **Baseline measurement.** Done, 2026-10-31: `pnpm coverage` runs Node's
    built-in coverage over the portable suites (opt-in; no gate, no
-   threshold). Baseline after the gap-closing tests: 99.58% lines / 87.50%
+   threshold). Baseline after the gap-closing tests: 99.58% lines / 87.80%
    branches / 99.68% functions over `src/`. The workerd provider is
    deferred: Cloudflare's vitest-plugin coverage documentation was a 404 when
    evaluated, no threshold exists to enforce, and a dev dependency would buy
@@ -74,8 +74,11 @@ the fifth, a standing rule rather than a test.
 3. **Targeted suites.** Close gaps that represent real behavior, not vanity
    lines. Where a threshold helps, apply it to `src/authority`, `src/access`,
    and the Cloudflare coordinators, excluding conformance fixture data.
-4. **Generative extension.** Extend the seeded suite to the roster and team
-   commands and to restore round-trips.
+4. **Generative extension.** Done, 2026-10-31: duplicate-command cases cover
+   create/update actor, appoint/retire administrator, and
+   request/admit/update/retire team; eight seeded command sequences re-check
+   invariants after the roster and team writes; and the workerd restore matrix
+   round-trips command-built roster and team state through export and restore.
 5. **Determinism audit.** Repeat the suites to catch clock/outbox/DO ordering
    flakes; fix or record each.
 6. **Adversarial concurrency review.** Test the stated bounds against
