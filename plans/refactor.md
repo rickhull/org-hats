@@ -153,9 +153,10 @@ Behavior-identical, in the schema-first order below.
    operation lookup and simple administrator gate. Disable's envelope path,
    fresh-evidence recovery, roster writes, select-hat, and the team writes
    keep their distinct rules.
-6. **Conformance inventory split** by family (`model`, `auth`, `participation`,
-   `commands`, `activation`, `roster`, `team`, `access`) with one exported
-   list.
+6. ~~Conformance inventory split~~ — done, 2026-10-31: the families live
+   under `src/conformance/` (`model`, `auth`, `activation`, `roster`, `team`,
+   `participation`, `commands`, `access`); `src/conformance/cases.ts` exports
+   the one ordered list, and `src/conformance.ts` keeps the public surface.
 7. **Portable test harness** extracted for fixtures, engine setup, command and
    envelope builders, shared by the domain suites.
 8. **`docs/commands.md`** — kind → owner, scope, authorization mode,
