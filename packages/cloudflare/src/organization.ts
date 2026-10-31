@@ -14,6 +14,7 @@ import {
   type StateRow,
 } from "./state";
 import { initializeOrganizationSchema } from "./schema/organization";
+import { handleOrganizationRequest } from "./http/organization";
 
 /** One organization authority. The object owns the facts that stay stable
  * while the organization participates in several operations: actors,
@@ -43,24 +44,7 @@ const value = <T>(result: T): { readonly ok: true; readonly value: T } => ({ ok:
 const payloadOf = (input: Record<string, unknown>): string =>
   canonicalJson(input as unknown as JsonValue);
 
-const asRecord = (input: unknown): Record<string, unknown> => {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    throw new Error("the request body must be a JSON object");
-  }
-  return input as Record<string, unknown>;
-};
-
-const asString = (input: unknown, field: string): string => {
-  if (typeof input !== "string" || input.length === 0) throw new Error(`${field} must be a non-empty string`);
-  return input;
-};
-
-const asArray = (input: unknown, field: string): unknown[] => {
-  if (!Array.isArray(input)) throw new Error(`${field} must be an array`);
-  return input;
-};
-
-interface BootstrapInput {
+export interface BootstrapInput {
   readonly organizationId: string;
   readonly displayName?: string;
   readonly actors: readonly {
@@ -77,48 +61,48 @@ interface BootstrapInput {
   readonly sealedIdpConfig?: string;
 }
 
-interface AcceptInput {
+export interface AcceptInput {
   readonly operationId: string;
   readonly actorId: string;
   readonly idempotencyKey: string;
 }
 
-interface RevokeInput extends AcceptInput {}
+export interface RevokeInput extends AcceptInput {}
 
-interface DisableInput {
+export interface DisableInput {
   readonly actorId: string;
   readonly byActorId: string;
   readonly idempotencyKey: string;
 }
 
-interface ActivationRequestInput {
+export interface ActivationRequestInput {
   readonly actorId: string;
   readonly byActorId: string;
   readonly secretHash: string;
   readonly operator?: boolean;
 }
 
-interface ActivationAcceptInput {
+export interface ActivationAcceptInput {
   readonly secretHash: string;
   readonly provider: string;
   readonly subject: string;
 }
 
-interface RecoveryInput {
+export interface RecoveryInput {
   readonly actorId: string;
   readonly byActorId: string;
   readonly idempotencyKey: string;
   readonly operator?: boolean;
 }
 
-interface CreateActorInput {
+export interface CreateActorInput {
   readonly actorId: string;
   readonly displayName?: string;
   readonly byActorId: string;
   readonly idempotencyKey: string;
 }
 
-interface UpdateActorInput {
+export interface UpdateActorInput {
   readonly actorId: string;
   /** `null` clears the display name; the field is required so a retry cannot
    * change shape between absent and null. */
@@ -127,7 +111,7 @@ interface UpdateActorInput {
   readonly idempotencyKey: string;
 }
 
-interface AdministratorInput {
+export interface AdministratorInput {
   readonly actorId: string;
   readonly byActorId: string;
   readonly idempotencyKey: string;
@@ -849,6 +833,72 @@ export class OrganizationAuthority extends DurableObject<Env> {
     });
   }
 
+  private intakeParticipationRevoked(operationId: string): Result<{ applied: boolean }> {
+    const at = now();
+    return this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec(
+        "UPDATE invitations SET status = 'revoked', updated_at = ? WHERE operation_id = ? AND status IN ('pending', 'accepted')",
+        at,
+        operationId,
+      );
+      this.audit("operation", `participation in ${operationId} revoked by operation`, at);
+      return value({ applied: true });
+    });
+  }
+
+  private actorView(actorId: string): {
+    readonly actorId: string;
+    readonly displayName?: string;
+    readonly disabled: boolean;
+    readonly linked: boolean;
+  } | undefined {
+    const actor = this.actor(actorId);
+    if (actor === undefined) return undefined;
+    return {
+      ...actor,
+      linked: this.one("SELECT 1 AS present FROM principal_links WHERE actor_id = ? LIMIT 1", actorId) !== undefined,
+    };
+  }
+
+  private rosterView(): {
+    readonly organizationId: string | null;
+    readonly actors: readonly { readonly actorId: string; readonly disabled: boolean }[];
+  } {
+    return {
+      organizationId: this.organizationId() ?? null,
+      actors: this.roster(),
+    };
+  }
+
+  private idpConfig(): { readonly present: boolean; readonly config?: string } {
+    const row = this.one("SELECT sealed_idp_config FROM organization LIMIT 1");
+    return {
+      present: row !== undefined && row["sealed_idp_config"] !== null,
+      ...(row !== undefined && row["sealed_idp_config"] !== null
+        ? { config: String(row["sealed_idp_config"]) }
+        : {}),
+    };
+  }
+
+  private organizationSummary(): { readonly organizationId: string | null; readonly displayName: string | null } {
+    const organizationId = this.organizationId();
+    const organization = organizationId === undefined
+      ? undefined
+      : this.one("SELECT display_name FROM organization WHERE organization_id = ?", organizationId);
+    const displayName = organization?.["display_name"];
+    return {
+      organizationId: organizationId ?? null,
+      displayName: displayName === undefined || displayName === null ? null : String(displayName),
+    };
+  }
+
+  private reset(): Result<{ reset: true }> {
+    for (const table of ["organization", "actors", "principal_links", "activation_requests", "org_admins", "invitations", "audit", "claims", "outbox"]) {
+      this.ctx.storage.sql.exec(`DELETE FROM ${table}`);
+    }
+    return value({ reset: true });
+  }
+
   private status(): Record<string, unknown> {
     const organizationId = this.organizationId();
     const organization = organizationId === undefined
@@ -962,290 +1012,39 @@ export class OrganizationAuthority extends DurableObject<Env> {
   }
 
   override async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
-    const json = (body: unknown, status = 200): Response =>
-      Response.json(body, { status });
-    const readBody = async (): Promise<Record<string, unknown>> => asRecord(await request.json());
-
-    try {
-      if (request.method === "POST" && url.pathname === "/bootstrap") {
-        const body = await readBody();
-        const input: BootstrapInput = {
-          organizationId: asString(body["organizationId"], "organizationId"),
-          ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
-          actors: asArray(body["actors"], "actors").map((entry) => {
-            const actor = asRecord(entry);
-            return {
-              actorId: asString(actor["actorId"], "actorId"),
-              ...(actor["displayName"] === undefined ? {} : { displayName: asString(actor["displayName"], "displayName") }),
-              ...(actor["disabled"] === true ? { disabled: true } : {}),
-            };
-          }),
-          principalLinks: asArray(body["principalLinks"], "principalLinks").map((entry) => {
-            const link = asRecord(entry);
-            return {
-              provider: asString(link["provider"], "provider"),
-              subject: asString(link["subject"], "subject"),
-              actorId: asString(link["actorId"], "actorId"),
-            };
-          }),
-          orgAdmins: asArray(body["orgAdmins"], "orgAdmins").map((entry) => asString(entry, "orgAdmins entry")),
-          ...(body["sealedIdpConfig"] === undefined ? {} : { sealedIdpConfig: asString(body["sealedIdpConfig"], "sealedIdpConfig") }),
-        };
-        return json(this.bootstrap(input));
-      }
-
-      if (request.method === "GET" && url.pathname === "/resolve") {
-        return json(this.resolve(
-          asString(url.searchParams.get("provider"), "provider"),
-          asString(url.searchParams.get("subject"), "subject"),
-        ));
-      }
-
-      if (request.method === "GET" && url.pathname === "/principal-links") {
-        return json(value({ links: this.principalLinks() }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/principal-link") {
-        const body = await readBody();
-        const result = this.linkPrincipal({
-          provider: asString(body["provider"], "provider"),
-          subject: asString(body["subject"], "subject"),
-          actorId: asString(body["actorId"], "actorId"),
-        });
-        return json(result, result.ok ? 200 : result.failure.kind === "unavailable" ? 503 : 400);
-      }
-
-      if (request.method === "POST" && url.pathname === "/activation-request") {
-        const body = await request.json();
-        const input = asRecord(body);
-        return json(this.activationRequest({
-          actorId: asString(input["actorId"], "actorId"),
-          byActorId: asString(input["byActorId"], "byActorId"),
-          secretHash: asString(input["secretHash"], "secretHash"),
-          ...(input["operator"] === true ? { operator: true } : {}),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/activation-inspect") {
-        const body = asRecord(await request.json());
-        return json(this.activationInspect(asString(body["secretHash"], "secretHash")));
-      }
-
-      if (request.method === "POST" && url.pathname === "/activation-preflight") {
-        const body = asRecord(await request.json());
-        return json(this.activationPreflight({
-          secretHash: asString(body["secretHash"], "secretHash"),
-          provider: asString(body["provider"], "provider"),
-          subject: asString(body["subject"], "subject"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/activation-accept") {
-        const body = asRecord(await request.json());
-        return json(this.activationAccept({
-          secretHash: asString(body["secretHash"], "secretHash"),
-          provider: asString(body["provider"], "provider"),
-          subject: asString(body["subject"], "subject"),
-        }));
-      }
-
-      if (request.method === "POST" && (url.pathname === "/revoke-activation" || url.pathname === "/unlink-principal")) {
-        const body = asRecord(await request.json());
-        const input: RecoveryInput = {
-          actorId: asString(body["actorId"], "actorId"),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-          ...(body["operator"] === true ? { operator: true } : {}),
-        };
-        return json(url.pathname === "/revoke-activation"
-          ? this.revokeActivation(input)
-          : this.unlinkPrincipal(input));
-      }
-
-      if (request.method === "POST" && url.pathname === "/invite") {
-        const body = await readBody();
-        return json(this.invite(
-          asString(body["invitationId"], "invitationId"),
-          asString(body["operationId"], "operationId"),
-        ));
-      }
-
-      if (request.method === "POST" && url.pathname === "/intake") {
-        const body = await readBody();
-        const kind = asString(body["kind"], "kind");
-        if (kind === "invitation") {
-          const result = this.invite(
-            asString(body["invitationId"], "invitationId"),
-            asString(body["operationId"], "operationId"),
-          );
-          return json(result, result.ok ? 200 : 503);
-        }
-        if (kind === "participation-revoked") {
-          const operationId = asString(body["operationId"], "operationId");
-          const at = now();
-          return json(this.ctx.storage.transactionSync(() => {
-            this.ctx.storage.sql.exec(
-              "UPDATE invitations SET status = 'revoked', updated_at = ? WHERE operation_id = ? AND status IN ('pending', 'accepted')",
-              at,
-              operationId,
-            );
-            this.audit("operation", `participation in ${operationId} revoked by operation`, at);
-            return value({ applied: true });
-          }));
-        }
-        return json(failure("invalid-command", `unknown intake kind ${kind}`), 400);
-      }
-
-      if (request.method === "POST" && url.pathname === "/drain") {
-        return json(value(await this.drain()));
-      }
-
-      if (request.method === "POST" && url.pathname === "/accept") {
-        const body = await readBody();
-        return json(this.accept({
-          operationId: asString(body["operationId"], "operationId"),
-          actorId: asString(body["actorId"], "actorId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/revoke") {
-        const body = await readBody();
-        return json(this.revoke({
-          operationId: asString(body["operationId"], "operationId"),
-          actorId: asString(body["actorId"], "actorId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/disable") {
-        const body = await readBody();
-        return json(this.disable({
-          actorId: asString(body["actorId"], "actorId"),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/create-actor") {
-        const body = await readBody();
-        return json(this.createActor({
-          actorId: asString(body["actorId"], "actorId"),
-          ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/update-actor") {
-        const body = await readBody();
-        return json(this.updateActor({
-          actorId: asString(body["actorId"], "actorId"),
-          displayName: body["displayName"] === null ? null : asString(body["displayName"], "displayName"),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && (url.pathname === "/appoint-administrator" || url.pathname === "/retire-administrator")) {
-        const body = await readBody();
-        const input: AdministratorInput = {
-          actorId: asString(body["actorId"], "actorId"),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        };
-        return json(url.pathname === "/appoint-administrator"
-          ? this.appointAdministrator(input)
-          : this.retireAdministrator(input));
-      }
-
-      if (request.method === "GET" && url.pathname === "/admin") {
-        const actorId = asString(url.searchParams.get("actorId"), "actorId");
-        return json(value({ admin: this.isAdmin(actorId) }));
-      }
-
-      if (request.method === "GET" && url.pathname === "/actor") {
-        const actorId = asString(url.searchParams.get("actorId"), "actorId");
-        const actor = this.actor(actorId);
-        return actor === undefined
-          ? json(failure("unauthenticated", "unknown actor"), 404)
-          : json(value({
-              ...actor,
-              linked: this.one("SELECT 1 AS present FROM principal_links WHERE actor_id = ? LIMIT 1", actorId) !== undefined,
-            }));
-      }
-
-      if (request.method === "GET" && url.pathname === "/roster") {
-        // the reconciliation direction: an operation pulls this to repair a
-        // roster push that never arrived
-        return json(value({
-          organizationId: this.organizationId() ?? null,
-          actors: this.roster(),
-        }));
-      }
-
-      if (request.method === "GET" && url.pathname === "/idp-config") {
-        // the sealed provider configuration, for the runtime's exchange —
-        // internal surface only (the coordinator is reachable solely through
-        // the Worker), and parsed by the runtime, never here
-        const row = this.one(
-          "SELECT sealed_idp_config FROM organization LIMIT 1",
-        );
-        return json(value({
-          present: row !== undefined && row["sealed_idp_config"] !== null,
-          ...(row !== undefined && row["sealed_idp_config"] !== null
-            ? { config: String(row["sealed_idp_config"]) }
-            : {}),
-        }));
-      }
-
-      if (request.method === "GET" && url.pathname === "/organization") {
-        const organizationId = this.organizationId();
-        const organization = organizationId === undefined
-          ? undefined
-          : this.one("SELECT display_name FROM organization WHERE organization_id = ?", organizationId);
-        return json(value({
-          organizationId: organizationId ?? null,
-          displayName: organization?.["display_name"] ?? null,
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/reset") {
-        for (const table of ["organization", "actors", "principal_links", "activation_requests", "org_admins", "invitations", "audit", "claims", "outbox"]) {
-          this.ctx.storage.sql.exec(`DELETE FROM ${table}`);
-        }
-        return json(value({ reset: true }));
-      }
-
-      if (request.method === "GET" && url.pathname === "/status") {
-        return json(value(this.status()));
-      }
-
-      if (request.method === "GET" && url.pathname === "/export") {
-        return json(value(this.exportSnapshot()));
-      }
-
-      if (request.method === "POST" && url.pathname === "/restore") {
-        return json(this.restoreSnapshot(await request.json()));
-      }
-
-      if (request.method === "GET" && url.pathname === "/audit") {
-        return json(value(this.auditRows()));
-      }
-
-      if (request.method === "GET" && url.pathname === "/outbox") {
-        return json(value(this.outboxRows()));
-      }
-
-      const delivered = /^\/outbox\/([^/]+)\/delivered$/.exec(url.pathname);
-      if (request.method === "POST" && delivered !== null) {
-        return json(this.markDelivered(decodeURIComponent(delivered[1] ?? "")));
-      }
-
-      return json(failure("wrong-binding", "unknown organization route"), 404);
-    } catch (error) {
-      return json(failure("invalid-command", error instanceof Error ? error.message : "invalid request"), 400);
-    }
+    return handleOrganizationRequest(request, {
+      bootstrap: (input) => this.bootstrap(input),
+      resolve: (provider, subject) => this.resolve(provider, subject),
+      principalLinks: () => this.principalLinks(),
+      linkPrincipal: (input) => this.linkPrincipal(input),
+      activationRequest: (input) => this.activationRequest(input),
+      activationInspect: (secretHash) => this.activationInspect(secretHash),
+      activationPreflight: (input) => this.activationPreflight(input),
+      activationAccept: (input) => this.activationAccept(input),
+      revokeActivation: (input) => this.revokeActivation(input),
+      unlinkPrincipal: (input) => this.unlinkPrincipal(input),
+      invite: (invitationId, operationId) => this.invite(invitationId, operationId),
+      intakeParticipationRevoked: (operationId) => this.intakeParticipationRevoked(operationId),
+      drain: () => this.drain(),
+      accept: (input) => this.accept(input),
+      revoke: (input) => this.revoke(input),
+      disable: (input) => this.disable(input),
+      createActor: (input) => this.createActor(input),
+      updateActor: (input) => this.updateActor(input),
+      appointAdministrator: (input) => this.appointAdministrator(input),
+      retireAdministrator: (input) => this.retireAdministrator(input),
+      isAdmin: (actorId) => this.isAdmin(actorId),
+      actorView: (actorId) => this.actorView(actorId),
+      rosterView: () => this.rosterView(),
+      idpConfig: () => this.idpConfig(),
+      organizationSummary: () => this.organizationSummary(),
+      reset: () => this.reset(),
+      status: () => this.status(),
+      exportSnapshot: () => this.exportSnapshot(),
+      restoreSnapshot: (input) => this.restoreSnapshot(input),
+      auditRows: () => this.auditRows(),
+      outboxRows: () => this.outboxRows(),
+      markDelivered: (id) => this.markDelivered(id),
+    });
   }
 }

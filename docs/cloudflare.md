@@ -36,7 +36,9 @@ remains the durable owner of the link and audit.
 
 The coordinators' table declarations and additive migration chain live
 together in `src/schema/`; each step is named and tested against an older
-coordinator shape.
+coordinator shape. Their HTTP routes and body parsing live in `src/http/`;
+the coordinators keep the use cases and pass a small adapter to the route
+modules.
 
 Every mutation commits with its audit event, idempotency claim, and outbox
 rows inside one `transactionSync`. Work spanning the two coordinators is a

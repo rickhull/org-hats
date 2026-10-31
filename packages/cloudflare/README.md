@@ -25,6 +25,8 @@ pnpm --filter org-hats-cloudflare demo    # self-contained: bootstrap, dev login
   participation, policy, refresh records
 - `src/schema/` — the coordinator table declarations and the named
   additive migration chain
+- `src/http/` — the coordinator route modules, body parsing, and the
+  shared request boundary
 - `src/runtime.ts` — the portable `AuthorityRuntime` over both, plus
   `evidenceFromProviderCode`
 - `src/subject-guard.ts` — per-provider-subject serialization for every

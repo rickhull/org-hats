@@ -45,6 +45,7 @@ import {
   type StateRow,
 } from "./state";
 import { initializeOperationSchema } from "./schema/operation";
+import { handleOperationRequest } from "./http/operation";
 import {
   rowActorId,
   rowFlag,
@@ -87,53 +88,13 @@ const sha256Hex = async (value: string): Promise<string> => {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 
-const asRecord = (input: unknown): Record<string, unknown> => {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    throw new Error("the request body must be a JSON object");
-  }
-  return input as Record<string, unknown>;
-};
-
-const asString = (input: unknown, field: string): string => {
-  if (typeof input !== "string" || input.length === 0) throw new Error(`${field} must be a non-empty string`);
-  return input;
-};
-
-const asArray = (input: unknown, field: string): unknown[] => {
-  if (!Array.isArray(input)) throw new Error(`${field} must be an array`);
-  return input;
-};
-
-// The command-handler seam: a request body carries opaque strings, and these
-// are where one becomes a domain id. Declared outside the class so the
-// coordinator's `organizationId`/`actorId` parameters cannot shadow them.
-const asOrganizationId = (input: unknown, field: string): OrganizationId =>
-  organizationId(asString(input, field));
-const asActorId = (input: unknown, field: string): ActorId => actorId(asString(input, field));
-const asOperationId = (input: unknown, field: string): OperationId =>
-  operationId(asString(input, field));
-const asSiteId = (input: unknown, field: string): SiteId => siteId(asString(input, field));
-const asTeamId = (input: unknown, field: string): TeamId => teamId(asString(input, field));
-
-/** A grant target, from a request body. The union is what makes "exactly
- * one target" a parse concern rather than a validation concern: the body
- * either names a team or a site, and anything else never becomes a
- * `GrantTarget` at all. */
-const asGrantTarget = (input: unknown, field: string): Unbranded<GrantTarget> => {
-  const target = asRecord(input);
-  const kind = asString(target["kind"], `${field}.kind`);
-  if (kind === "team") return { kind: "team", teamId: asString(target["teamId"], `${field}.teamId`) };
-  if (kind === "site") return { kind: "site", siteId: asString(target["siteId"], `${field}.siteId`) };
-  throw new Error(`${field}.kind must be "team" or "site"`);
-};
-
 /** The three columns a target is stored as: the discriminant and the two
  * nullable id columns. Written once, so the rows cannot disagree with the
  * union. */
 const targetColumns = (target: Unbranded<GrantTarget>): readonly [string, string | null, string | null] =>
   target.kind === "team" ? ["team", target.teamId, null] : ["site", null, target.siteId];
 
-interface SiteInput {
+export interface SiteInput {
   readonly siteId: string;
   readonly displayName?: string;
   /** The canonical one-segment path beneath the operation hostname. */
@@ -141,14 +102,14 @@ interface SiteInput {
   readonly aliases: readonly string[];
 }
 
-interface TeamInput {
+export interface TeamInput {
   readonly teamId: string;
   readonly siteId: string;
   readonly organizationId: string;
   readonly displayName?: string;
 }
 
-interface GrantInput {
+export interface GrantInput {
   readonly grantId: string;
   readonly organizationId: string;
   readonly actorId: string;
@@ -158,7 +119,7 @@ interface GrantInput {
   readonly revoked?: boolean;
 }
 
-interface TeamRequestInput {
+export interface TeamRequestInput {
   readonly teamId: string;
   readonly siteId: string;
   readonly organizationId: string;
@@ -168,13 +129,13 @@ interface TeamRequestInput {
   readonly idempotencyKey: string;
 }
 
-interface TeamAdmitInput {
+export interface TeamAdmitInput {
   readonly teamId: string;
   readonly byActorId: string;
   readonly idempotencyKey: string;
 }
 
-interface TeamUpdateInput {
+export interface TeamUpdateInput {
   readonly teamId: string;
   readonly displayName: string | null;
   readonly byActorId: string;
@@ -182,7 +143,7 @@ interface TeamUpdateInput {
   readonly idempotencyKey: string;
 }
 
-interface TeamRetireInput {
+export interface TeamRetireInput {
   readonly teamId: string;
   readonly byActorId: string;
   readonly byOrganizationId: string;
@@ -190,12 +151,12 @@ interface TeamRetireInput {
   readonly idempotencyKey: string;
 }
 
-interface ParticipationInput {
+export interface ParticipationInput {
   readonly organizationId: string;
   readonly status: "invited" | "accepted" | "active" | "revoked";
 }
 
-interface BootstrapInput {
+export interface BootstrapInput {
   readonly operationId: string;
   readonly displayName?: string;
   /** The one DNS label naming the operation hostname. */
@@ -211,7 +172,7 @@ interface BootstrapInput {
   readonly participations: readonly ParticipationInput[];
 }
 
-interface InviteInput {
+export interface InviteInput {
   readonly invitationId?: string;
   readonly organizationId: string;
   readonly byActorId: string;
@@ -220,12 +181,12 @@ interface InviteInput {
 
 /** One organization actor as the projection carries it: who they are and
  * whether they are disabled. Nothing else crosses — see `org_actors`. */
-interface RosterActor {
+export interface RosterActor {
   readonly actorId: string;
   readonly disabled: boolean;
 }
 
-interface IntakeMessage {
+export interface IntakeMessage {
   readonly messageId: string;
   readonly kind: string;
   readonly invitationId?: string;
@@ -241,7 +202,7 @@ interface IntakeMessage {
   readonly at?: number;
 }
 
-interface GrantCommand {
+export interface GrantCommand {
   readonly grantId?: string;
   readonly organizationId: string;
   readonly actorId: string;
@@ -252,20 +213,20 @@ interface GrantCommand {
   readonly idempotencyKey: string;
 }
 
-interface RevokeGrantCommand {
+export interface RevokeGrantCommand {
   readonly grantId: string;
   readonly byActorId: string;
   readonly idempotencyKey: string;
 }
 
-interface SelectHatCommand {
+export interface SelectHatCommand {
   readonly grantId: string;
   readonly actorId: string;
   readonly byActorId: string;
   readonly idempotencyKey: string;
 }
 
-interface AccessRequestCommand {
+export interface AccessRequestCommand {
   readonly requestId?: string;
   readonly organizationId: string;
   readonly actorId: string;
@@ -273,7 +234,7 @@ interface AccessRequestCommand {
   readonly idempotencyKey: string;
 }
 
-interface AdmitCommand {
+export interface AdmitCommand {
   readonly organizationId: string;
   readonly actorId: string;
   readonly byActorId: string;
@@ -282,7 +243,7 @@ interface AdmitCommand {
 
 /** A full replace of the operation's routing facts. Every site must be named;
  * a partial set would leave a routing projection with no source. */
-interface RoutingFactsInput {
+export interface RoutingFactsInput {
   readonly slug: string;
   readonly sites: readonly { readonly siteId: string; readonly path: string }[];
 }
@@ -1171,6 +1132,10 @@ export class OperationAuthority extends DurableObject<Env> {
     this.ctx.storage.sql.exec("UPDATE outbox SET delivered_at = ? WHERE id = ?", now(), id);
   }
 
+  private auditRows(): readonly Row[] {
+    return this.rows("SELECT seq, at, actor, fact FROM audit ORDER BY seq");
+  }
+
   private status(): Record<string, unknown> {
     const count = (table: string): number => Number(this.one(`SELECT COUNT(*) AS n FROM ${table}`)?.["n"] ?? 0);
     const siteCount = count("sites");
@@ -1649,312 +1614,39 @@ export class OperationAuthority extends DurableObject<Env> {
   }
 
   override async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
-    const json = (body: unknown, status = 200): Response => Response.json(body, { status });
-    const readBody = async (): Promise<Record<string, unknown>> => asRecord(await request.json());
-
-    try {
-      if (request.method === "POST" && url.pathname === "/bootstrap") {
-        const body = await readBody();
-        const policy = asRecord(body["policy"]) as unknown as PolicyBundle;
-        const input: BootstrapInput = {
-          operationId: asString(body["operationId"], "operationId"),
-          slug: asString(body["slug"], "slug"),
-          ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
-          ...(body["bounded"] === true ? { bounded: true } : {}),
-          policy,
-          ...(body["adminRoles"] === undefined ? {} : { adminRoles: asArray(body["adminRoles"], "adminRoles").map((entry) => asString(entry, "adminRoles entry")) }),
-          ...(body["configureActions"] === undefined ? {} : { configureActions: asArray(body["configureActions"], "configureActions").map((entry) => asString(entry, "configureActions entry")) }),
-          ...(body["envelopeLifetimeSeconds"] === undefined ? {} : { envelopeLifetimeSeconds: Number(body["envelopeLifetimeSeconds"]) }),
-          sites: asArray(body["sites"], "sites").map((entry) => {
-            const site = asRecord(entry);
-            return {
-              siteId: asString(site["siteId"], "siteId"),
-              path: asString(site["path"], "path"),
-              ...(site["displayName"] === undefined ? {} : { displayName: asString(site["displayName"], "displayName") }),
-              aliases: asArray(site["aliases"] ?? [], "aliases").map((alias) => asString(alias, "alias")),
-            };
-          }),
-          teams: asArray(body["teams"], "teams").map((entry) => {
-            const team = asRecord(entry);
-            return {
-              teamId: asString(team["teamId"], "teamId"),
-              siteId: asString(team["siteId"], "siteId"),
-              organizationId: asString(team["organizationId"], "organizationId"),
-              ...(team["displayName"] === undefined ? {} : { displayName: asString(team["displayName"], "displayName") }),
-            };
-          }),
-          grants: asArray(body["grants"] ?? [], "grants").map((entry) => {
-            const grant = asRecord(entry);
-            return {
-              grantId: asString(grant["grantId"], "grantId"),
-              organizationId: asString(grant["organizationId"], "organizationId"),
-              actorId: asString(grant["actorId"], "actorId"),
-              role: asString(grant["role"], "role"),
-              target: asGrantTarget(grant["target"], "target"),
-              ...(grant["primary"] === true ? { primary: true } : {}),
-              ...(grant["revoked"] === true ? { revoked: true } : {}),
-            };
-          }),
-          participations: asArray(body["participations"] ?? [], "participations").map((entry) => {
-            const participation = asRecord(entry);
-            const status = asString(participation["status"], "status");
-            if (!["invited", "accepted", "active", "revoked"].includes(status)) throw new Error("invalid participation status");
-            return {
-              organizationId: asString(participation["organizationId"], "organizationId"),
-              status: status as ParticipationInput["status"],
-            };
-          }),
-        };
-        const bootstrapped = this.bootstrap(input);
-        // Populate the projection before anything reads it. A bootstrap that
-        // declares active participations and grants must be able to issue on
-        // the next request, and the push channel carries only changes made
-        // after the relationship exists — so the first image has to be
-        // pulled here.
-        if (bootstrapped.ok) await this.reconcileRosters(true);
-        return json(bootstrapped);
-      }
-
-      if (request.method === "POST" && url.pathname === "/routing-facts") {
-        const body = await readBody();
-        return json(this.setRoutingFacts({
-          slug: asString(body["slug"], "slug"),
-          sites: asArray(body["sites"], "sites").map((entry) => {
-            const site = asRecord(entry);
-            return { siteId: asString(site["siteId"], "siteId"), path: asString(site["path"], "path") };
-          }),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/invite") {
-        const body = await readBody();
-        return json(this.invite({
-          ...(body["invitationId"] === undefined ? {} : { invitationId: asString(body["invitationId"], "invitationId") }),
-          organizationId: asString(body["organizationId"], "organizationId"),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/intake") {
-        const body = await readBody();
-        const result = this.intake({
-          messageId: asString(body["messageId"], "messageId"),
-          kind: asString(body["kind"], "kind"),
-          ...(body["invitationId"] === undefined ? {} : { invitationId: asString(body["invitationId"], "invitationId") }),
-          ...(body["organizationId"] === undefined ? {} : { organizationId: asString(body["organizationId"], "organizationId") }),
-          ...(body["operationId"] === undefined ? {} : { operationId: asString(body["operationId"], "operationId") }),
-          ...(body["actorId"] === undefined ? {} : { actorId: asString(body["actorId"], "actorId") }),
-          ...(typeof body["at"] === "number" ? { at: body["at"] } : {}),
-          ...(body["actors"] === undefined ? {} : {
-            actors: asArray(body["actors"], "actors").map((entry) => {
-              const actor = asRecord(entry);
-              return {
-                actorId: asString(actor["actorId"], "actorId"),
-                disabled: actor["disabled"] === true,
-              };
-            }),
-          }),
-        });
-        return json(result, result.ok ? 200 : 503);
-      }
-
-      if (request.method === "POST" && url.pathname === "/revoke-participation") {
-        const body = await readBody();
-        return json(this.revokeParticipation(
-          asString(body["organizationId"], "organizationId"),
-          asString(body["byActorId"], "byActorId"),
-          asString(body["idempotencyKey"], "idempotencyKey"),
-        ));
-      }
-
-      if (request.method === "POST" && url.pathname === "/grant") {
-        const body = await readBody();
-        return json(this.grant({
-          ...(body["grantId"] === undefined ? {} : { grantId: asString(body["grantId"], "grantId") }),
-          organizationId: asString(body["organizationId"], "organizationId"),
-          actorId: asString(body["actorId"], "actorId"),
-          role: asString(body["role"], "role"),
-          target: asGrantTarget(body["target"], "target"),
-          ...(body["primary"] === true ? { primary: true } : {}),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/revoke-grant") {
-        const body = await readBody();
-        return json(this.revokeGrant({
-          grantId: asString(body["grantId"], "grantId"),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/select-hat") {
-        const body = await readBody();
-        return json(this.selectHat({
-          grantId: asString(body["grantId"], "grantId"),
-          actorId: asString(body["actorId"], "actorId"),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/request-access") {
-        const body = await readBody();
-        return json(this.requestAccess({
-          ...(body["requestId"] === undefined ? {} : { requestId: asString(body["requestId"], "requestId") }),
-          organizationId: asString(body["organizationId"], "organizationId"),
-          actorId: asString(body["actorId"], "actorId"),
-          ...(body["note"] === undefined ? {} : { note: asString(body["note"], "note") }),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/admit") {
-        const body = await readBody();
-        return json(this.admit({
-          organizationId: asString(body["organizationId"], "organizationId"),
-          actorId: asString(body["actorId"], "actorId"),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/request-team") {
-        const body = await readBody();
-        return json(this.requestTeam({
-          teamId: asString(body["teamId"], "teamId"),
-          siteId: asString(body["siteId"], "siteId"),
-          organizationId: asString(body["organizationId"], "organizationId"),
-          ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          byOrganizationId: asString(body["byOrganizationId"], "byOrganizationId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/admit-team") {
-        const body = await readBody();
-        return json(this.admitTeam({
-          teamId: asString(body["teamId"], "teamId"),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/update-team") {
-        const body = await readBody();
-        return json(this.updateTeam({
-          teamId: asString(body["teamId"], "teamId"),
-          displayName: body["displayName"] === null ? null : asString(body["displayName"], "displayName"),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          byOrganizationId: asString(body["byOrganizationId"], "byOrganizationId"),
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/retire-team") {
-        const body = await readBody();
-        return json(this.retireTeam({
-          teamId: asString(body["teamId"], "teamId"),
-          byActorId: asString(body["byActorId"], "byActorId"),
-          byOrganizationId: asString(body["byOrganizationId"], "byOrganizationId"),
-          asOperationAdmin: body["asOperationAdmin"] === true,
-          idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/refresh-record") {
-        const body = await readBody();
-        return json(this.recordRefresh(
-          asString(body["handleHash"], "handleHash"),
-          asString(body["organizationId"], "organizationId"),
-          asString(body["actorId"], "actorId"),
-        ));
-      }
-
-      if (request.method === "POST" && url.pathname === "/issue") {
-        const body = await readBody();
-        const auth: AuthenticationFacts | undefined =
-          body["amr"] === undefined && body["authTime"] === undefined
-            ? undefined
-            : {
-                ...(body["amr"] === undefined ? {} : { amr: asArray(body["amr"], "amr").map((entry) => asString(entry, "amr entry")) }),
-                ...(body["authTime"] === undefined ? {} : { authTime: Number(body["authTime"]) }),
-              };
-        const result = await this.issue(
-          asOrganizationId(body["organizationId"], "organizationId"),
-          asActorId(body["actorId"], "actorId"),
-          auth,
-        );
-        return json(result, result.ok ? 200 : 400);
-      }
-
-      if (request.method === "POST" && url.pathname === "/refresh") {
-        const body = await readBody();
-        const result = await this.refresh(asString(body["handle"], "handle"));
-        return json(result, result.ok ? 200 : 400);
-      }
-
-      if (request.method === "POST" && url.pathname === "/reset") {
-        return json(this.reset());
-      }
-
-      if (request.method === "GET" && url.pathname === "/config") {
-        return json(value({
-          adminRoles: this.adminRoles(),
-          configureActions: this.configureActions(),
-          envelopeLifetimeSeconds: this.envelopeLifetime(),
-        }));
-      }
-
-      if (request.method === "POST" && url.pathname === "/context") {
-        const body = await readBody();
-        return json(this.context(
-          asOrganizationId(body["organizationId"], "organizationId"),
-          asActorId(body["actorId"], "actorId"),
-          asString(body["role"], "role"),
-        ));
-      }
-
-      if (request.method === "POST" && url.pathname === "/reconcile-rosters") {
-        // forced reconciliation, for an operator repairing a stale
-        // projection and for tests that must not wait out the cadence
-        return json(value(await this.reconcileRosters(true)));
-      }
-
-      if (request.method === "POST" && url.pathname === "/drain") {
-        return json(value(await this.drain()));
-      }
-
-      if (request.method === "GET" && url.pathname === "/status") return json(value(this.status()));
-      if (request.method === "GET" && url.pathname === "/export") return json(value(this.exportSnapshot()));
-      if (request.method === "POST" && url.pathname === "/restore") {
-        const restored = this.restoreSnapshot(await request.json());
-        // rebuild the derived projection, so a restored operation can decide
-        // again without waiting for the reconciliation interval
-        if (restored.ok) await this.reconcileRosters(true);
-        return json(restored);
-      }
-      if (request.method === "GET" && url.pathname === "/snapshot") return json(value(this.snapshot()));
-      if (request.method === "GET" && url.pathname === "/audit") {
-        return json(value(this.rows("SELECT seq, at, actor, fact FROM audit ORDER BY seq")));
-      }
-      if (request.method === "GET" && url.pathname === "/outbox") {
-        return json(value(this.outboxRows().map((row) => ({
-          id: String(row["id"]),
-          kind: String(row["kind"]),
-          target: String(row["target"]),
-          payload: JSON.parse(String(row["payload"])) as unknown,
-        }))));
-      }
-
-      return json(failure("wrong-binding", "unknown operation route"), 404);
-    } catch (error) {
-      return json(failure("invalid-command", error instanceof Error ? error.message : "invalid request"), 400);
-    }
+    return handleOperationRequest(request, {
+      bootstrap: (input) => this.bootstrap(input),
+      reconcileRosters: (force) => this.reconcileRosters(force),
+      setRoutingFacts: (input) => this.setRoutingFacts(input),
+      invite: (input) => this.invite(input),
+      intake: (input) => this.intake(input),
+      revokeParticipation: (organizationId, byActorId, idempotencyKey) =>
+        this.revokeParticipation(organizationId, byActorId, idempotencyKey),
+      grant: (input) => this.grant(input),
+      revokeGrant: (input) => this.revokeGrant(input),
+      selectHat: (input) => this.selectHat(input),
+      requestAccess: (input) => this.requestAccess(input),
+      admit: (input) => this.admit(input),
+      requestTeam: (input) => this.requestTeam(input),
+      admitTeam: (input) => this.admitTeam(input),
+      updateTeam: (input) => this.updateTeam(input),
+      retireTeam: (input) => this.retireTeam(input),
+      recordRefresh: (handleHash, organizationId, actorId) =>
+        this.recordRefresh(handleHash, organizationId, actorId),
+      issue: (organizationId, actorId, auth) => this.issue(organizationId, actorId, auth),
+      refresh: (handle) => this.refresh(handle),
+      reset: () => this.reset(),
+      adminRoles: () => this.adminRoles(),
+      configureActions: () => this.configureActions(),
+      envelopeLifetime: () => this.envelopeLifetime(),
+      context: (organizationId, actorId, role) => this.context(organizationId, actorId, role),
+      drain: () => this.drain(),
+      status: () => this.status(),
+      exportSnapshot: () => this.exportSnapshot(),
+      restoreSnapshot: (input) => this.restoreSnapshot(input),
+      snapshot: () => this.snapshot(),
+      auditRows: () => this.auditRows(),
+      outboxRows: () => this.outboxRows(),
+    });
   }
 }

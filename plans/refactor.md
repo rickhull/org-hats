@@ -135,8 +135,9 @@ Behavior-identical, in the schema-first order below.
 1. ~~Cloudflare schema and migrations~~ — done, 2026-10-31: the table
    declarations and named additive steps live in `src/schema/`, with
    `test/schema.test.ts` exercising an old organization and operation shape.
-2. **Route and body parsing** out of the coordinator classes; the classes keep
-   use cases.
+2. ~~Route and body parsing~~ — done, 2026-10-31: `src/http/` owns the two
+   route modules plus the shared parse/response boundary; the coordinators
+   keep the use cases and a short adapter object.
 3. **Shared validators** imported by the Cloudflare adapter, or a documented
    decision that adapter-local copies are intentional.
 4. **Command descriptor** — one module states owner, operation binding,
