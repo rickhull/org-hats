@@ -104,18 +104,26 @@ deferred, and any threshold is stable across repeated runs.
 
 ## 3. Performance optimization
 
-1. **Harness.** A benchmark script (not a gate) for issuance, verify, refresh,
-   and context in memory and through the binding; record numbers per commit
-   that claims an improvement. Count SQL statements per command in the
-   Durable Object.
-2. **Hot-path review.** Repeated `snapshotOf` assembly during one issuance or
-   refresh; claims sorting and canonicalization; signature work; DO query
-   counts and indexes (`EXPLAIN QUERY PLAN` for the hot reads).
-3. **Budgets.** Keep envelope size as the hard gate. Add a Worker bundle-size
-   reading to the artifact check if it is stable; add test-runtime budgets to
-   the rings rather than per-benchmark gates.
-4. **Evidence.** Before/after numbers for every performance change; revert a
-   change that does not move the measured cost.
+**Done 2026-10-31.** The harness and baseline live in
+[`docs/performance.md`](../docs/performance.md).
+
+1. **Harness.** Done: `pnpm bench` measures issuance, refresh, context, and
+   verification in memory; `pnpm bench:binding` measures the same through the
+   workerd Durable Objects plus `grant-hat` and SQL statements per call.
+   Neither is a gate. The binding harness wraps each coordinator's `exec`
+   method to count statements.
+2. **Hot-path review.** Done: in-memory cost is signing and canonicalization;
+   binding cost is the service/Durable Object round trip, with stable, small
+   SQL counts. Repeated config and snapshot reads are visible but not
+   measurable against transport; the hot reads use primary keys. Nothing was
+   changed without a before/after.
+3. **Budgets.** Envelope size stays the hard gate. `bin/check-artifact` now
+   prints the stable `index.js` size (285,186 bytes at baseline) as a reading,
+   not a gate. No per-operation or test-runtime threshold was added: ring
+   times move with the host, and an unstable threshold would be a false gate.
+4. **Evidence.** Baseline recorded above; every future performance change must
+   carry its before/after, and a change that does not move the measured cost
+   is reverted.
 
 **Done when:** baselines exist, the measured hot spots are addressed or
 recorded as acceptable, and the only gates are the stable ones.
@@ -163,7 +171,7 @@ suite references current; add the command table; record adapter-only behavior
 2. ~~Coverage expansion (phase 2)~~ — done, 2026-10-31.
 3. Mechanical extractions (schema, routes, conformance split, test harness)
    interleaved with the targeted tests they enable.
-4. Benchmarks and measured performance work.
+4. ~~Benchmarks and measured performance work~~ — done, 2026-10-31.
 5. Command descriptor and `docs/commands.md` last, once the guards and
    parity tests are in place.
 

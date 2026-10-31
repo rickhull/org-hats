@@ -9,7 +9,7 @@
 // It never deploys, never reads a secret, and never touches the network.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -128,6 +128,7 @@ if (tag === undefined) {
 }
 
 let built = false;
+let bundleSize;
 if (build) {
   const head = git(root, ["rev-parse", "HEAD"]).stdout.trim();
   if (tag !== undefined && head !== commit) {
@@ -154,6 +155,7 @@ if (build) {
       if (!existsSync(join(outdir, "index.js"))) {
         fail(`the bundle did not produce index.js\n${(result.stdout || "").trim()}`);
       }
+      bundleSize = statSync(join(outdir, "index.js")).size;
       built = true;
     } finally {
       rmSync(outdir, { recursive: true, force: true });
@@ -166,5 +168,5 @@ const label = tag === undefined
   : `${tag} -> ${commit.slice(0, 12)} (version ${manifest.version})`;
 console.log(`check-artifact: ${label}`);
 console.log(`check-artifact: template name ${config.name}, no routes, workers_dev false`);
-if (built) console.log("check-artifact: bundle ok");
+if (built) console.log(`check-artifact: bundle ok (index.js ${bundleSize} bytes)`);
 console.log("check-artifact: ok");

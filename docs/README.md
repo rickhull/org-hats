@@ -96,6 +96,8 @@ public `org-hats` docs are normative for the seam.
 
 - [`golang.md`](golang.md) — the Go posture: interesting, not needed yet; a
   wire contract and byte-exact vectors come before any module.
+- [`performance.md`](performance.md) — the opt-in benchmark harness, the
+  2026-10-31 baseline, and the hot-path review.
 - [`lexicon_use_concerns.md`](lexicon_use_concerns.md) — the open
   lexicon-use register: public names, built-in example titles, and negative
   historical uses that are not cheap fixes.
