@@ -39,18 +39,14 @@ seam (A3), or merging the portable and Durable Object state models.
 
 ## 1. Guards before movement
 
-Make drift fail before moving any code. Three of the five guards hold —
-schema/spec parity, the command inventory, and failure mapping (2026-10-30,
-`tests/schema-parity.test.ts`, `tests/command-inventory.test.ts`,
-`tests/failure-mapping.test.ts`); the rest remain.
+Done, 2026-10-30: all five guards hold and each fails on the drift it
+names — `tests/schema-parity.test.ts`, `tests/command-inventory.test.ts`,
+`tests/failure-mapping.test.ts`, and the workerd restore matrix in
+`packages/cloudflare/test/restore-matrix.test.ts`. The dead-surface rule is
+the fifth, a standing rule rather than a test.
 
-1. **Restore matrix.** Organization and operation exports at each supported
-   schema restore; teams without status default active; older columns read
-   null; an unsupported future version is refused.
-2. **Dead surface.** The ignored `admit.teamId` is documented as deprecated;
-   removal is an interface-bump item, not a quiet deletion.
-
-**Done when:** each guard is a test that fails on the drift it names.
+- **Dead surface.** The ignored `admit.teamId` is documented as deprecated;
+  removal is an interface-bump item, not a quiet deletion.
 
 ## 2. Coverage expansion
 
@@ -140,7 +136,7 @@ suite references current; add the command table; record adapter-only behavior
 
 ## Sequencing
 
-1. Guards (phase 1) and the current cleanup commit.
+1. ~~Guards (phase 1)~~ — done, 2026-10-30.
 2. Coverage baseline and gap list.
 3. Mechanical extractions (schema, routes, conformance split, test harness)
    interleaved with the targeted tests they enable.
