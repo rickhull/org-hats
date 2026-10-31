@@ -45,6 +45,7 @@ import {
   type StateRow,
 } from "./state";
 import { initializeOperationSchema } from "./schema/operation";
+import { displayNameFailure, identifierFailure } from "./validation";
 import { handleOperationRequest } from "./http/operation";
 import {
   rowActorId,
@@ -824,19 +825,6 @@ export class OperationAuthority extends DurableObject<Env> {
     });
   }
 
-  private teamIdFailure(value: string): Result<never> | undefined {
-    if (value.trim().length === 0) return failure("invalid-command", "team id is empty");
-    if (value.length > 128) return failure("invalid-command", "team id is too long");
-    return undefined;
-  }
-
-  private teamNameFailure(value: string | null | undefined): Result<never> | undefined {
-    if (value === undefined || value === null) return undefined;
-    if (value.trim().length === 0) return failure("invalid-command", "team display name is empty");
-    if (value.length > 200) return failure("invalid-command", "team display name is too long");
-    return undefined;
-  }
-
   private requestTeam(input: TeamRequestInput): Result<{ applied: boolean }> {
     const at = now();
     const payload = payloadOf({
@@ -850,10 +838,10 @@ export class OperationAuthority extends DurableObject<Env> {
     return this.ctx.storage.transactionSync(() => {
       const replay = this.replay(input.idempotencyKey, payload);
       if (replay !== undefined) return replay;
-      const idFailure = this.teamIdFailure(input.teamId);
-      if (idFailure !== undefined) return idFailure;
-      const nameFailure = this.teamNameFailure(input.displayName);
-      if (nameFailure !== undefined) return nameFailure;
+      const idFailure = identifierFailure(input.teamId, "team id");
+      if (idFailure !== undefined) return { ok: false, failure: idFailure };
+      const nameFailure = displayNameFailure(input.displayName, "team display name");
+      if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
       const standing = this.one("SELECT status FROM participations WHERE organization_id = ?", input.organizationId);
       if (standing === undefined || String(standing["status"]) !== "active") {
         return failure("denied", "the organization does not actively participate in this operation");
@@ -921,8 +909,8 @@ export class OperationAuthority extends DurableObject<Env> {
       if (String(team["organization_id"]) !== input.byOrganizationId) {
         return failure("denied", "the caller does not administer this team's organization");
       }
-      const nameFailure = this.teamNameFailure(input.displayName);
-      if (nameFailure !== undefined) return nameFailure;
+      const nameFailure = displayNameFailure(input.displayName, "team display name");
+      if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
       if (String(team["status"]) === "retired") return failure("invalid-command", "team is retired");
       const current = team["display_name"] === null ? null : String(team["display_name"]);
       if (current !== input.displayName) {

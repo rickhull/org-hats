@@ -14,6 +14,7 @@ import {
   type StateRow,
 } from "./state";
 import { initializeOrganizationSchema } from "./schema/organization";
+import { displayNameFailure, identifierFailure } from "./validation";
 import { handleOrganizationRequest } from "./http/organization";
 
 /** One organization authority. The object owns the facts that stay stable
@@ -174,13 +175,6 @@ export class OrganizationAuthority extends DurableObject<Env> {
       return failure("invalid-command", "idempotency key reused with a different payload");
     }
     return value({ applied: false });
-  }
-
-  private displayNameFailure(value: string | null | undefined): Result<never> | undefined {
-    if (value === undefined || value === null) return undefined;
-    if (value.trim().length === 0) return failure("invalid-command", "display name is empty");
-    if (value.length > 200) return failure("invalid-command", "display name is too long");
-    return undefined;
   }
 
   private isAdmin(actorId: string): boolean {
@@ -720,10 +714,10 @@ export class OrganizationAuthority extends DurableObject<Env> {
       const replay = this.replay(input.idempotencyKey, payload);
       if (replay !== undefined) return replay;
       if (!this.isAdmin(input.byActorId)) return failure("denied", "the caller does not administer this organization");
-      if (input.actorId.trim().length === 0) return failure("invalid-command", "actor id is empty");
-      if (input.actorId.length > 128) return failure("invalid-command", "actor id is too long");
-      const nameFailure = this.displayNameFailure(input.displayName);
-      if (nameFailure !== undefined) return nameFailure;
+      const idFailure = identifierFailure(input.actorId, "actor id");
+      if (idFailure !== undefined) return { ok: false, failure: idFailure };
+      const nameFailure = displayNameFailure(input.displayName);
+      if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
       if (this.actor(input.actorId) !== undefined) return failure("invalid-command", "actor already exists");
       this.ctx.storage.sql.exec(
         "INSERT INTO actors (actor_id, display_name, disabled, created_at, updated_at) VALUES (?, ?, 0, ?, ?)",
@@ -753,8 +747,8 @@ export class OrganizationAuthority extends DurableObject<Env> {
       const replay = this.replay(input.idempotencyKey, payload);
       if (replay !== undefined) return replay;
       if (!this.isAdmin(input.byActorId)) return failure("denied", "the caller does not administer this organization");
-      const nameFailure = this.displayNameFailure(input.displayName);
-      if (nameFailure !== undefined) return nameFailure;
+      const nameFailure = displayNameFailure(input.displayName);
+      if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
       const target = this.actor(input.actorId);
       if (target === undefined) return failure("invalid-command", "unknown actor");
       const changed = (target.displayName ?? null) !== input.displayName;

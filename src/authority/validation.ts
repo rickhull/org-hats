@@ -2,7 +2,8 @@
 // address and presentation rules, not identity: an id is opaque, a display
 // name is never compared, and no format beyond emptiness and length is
 // parsed. The Cloudflare adapter keeps its own copies at the adapter
-// boundary; the portable coordinators share these.
+// boundary (docs/cloudflare.md § Adapter-local validators); the portable
+// coordinators share these.
 
 import type { Failure } from "../contract.ts";
 

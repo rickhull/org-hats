@@ -138,8 +138,10 @@ Behavior-identical, in the schema-first order below.
 2. ~~Route and body parsing~~ — done, 2026-10-31: `src/http/` owns the two
    route modules plus the shared parse/response boundary; the coordinators
    keep the use cases and a short adapter object.
-3. **Shared validators** imported by the Cloudflare adapter, or a documented
-   decision that adapter-local copies are intentional.
+3. ~~Shared validators~~ — done, 2026-10-31: routing-label and policy
+   validators are imported; the adapter-local actor/team id and display-name
+   copies are consolidated in `src/validation.ts` and documented as the
+   intentional exception in `docs/cloudflare.md`.
 4. **Command descriptor** — one module states owner, operation binding,
    authorization mode, and required standing per kind; `engine.ts` and
    `runtime.ts` consume it instead of parallel switches and the binding list.

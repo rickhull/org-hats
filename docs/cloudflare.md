@@ -40,6 +40,18 @@ coordinator shape. Their HTTP routes and body parsing live in `src/http/`;
 the coordinators keep the use cases and pass a small adapter to the route
 modules.
 
+## Adapter-local validators
+
+The coordinators keep the actor/team identifier and display-name checks in
+`src/validation.ts` rather than importing the portable authority module's
+internal helpers. They are deliberately adapter-boundary rules: the limits
+are part of the storage command contract, and the roster and team suites pin
+them on both the portable and Cloudflare sides. Sharing the portable
+implementation would publish an internal helper for a handful of length
+checks. The routing-label and policy validators are shared through
+`org-hats` and `org-hats/authority`; these address checks are the documented
+exception.
+
 Every mutation commits with its audit event, idempotency claim, and outbox
 rows inside one `transactionSync`. Work spanning the two coordinators is a
 durable outbox message with a visible partial state and an alarm-driven
