@@ -1,6 +1,7 @@
 {
   "name": "org-hats",
   "version": "3.5.0",
+  "private": true,
   "type": "module",
   "engines": { "node": ">=24" },
   "description": "A portable organizational authority subsystem — use-case authority runtime, signed access envelopes, and a verification-only access module. The v0.4 organization model lives at its tags.",

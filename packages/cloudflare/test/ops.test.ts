@@ -96,6 +96,18 @@ describe("typed ops routes", () => {
   it("requires the ops token", async () => {
     const denied = await SELF.fetch(`https://authority.internal/ops/schema-status?coordinator=operation&id=${OP}`);
     expect(denied.status).toBe(401);
+    // The compare is timing-safe; a wrong length and a wrong value at the
+    // right length both fail closed.
+    const wrongLength = await SELF.fetch(
+      `https://authority.internal/ops/schema-status?coordinator=operation&id=${OP}`,
+      { headers: { authorization: "Bearer nope" } },
+    );
+    expect(wrongLength.status).toBe(401);
+    const wrongValue = await SELF.fetch(
+      `https://authority.internal/ops/schema-status?coordinator=operation&id=${OP}`,
+      { headers: { authorization: `Bearer ${"x".repeat("test-ops-token".length)}` } },
+    );
+    expect(wrongValue.status).toBe(401);
   });
 
   it("bootstraps through typed routes and reports schema status", async () => {

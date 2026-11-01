@@ -16,20 +16,24 @@ deploying host owns its product surface, IdP, secrets, and deployment; the
   participations, teams, grants, refresh records, audit, and outbox rows.
 - **Activation material** — return-once secrets and their stored digests.
 - **Operator material** — `OPS_TOKEN`, the organization directory, sealed
-  IdP configuration, and the Durable Object service binding.
+  IdP configuration, and the worker's Durable Object bindings.
 - **Release integrity** — tags, manifests, and tracked `dist/` output.
 
 ## Trust boundaries
 
-1. **Provider → host → evidence.** The host authenticates the user and passes
-   only typed, verified evidence. `org-hats` does not verify provider
-   credentials; anything before `accessFromEvidence` is the host's trust
-   decision.
+1. **Provider → host → evidence.** The portable seam takes typed, verified
+   evidence and never sees provider credentials; anything before
+   `accessFromEvidence` is the host's trust decision. The Cloudflare runtime
+   additionally runs the provider-callback exchange authority-side —
+   discovery, the token exchange with the sealed client secret, and ID-token
+   verification (signature, issuer, audience, nonce, expiry) against the
+   provider's JWKS. The configured IdP is the trust root for authentication
+   either way.
 2. **Issuer → verifier.** Verifiers trust the issuer's computed claims when
    a key in the configured set signs them. They do not recompute policy.
 3. **Worker → coordinators.** The Worker reaches the organization and
-   operation Durable Objects through service bindings. The coordinators are
-   not public HTTP surfaces.
+   operation Durable Objects through Durable Object namespace bindings. The
+   coordinators are not public HTTP surfaces.
 4. **Operator → ops routes.** `OPS_TOKEN` authenticates a high-authority,
    all-or-nothing operator surface. The token is not a tenant credential.
 5. **Host → bearer.** The host transports envelopes and refresh handles and
@@ -37,6 +41,14 @@ deploying host owns its product surface, IdP, secrets, and deployment; the
 6. **Upstream → release consumer.** Tags and tracked `dist/` define what a
    host pins; the forge account and release tooling are part of the supply
    chain.
+7. **Any reachable caller → the shipped surface.** The Worker's fetch surface
+   also serves unauthenticated demo and harness routes: `GET /demo/bootstrap`
+   resets and reseeds the coordinators, `POST /demo/login` mints an envelope
+   and refresh handle, `/demo/access` verifies one, and `/increment` is a
+   harness counter. The reference production config attaches no routes
+   (`workers_dev` false, service binding only); a host that routes the
+   Worker publicly — and any caller that can reach the service binding —
+   reaches them with no token.
 
 ## Threats
 
@@ -46,22 +58,26 @@ deploying host owns its product surface, IdP, secrets, and deployment; the
 | Replay of a stolen envelope | Bearer copy used by another party | Short `exp`; host TLS and cookie protections; refresh re-resolves actor state | A bearer envelope has no proof of possession; it is replayable within its lifetime. The host owns anti-replay and step-up |
 | Stolen refresh handle | Handle leaked from host storage or logs | Handles are hashed at rest, rotate on use, and are revoked by disable/unlink/participation/team/grant changes; refresh re-reads organization state | A stolen, still-live handle can rotate once before the host notices; there is no global bulk revoke |
 | Principal impersonation | Provider subject collision or malicious IdP | One `(provider, subject)` maps to one actor; links are explicit; bootstrap/bind refusals; subject guard serializes cross-organization binds; ambiguity is `unavailable` | The configured IdP is trusted for authentication. A malicious provider can authenticate the wrong human |
+| Provider-callback exchange abused | Intercepted one-time code, nonce reuse, stale or attacker-pinned JWKS | The exchange runs authority-side with the sealed client secret; the nonce is verified against the ID token; signature, issuer, audience, and expiry are checked against a TTL-bounded JWKS cache with forced refetch on unknown kids | The one-time code is the provider's to enforce, and a provider key rotation is only picked up within the cache TTL; a malicious provider authenticates the wrong human (see the impersonation row) |
 | Privilege escalation through commands | A hat, envelope, or fresh evidence used beyond its standing | Command policy table; organization/operation standing; fresh-only writes; selected hat authorizes no command; idempotent claims; audit | An administrator compromised within their own granted authority can exercise it. Separation of duties beyond these roles is host code |
 | Cross-organization or cross-operation reach | Wrong directory id, operation id, or target | Envelope operation binding; coordinator ownership; operation-local grants; per-operation Durable Objects; `wrong-binding` fail closed | A misconfigured organization directory can cause outage or route evidence to the wrong tenant; it is operator configuration |
-| Ops-token compromise | Leaked bearer token | Token is a secret, stored outside the repository; it gates every ops route except the public, secret-free `GET /ops/verification-keys`; use a private ops Worker or tightly held transport | The token is all-or-nothing: bootstrap, links, activation recovery, routing facts, export, and restore. It can read sealed IdP config and alter state |
+| Ops-token compromise | Leaked bearer token | Token is a secret, stored outside the repository; it gates every ops route except the public, secret-free `GET /ops/verification-keys`; use a private ops Worker or tightly held transport | The token is all-or-nothing: bootstrap, links, activation recovery, routing facts, export, and restore. It can read sealed IdP config and alter state. Key ids and rotation state are visible to anyone who can reach the public verification-keys route |
 | Sealed IdP configuration disclosure | Export/backup, database access, or ops-token use | Configuration is held by the organization object and resolved only by the exchange; named “sealed” because the portable core treats it as opaque | It is not encrypted by `org-hats`; export contains it. Protect exports and rotate the provider client secret if exposed |
 | Signing-key compromise | Secret leak, host compromise, bad deployment configuration | Key pair is proven at import; verifier-first rotation; verifiers keep only configured keys; development fallback is per-isolate | A leaked private key can mint valid envelopes. Removing the old verification key immediately invalidates live sessions but is the safe containment |
 | Accidental development signing | Deployment omits the signing trio | Full signing config is a proven pair; a partial set errors at runtime construction | The runtime cannot infer deployment intent, so a host gate must refuse the ephemeral dev signer in production |
-| Malicious or lost state | Database access, bad restore, operator mistake | Typed restore; atomic transactions; projections rebuild by pulling; audit rows | Direct storage access or an authorized restore can rewrite authority state. No tamper-evident audit log |
-| Denial of service | Expensive envelope parsing, signature checks, provider fetches, or request floods | The [envelope-size baseline](consumer-session.md) documents the worst case a host must budget for carriage; bounded provider caches; Durable Object alarms; fail-closed failures | No built-in rate limiting; the Worker platform and host must absorb volumetric traffic |
+| Demo or harness surface reached | The Worker is routed publicly, or a service-binding caller asks for `/demo/*` | The reference production config attaches no routes and sets `workers_dev` false; the demo routes carry no secret, so nothing is exposed but authority state itself | Unauthenticated callers can reset coordinator state (`/demo/bootstrap`) and mint envelopes (`/demo/login`); a routed deployment must front or filter them |
+| Malicious or lost state | Database access, bad restore, operator mistake | Typed restore; atomic transactions; projections rebuild by pulling; audit rows | Direct storage access or an authorized restore can rewrite authority state, and a crafted snapshot's undelivered outbox rows are re-delivered as if fresh. No tamper-evident audit log |
+| Denial of service | Expensive envelope parsing, signature checks, provider fetches, or request floods | The [envelope-size baseline](consumer-session.md) documents the largest envelope the authority issues today — a budget input, not a bound; bounded provider caches; Durable Object alarms; fail-closed failures | No built-in rate limiting; the Worker platform and host must absorb volumetric traffic |
 | Clock and expiry skew | Verifier clock ahead/behind issuer | `exp` checked against the verifier's clock; no not-before check | Clock skew shortens or extends the usable window within the host's clock discipline |
 | Supply-chain or tag rewrite | Moved tag, rebuilt `dist/`, compromised release credentials | Immutable-tag policy; `bin/check-version`; tracked `dist/`; artifact gate; no registry publication | Git tags are names, not cryptographic commitments. Consumers should pin a commit where reproducibility matters |
 | Sensitive-data leakage through logs/notes | Secrets, exports, roster material copied into logs or relay notes | Activation stores only digests; refresh handles are hashed; notes are publishable by assumption; no secrets in audit | Host logs, exports, and browser storage are outside this repository's control |
 
 ## Assumptions
 
-- The host verifies provider callbacks and evidence before calling the
-  authority.
+- The host drives the browser redirect and session flow; evidence reaches
+  the authority verified — host-verified on the portable seam, and
+  exchange-verified on the Cloudflare runtime — and the configured IdP is
+  the trust root for authentication.
 - TLS protects envelopes and refresh handles in transit.
 - The host protects cookies and other bearer storage, and decides when
   reauthentication or step-up is required.

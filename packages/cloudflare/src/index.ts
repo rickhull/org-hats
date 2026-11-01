@@ -62,7 +62,14 @@ const runtime = async (env: Env): Promise<AuthorityRuntime> => {
 const opsAuthorized = (request: Request, env: Env): boolean => {
   const token = env.OPS_TOKEN;
   if (token === undefined || token.length === 0) return false;
-  return request.headers.get("authorization") === `Bearer ${token}`;
+  const given = request.headers.get("authorization") ?? "";
+  const expected = `Bearer ${token}`;
+  // The comparison is timing-safe; an unequal length cannot match and the
+  // length itself is not secret.
+  const a = new TextEncoder().encode(given);
+  const b = new TextEncoder().encode(expected);
+  if (a.byteLength !== b.byteLength) return false;
+  return crypto.subtle.timingSafeEqual(a, b);
 };
 
 const DEMO_OPERATION = "op-9f2e6ad4";

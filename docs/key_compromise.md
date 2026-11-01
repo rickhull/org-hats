@@ -29,6 +29,7 @@ or bearer credentials. The design assumptions and residual risk are in
 | `OPS_TOKEN` exposed | Rotate the host secret and redeploy; review state; rotate sealed IdP secret if it could be read | A release |
 | Sealed IdP client secret exposed | Rotate at the provider; install new sealed config; destroy old exports/backups | Rebuilding authority state |
 | Envelope or refresh handle leaked | Invalidate the host session; revoke the affected refresh authority through the owning command | A signing-key rotation |
+| Activation secret exposed | Revoke the request through `/ops/organization/revoke-activation` and issue a fresh activation | The actor re-requesting |
 | Deployment has no signing config | Treat as a deployment defect: ephemeral per-isolate keys; stop rollout and configure the signing trio | The next release |
 
 ## Signing-key compromise
@@ -54,7 +55,11 @@ the pair at import.
    Do not retain it for the normal overlap. Existing envelopes signed by the
    compromised key fail after removal; that is the intended containment.
    If a verifier cannot be reached yet, treat every envelope it accepts from
-   the compromised key as untrusted.
+   the compromised key as untrusted. The authority serves its configured
+   set plus the current signer, so the compromised key disappears from
+   `GET /ops/verification-keys` only once the signing triple no longer
+   names it; removal from `AUTHORITY_VERIFICATION_KEYS` takes effect at
+   verifiers immediately.
 6. **Assume existing sessions are compromised.** Force host-side re-login,
    invalidate cookies, and require fresh authentication where the product
    needs it.
@@ -107,7 +112,9 @@ tenant token and has no per-route scopes.
    sealed IdP configuration; operation slugs, sites, teams, grants,
    participations, outbox, and refresh records. Compare against a trusted
    backup. Restore a known-good snapshot through `/ops/restore` when state
-   was altered; restore is authenticated and atomic.
+   was altered; restore is authenticated and atomic, and it re-delivers the
+   snapshot's undelivered outbox rows on the next drain, so a snapshot's
+   outbox is part of what you are trusting.
 4. **Rotate the sealed IdP client secret** if the token could read it. An
    export contains the sealed configuration.
 5. **Check the release surface.** Confirm the deployed commit and tag, and
@@ -159,6 +166,27 @@ Before or after any incident, confirm:
 - `GET /ops/verification-keys` shows the expected stable key id and public
   key;
 - the host's deployment gate refuses the development fallback in production.
+
+## Activation-secret exposure
+
+An activation secret is a bearer credential until redeemed: return-once,
+22 characters, 128 random bits. Only its SHA-256 digest is stored, so a
+store leak exposes digests, not secrets, and brute force from digests is
+bounded by the secret's entropy.
+
+1. Revoke the exposed request through
+   `/ops/organization/revoke-activation` — containment first.
+2. Issue a fresh activation; the old secret is dead once revoked.
+3. Record the request id, not the secret.
+
+## Demo and harness routes
+
+The shipped Worker serves unauthenticated demo routes: `/demo/bootstrap`
+resets and reseeds the coordinators, and `/demo/login` mints an envelope
+and refresh handle. The reference production config attaches no routes
+and reaches the Worker only through the service binding. A deployment
+that routes the Worker publicly must front or filter these routes before
+it carries real authority.
 
 ## Normal rotation
 
