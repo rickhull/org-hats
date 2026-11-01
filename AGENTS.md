@@ -102,18 +102,15 @@ The local Pi mesh is an interrupt channel, not a second relay.  Follow
 ## Delegation
 
 Work that splits into three or more weakly-coupled areas, each needing real
-judgment, runs through Quartermaster's `moshpit` skill: one orchestrator
-liaises with Rick, plans, and outsources execution to the cheapest capable
-subagents, retiring each before its context fills.  The layers are `me`,
-`orchestrator`, `specialist`, `helper`.
+judgment, runs through the `moshpit` skill: one orchestrator liaises with
+Rick, plans, and outsources execution to the cheapest capable subagents,
+retiring each before its context fills.  The layers are `me`, `orchestrator`,
+`specialist`, `helper`.
 
-The skill is `~/git/quartermaster/.agents/skills/moshpit/SKILL.md`; read it
-there.  It is Quartermaster's file: do not edit it, and do not vendor a copy
-here, because two copies of one pattern drift.  This assumes both clones are
-on one machine, as the relay does.  Invoke it deliberately — below three
-areas, or for a mechanical sweep, do the work inline.  It opens by mapping
-this machine's models to the layers, asked once with a default per question,
-and only after the entry test passes; a failing test means no questionnaire.
+The skill lives once in the shared skill library (`agent-skills`, core,
+globally discovered); there is no per-repo copy to keep in step.  Invoke it
+deliberately — below three areas, or for a mechanical sweep, do the work
+inline.  The entry test gates the intake; a failing test means no fan-out.
 
 ## Tooling
 
