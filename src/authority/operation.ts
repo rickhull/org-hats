@@ -212,6 +212,12 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     // never by a role match, which is arbitrary when two grants share a
     // role.
     const selected = firstByRank(wearable);
+    // The target's display name is operation state a host would otherwise
+    // need a round trip to read; absent when unset, never the id.
+    const nameOf = (target: HatSummary["target"]): string | undefined =>
+      target.kind === "team"
+        ? snapshot.teams.find((t) => t.teamId === target.teamId)?.displayName
+        : snapshot.sites.find((s) => s.siteId === target.siteId)?.displayName;
     // Presentation still may not invent an action list. A grant naming a
     // role the bundle dropped makes the context unanswerable, not empty.
     const hats: HatSummary[] = [];
@@ -220,14 +226,17 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
       if (!role.found) {
         return { failure: { kind: "unavailable", detail: `the policy bundle no longer carries the role "${g.role}"` } };
       }
+      const targetDisplayName = nameOf(g.target);
       hats.push({
         role: g.role,
         actions: [...role.actions],
         target: g.target,
         primary: g.primary === true,
         grantId: g.grantId,
+        ...(targetDisplayName !== undefined ? { targetDisplayName } : {}),
       });
     }
+    const selectedDisplayName = selected === undefined ? undefined : nameOf(selected.target);
     return {
       actor: {
         organizationId: organizationId_,
@@ -250,6 +259,9 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
               target: selected.target,
               primary: selected.primary === true,
               grantId: selected.grantId,
+              ...(selectedDisplayName !== undefined
+                ? { targetDisplayName: selectedDisplayName }
+                : {}),
             },
           }),
       sites: [...envelope.claims.sites],

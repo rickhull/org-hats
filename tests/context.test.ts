@@ -5,7 +5,10 @@
 // (`firstByRank`: primary, then role, target, grant id) — the same rule
 // every default-hat chooser reads — so the context agrees with the signed
 // envelope by construction. The envelope cannot name the worn grant, and
-// this test pins the next-best honest resolution.
+// this test pins the next-best honest resolution. The display-name
+// projection answers the same day's 19:31 request: a hat target carries the
+// operation's own display name when one is set, absent rather than the id
+// when not, on both the wearable hats and the selected one.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -122,4 +125,73 @@ test("the context still names a hat when nothing was explicitly selected", async
   });
   if (isFailed(context)) throw new Error(`context failed: ${context.failure.kind}`);
   assert.equal(context.selectedHat?.grantId, "g-first");
+});
+
+const namedTargetsWorld = (): WorldDefinition => ({
+  name: "named-targets",
+  policy: {
+    format: 1,
+    id: "policy-named",
+    version: "1",
+    actions: ["inspect"],
+    roles: [{ title: "hand", actions: ["inspect"] }],
+    readPolicy: { organizations: "granted-teams" },
+  },
+  snapshot: {
+    operations: [{ operationId: "op-named", displayName: "Named", slug: "named" }],
+    organizations: [{ organizationId: "org-named" }],
+    actors: [{ organizationId: "org-named", actorId: "actor-named" }],
+    sites: [{ siteId: "site-north", operationId: "op-named", displayName: "North Yard", path: "north", aliases: ["north"] }],
+    teams: [
+      { teamId: "team-named", siteId: "site-north", organizationId: "org-named", displayName: "Harbor Field" },
+      { teamId: "team-plain", siteId: "site-north", organizationId: "org-named" },
+    ],
+    grants: [
+      {
+        grantId: "g-named", operationId: "op-named", organizationId: "org-named",
+        actorId: "actor-named", role: "hand", primary: true,
+        target: { kind: "team", teamId: "team-named" },
+      },
+      {
+        grantId: "g-plain", operationId: "op-named", organizationId: "org-named",
+        actorId: "actor-named", role: "hand",
+        target: { kind: "team", teamId: "team-plain" },
+      },
+      {
+        grantId: "g-site", operationId: "op-named", organizationId: "org-named",
+        actorId: "actor-named", role: "hand",
+        target: { kind: "site", siteId: "site-north" },
+      },
+    ],
+    participations: [{ organizationId: "org-named", operationId: "op-named", status: "active" }],
+  },
+});
+
+test("wearable hats and the selected hat carry the target's display name", async () => {
+  const engine = await createTestEngine({
+    fixtures: [defineWorld(namedTargetsWorld())],
+    principalLinks: [
+      { provider: "idp", subject: "named", organizationId: "org-named" as never, actorId: "actor-named" as never },
+    ],
+  });
+  const issued = await issueAccess(
+    engine,
+    { provider: "idp", subject: "named" } as const,
+    operationId("op-named"),
+  );
+
+  const context = await engine.runtime.context({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    envelope: issued.envelope,
+  });
+  if (isFailed(context)) throw new Error(`context failed: ${context.failure.kind}`);
+
+  const byGrant = new Map(context.wearableHats.map((hat) => [hat.grantId, hat]));
+  assert.equal(byGrant.get("g-named")?.targetDisplayName, "Harbor Field");
+  assert.equal(byGrant.get("g-site")?.targetDisplayName, "North Yard");
+  // Absent when the operation set no name — never the id, so a host
+  // decides what to show.
+  assert.ok(!("targetDisplayName" in (byGrant.get("g-plain") ?? {})));
+  assert.equal(context.selectedHat?.grantId, "g-named");
+  assert.equal(context.selectedHat?.targetDisplayName, "Harbor Field");
 });

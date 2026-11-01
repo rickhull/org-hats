@@ -127,6 +127,9 @@ export interface HatSummary {
   /** The grant's id: the addressing `select-hat` takes, so a host can
    * offer the switch the summary shows. */
   readonly grantId: string;
+  /** The target's display name when the operation set one; absent when it
+   * did not, never a fallback to the id, so a host decides what to show. */
+  readonly targetDisplayName?: string;
 }
 
 export interface AuthorityContext {
