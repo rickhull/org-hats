@@ -170,7 +170,7 @@ export const taggedTitles = (): readonly TaggedTitle[] => {
   return titles;
 };
 
-// The suites are views over traits, per plans/spec_testing.md:
+// The suites are views over witness traits:
 // unit — unit witnesses; smoke — unit, smoke, and portable executable
 // blocks; integration — integration and concurrency; static — static and
 // review. They are focused loops, not rings: `pnpm check` and

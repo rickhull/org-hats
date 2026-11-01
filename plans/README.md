@@ -9,9 +9,8 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-- [`spec_testing.md`](spec_testing.md) — the specs-driven witness suite: a
-  spec-to-test link gate, portable unit/smoke witnesses, and segmented
-  integration coverage.
+No active plans. The specs-driven witness suite landed; its durable
+convention lives in `tests/README.md` and `specs/README.md`.
 
 The activation, roster, and team slices landed on 2026-10-28 and 2026-10-29;
 their durable facts are in `docs/activation.md`, `docs/roster.md`,
