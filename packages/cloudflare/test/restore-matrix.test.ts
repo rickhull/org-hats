@@ -1,4 +1,4 @@
-// The restore matrix (plans/refactor.md phase 1, the last guard): every
+// The restore matrix: every
 // supported export schema restores into a fresh coordinator, older columns
 // read null rather than garbage, teams that predate the status column
 // default active, an older team status is genuinely absent (not echoed), and

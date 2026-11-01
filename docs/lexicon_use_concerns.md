@@ -29,9 +29,8 @@ accepted, and what remains deferred. The normative vocabulary is
 
 ### Built-in `admin` role
 
-- Where: `src/authority/twins.ts:72,136,164,239`;
-  `src/conformance.ts:412,469`; `README.md:19`;
-  `docs/tutorial.md:55,328,351,546,573`.
+- Where: `src/authority/twins.ts`; `src/conformance/model.ts`; `README.md`;
+  `docs/tutorial.md`.
 - Decision: keep the fixture role title. The twins comment, README,
   tutorial, and walkthrough state that it is example policy data, not a
   built-in administrator title. A rename would change public conformance
@@ -39,13 +38,13 @@ accepted, and what remains deferred. The normative vocabulary is
 
 ### Test-local role titles
 
-- `tests/engine.test.ts:527` uses a role titled `admin` deliberately to
+- `tests/engine.test.ts` uses a role titled `admin` deliberately to
   prove there is no hardcoded fallback; `tests/generative.test.ts` and the
   Cloudflare package tests use local fixtures. They are not built-in
   examples; leave them unless those tests are being touched.
 - The Cloudflare suites keep `title: "admin"` paired with
-  `adminRoles: ["admin"]` (`operation.test.ts:52,56`, `ops.test.ts:43`,
-  `roster.test.ts:49`). That pair is policy fixture data, and an
+  `adminRoles: ["admin"]` (`operation.test.ts`, `ops.test.ts`,
+  `roster.test.ts`). That pair is policy fixture data, and an
   administrative role is configuration rather than a built-in title; renaming
   it would change what the fixture tests. The actor ids and roster constants
   are renamed — see Resolved.

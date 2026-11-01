@@ -47,10 +47,14 @@ it is not part of per-push Codeberg CI.
 portable suites as `pnpm test`. It is opt-in, not a gate; no threshold is
 enforced.
 
-Baseline, 2026-10-31, after the phase-1 guards and the gap-closing tests:
-**99.58% lines / 87.93% branches / 99.68% functions** over `src/`. The
-remaining gaps are classified in `plans/refactor.md` phase 2 while that plan
-is open.
+Baseline, 2026-10-31, after the guard and gap-closing work:
+**99.41% lines / 88.56% branches / 99.68% functions** over `src/`. Remaining
+paths are deferred as defensive or contract-unreachable: `verifyKeyOf` and
+the platform-crypto catch arms in both verifiers; the conformance harness's
+assertion and runner failure branches; the command descriptor's typed default
+arm, the `firstByRank` final tie, and the context's stale-role branch; and
+the organization authorization helper's untriggered unknown-organization and
+fallback-detail arms.
 
 The workerd ring has no coverage provider. Cloudflare's vitest-plugin
 coverage documentation was unavailable when evaluated (404), and there is no
@@ -115,7 +119,7 @@ domain — contract, model, policy, engine, claims, verification, keys, the
 vertical path, the scenarios, and the conformance inventory — in one
 `node --test` process.
 
-The portable suite is already smoke-sized: all of it runs in ~2.5 s, and a
+The portable suite is already smoke-sized: all of it runs in ~5 s, and a
 single file costs ~0.3 s of Node startup, so a subset saves pennies while
 dropping a domain — run it whole or not at all. The workerd side is the
 opposite trade: the vitest harness floor is ~4–5 s and marginal files are

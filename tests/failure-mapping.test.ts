@@ -1,4 +1,4 @@
-// Guard 3 of plans/refactor.md phase 1 (reliability guards): failure
+// The consumer mapping guard: failure
 // mapping. The closed `FailureKind` taxonomy has a consumer/product mapping
 // in `examples/consumer-access.ts` — an exhaustive switch, then a walk that
 // prints every mapping at run time. The switch is pinned at compile time by

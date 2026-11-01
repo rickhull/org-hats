@@ -1,4 +1,4 @@
-// Guard 1 of plans/refactor.md phase 1 (reliability guards): schema/spec
+// The schema/spec guard: schema/spec
 // parity. Every coordinator table's declared columns equal its export/
 // restore column list, and every table the DDL creates is either exported
 // or on a recorded allowance.

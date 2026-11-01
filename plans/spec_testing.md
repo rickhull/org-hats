@@ -234,8 +234,9 @@ are the likely ones:
   and outbox/alarm/reconciliation. Run whole, per `tests/README.md`.
 - **I3** — adversarial concurrency: disable/revoke/unlink against refresh,
   two refreshes of one handle, issuance racing revocation, delayed outbox.
-  This is the existing `plans/refactor.md` item 6; it is not folded into the
-  link gate and needs a controllable pause at the organization read.
+  This is the existing concurrency review (`tests/concurrency.test.ts` and
+  the workerd roster concurrency cases); it is not folded into the link gate
+  and needs a controllable pause at the organization read.
 - **I4/X** — release, artifact, tag, CI, and fence checks; these are tool
   witnesses, not workerd suites.
 - **R** — P3/P4 only unless a new architectural claim appears; each carries
@@ -267,8 +268,8 @@ are the likely ones:
    commands still exist.
    *Done when:* no static/review entry is stale, and the review list holds
    only P3/P4 or a named new claim.
-5. **Adversarial pass.** Implement the I3 cases from `plans/refactor.md` item
-   6 and tag them by invariant.
+5. **Adversarial pass.** Implement the I3 cases from the concurrency review
+   and tag them by invariant.
    *Done when:* every stated bound has an interleaving test or a recorded
    reason why the runtime cannot express it.
 

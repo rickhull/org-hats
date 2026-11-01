@@ -265,6 +265,11 @@ so the restore drill is about state semantics, not storage format. The
 organizations, so a snapshot that carried it would restore a stale roster as
 authority. Restore clears it and rebuilds by pulling before returning, and
 `GET /snapshot` shows its contents for inspection.
+Export, restore, and the operator snapshot are adapter-only behavior: the
+portable runtime has no storage surface. `/snapshot` is the operation
+Durable Object's internal inspection view, and it includes the derived
+`org_actors` projection that export deliberately omits; it is not
+restorable authority state.
 Restore is typed and atomic; a failed restore leaves the previous state
 intact. Refresh handles issued before a wipe survive the export → wipe →
 restore round trip: recovery does not strand a session.

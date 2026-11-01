@@ -84,7 +84,7 @@ The full verification gate checks the portable suites, type and import boundarie
 There is no package-registry publication. Pin a release tag (or, for stronger reproducibility, an exact commit). For example:
 
 ```sh
-pnpm add "git+https://codeberg.org/rickhull/org-hats.git#v3.3.0"
+pnpm add "git+https://codeberg.org/rickhull/org-hats.git#v3.4.0"
 ```
 
 The authority side exposes four session and command calls, plus the three activation lifecycle calls:
@@ -152,10 +152,10 @@ The portable `src/` modules avoid Cloudflare imports and ambient runtime types. 
 
 | Surface | Current version in this source archive |
 | --- | --- |
-| `org-hats` | 3.3.0 |
+| `org-hats` | 3.4.0 |
 | Authority interface | 3 |
 | Access envelope format | 1 |
-| Cloudflare runtime | 0.9.0 (`cloudflare-v*` tags); operation schema 5 |
+| Cloudflare runtime | 0.10.0 (`cloudflare-v*` tags); operation schema 5 |
 
 Interface and envelope versions advance independently. See [v2 migration](docs/migration-v2.md), [v3 migration](docs/migration-v3.md), and [publishing](docs/publishing.md). Codeberg is canonical; GitHub is a release mirror. Git tag immutability depends on repository governance; verify an exact commit (and its `dist/`) where supply-chain reproducibility matters.
 

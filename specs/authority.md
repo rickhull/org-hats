@@ -116,7 +116,8 @@ spec.expectFailure(await s.refresh(issued), "unauthenticated", "the revoked hand
 *Held by:* revoke/disable/participation-revoke paths in both runtimes;
 `OH-AUTH-04`, `OH-AUTH-05`, the participation cases; the A13 refresh gate;
 the Cloudflare refresh's transactional consume-and-install, with the
-concurrent-refresh case pinning one winner; the A7 executable example.
+concurrent-refresh cases in `packages/cloudflare/test/roster.test.ts` pinning
+one winner; the A7 executable example.
 *If it breaks:* a revoked actor keeps an endless session and the bounded
 revocation window of E7 becomes an unbounded one.
 
@@ -168,7 +169,8 @@ evidence; a refused first login is the host's audit material.
 and authentication facts only; `linkPrincipal` and bootstrap check the
 existing link and actor before mutating; `PrincipalSubjectGuard` serializes
 the directory check and target commit for manual bind and activation;
-`tests/ops.test.ts` and `organization.test.ts` pin the conflicts; the
+`packages/cloudflare/test/ops.test.ts` and
+`packages/cloudflare/test/organization.test.ts` pin the conflicts; the
 Cloudflare runtime's directory refuses a `(provider, subject)` found in more
 than one organization (`packages/cloudflare/test/runtime.test.ts`); the
 twins keep actors organization-scoped.
@@ -241,7 +243,9 @@ mode, never against the hat's actions.
 *Held by:* the claims shape (`hat`, `readableOrganizationIds`,
 `readableTeamIds`, `configurableSiteIds`, `memberTeamIds`),
 `assembleAccessClaims`, `NeutralAccess`, the access/claims suites, and the
-command handlers' standing and fresh-evidence checks (A9).
+command handlers' standing and fresh-evidence checks (A9), with the policy
+table in `src/authority/commands.ts` and the documented table in
+[`docs/commands.md`](../docs/commands.md).
 *If it breaks:* "one hat at a time" becomes an overclaim, a host cannot
 name the layer a decision came from, or a host treats a product action as
 permission to mutate authority.

@@ -1,4 +1,4 @@
-// Guard 2 of plans/refactor.md phase 1 (reliability guards): the command
+// The command inventory guard: the command
 // inventory. Every `AuthorityCommand` kind resolves to exactly one
 // coordinator, one operation-binding rule, one authorization mode, and one
 // required standing — stated here as a table, then verified against the
