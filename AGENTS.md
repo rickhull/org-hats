@@ -42,13 +42,18 @@ Quartermaster's detailed protocol is `~/git/quartermaster/specs/notes_relay.md`;
 this section is the directive.
 
 Every entry is prepended, newest first, and begins with
-`## <ISO-8601> — <subject>`, then the body; keep a `Coordination:` line when
+`## <subject>`, then the body; keep a `Coordination:` line when
 coordination matters.  The first line of the file is always the newest
-entry's timestamp and subject; no static title sits above it.  Entries are
+entry's subject; no static title sits above it.  Entries carry no
+timestamps: the file's strict newest-first order is the chronology, and
+the relay is not a dated record — mtime dates only the newest entry, and
+a durable date belongs in `docs/`, `specs/`, or a commit message.  A
+date that is itself the subject is content, not a protocol field.
+Entries are
 separated by a blank line; the body ends at the next `## ` heading.  Read the
 first entry in `~/git/quartermaster/notes/to-org-hats.md` at the start of
 every turn and again before handing off — a reply can land mid-turn.  Read
-newer entries from the top until the last timestamp already seen.  A new
+newer entries from the top until the last entry already seen.  A new
 entry is incorporated or answered, never left unread in a handoff; if the
 work it needs does not fit this turn, say so in the handoff.
 
@@ -89,7 +94,7 @@ The local Pi mesh is an interrupt channel, not a second relay.  Follow
   path, a section, and the single action the peer owns.  A timeout is not
   retried; never wake for ACK/FYI, and never while Rick is driving.
 - Rick holds the conch outside a lease and can revoke one at any time.
-- Every new relay entry carries a timestamped heading and a `Coordination:`
+- Every new relay entry carries a `Coordination:`
   header.
 - Echo mesh addresses verbatim; do not use the deprecated blocking
   `agent_request`.
