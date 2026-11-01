@@ -246,7 +246,8 @@ The hat does not bound the other three. Each is issuer-computed from the
 actor's wearable grants and compared by the verifier; none is derived from
 another. A host reads the layer its decision belongs to. The grant is the
 operation's operative admission; access requests are a review queue, not a
-stored relation. Formal and threat models are not claims in this line.
+stored relation. A formal model is not a claim in this line; the
+design-level threat model is published in [threat_model.md](threat_model.md).
 
 The hat is not the authority for an authority command. It is the local check
 for a host's own product mutations; the runtime's commands declare their own

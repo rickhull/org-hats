@@ -62,6 +62,12 @@ deploying operator owns those; report there as appropriate.
 
 ## Posture
 
+The design-level [threat model](docs/threat_model.md) records the assets,
+trust boundaries, mitigations, and residual risk. The
+[key-compromise runbook](docs/key_compromise.md) covers signing keys,
+verification trust, the ops token, sealed IdP configuration, and bearer
+credentials.
+
 The invariants a report may rely on:
 
 - envelopes are Ed25519-signed over canonical JSON, versioned, and bounded by

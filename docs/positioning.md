@@ -114,7 +114,8 @@ policy; a directory remains the identity source.
   schedule.
 - "Drop-in portable": the honest phrase is **portable semantics, one
   reference runtime**.
-- "Secure by default" — there is no published threat model.
+- "Secure by default" — there is a published, design-level threat model,
+  but no independent audit.
 
 ## Language guidance
 

@@ -51,7 +51,8 @@ rebuilds policy; the interface-version vs envelope-version split; named invarian
 “held by” evidence; the executable conformance inventory; the synthetic
 examples; migration discipline; the bounded revocation window.
 
-**What blocks a “foundational” claim:** no formal model or threat model; no
+**What blocks a “foundational” claim:** no formal model or independent
+audit — the published threat model is design-level; no
 constraints/separation of duty, delegation, or temporal semantics; vocabulary
 collisions (`operation`, `grant`, `hat`, `principal`, `admission`); and the
 fact that `decide` is per-target while issuance selects one action hat. The
@@ -142,7 +143,8 @@ model.
   bounds read, configuration, or member reach.
 - The grant is the operative admission; access requests are a reviewed queue,
   not a stored relation.
-- Formal and threat models are not claimed; this line stays a reference
+- A formal model and an independent audit are not claimed — the published
+  threat model is design-level; this line stays a reference
   architecture.
 - A plain-language translation is still a claim. "Checked automatically" and
   "takes effect quickly" are fine; "immediately," "secure," or "nothing to

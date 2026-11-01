@@ -149,7 +149,9 @@ runtime that signs envelopes nothing verifies.
 
 Rotation is verifier-first: install the next key in
 `AUTHORITY_VERIFICATION_KEYS` everywhere before the issuer switches, and
-remove the old entry after its last envelope has expired.
+remove the old entry after its last envelope has expired. A suspected or
+confirmed key exposure follows [key_compromise.md](key_compromise.md), which
+removes the compromised key immediately instead of using the normal overlap.
 
 ## Configuration
 

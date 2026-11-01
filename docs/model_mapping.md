@@ -154,8 +154,9 @@ mechanized proof.
 
 ## Citable-model work
 
-The formal model, threat model, language-independent envelope specification,
-structured audit/provenance, and comparative evaluation are not current
+The formal model, a formal threat model (the published one is design-level),
+the language-independent envelope specification, structured audit/provenance,
+and comparative evaluation are not current
 claims and are not pursued in this line. The invariant style in
 `specs/authority.md` and `specs/envelope.md` — claim, "held by", "if it
 breaks" — is the right skeleton for a future appendix.

@@ -46,6 +46,11 @@ public `org-hats` docs are normative for the seam.
 - [`commands.md`](commands.md) — the authority command table: owner, scope,
   authorization mode, required standing, effects, and why a selected hat
   authorizes no authority command.
+- [`threat_model.md`](threat_model.md) — assets, trust boundaries,
+  threats with mitigations and residual risk, assumptions, and non-goals.
+- [`key_compromise.md`](key_compromise.md) — the operator runbook for signing
+  keys, verification trust, the ops token, sealed IdP configuration, and
+  bearer credentials.
 - [`binding-conformance.md`](binding-conformance.md) — the documented
   service-binding smoke subset and what it does not claim.
 - [`inventory.md`](inventory.md) — the story index: every conformance case
