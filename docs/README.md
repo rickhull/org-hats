@@ -43,6 +43,9 @@ public `org-hats` docs are normative for the seam.
 - [`teams.md`](teams.md) — team requests, operation admission, the
   pending/active/retired lifecycle, and retirement's grant and refresh
   effects.
+- [`commands.md`](commands.md) — the authority command table: owner, scope,
+  authorization mode, required standing, effects, and why a selected hat
+  authorizes no authority command.
 - [`binding-conformance.md`](binding-conformance.md) — the documented
   service-binding smoke subset and what it does not claim.
 - [`inventory.md`](inventory.md) — the story index: every conformance case

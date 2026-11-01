@@ -17,6 +17,7 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 
+import { COMMAND_POLICY } from "../src/authority/commands.ts";
 import { CONFORMANCE_CASES } from "../src/conformance.ts";
 import { AIRLIFT, FESTIVAL, PROFESSIONAL_OPERATION } from "../src/authority/twins.ts";
 
@@ -98,6 +99,28 @@ test("every shipped case has an inventory row with its title verbatim", () => {
       rows.get(conformanceCase.id),
       conformanceCase.title,
       `${conformanceCase.id}'s inventory title must match the shipped title verbatim`,
+    );
+  }
+});
+
+test("docs/commands.md matches the command descriptor", () => {
+  const rows = new Map<string, readonly string[]>();
+  for (const line of read("docs/commands.md").split("\n")) {
+    if (!line.startsWith("| `")) continue;
+    const cells = line.split("|").map((cell) => cell.trim());
+    const kind = cells[1]?.replaceAll("`", "");
+    assert.ok(kind !== undefined && kind.length > 0, `commands.md: unreadable row: ${line}`);
+    rows.set(kind, cells.slice(2, 6));
+  }
+
+  assert.equal(rows.size, Object.keys(COMMAND_POLICY).length, "one command row per descriptor kind");
+  for (const [kind, policy] of Object.entries(COMMAND_POLICY)) {
+    const row = rows.get(kind);
+    assert.ok(row !== undefined, `commands.md: ${kind} has no row`);
+    assert.deepEqual(
+      row,
+      [policy.coordinator, policy.operationBound ? "operation" : "organization", policy.mode, policy.standing],
+      `commands.md: ${kind} disagrees with src/authority/commands.ts`,
     );
   }
 });

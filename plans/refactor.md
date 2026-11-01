@@ -130,7 +130,7 @@ recorded as acceptable, and the only gates are the stable ones.
 
 ## 4. Structural refactors
 
-Behavior-identical, in the schema-first order below.
+**Done 2026-10-31.** Behavior-identical, in the schema-first order below.
 
 1. ~~Cloudflare schema and migrations~~ — done, 2026-10-31: the table
    declarations and named additive steps live in `src/schema/`, with
@@ -161,9 +161,10 @@ Behavior-identical, in the schema-first order below.
    owns the test engine, command shell, fresh-evidence and envelope builders,
    and access issuance; the roster, team, activation, context, engine, and
    concurrency suites consume them.
-8. **`docs/commands.md`** — kind → owner, scope, authorization mode,
-   required standing, effects — checked against the descriptor; the table
-   states that the selected hat authorizes no authority command.
+8. ~~`docs/commands.md`~~ — done, 2026-10-31: the table states owner, scope,
+   authorization mode, required standing, and effects; `tests/docs.test.ts`
+   checks its policy columns against `src/authority/commands.ts`, and the
+   table states that the selected hat authorizes no authority command.
 
 **Done when:** the largest files are navigable in one read, the duplicated
 policy lives in one place, and the suites still pass unchanged.
@@ -183,8 +184,7 @@ suite references current; add the command table; record adapter-only behavior
 3. Mechanical extractions (schema, routes, conformance split, test harness)
    interleaved with the targeted tests they enable.
 4. ~~Benchmarks and measured performance work~~ — done, 2026-10-31.
-5. `docs/commands.md` last, once the guards, descriptor, and parity tests
-   are in place.
+5. ~~`docs/commands.md`~~ — done, 2026-10-31.
 
 ## Exit criteria
 
