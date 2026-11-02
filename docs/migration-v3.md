@@ -43,7 +43,7 @@ unchanged.
 ## Cutover
 
 The version gate is strict equality in both directions
-(`src/authority/engine.ts:250`): a 2.x caller sending `interfaceVersion: 2`
+(`src/authority/engine.ts`, the interface-version gate): a 2.x caller sending `interfaceVersion: 2`
 is refused by a v3 authority, and a 3.x caller sending `interfaceVersion: 3`
 is refused by a live v2 authority. Neither side can move first by
 tolerating the other's version; there is no compatibility window upstream.
@@ -84,8 +84,10 @@ blue/green at the service binding:
    Worker accepted after the flip does not exist in the v2 Worker, so a
    binding flip alone loses it. Roll back either with no writes since the
    flip, or export the v3 state, restore it into the v2 Worker, and then
-   flip the binding and revert the callers. The operation schema does not
-   move, so a v3 export restores into v2.
+   flip the binding and revert the callers. At the 3.0 break the operation
+   schema did not move, so a v3 export restored into a v2 Worker of that
+   era; since then the schema chain has advanced, so restore across lines
+   checks the schema versions the snapshot carries.
 
 Already-issued envelopes keep verifying across either flip: `ACCESS_ENVELOPE_VERSION`
 stays 1, and verification never gates on the claims' `interfaceVersion` (see

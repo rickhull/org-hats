@@ -70,9 +70,9 @@ export const verificationKeyOf = async (signer: CloudflareSigner): Promise<Verif
  * The three signing variables travel as a set: none means the development
  * fallback, a partial set is a configuration error — a deployment that
  * meant to configure signing must not serve silently ephemeral — and a
- * full set is proven a pair at import: the private half signs a fixed
- * probe the public half must verify, so a mismatch is an error here, not
- * an outage discovered when envelopes stop verifying. */
+ * full set is proven a pair at signer construction: the private half signs
+ * a fixed probe the public half must verify, so a mismatch is an error
+ * here, not an outage discovered when envelopes stop verifying. */
 export const signerFromEnv = async (env: Env): Promise<CloudflareSigner> => {
   const key = env.AUTHORITY_SIGNING_KEY;
   const publicKeyRaw = env.AUTHORITY_SIGNING_PUBLIC_KEY;

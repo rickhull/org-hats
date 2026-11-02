@@ -55,7 +55,7 @@ Not "is Dana an administrator," but "is Dana wearing a hat that may do *this*,
 | **team** | A working group at one site: Dana's yard crew. |
 | **actor** | A person within one organization. Dana is an actor of her employer. |
 | **grant** | The fact that this actor holds this role over this one target, written down and auditable. |
-| **hat** | A grant worn for a session. You wear exactly one action hat at a time. |
+| **hat** | The grant currently worn; exactly one action hat at a time. |
 | **reach** | What a grant's target covers. A team grant covers that team; a site grant covers every team at that site. |
 | **envelope** | The signed, short-lived badge the authority issues for a session — see §4. |
 | **read board** | The list of organizations whose work you can *see* (as opposed to act on). |
@@ -214,7 +214,7 @@ inside a live one.
 > names, sites, the hat list with the ids to act on. I don't join anything
 > against the directory to draw the menu.
 >
-> **The academic says:** one active hat per session, selected by the
+> **The academic says:** one active hat at a time, selected by the
 > subject, addressed by grant id — the activation is explicit, not
 > ambient.
 >

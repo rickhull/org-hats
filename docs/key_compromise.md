@@ -38,7 +38,7 @@ The signing triple is `AUTHORITY_SIGNING_KEY`,
 `AUTHORITY_SIGNING_PUBLIC_KEY`, and `AUTHORITY_SIGNING_KEY_ID`; verifiers use
 `AUTHORITY_VERIFICATION_KEYS`. A partial signing set errors at runtime
 construction — the first request into an isolate — and the runtime proves
-the pair at import.
+the pair when the signer is built.
 
 1. **Preserve evidence without exposing the key.** Record the observed key
    id, how the key is believed to have leaked, affected deployments, and the
@@ -182,8 +182,9 @@ bounded by the secret's entropy.
 ## Demo and harness routes
 
 The shipped Worker serves unauthenticated demo routes: `/demo/bootstrap`
-resets and reseeds the coordinators, and `/demo/login` mints an envelope
-and refresh handle. The reference production config attaches no routes
+resets and reseeds the coordinators, `/demo/login` mints an envelope
+and refresh handle, `/demo/access` verifies one, and `/increment` is a
+harness counter. The reference production config attaches no routes
 and reaches the Worker only through the service binding. A deployment
 that routes the Worker publicly must front or filter these routes before
 it carries real authority.

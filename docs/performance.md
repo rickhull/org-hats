@@ -65,5 +65,5 @@ repeated runs.
   baseline sizes that scan is cheap. Add an index only when a benchmark shows
   the scan is the cost.
 - The envelope-size gate remains the hard budget. `bin/check-artifact` now
-  also prints the built Worker's `index.js` size (`285,186` bytes at this
-  baseline, identical across repeated dry runs); it is a reading, not a gate.
+  also prints the built Worker's `index.js` size (`293,236` bytes at this
+  checkout, 2026-11-01; identical across repeated dry runs); it is a reading, not a gate.

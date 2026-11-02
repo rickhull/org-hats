@@ -1,8 +1,8 @@
 # Literature review
 
 *What each reference supports here, where it disagrees, and what a well-read
-practitioner should verify before citing. [rbac.md](rbac.md) states the
-positioning; this file carries the evidence.*
+practitioner should verify before citing. [positioning.md](positioning.md)
+states the positioning; this file carries the evidence.*
 
 ## How to read this
 

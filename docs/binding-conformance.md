@@ -8,12 +8,13 @@ binding and entrypoint preserve the public runtime behaviour for a dedicated,
 pre-bootstrapped operation without resetting it.*
 
 *The reference runtime is deployed by the consuming host. The live
-deployment is `cloudflare-v0.7.0` (Worker Version
-`1a3995a2-56d6-4576-91ca-5b3c8520a05f`, tagged
-`da57a467c772f30124dcf52cb53fedf0e840fa0a`), deployed on 2026-10-29. Its
-deployment post-checks passed — six secret names, the unchanged signing key
-id, and schema status — but the six-group binding smoke has not been rerun on
-it: the dedicated smoke organization is spent and needs fresh fixture ids.
+deployment is `cloudflare-v0.11.0` (Worker Version
+`48bec7e9-9789-4fdf-9823-fdcf02d1b5bc`, tagged
+`b161d339ef6f7393d963399197aa0c1faa21201c`), deployed on 2026-11-01. Its
+deployment post-checks passed — tag and manifest verified, the unchanged
+signing key id, schema status, and an export read-back — but the six-group
+binding smoke has not been rerun on it: the dedicated smoke organization
+is spent and needs fresh fixture ids.
 
 The last full acceptance remains `cloudflare-v0.6.1` (Worker Version
 `fc3d9e1d-651e-4e40-bc6c-1f2152db288b`, tagged
@@ -59,7 +60,7 @@ it only after the host has deployed and accepted the version.*
 ## Claim
 
 Through the service binding, with interface version `3`, carried by the live
-`cloudflare-v0.7.0`:
+runtime:
 
 1. `accessFromEvidence` for the linked evidence returns a signed envelope and
    a refresh handle.

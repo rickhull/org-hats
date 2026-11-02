@@ -32,7 +32,7 @@ The clean decomposition:
 | Team | Group / object set / team context | Organization-fielded, site-local. Membership is not authority; there is no group-as-grantee. |
 | Actor | Subject/user | Organization-scoped identity; no platform-global person; no credential in the model. |
 | Participation | Organization–operation relationship | A two-party lifecycle (`invited → accepted → active → revoked`), not a group membership. |
-| Admission | Enrollment/eligibility | Documented as distinct; the grant is currently operative. See the model-coherence plan. |
+| Admission | Enrollment/eligibility | Documented as distinct; the grant is currently operative. See [`../../specs/authority.md`](../../specs/authority.md) A15. |
 | Grant | User-role assignment (UA) with a target | One actor, one role, one team or site. Not a permission; not an ACL. |
 | Role | Flat RBAC role | Action set only. No hierarchy, dominance, prerequisites, or constraints. |
 | Action | RBAC operation; one half of a permission | Object-independent. A permission is `(action, target)` and is not materialized. |
@@ -154,8 +154,9 @@ mechanized proof.
 
 ## Citable-model work
 
-The formal model, threat model, language-independent envelope specification,
-structured audit/provenance, and comparative evaluation are not current
+The formal model, a formal threat model (the published one is design-level),
+the language-independent envelope specification, structured
+audit/provenance, and comparative evaluation are not current
 claims and are not pursued in this line. The invariant style in
 `specs/authority.md` and `specs/envelope.md` — claim, "held by", "if it
 breaks" — is the right skeleton for a future appendix.

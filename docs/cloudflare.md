@@ -136,8 +136,9 @@ The three signing variables travel as a set: **none** means the
 development fallback (an ephemeral Ed25519 key per isolate — dev-only;
 refusing it in a deployment is the deploying tooling's call, since the
 runtime cannot read deployment intent), **a partial set is an error**, and
-a full set is **proven a pair at import** — the private half signs a fixed
-probe the public half must verify, so a mismatch is a startup error, not a
+a full set is **proven a pair at signer construction** — the private half
+signs a fixed probe the public half must verify, so a mismatch is an
+error at runtime construction (the first request into an isolate), not a
 runtime that signs envelopes nothing verifies.
 
 - `AUTHORITY_SIGNING_KEY` — pkcs8, base64
@@ -186,7 +187,7 @@ is in [deploy_runbook.md](deploy_runbook.md#configuration-only-versions).
 Upstream's release act ends at an immutable `cloudflare-v*` tag and its
 publication. Deploying that tag — the host's Cloudflare account, Worker
 Versions, secrets, traffic, and service binding — is the consuming host's
-act. The live deployment is the consuming host's `cloudflare-v0.7.0`; the
+act. The live deployment is the consuming host's `cloudflare-v0.11.0`; the
 host's ops porcelain owns the deploy verbs. A deployed tag can lag `main`;
 the tag is the deployment unit.
 
@@ -245,7 +246,8 @@ public key distribution:
   includes the operation's roster-projection counts and freshness, plus
   `operationSlug`, `sitesWithPath`, and `routingFactsComplete`
 - `GET /ops/export?coordinator=…&id=…` — canonical JSON
-- `POST /ops/restore` — `{ coordinator, id, snapshot }`, typed and atomic
+- `POST /ops/restore` — `{ coordinator, id, snapshot }`, typed and atomic;
+  a snapshot's undelivered outbox rows are re-delivered by the next drain
 - `GET /ops/verification-keys` — **public**, no token:
   `{ signingKeyId, keySet }` where `keySet` is the serialized
   `VerifyKeySet`
@@ -318,7 +320,14 @@ A self-contained page: bootstrap the demo world, sign in with fixed dev evidence
 (no identity provider, no external service, no production secret), and
 check access — a real signed envelope issued through the authority
 runtime and verified through `org-hats/access`, with neutral facts and
-allow/deny checks. The `/demo/*` routes are not a product surface.
+allow/deny checks. The `/demo/*` routes are not a product surface, and
+they carry no token: `GET /demo/bootstrap` resets and reseeds the
+coordinators, `POST /demo/login` mints an envelope and refresh handle,
+`/demo/access` verifies one, and `/increment` is a harness counter. The
+reference production config attaches no routes (`workers_dev: false`,
+service binding only); a deployment that routes the Worker publicly — and
+any caller that can reach the service binding — reaches them
+unauthenticated. The [threat model](threat_model.md) carries the boundary.
 
 ## Portability constraint
 

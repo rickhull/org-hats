@@ -9,7 +9,7 @@ are in [`authority_redesign.md`](authority_redesign.md) § Access.*
 `org-hats` is a portable authority core for organizations that work across
 many operations, sites, and teams. It keeps organization identity and
 operation-local authority as separate state, grants a role to one actor over
-one team or site, selects the active hat for a session, and issues a
+one team or site, wears one active hat at a time, and issues a
 short-lived signed access envelope. A verifier checks the signature, expiry,
 and binding and compares signed ids; it never rebuilds the operation's
 policy. Revocation is bounded by the envelope lifetime, with refresh
@@ -136,7 +136,7 @@ policy; a directory remains the identity source.
   reference and test adapter, not a durable store.
 - **Identity:** OIDC authorization-code + PKCE exchange; no LDAP, SAML, SCIM,
   or client-credentials flow. The live deployment, the consuming host's
-  `cloudflare-v0.7.0`, verifies ES256 and RS256.
+  `cloudflare-v0.11.0`, verifies ES256 and RS256.
 - **Envelope:** Ed25519 over canonical JSON, not JWT/JWKS; downstream services
   need `org-hats/access` and the key set.
 - **Distribution:** git tags only; no registry publication.
@@ -152,8 +152,9 @@ policy; a directory remains the identity source.
   [`authority_redesign.md`](authority_redesign.md) § Access and
   [`../specs/authority.md`](../specs/authority.md) A14/A15.
 - **Known code limits:** the envelope does not carry `grantId` or a policy
-  version, so `context` identifies the selected grant by role; two grants
-  sharing a role are ambiguous for presentation. The refresh-handle type
+  version; the context resolves the worn hat by the issuance ranking
+  (`firstByRank`) and names the grant itself, so only a verifier reading the
+  envelope alone cannot name the worn grant. The refresh-handle type
   reserves `kept`/`revoked`, but both engines currently return `rotated`. The
   canonical JSON has one implementation and makes no cross-language
   interoperability claim. `expectedOperationId`/`expectedSiteId` are optional;

@@ -11,7 +11,7 @@ roadmap.*
 ## The one-sentence position
 
 > A portable authority core for organizations that work across many
-> operations and sites: one identity, one active hat per session, grants over
+> operations and sites: one identity, one active hat at a time, grants over
 > one target, and locally verifiable signed access with a bounded revocation
 > window.
 
@@ -139,7 +139,7 @@ model.
   strengthen a claim in a persona description.
 - No customer names, real rosters, or key material. The examples are
   synthetic.
-- “One active hat per session” is the action layer, not a claim that the hat
+- “One active hat at a time” is the action layer, not a claim that the hat
   bounds read, configuration, or member reach.
 - The grant is the operative admission; access requests are a reviewed queue,
   not a stored relation.

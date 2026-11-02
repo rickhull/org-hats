@@ -29,7 +29,7 @@ decoration. That is the right lesson for cross-organization, multi-site work.
 | **Site** | Resource container / site OU | One containment level: a site has teams. It is not a subtree you can delegate. |
 | **Team** | Resource-scoped security group | Membership is not authority. A team is fielded by one organization at one site; there are no nested teams and no group-as-grantee. |
 | **Actor** | User or service account | An organization-scoped identity, not a global person. There is no credential in the model: no password, keytab, or client secret. |
-| **Principal link** | External-subject mapping | An explicit `(provider, subject) → actor` link created at bootstrap. There is no DN and no directory sync; equal mail-shaped subjects never merge actors. |
+| **Principal link** | External-subject mapping | An explicit `(provider, subject) → actor` link, created at bootstrap or bound later through the organization's link routes. There is no DN and no directory sync; equal mail-shaped subjects never merge actors. |
 | **Grant** | User-role assignment / ACE | One actor, one role, one target (team or site). It is not a permission and not an ACL: the permission is the pair `(action, target)`. There is no group principal and no `AGDLP`. |
 | **Role** | Role / permission set | Flat action set. No role hierarchy, dominance, nested roles, prerequisites, or constraints. |
 | **Hat** | Active role / PAM role activation | The grant worn for this envelope. One action hat per envelope; unlike a Kerberos ticket or PAC, the envelope carries a selected capacity, not every group. |
@@ -63,7 +63,8 @@ decoration. That is the right lesson for cross-organization, multi-site work.
 - **Service accounts and workload identity.** The reference exchange is OIDC
   authorization-code + PKCE for a browser login. There is no client-credentials
   flow, gMSA, SPN, or keytab story; a machine identity needs an adapter.
-- **Directory sync.** Principal links are explicit bootstrap material. There
+- **Directory sync.** Principal links are explicit material — created at
+  bootstrap or bound through the organization's link routes. There
   is no LDAP/SCIM/SAML connector in the box.
 - **Immediate revocation.** An already-issued ordinary envelope survives to
   its expiry; the lease is the revocation bound. Refresh is the liveness gate.
@@ -123,7 +124,7 @@ verified. The consumer pin is in [`publishing.md`](publishing.md).
 ## Current limits for an AD shop
 
 - No LDAP, SAML, or SCIM connector; OIDC only.
-- The live `cloudflare-v0.7.0` verifies ES256 and RS256. Check the provider's
+- The live `cloudflare-v0.11.0` verifies ES256 and RS256. Check the provider's
   signing algorithm before a pilot.
 - One action hat per envelope, and read/config/member reach are separate
   issuer-computed layers over wearable grants; the layers are named in
