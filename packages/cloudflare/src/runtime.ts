@@ -471,7 +471,10 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     // grants of one role the first match is arbitrary. `HatSummary` carries
     // everything `firstByRank` reads (primary, role, target, grant id) with
     // unbranded ids, hence the structural cast.
-    const selected = firstByRank(op.value.wearableHats as unknown as readonly ActiveGrant[]);
+    const ranked = firstByRank(op.value.wearableHats as unknown as readonly ActiveGrant[]);
+    const selected = ranked === undefined
+      ? undefined
+      : op.value.wearableHats.find((hat) => hat.grantId === ranked.grantId);
     return {
       actor: {
         organizationId: claims.actor.organizationId,
@@ -494,6 +497,9 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
               target: selected.target,
               primary: selected.primary === true,
               grantId: selected.grantId,
+              ...(selected.targetDisplayName === undefined
+                ? {}
+                : { targetDisplayName: selected.targetDisplayName }),
             },
           }),
       sites: claims.sites,
