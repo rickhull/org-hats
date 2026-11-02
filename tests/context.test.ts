@@ -119,13 +119,20 @@ test("[E4] the context refuses a malformed envelope as a value, never a throw", 
   // are absent, must be a closed failure and not an exception out of the
   // runtime call.
   const { engine } = await setup();
-  for (const envelope of [null, undefined, "envelope", {}, { format: "org-hats.access", v: 1 }]) {
+  const cases: readonly (readonly [unknown, string])[] = [
+    [null, "unauthenticated"],
+    [undefined, "unauthenticated"],
+    ["envelope", "unauthenticated"],
+    [{ format: "org-hats.access", v: 1 }, "unauthenticated"],
+    [{}, "wrong-interface-version"],
+  ];
+  for (const [envelope, kind] of cases) {
     const context = await engine.runtime.context({
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
       envelope: envelope as never,
     });
     assert.ok(isFailed(context), `${String(JSON.stringify(envelope))} must fail as a value`);
-    assert.equal(context.failure.kind, "wrong-interface-version");
+    assert.equal(context.failure.kind, kind);
   }
 });
 

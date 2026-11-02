@@ -68,6 +68,14 @@ throws is `invalid-signature`. Every caller of the gate — the verifier, the
 context, and command authorization — inherits this, and none of them may read
 a claim before it has run.
 
+Unreadable and unsupported are different answers. Something that is not
+recognizable as an envelope declares no version, so it is `unauthenticated`:
+the caller presented no usable authority, and a fresh login is the remedy.
+Only a recognizable envelope can disagree with us about a version, and that
+stays `wrong-interface-version` — a deployment mismatch no login would fix.
+Collapsing the two would tell a person with a damaged cookie to wait for an
+outage that is not happening.
+
 *Held by:* the single `verify` order; the shared `envelopeVersionFailure`
 gate; `OH-ACCESS-01` through `OH-ACCESS-04` and the vectors.
 *If it breaks:* an unrecognized envelope gets interpreted before it is

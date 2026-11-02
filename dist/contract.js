@@ -55,8 +55,13 @@ export const envelopeVersionFailure = (envelope) => {
     // field read, so it owns the structural checks too — a non-object envelope or
     // an absent claims payload is a closed failure here, never an exception out
     // of a caller that promised a failure as a value.
+    // Structure first, and it is `unauthenticated`, not a version disagreement:
+    // a non-object envelope declares no version, so the caller presented no
+    // usable authority. Only something recognizable as an envelope can disagree
+    // with us about a version. The distinction is what a host shows a person
+    // whose bearer cookie was truncated — clear it and sign in again, not a 500.
     if (typeof envelope !== "object" || envelope === null || Array.isArray(envelope)) {
-        return { kind: "wrong-interface-version", detail: "not a recognized access envelope" };
+        return { kind: "unauthenticated", detail: "not a readable access envelope" };
     }
     const candidate = envelope;
     if (candidate.format !== ACCESS_ENVELOPE_FORMAT) {
@@ -67,7 +72,7 @@ export const envelopeVersionFailure = (envelope) => {
     }
     const claims = candidate.claims;
     if (typeof claims !== "object" || claims === null || Array.isArray(claims)) {
-        return { kind: "wrong-interface-version", detail: "the envelope carries no claims" };
+        return { kind: "unauthenticated", detail: "the envelope carries no claims" };
     }
     if (claims.v !== ACCESS_ENVELOPE_VERSION) {
         return { kind: "wrong-interface-version", detail: "envelope and claims disagree on the version" };

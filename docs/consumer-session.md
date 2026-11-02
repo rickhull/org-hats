@@ -106,6 +106,21 @@ closed and the host maps every kind.  A refused issuance may be audited with
 the provider and subject the evidence carried — never a token, a code, or a
 client secret.
 
+A damaged access cookie is part of that one path.  A cookie truncated at the
+4 KB cap, re-encoded by a proxy, or half-written by an interrupted response
+decodes to something that is not a readable envelope, and verification
+answers `unauthenticated` — the caller presented no usable authority.  It is
+not `wrong-interface-version`: nothing declared a version to disagree about,
+and a deployment mismatch is not what happened.  The host's response is the
+ordinary reauthenticate path and it is already specific enough to act on:
+clear both session cookies — the access cookie is the damaged one, and
+keeping a refresh cookie beside a credential that would not parse only
+repeats the failure — then send the person to login.  Telling someone to
+clear cookies by hand is a bug in the host, not advice: the refusal already
+clears them, and the next request starts a clean login.  A host that instead
+maps this to a 500 leaves a person stuck in a loop with a bad cookie it
+never cleared.
+
 ## What upstream does not own
 
 Routes, cookie names, response bodies, status codes, redirect policy, and

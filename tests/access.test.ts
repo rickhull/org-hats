@@ -121,23 +121,40 @@ test("[E4] a structurally malformed envelope fails closed as a value, never a th
   // it must refuse a non-object envelope and an absent or non-object claims
   // payload before it reads a field. `format` and `v` are public constants:
   // clearing the first two gates costs an attacker nothing.
+  // Unreadable as an envelope is `unauthenticated` — it declares no version,
+  // so the caller presented no usable authority, and a host can tell the
+  // person to clear the credential and sign in again.
   const now = vectors.claims.iat + 1;
-  const malformed: readonly unknown[] = [
+  const unreadable: readonly unknown[] = [
     null,
     undefined,
     "org-hats.access",
     42,
     [],
-    {},
-    { format: ACCESS_ENVELOPE_FORMAT },
     { format: ACCESS_ENVELOPE_FORMAT, v: 1 },
     { format: ACCESS_ENVELOPE_FORMAT, v: 1, claims: null },
     { format: ACCESS_ENVELOPE_FORMAT, v: 1, claims: "claims" },
     { format: ACCESS_ENVELOPE_FORMAT, v: 1, claims: 1 },
     { format: ACCESS_ENVELOPE_FORMAT, v: 1, claims: [] },
+  ];
+  for (const envelope of unreadable) {
+    const result = await verify(envelope as never, keys, { now });
+    assert.equal(
+      failureOf(result).kind,
+      "unauthenticated",
+      `${String(JSON.stringify(envelope))} must fail as a value`,
+    );
+  }
+
+  // Recognizable as an envelope, but declaring a version we do not support:
+  // that is the version gate's own answer, unchanged. An absent format marker
+  // is a declared-format mismatch, not an unreadable envelope.
+  const disagreeing: readonly unknown[] = [
+    {},
+    { format: ACCESS_ENVELOPE_FORMAT },
     { format: ACCESS_ENVELOPE_FORMAT, v: 1, claims: {} },
   ];
-  for (const envelope of malformed) {
+  for (const envelope of disagreeing) {
     const result = await verify(envelope as never, keys, { now });
     assert.equal(
       failureOf(result).kind,

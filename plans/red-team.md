@@ -327,6 +327,18 @@ What landed from Phase 1, and its evidence:
   and `src/authority/organization.ts`; witnessed by the `[E4]` tests in
   `tests/access.test.ts`, `tests/context.test.ts`, and `tests/engine.test.ts`,
   each proven red first.  E4 now states that closed means *as a value*.
+- **The fix exposed a misclassification, and it is fixed too.**  An
+  unreadable envelope first answered `wrong-interface-version`, which the
+  taxonomy defines as the caller's *declared* version being unsupported — a
+  `null` envelope declares nothing, and the reference host maps that kind to a
+  no-reauth 500.  A person whose access cookie was truncated would have been
+  held in a loop by an outage that was not happening.  Unreadable is now
+  `unauthenticated` ("no usable authority"), which is the reauthenticate path;
+  a recognizable envelope declaring an unsupported version still answers
+  `wrong-interface-version`, so E8 and its witnesses are untouched.  The
+  taxonomy stays closed at nine kinds.  Consumer-visible: `docs/consumer-session.md`
+  carries the damaged-cookie guidance and `examples/consumer-access.ts` the
+  mapping rationale.
 - **Two documentation defects, low.**  `SECURITY.md` named
   `cloudflare-v0.11.x` as the current runtime line while `0.12.1` shipped,
   and its in-scope list never named the reference runtime at all while

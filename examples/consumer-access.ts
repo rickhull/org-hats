@@ -48,6 +48,9 @@ const productResponse = (failure: Failure): ProductResponse => {
     case "unavailable":
       return { status: 503, reauthenticate: false, message: "Temporarily unavailable." };
     case "unauthenticated":
+      // No usable authority was presented — including a bearer cookie too
+      // damaged to read.  The refusal path clears the session cookies, so
+      // this is already the specific remedy: sign in again on a clean slate.
       return { status: 401, reauthenticate: true, message: "Sign in to continue." };
     case "expired":
       return { status: 401, reauthenticate: true, message: "Sign in to continue." };
@@ -64,7 +67,9 @@ const productResponse = (failure: Failure): ProductResponse => {
     case "invalid-command":
       return { status: 400, reauthenticate: false, message: "That request was not valid." };
     case "wrong-interface-version":
-      // Our deployments disagree.  Nothing the caller can do.
+      // Our deployments disagree about a version something actually declared.
+      // Nothing the caller can do — and nothing a fresh login would fix, which
+      // is why an unreadable credential is `unauthenticated` instead.
       return { status: 500, reauthenticate: false, message: "Temporarily unavailable." };
     default: {
       const unreachable: never = failure.kind;

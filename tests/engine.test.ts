@@ -728,14 +728,21 @@ test("[E4] command authorization refuses a malformed envelope as a value, never 
   // claims payload before any field is touched. A host decoding a bearer
   // cookie into JSON supplies exactly these shapes.
   const { engine } = await setup();
-  for (const envelope of [null, undefined, "envelope", {}, { format: "org-hats.access", v: 1 }]) {
+  const cases: readonly (readonly [unknown, string])[] = [
+    [null, "unauthenticated"],
+    [undefined, "unauthenticated"],
+    ["envelope", "unauthenticated"],
+    [{ format: "org-hats.access", v: 1 }, "unauthenticated"],
+    [{}, "wrong-interface-version"],
+  ];
+  for (const [envelope, kind] of cases) {
     const command = await engine.runtime.command(cmd(
       { kind: "select-hat", operationId: OP, grantId: "g-mer-3" },
       { kind: "access-envelope", envelope: envelope as never },
       `malformed-${String(JSON.stringify(envelope))}`,
     ));
     assert.ok(!command.ok, `${String(JSON.stringify(envelope))} must fail as a value`);
-    assert.equal(failureOf(command).kind, "wrong-interface-version");
+    assert.equal(failureOf(command).kind, kind);
   }
 });
 
