@@ -49,6 +49,34 @@ The counts include the runtime's around-call outbox drain and roster
 reconciliation, not only the handler's own statement. They are stable across
 repeated runs.
 
+## Scaled world, 2026-11-01
+
+`bench/scale.bench.ts` boots the same coordinators with 10,000 grants,
+3,000 projected actors, 60 teams, and 10 sites — the order of a mid-size
+operation — and runs the same four calls. It exists to price the O(state-size)
+candidates the toy world cannot see. Both columns are the same day's runs
+on the same machine, minutes apart.
+
+| Operation | Toy world | Scaled world | Statements (toy = scaled) |
+| --- | ---: | ---: | --- |
+| issue | 22 ms | **85 ms** | 16 = 16 |
+| refresh | 11 ms | **81 ms** | 19 = 19 |
+| context | 7 ms | 10 ms | 4 = 4 |
+| grant-hat | 17 ms | 19 ms | 19 = 19 |
+
+The verdict the table writes: statement counts are identical at both
+scales — the cost moved into the statements, not into more of them — and
+**issue and refresh are O(state)**: they re-read the whole model snapshot
+(all grants, teams, sites, participations, and the actor projection) per
+call, so at ~600× the state they cost ~4–7× more and converge on each
+other. Context and grant-hat stay flat; their statements are keyed reads,
+not world reads. A write-through snapshot cache in the operation
+coordinator — the single writer, so the cache is sound — is the one change
+this measurement justifies: it would return issue and refresh to the
+transport floor at any state size. The indexless scans (the undelivered
+outbox scan rides every drain) remain unpriced until a bench accumulates
+outbox history; nothing measured here justifies an index yet.
+
 ## Review
 
 - In memory, signing and canonicalization dominate issuance, refresh, and
