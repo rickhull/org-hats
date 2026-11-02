@@ -105,16 +105,21 @@ The local Pi mesh is an interrupt channel, not a second relay.  Follow
 
 ## Delegation
 
-Work that splits into three or more weakly-coupled areas, each needing real
-judgment, runs through the `moshpit` skill: one orchestrator liaises with
-Rick, plans, and outsources execution to the cheapest capable subagents,
-retiring each before its context fills.  The layers are `me`, `orchestrator`,
-`specialist`, `helper`.
+Work that splits into two or more durable, weakly-coupled areas, needing
+judgment at the lane or integration level and able to run as parallel
+specialist lanes, runs through the `moshpit` skill: one orchestrator liaises
+with Rick, plans, and outsources execution to the cheapest capable subagents,
+retiring each before its context fills.  A reasonable two-lane parallel split
+is enough to try it; a repository-wide sweep after a pivot is a base case,
+with mechanical chunks delegated to `agentic-sweep` or pooled helpers.  The
+layers are `me`, `orchestrator`, `specialist`, `helper`.
 
 The skill lives once in the shared skill library (`agent-skills`, core,
 globally discovered); there is no per-repo copy to keep in step.  Invoke it
-deliberately — below three areas, or for a mechanical sweep, do the work
-inline.  The entry test gates the intake; a failing test means no fan-out.
+deliberately — with no real parallelism, or for a pure mechanical sweep in one
+checkout, do the work inline or use `agentic-sweep` directly.  The entry test
+gates the intake; a failing test means no fan-out.  On a threshold case, the
+run ends with a short self-evaluation of whether the skill earned its keep.
 
 ## Tooling
 
