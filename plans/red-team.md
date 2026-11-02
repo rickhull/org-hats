@@ -77,6 +77,64 @@ next decision before the campaign continues.  Remediation follows the
 repository's bugfix rule: prove the defect red first, then fix it, and keep the
 test and fix in one commit-sized handoff.
 
+## Moshpit execution
+
+This campaign is the threshold-case test of the shared `moshpit` skill.  The
+orchestrator runs in a harness that can put the strongest model in the chair
+and choose a model per specialist; if this Pi harness cannot, hand the run to
+Claude Code or another capable harness.  The campaign plan remains
+authoritative over the harness.
+
+The orchestrator owns the threat-model matrix, the gap register, the
+cross-area decisions, the stop conditions, and the final adjudication.  It
+settles these before any spawn:
+
+- the matrix schema and disposition vocabulary (`confirmed`, `residual`,
+  `documentation defect`, `rejected`);
+- the evidence standard (invariant, source path, test name, owner);
+- severity and owner classification; and
+- private-finding routing and the disclosure point.
+
+Specialists own boundary lanes; helpers do bounded extraction only.  A
+specialist that finds a cross-lane or cross-cutting issue reports it upward;
+it does not judge it alone.  No specialist receives another lane's transcript;
+pointers and row dispositions travel through the orchestrator.
+
+Phase 1 is the initial two-lane pod:
+
+- **issuer → verifier** — envelope format, canonical bytes, signature and key
+  set, claims, access verification, and the fixed vectors;
+- **operator → ops** — operator authentication, ops routes, the ops token,
+  sealed IdP configuration, bootstrap/export/restore, and the runtime's
+  operator boundary.
+
+The orchestrator integrates the two lane reports into one matrix, reconciles
+overlapping threat rows, and stops for Rick's review before any attack test is
+written.
+
+Later phases are sequenced, not parallel campaign lanes.  The orchestrator may
+form a phase-scoped pod when that phase has two or more durable, independent
+sub-areas; it must not run a later phase while an earlier phase's confirmed
+finding or open cross-area decision would change its premises.  A confirmed
+critical or high finding stops the current phase and goes to Rick privately;
+the pod does not continue around it.
+
+Phase 1 is read-only.  In phases that add tests, workers may run a single named
+suite; the orchestrator runs `pnpm check`, `pnpm check:cloudflare`, or
+`pnpm verify` at integration, never inside a worker.  Parallel writers use
+worktrees or disjoint file allowlists.  Mechanical breadth may use
+`agentic-sweep` in an isolated sweep lane; it is a batch tool, not a second
+command structure.
+
+Because Phase 1 is a threshold case, its report ends with the moshpit
+self-evaluation from the shared skill.  The evaluation covers process, not
+finding details; sensitive evidence stays in the private report.  A “should
+have been inline” verdict is a valid result and informs whether later phases
+use a pod or run serially.
+
+This execution model does not change the campaign's scope, sequencing,
+disclosure rules, or stop conditions.
+
 ## Phase 1 — Claims-to-evidence map
 
 Build a traceability matrix from each threat, assumption, and residual risk in
@@ -243,8 +301,11 @@ remaining host-, operator-, and consumer-owned risk.
 
 Begin Phase 1 with the issuer-to-verifier and operator-to-ops boundaries.  They
 hold the widest authority and give the later credential, runtime, and release
-tests their priority order.  Stop after the traceability report for Rick's
-review before writing attack tests.
+tests their priority order.  Run it as the threshold-case moshpit pod described
+above, in a harness that can select the orchestrator and per-spawn models; this
+Pi session is not the run's chair.  Stop after the traceability report for
+Rick's review before writing attack tests, and include the threshold
+self-evaluation.
 
 ## Specification placement
 
