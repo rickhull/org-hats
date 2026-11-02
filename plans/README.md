@@ -9,6 +9,11 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
+The authority, Cloudflare runtime, release path, and compromise procedures
+need one bounded adversarial campaign.  Its local-only rules of engagement,
+phases, evidence, stop conditions, and done-when are in
+[`red-team.md`](red-team.md).
+
 The operation snapshot cache is deferred until a consumer approaches the
 scaled bench's state; the measured verdict, the consumer-agreed design
 (model-scoped epoch, trigger-backed), and the done-when are in
