@@ -1,5 +1,10 @@
 # Codeberg's hosted Forgejo Actions: the portable gate only.
 #
+# This workflow is manual only. Codeberg is a release mirror, and mirror pushes
+# must not schedule CI: the git path and the shared runner pool stay
+# independent. Dispatch it from the Codeberg Actions UI or with:
+#   fj actions dispatch -r rickhull/org-hats check.yml main -H codeberg.org
+#
 # `codeberg-small` is 2 CPU / 4 GB / 5 min. The root-only install keeps the
 # Cloudflare workspace (workerd, vitest, wrangler) off this runner; workerd
 # stays on the local/release rings. A local root-only run is well inside the
@@ -8,10 +13,9 @@
 name: check
 
 on:
-  push:
   workflow_dispatch:
 
-# One witness per ref: a newer push supersedes its queued or running run
+# One witness per ref: a newer dispatch supersedes its queued or running run
 # instead of stacking on the shared pool (docs/forgejo_actions.md).
 concurrency:
   group: check-${{ github.ref }}

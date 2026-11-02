@@ -1,11 +1,20 @@
 # Forgejo Actions — the third-party build witness
 
-Codeberg's hosted Forgejo Actions run the portable gate whenever that public
-release mirror catches up. The run is assurance that a third party can build
-and test the repository from a clean checkout — not a gate of record. The local rings in
-[`tests/README.md`](../tests/README.md) are the authority; remote red without
-local red means the *environment* broke, and that reading has held exactly
-once (see the incident below).
+Codeberg's hosted Forgejo Actions run the portable gate only when an
+administrator dispatches the workflow. The run is assurance that a third party
+can build and test the repository from a clean checkout — not a gate of record.
+The local rings in [`tests/README.md`](../tests/README.md) are the authority;
+remote red without local red means the *environment* broke, and that reading
+has held exactly once (see the incident below).
+
+The workflow is `workflow_dispatch` only. Codeberg is a release mirror, and its
+push path and the shared runner pool must stay independent: a release push
+schedules no run. The Actions unit stays enabled so an administrator can
+dispatch the witness from the Codeberg web UI or with:
+
+```sh
+fj actions dispatch -r rickhull/org-hats check.yml main -H codeberg.org
+```
 
 Woodpecker CI — Codeberg's primary hosted CI — is deliberately not used: it
 is application-gated and a second system to operate, and this repository
@@ -20,7 +29,7 @@ one job, one workflow, no secrets, nothing release-critical.
 
 - Runners: `codeberg-tiny` (1 CPU / 2 GB / 2 min), `codeberg-small`
   (2 CPU / 4 GB / 5 min — what we use), `codeberg-medium` (4 CPU / 8 GB /
-  10 min). A `-lazy` suffix defers scheduling; useless for push assurance.
+  10 min). A `-lazy` suffix defers scheduling; useless for on-demand evidence.
 - The RAM quota **counts filesystem writes**; the full images below are
   impossible under it.
 - The default job image is `ghcr.io/catthehacker/ubuntu:act-latest`, chosen
@@ -46,7 +55,7 @@ one job, one workflow, no secrets, nothing release-critical.
   pinned `rg` step below). Everything else is the workflow's job: runner
   setup belongs in the workflow files, next to the `pnpm` and `node` setup
   actions, not in the repository scripts. A fence that names a tool no step
-  installs is a CI outage waiting for the next push.
+  installs is a CI outage waiting for the next dispatch.
 
 ### The incident that fixed this
 
@@ -127,18 +136,18 @@ short `-r` pitfall (see `AGENTS.md`) the moment they exist.
 
 - **Load etiquette.** The runner pool is shared; the queue we add to is
   everyone's. The workflow declares a `concurrency` group per ref with
-  `cancel-in-progress`, so a burst of pushes collapses to one witness per
-  ref — the last push's run — instead of stacking queued runs. What was
+  `cancel-in-progress`, so a burst of dispatches collapses to one witness per
+  ref — the last dispatch's run — instead of stacking queued runs. What was
   considered and rejected: `codeberg-tiny` (its two-minute cap leaves no
   headroom: observed runs are 1m6s–1m44s on **two** CPUs, median ~1m15s,
   and tiny is a one-CPU label — the median already flirts with the cap and
   the worst case exceeds it; a cap-killed run is a red witness, worse than
-  a queued one), `-lazy` labels (deferred
-  scheduling defeats push-blocking assurance), `paths` filters (Forgejo
-  does not intend them combined with `tags`, and skipping pushes weakens
-  the witness), and caching the 2.3 MB rg fetch (not worth a cache action).
-  The floor is one full gate per mirrored release update. The duplicate run
-  a root `v*` tag triggers is an accepted, bounded cost of that.
+  a queued one), `-lazy` labels (deferred scheduling delays on-demand
+  evidence), `paths` filters (Forgejo does not intend them combined with
+  `tags`, and skipping pushes weakens the witness), and caching the 2.3 MB rg
+  fetch (not worth a cache action). The workflow is manual only, so the
+  floor is one full gate per administrator dispatch. A dispatch on a tag ref
+  exercises the tag-specific artifact gate; a mirror push schedules nothing.
 
 - Keep the job whole and short: one `CI=1 ci/run portable` invocation,
   ~90 s, well inside the `codeberg-small` five-minute cap.
@@ -146,10 +155,10 @@ short `-r` pitfall (see `AGENTS.md`) the moment they exist.
   `node` 24, and any fetched binary's version **and** digest.
 - `fetch-depth: 0` is required: the release-metadata and tag gates read
   history and tag objects, and CI mode refuses a shallow or dirty checkout.
-- `cloudflare-v*` tag pushes carry the annotated-tag repair step (the
-  checkout action replaces the annotated object with a lightweight ref) and
-  the artifact gate; see [`publishing.md`](publishing.md) for the release
-  side.
+- A manual dispatch on a `cloudflare-v*` tag carries the annotated-tag repair
+  step (the checkout action replaces the annotated object with a lightweight
+  ref) and the artifact gate; see [`publishing.md`](publishing.md) for the
+  release side.
 - Watch runs with `fj actions tasks`. Logs are not exposed by `fj` 0.7;
   the Codeberg API serves them read-only:
   `/api/v1/repos/<owner>/<repo>/actions/runs` (list; note the `id`) →
@@ -160,9 +169,10 @@ short `-r` pitfall (see `AGENTS.md`) the moment they exist.
   not a just-written change. `gh workflow run check --ref main` is still the pre-release
   canary: it fails in seconds when the mirror's tree can no longer satisfy
   its own CI contract (runner-image drift, a fence change not yet
-  released). After a release, read the triggered mirror runs — the
-  `cloudflare-v0.9.0` release shipped with both mirror runs red and no one
-  watching, which is the gap this canary closes.
+  released). After a release, read the triggered GitHub run; Codeberg's witness
+  now runs only on a manual dispatch. The `cloudflare-v0.9.0` release shipped
+  with both mirror runs red and no one watching, which is the gap this canary
+  closes.
 - A red remote with a green local ring means the environment changed:
   suspect the moving `act-latest` tag first, then a missing tool, then the
   runner fleet's status page referenced from

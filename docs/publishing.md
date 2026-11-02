@@ -56,18 +56,20 @@ git remote add github git@github.com:rickhull/org-hats.git   # if absent
 ```
 
 A fresh clone adds `origin`, `codeberg`, and `github` with the same URLs.
-Then seed the authority once and set the upstream:
+Then seed the authority once and set the upstream. `--all` and `--tags` are
+mutually exclusive, so the seed is two pushes:
 
 ```sh
-git push --atomic origin --all --tags
+git push --atomic origin --all
+git push --atomic origin --tags
 git fetch origin
 git branch --set-upstream-to=origin/main main
 ```
 
 The seed is the only push that carries every ref. The pre-push hook
-validates every tag in it (the historical `v0.4.3` is skipped).
-`cloudflare-v0.5.0` is not reachable from `main`, so `--tags` carries it;
-the ordinary release `--follow-tags` path would not.
+validates every tag in the second push (the historical `v0.4.3` is skipped).
+`cloudflare-v0.5.0` is not reachable from `main`, so the `--tags` push
+carries it; the ordinary release `--follow-tags` path would not.
 
 For a release created with `--no-push`, publish in authority order:
 
@@ -115,13 +117,18 @@ pre-push hook skips it explicitly so a catch-up can validate every other tag;
 ## CI
 
 Codeberg hosted Forgejo Actions runs
-[`.forgejo/workflows/check.yml`](../.forgejo/workflows/check.yml) when the
-release mirror is updated and on `workflow_dispatch`, on `codeberg-small`:
+[`.forgejo/workflows/check.yml`](../.forgejo/workflows/check.yml) only on
+`workflow_dispatch`, on `codeberg-small`:
 
 - checkout with tags (`fetch-depth: 0`), pnpm 11.21.0, Node 24;
 - `CI=1 ci/run portable` — the repository-owned contract performs the
   root-only frozen install, build-freshness check, portable gate, and static
   Cloudflare artifact check. Workerd and vitest stay off the light runner.
+
+The workflow is manual only. Codeberg is a release mirror, and a mirror push
+schedules no run: the git path and the shared runner pool stay independent.
+An administrator dispatches the witness from the Codeberg Actions UI or with
+`fj actions dispatch -r rickhull/org-hats check.yml main -H codeberg.org`.
 
 The first run was green: 96 portable tests in about 1m25s, well inside the
 5-minute cap. Workerd is not on this runner; it stays in the local and
@@ -139,9 +146,9 @@ Its distinct contribution is the workerd suites on a clean machine: `pnpm
 verify` already runs every gate locally, but only through the nix-ld loader,
 so CI is the one execution of the deployable artifact outside it.
 
-Codeberg's mirror job runs the portable gate only. The workerd suites run in
-ring 2 locally and at release on GitHub. Both hosted results are mirror
-evidence, not prerequisites for the already-published NAS release.
+The Codeberg manual job runs the portable gate only. The workerd suites run in
+ring 2 locally and at release on GitHub. Both hosted results are evidence, not
+prerequisites for the already-published NAS release.
 
 A `cloudflare-v*` tag job restores the tag ref before the artifact gate reads
 it. The checkout action force-writes the peeled commit into `refs/tags/<tag>`,
@@ -165,10 +172,27 @@ Enable Actions). The CLI path is:
 
 ```sh
 # once per clone; use an application token, not the OAuth browser flow
-fj auth add-token          # token from codeberg.org/user/settings/applications
+fj auth add-token -H codeberg.org   # token from codeberg.org/user/settings/applications
 fj auth list
-fj repo units rickhull/org-hats actions --enable true
+fj repo units rickhull/org-hats actions --enable true -H codeberg.org
+fj repo units rickhull/org-hats actions --enable false -H codeberg.org
 ```
+
+Pass `-H codeberg.org` for Codeberg operations in a maintainer clone whose
+`origin` is the NAS: without it, `fj` derives the host from the current remote
+and sends the request to the NAS API.
+
+The workflow is `workflow_dispatch` only, so enabling the unit does not schedule
+a run on a mirror push. Dispatch it from the Actions UI or with the
+`fj actions dispatch` command below. The trigger is read from the pushed ref:
+tags cut before this change still carry their original push trigger, so do not
+re-push a historical tag while the Actions unit is enabled.
+
+The actions unit is the emergency kill switch: disabling it is a repository
+setting, not an in-repo flag, and it is reversible the same way. The normal
+posture is manual-only in the workflow itself (`workflow_dispatch`); changing
+that trigger is a CI policy change and needs a push, while a job-level
+condition would still enqueue a run.
 
 Grant the token `repository` read/write (and `user` read if you want
 `fj whoami`). `fj auth login` waits for an OAuth callback on
@@ -178,9 +202,9 @@ so `-H` is only needed to override the repository's host.
 
 The run history is at <https://codeberg.org/rickhull/org-hats/actions> and
 through `GET /api/v1/repos/rickhull/org-hats/actions/runs`.
-`fj actions tasks -r rickhull/org-hats` shows the task list and status — the
-first run was `success` in 1m25s. A manual dispatch is
-`fj actions dispatch -r rickhull/org-hats check.yml main`.
+`fj actions tasks -r rickhull/org-hats -H codeberg.org` shows the task list and
+status — the first run was `success` in 1m25s. A manual dispatch is
+`fj actions dispatch -r rickhull/org-hats check.yml main -H codeberg.org`.
 
 ## The release
 
@@ -281,7 +305,7 @@ From a clean `main`:
 - **A release tag must match its manifest.** `bin/check-version` validates both families: `vX.Y.Z` against `package.json`, `cloudflare-vX.Y.Z` against `packages/cloudflare/package.json` (it also audits any tag: `bin/check-version v0.4.3`, `bin/check-version cloudflare-v0.2.0`). `bin/check` runs it, so CI enforces it on every mirror push; `bin/release` keeps the two equal by construction and re-checks the tag it just made. The committed `.githooks/pre-push` runs the root gate before a push leaves the machine — install it once with `git config core.hooksPath .githooks`. CI remains the backstop.
 - **`dist/` must be fresh.** `bin/check` runs the fence but does not emit; `pnpm build` does. `bin/check-dist` builds and fails if `git status --porcelain -- dist` is non-empty; the pre-push hook and **CI** both run it, so the local gate and the remote gate answer the same question in the same order.
 - **A gated commit is recorded locally.** A passing pre-push gate writes a marker under `.git/org-hats-gates/` keyed by the commit and a fingerprint of the runtime, compiler, and installed tree. Later pushes of the same clean commit to NAS and the mirrors reuse it; a dirty tree, a new commit, or a changed toolchain does not. The marker is local and never a release authority — `bin/release` and CI run their own gates.
-- **The local gate protects the canonical push.** Codeberg and GitHub Actions run when their release mirrors catch up. Workerd stays in the local and release rings.
+- **The local gate protects the canonical push.** Codeberg Actions are admin-triggered; GitHub Actions runs when its release mirror catches up. Workerd stays in the local and release rings.
 - **Know which host the consumer pins.** Both public mirrors may lag NAS. Verify the tag before changing a consumer pin.
 
 ## Metadata

@@ -27,9 +27,9 @@ and the annotated-tag repair imposed by checkout actions.
   and never concurrently with `pnpm check` in the same checkout.
 - **Ring 3 — full.** `pnpm verify` (ring 2 plus ring 1; records the local
   gate cache for a clean commit) and `bin/release` for a release, which
-  publishes by default. CI
-  on the public release mirrors is release-time evidence, not the live gate.
-  A Cloudflare tag also passes `bin/check-artifact`.
+  publishes by default. Codeberg CI is manual-dispatch evidence; GitHub CI is
+  release-time evidence. Neither is the live gate. A Cloudflare tag also
+  passes `bin/check-artifact`.
 
 `pnpm test:tools` runs the release and harness suites alone
 (`release-tools.test.ts`, `gate-cache.test.ts`, `artifact-check.test.ts`,
@@ -37,10 +37,10 @@ and the annotated-tag repair imposed by checkout actions.
 use Node, bash, git, and rg from the project shell. Use it alone for a
 fast loop; ring 1 runs them too.
 
-Pre-push runs the portable gate before the canonical NAS push. Codeberg and
-GitHub CI are best-effort release-mirror evidence. The workerd suite runs in
-ring 2, `pnpm verify`, `bin/release`, and the GitHub mirror job; it is not part
-of the Codeberg mirror job.
+Pre-push runs the portable gate before the canonical NAS push. Codeberg CI is
+manual-dispatch evidence; GitHub CI is release-time evidence. The workerd suite
+runs in ring 2, `pnpm verify`, `bin/release`, and the GitHub mirror job; it is
+not part of the Codeberg manual job.
 
 ## Coverage
 

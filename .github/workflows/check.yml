@@ -1,10 +1,11 @@
 # GitHub Actions. This repository on GitHub is a release mirror: `bin/release
-# --push` updates it, so CI runs when a release is pushed, not on every
-# Codeberg push. The jobs delegate the portable and Cloudflare gates to
-# ci/run; a cloudflare-v* tag also passes the deployable-artifact gate.
+# --push` updates it, so CI runs only when a release is pushed. The jobs
+# delegate the portable and Cloudflare gates to ci/run; a cloudflare-v* tag
+# also passes the deployable-artifact gate.
 #
-# Codeberg CI (.forgejo/workflows/check.yml) is the per-push gate; this is the
-# release-time backstop, and the only ring where the workerd suites run in CI.
+# Codeberg CI (.forgejo/workflows/check.yml) is manual-dispatch only; a push
+# to the Codeberg mirror schedules nothing. This is the release-time backstop,
+# and the only ring where the workerd suites run in CI.
 name: check
 
 on:
