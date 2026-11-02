@@ -4,13 +4,26 @@
 
 *Who may act, in which organizational capacity, on which target, in which operation?*
 
-A person may work for an organization across several operations, sites, and teams, with different responsibilities in each. `org-hats` models that authority separately from login identity and issues signed **access envelopes** that other services can verify locally, without querying the authority database.
+A person may work for an organization across several operations, sites, and teams, with different responsibilities in each. `org-hats` models that authority separately from login identity and issues signed **access envelopes** — short-lived statements of what the holder may do, verifiable by any service locally — without querying the authority database.
 
-In the literature's terms, it is best read as **target-scoped RBAC with a signed bearer authorization projection**—not an identity provider, a general policy engine, or a Zanzibar-style relationship database.
+Concretely: Dana coordinates the yard crew at one site and holds no reach at another; at a festival, the same Dana wears an admin role over a different gate. One person, several jobs, different keys for each — and when a job ends, the access that came with it is revoked and dies on a short, known clock. The portable core runs wherever JavaScript does; the reference production runtime is Cloudflare Workers.
 
-> **Core action rule:** An action is permitted when the **selected hat's role** carries that action **and** its grant reaches the target.
+The vocabulary, one line each — the [Model](#model) section below is precise:
+
+- **Operation** — one undertaking with its own boundary: a festival, a deployment, a product line. Not a business process.
+- **Actor** — one person known to one organization; the same human in two organizations is two actors.
+- **Target** — the one place a grant reaches: one team, or one site and its teams.
+- **Grant** — one actor, one role, one target. The unit of "who may do what, where."
+- **Hat** — the one grant selected for acting. You hold several; you act through one.
+- **Evidence** — typed proof from an identity provider that a person authenticated. Login is the host's business; evidence is the input here.
+- **Issuer** — the authority that signs envelopes. A **verifier** (or consumer) is any service that checks one locally.
+- **Host** — the application integrating `org-hats`; it owns login, product policy, and what happens on a denial.
+
+In the literature's terms, it is best read as **target-scoped RBAC with a signed bearer authorization projection**—not an identity provider, a general policy engine, or a Zanzibar-style relationship database (Google's system for sharing by relationships). The standards mapping — each term against INCITS 359 and its neighbours — is in [the academic guide](docs/personas/academic.md).
+
+> **Core action rule:** To **act**, the **selected hat's role** must carry that **action**, and its grant must reach the target. Seeing, configuring, and member reach follow other rules.
 >
-> **Important qualification:** The selected hat bounds `mayAct`, **not every form of authority**. Read reach is issuer-computed under the active read policy; configuration and member reach are issuer-computed over wearable grants. Consumers must choose the appropriate accessor. Hosts must keep their own attribution where it matters; audit facts name the actor, not the authorizing layer (see [Audit attribution](docs/authority_redesign.md#audit-attribution)).
+> **Important qualification:** The selected hat is the acting role for a decision — it is not the whole of what the holder can do. What they may *see*, what they may *configure*, and which teams they *reach as a member* are separate facts, each computed by the issuer from the actor's grants, never from the selected hat alone. A consumer asks for the fact it needs — act, read, configure, or member reach (the table below) — rather than inferring one from another. Hosts must keep their own attribution where it matters; audit facts name the actor, not the authorizing layer (see [Audit attribution](docs/authority_redesign.md#audit-attribution)).
 
 ## When to use it
 
@@ -77,7 +90,7 @@ All example worlds use synthetic data. The [tutorial](docs/tutorial.md) follows 
 pnpm verify
 ```
 
-The full verification gate checks the portable suites, type and import boundaries, examples, release metadata, and the Cloudflare workerd suite. `pnpm test` runs the portable tests; `pnpm check:cloudflare` runs the reference-runtime tests.
+The full verification gate checks the portable suites, type and import boundaries, examples, release metadata, and the Cloudflare workerd suite (workerd is Cloudflare's server-side JavaScript runtime). `pnpm test` runs the portable tests; `pnpm check:cloudflare` runs the reference-runtime tests.
 
 ## Integrate
 
@@ -95,11 +108,11 @@ The authority side exposes four session and command calls, plus the three activa
 | `refresh` | Continue a session and report whether the handle was kept, rotated, or revoked |
 | `context` | Read presentation facts, not an authorization decision |
 | `command` | Execute typed, idempotent authority mutations |
-| `activationRequest` | Mint a return-once activation secret for an existing, unlinked actor |
+| `activationRequest` | Mint a one-time activation code (return-once) for an existing actor who has no login bound yet |
 | `activationInspect` | Disclose only whether an activation secret is usable |
 | `activationAccept` | Bind verified evidence to the named actor and consume the activation |
 
-The consumer uses only the verifier. A verifier needs the `org-hats/access` package and the issuer's distributed `VerifyKeySet`; standard JWT/JWKS middleware will not verify these envelopes:
+The consumer uses only the verifier. A verifier needs the `org-hats/access` package and the issuer's distributed `VerifyKeySet` (the public verification keys); standard JWT/JWKS middleware will not verify these envelopes:
 
 ```ts
 import { isFailed, verify } from "org-hats/access";
@@ -143,8 +156,8 @@ The design-level [threat model](docs/threat_model.md) and the [key-compromise ru
 | `org-hats` | Pure organizational model, policy vocabulary, reach and invariants |
 | `org-hats/authority` | Portable authority runtime, in-memory engine, fixtures |
 | `org-hats/access` | Local verification and neutral access API |
-| `org-hats/conformance` | Executable `OH-*` public-interface conformance inventory |
-| `org-hats-cloudflare` | Reference runtime with SQLite-backed coordinators and service bindings |
+| `org-hats/conformance` | Executable `OH-*` conformance inventory — one named, runnable check per public claim |
+| `org-hats-cloudflare` | Reference runtime with SQLite-backed coordinators (the authority's state holders) and service bindings |
 
 The portable `src/` modules avoid Cloudflare imports and ambient runtime types. The Cloudflare runtime is the deployed reference implementation; the in-memory runtime is for examples and tests. The full conformance inventory runs against the workerd coordinators; the deployed service-binding smoke test is a narrower claim, not equivalent to full conformance.
 
