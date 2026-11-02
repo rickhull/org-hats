@@ -49,13 +49,27 @@ export const isFailed = (result) => "failure" in result;
  * are read. The claims' `interfaceVersion` is provenance and is deliberately
  * not checked here. */
 export const envelopeVersionFailure = (envelope) => {
-    if (envelope.format !== ACCESS_ENVELOPE_FORMAT) {
+    // The parameter is `unknown` because the envelope is untrusted input: a host
+    // decodes it from a cookie or a request body, and the declared type is erased
+    // before it arrives. This gate is the only thing between that input and a
+    // field read, so it owns the structural checks too — a non-object envelope or
+    // an absent claims payload is a closed failure here, never an exception out
+    // of a caller that promised a failure as a value.
+    if (typeof envelope !== "object" || envelope === null || Array.isArray(envelope)) {
         return { kind: "wrong-interface-version", detail: "not a recognized access envelope" };
     }
-    if (envelope.v !== ACCESS_ENVELOPE_VERSION) {
+    const candidate = envelope;
+    if (candidate.format !== ACCESS_ENVELOPE_FORMAT) {
+        return { kind: "wrong-interface-version", detail: "not a recognized access envelope" };
+    }
+    if (candidate.v !== ACCESS_ENVELOPE_VERSION) {
         return { kind: "wrong-interface-version", detail: "unrecognized envelope version" };
     }
-    if (envelope.claims.v !== ACCESS_ENVELOPE_VERSION) {
+    const claims = candidate.claims;
+    if (typeof claims !== "object" || claims === null || Array.isArray(claims)) {
+        return { kind: "wrong-interface-version", detail: "the envelope carries no claims" };
+    }
+    if (claims.v !== ACCESS_ENVELOPE_VERSION) {
         return { kind: "wrong-interface-version", detail: "envelope and claims disagree on the version" };
     }
     return undefined;

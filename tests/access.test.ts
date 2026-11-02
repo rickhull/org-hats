@@ -115,6 +115,56 @@ test("[E4] verification fails closed in a fixed order when faults combine", asyn
   );
 });
 
+test("[E4] a structurally malformed envelope fails closed as a value, never a throw", async () => {
+  // An envelope arrives as untrusted JSON, and the typed parameter is no
+  // runtime guard. The version gate reads `format`, `v`, then `claims.v`, so
+  // it must refuse a non-object envelope and an absent or non-object claims
+  // payload before it reads a field. `format` and `v` are public constants:
+  // clearing the first two gates costs an attacker nothing.
+  const now = vectors.claims.iat + 1;
+  const malformed: readonly unknown[] = [
+    null,
+    undefined,
+    "org-hats.access",
+    42,
+    [],
+    {},
+    { format: ACCESS_ENVELOPE_FORMAT },
+    { format: ACCESS_ENVELOPE_FORMAT, v: 1 },
+    { format: ACCESS_ENVELOPE_FORMAT, v: 1, claims: null },
+    { format: ACCESS_ENVELOPE_FORMAT, v: 1, claims: "claims" },
+    { format: ACCESS_ENVELOPE_FORMAT, v: 1, claims: 1 },
+    { format: ACCESS_ENVELOPE_FORMAT, v: 1, claims: [] },
+    { format: ACCESS_ENVELOPE_FORMAT, v: 1, claims: {} },
+  ];
+  for (const envelope of malformed) {
+    const result = await verify(envelope as never, keys, { now });
+    assert.equal(
+      failureOf(result).kind,
+      "wrong-interface-version",
+      `${String(JSON.stringify(envelope))} must fail as a value`,
+    );
+  }
+});
+
+test("[E4] a verify key that throws fails closed, not out of the call", async () => {
+  // `verifyKeyOf` is a public escape hatch accepting any verify predicate, so
+  // a host-supplied key that throws is a real input. The defensive catch in
+  // `ed25519VerifyKey` does not cover it: the guard belongs at the call site.
+  const exploding: VerifyKey = {
+    keyId: vectors.keyId,
+    verify: () => {
+      throw new Error("the host's verify predicate threw");
+    },
+  };
+  const result = await verify(
+    envelopeOf(vectors.claims),
+    new Map<string, VerifyKey>([[exploding.keyId, exploding]]),
+    { now: vectors.claims.iat + 1 },
+  );
+  assert.equal(failureOf(result).kind, "invalid-signature");
+});
+
 test("[E8] wrong versions fail closed, never reinterpreted", async () => {
   const now = vectors.claims.iat + 1;
   const badFormat = { ...envelopeOf(vectors.claims), format: "something.else" as never };

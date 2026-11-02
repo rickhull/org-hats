@@ -33,7 +33,13 @@ deploying host owns its product surface, IdP, secrets, and deployment; the
    a key in the configured set signs them. They do not recompute policy.
 3. **Worker → coordinators.** The Worker reaches the organization and
    operation Durable Objects through Durable Object namespace bindings. The
-   coordinators are not public HTTP surfaces.
+   coordinators are not public HTTP surfaces. Coordinators also call each
+   other — organization intake into an operation, and the subject guard's
+   bind relay — as plain binding `fetch` calls carrying JSON. A sibling
+   coordinator's message is parsed with the same validators as any other
+   input and is trusted *structurally*: there is no shared secret, signature,
+   or provenance check, so the isolation of that channel is the platform's
+   binding scope alone, with no application-level backstop.
 4. **Operator → ops routes.** `OPS_TOKEN` authenticates a high-authority,
    all-or-nothing operator surface. The token is not a tenant credential.
 5. **Host → bearer.** The host transports envelopes and refresh handles and
@@ -51,23 +57,51 @@ deploying host owns its product surface, IdP, secrets, and deployment; the
    not, so a host that routes the Worker publicly — and any caller that can
    reach the service binding — gets 404s, not the routes.
 
+## Reachable inputs
+
+Every boundary above is crossed by one of these. The list is named so that a
+new input class is a visible addition to the model rather than an assumption.
+
+- **Access envelopes and refresh handles** — untrusted bytes. The envelope
+  arrives as JSON a host decoded from a cookie or body; its declared type is
+  erased at runtime, so the shared version gate owns the structural checks
+  (non-object envelope, absent or non-object claims) before any field is read.
+- **Client and ops request bodies** — typed field-by-field by the HTTP
+  validators; an unrecognized shape is `invalid-command`.
+- **Inter-coordinator relay bodies** — trusted structurally; see boundary 3.
+- **Stored snapshots** — a restore is operator-authorized *structure*, not
+  operator-verified *fact*. Every restorable column is trusted: undelivered
+  outbox rows, refresh-record `revoked`/`superseded` flags, and team status
+  all come back as the snapshot states them. Structure and schema version are
+  validated; the truth of the rows is not.
+- **Environment configuration** — the signing trio, `OPS_TOKEN`, `DEMO_ROUTES`,
+  and `AUTHORITY_ORGANIZATION_IDS`. The directory is the exchange's only route
+  to an issuer's sealed configuration: an organization omitted from it is
+  invisible to login, and one wrongly included extends evidence resolution to
+  it.
+- **OIDC documents** — discovery, JWKS, and token responses are hostile input.
+  Only `issuer`, `token_endpoint`, and `jwks_uri` are read from discovery; the
+  rest is ignored, and the exchange never redirects.
+- **Release metadata** — tags, manifests, and tracked `dist/`; see the
+  supply-chain row.
+
 ## Threats
 
 | Threat | Vector | Mitigation | Residual risk |
 | --- | --- | --- | --- |
-| Envelope forgery or claim tampering | Forged signature, edited claims, unknown key | Ed25519 over canonical JSON; closed version pair; configured key set; `invalid-signature` fails closed | A compromised signing key is authoritative until removed from verifiers |
+| Envelope forgery or claim tampering | Forged signature, edited claims, unknown key, structurally malformed envelope | Ed25519 over canonical JSON; closed version pair; configured key set; `invalid-signature` fails closed; the shared version gate refuses a non-object envelope or absent claims before a field is read, and a host-supplied verify predicate that throws is `invalid-signature`, not an exception | A compromised signing key is authoritative until removed from verifiers |
 | Replay of a stolen envelope | Bearer copy used by another party | Short `exp`; host TLS and cookie protections; refresh re-resolves actor state | A bearer envelope has no proof of possession; it is replayable within its lifetime. The host owns anti-replay and step-up |
 | Stolen refresh handle | Handle leaked from host storage or logs | Handles are hashed at rest, rotate on use, and are revoked by disable/unlink/participation/team/grant changes; refresh re-reads organization state | A stolen, still-live handle can rotate once before the host notices; there is no global bulk revoke |
 | Principal impersonation | Provider subject collision or malicious IdP | One `(provider, subject)` maps to one actor; links are explicit; bootstrap/bind refusals; subject guard serializes cross-organization binds; ambiguity is `unavailable` | The configured IdP is trusted for authentication. A malicious provider can authenticate the wrong human |
 | Provider-callback exchange abused | Intercepted one-time code, nonce reuse, stale or attacker-pinned JWKS | The exchange runs authority-side with the sealed client secret; the nonce is verified against the ID token; signature, issuer, audience, and expiry are checked against a TTL-bounded JWKS cache with forced refetch on unknown kids | The one-time code is the provider's to enforce, and a provider key rotation is only picked up within the cache TTL; a malicious provider authenticates the wrong human (see the impersonation row) |
 | Privilege escalation through commands | A hat, envelope, or fresh evidence used beyond its standing | Command policy table; organization/operation standing; fresh-only writes; selected hat authorizes no command; idempotent claims; audit | An administrator compromised within their own granted authority can exercise it. Separation of duties beyond these roles is host code |
 | Cross-organization or cross-operation reach | Wrong directory id, operation id, or target | Envelope operation binding; coordinator ownership; operation-local grants; per-operation Durable Objects; `wrong-binding` fail closed | A misconfigured organization directory can cause outage or route evidence to the wrong tenant; it is operator configuration |
-| Ops-token compromise | Leaked bearer token | Token is a secret, stored outside the repository; it gates every ops route except the public, secret-free `GET /ops/verification-keys`; use a private ops Worker or tightly held transport | The token is all-or-nothing: bootstrap, links, activation recovery, routing facts, export, and restore. It can read sealed IdP config and alter state. Key ids and rotation state are visible to anyone who can reach the public verification-keys route |
+| Ops-token compromise | Leaked bearer token | Token is a secret, stored outside the repository; it gates every ops route except the public, secret-free `GET /ops/verification-keys`; use a private ops Worker or tightly held transport | The token is all-or-nothing: bootstrap, links, activation recovery, routing facts, export, and restore. Export returns every table — sealed IdP configuration, refresh-handle hashes, activation digests, and audit rows — and restore can rewrite all of them. Key ids and rotation state are visible to anyone who can reach the public verification-keys route |
 | Sealed IdP configuration disclosure | Export/backup, database access, or ops-token use | Configuration is held by the organization object and resolved only by the exchange; named “sealed” because the portable core treats it as opaque | It is not encrypted by `org-hats`; export contains it. Protect exports and rotate the provider client secret if exposed |
 | Signing-key compromise | Secret leak, host compromise, bad deployment configuration | Key pair is proven at import; verifier-first rotation; verifiers keep only configured keys; development fallback is per-isolate | A leaked private key can mint valid envelopes. Removing the old verification key immediately invalidates live sessions but is the safe containment |
 | Accidental development signing | Deployment omits the signing trio | Full signing config is a proven pair; a partial set errors at runtime construction | The runtime cannot infer deployment intent, so a host gate must refuse the ephemeral dev signer in production |
 | Demo or harness surface reached | The Worker is routed publicly, or a service-binding caller asks for `/demo/*` | The reference production config attaches no routes and sets `workers_dev` false; the routes refuse to serve unless the deployment sets `DEMO_ROUTES: "1"`, which the reference config does not | An operator who sets the flag on a routed Worker re-opens the exposure: unauthenticated callers could reset coordinator state and mint envelopes |
-| Malicious or lost state | Database access, bad restore, operator mistake | Typed restore; atomic transactions; projections rebuild by pulling; audit rows | Direct storage access or an authorized restore can rewrite authority state, and a crafted snapshot's undelivered outbox rows are re-delivered as if fresh. No tamper-evident audit log |
+| Malicious or lost state | Database access, bad restore, operator mistake | Typed restore; schema version validated, with a future or unsupported version refused; atomic transactions; projections rebuild by pulling; audit rows | Direct storage access or an authorized restore can rewrite authority state. Restore validates structure, not truth: a crafted snapshot's undelivered outbox rows are re-delivered as if fresh, and its refresh-record and team-status flags come back as stated — A13's live organization read still gates the next refresh. No tamper-evident audit log |
 | Denial of service | Expensive envelope parsing, signature checks, provider fetches, or request floods | The [envelope-size baseline](consumer-session.md) documents the largest envelope the authority issues today — a budget input, not a bound; bounded provider caches; Durable Object alarms; fail-closed failures | No built-in rate limiting; the Worker platform and host must absorb volumetric traffic |
 | Clock and expiry skew | Verifier clock ahead/behind issuer | `exp` checked against the verifier's clock; no not-before check | Clock skew shortens or extends the usable window within the host's clock discipline |
 | Supply-chain or tag rewrite | Moved tag, rebuilt `dist/`, compromised release credentials | Immutable-tag policy; `bin/check-version`; tracked `dist/`; artifact gate; no registry publication | Git tags are names, not cryptographic commitments. Consumers should pin a commit where reproducibility matters |

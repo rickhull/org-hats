@@ -113,6 +113,22 @@ test("[E8] the context refuses a forged envelope before it reads a hat", async (
   assert.equal(context.failure.kind, "invalid-signature");
 });
 
+test("[E4] the context refuses a malformed envelope as a value, never a throw", async () => {
+  // `context` shares the envelope version gate with the verifier, so it
+  // inherits the same obligation: a non-object envelope, or one whose claims
+  // are absent, must be a closed failure and not an exception out of the
+  // runtime call.
+  const { engine } = await setup();
+  for (const envelope of [null, undefined, "envelope", {}, { format: "org-hats.access", v: 1 }]) {
+    const context = await engine.runtime.context({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      envelope: envelope as never,
+    });
+    assert.ok(isFailed(context), `${String(JSON.stringify(envelope))} must fail as a value`);
+    assert.equal(context.failure.kind, "wrong-interface-version");
+  }
+});
+
 test("the context still names a hat when nothing was explicitly selected", async () => {
   const { engine, issue } = await setup();
   const issued = await issue();

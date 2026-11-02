@@ -218,7 +218,7 @@ export interface SignedAccessEnvelope {
  * and the claims' version must agree before a signature is trusted or claims
  * are read. The claims' `interfaceVersion` is provenance and is deliberately
  * not checked here. */
-export declare const envelopeVersionFailure: (envelope: SignedAccessEnvelope) => Failure | undefined;
+export declare const envelopeVersionFailure: (envelope: unknown) => Failure | undefined;
 /** What happened to the refresh handle alongside a new envelope. A host never
  * infers session state; the issuer states it. */
 export type RefreshHandleOutcome = {

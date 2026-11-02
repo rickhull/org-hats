@@ -297,15 +297,74 @@ regression test or is explicitly accepted by Rick; the compromise table is
 executable as a local procedure; and the threat model accurately states the
 remaining host-, operator-, and consumer-owned risk.
 
+## Phase 1 — complete
+
+Run 2026-11-02 in Claude Code as a two-lane moshpit pod (Opus chair, Sonnet
+specialists, an unused Haiku helper tier), plus a bounded same-lane successor
+after the operator-to-ops lane retired at its context ceiling.  Every
+threat-model row, trust boundary, asset, assumption, the non-goals, and every
+`SECURITY.md` invariant bullet now carries an owner and an evidence
+disposition: 38 verified, 9 residual, 2 documentation defects, 1 confirmed,
+1 rejected, 3 deferred to Phase 4.  The threshold self-evaluation returned
+*earned its keep*, with the margin coming from integration judgment rather
+than from parallelism.
+
+The disposition vocabulary needed a fifth value, `verified`, for a claim that
+holds with its enforcement located and a witness named; the plan's four
+describe outcomes of an attack, not of a claims-to-evidence map.
+
+What landed from Phase 1, and its evidence:
+
+- **Confirmed, medium — the envelope version gate threw instead of failing as
+  a value.**  `envelopeVersionFailure` read `format`, `v`, and `claims.v`
+  with no structural guard, so a `null` envelope or one with `claims` absent
+  left `verify` by a `TypeError` — against the stated contract ("a
+  session-surface failure, as a value — never an exception"), E4, and A4's
+  closed taxonomy.  Reachable through all three callers: the verifier, the
+  context, and command authorization, where the claims were read one
+  statement *before* the gate.  A host-supplied verify predicate that threw
+  escaped the same way.  Fixed in `src/contract.ts`, `src/access/verify.ts`,
+  and `src/authority/organization.ts`; witnessed by the `[E4]` tests in
+  `tests/access.test.ts`, `tests/context.test.ts`, and `tests/engine.test.ts`,
+  each proven red first.  E4 now states that closed means *as a value*.
+- **Two documentation defects, low.**  `SECURITY.md` named
+  `cloudflare-v0.11.x` as the current runtime line while `0.12.1` shipped,
+  and its in-scope list never named the reference runtime at all while
+  "the Cloudflare platform" sat in out-of-scope — read literally, a report
+  about the ops-token gate had nowhere to go.  Both corrected.
+- **Four under-named reachable inputs**, now a named `Reachable inputs`
+  section in the threat model: inter-coordinator relay bodies (trusted
+  structurally, no provenance check, platform isolation only), the breadth of
+  what a restore trusts, `AUTHORITY_ORGANIZATION_IDS`, and the discovery
+  document's ignored fields.
+- **Rejected:** the confirmed defect is an instance, not a class.  The
+  exchange's `JSON.parse` sites are guarded (`decodeSegment` catches;
+  `parseSealedProviderConfig` type-checks), so the correct pattern was
+  already present in three places and bounded the fix to one function.
+  Evidence retained against regression.
+- **Retracted:** a reported absence of a concurrent subject-guard witness.
+  `runtime.test.ts` `"[A10] serializes one provider subject across
+  concurrent organization claims"` is that witness; the gap came from a
+  test-name search standing in for a read.
+
 ## Next action
 
-Begin Phase 1 with the issuer-to-verifier and operator-to-ops boundaries.  They
-hold the widest authority and give the later credential, runtime, and release
-tests their priority order.  Run it as the threshold-case moshpit pod described
-above, in a harness that can select the orchestrator and per-spawn models; this
-Pi session is not the run's chair.  Stop after the traceability report for
-Rick's review before writing attack tests, and include the threshold
-self-evaluation.
+Phase 2's remaining credential and authority attacks, against the portable
+layer only.  The confirmed finding above is already closed, so what is left is
+the generative and state-machine half: adversarial claims shapes signed with a
+test key (oversized, deeply nested, `__proto__`-shaped keys) through
+`neutralAccess`; cross-organization grant targets in
+`src/authority/commands.ts`, which Phase 1 disposed one layer shallower than
+the rest; refresh reuse and concurrency; idempotency-key collision and payload
+substitution; and activation-secret replay.
+
+Phase 1's open evidence gaps are the priority inside that, since each is a
+claim with no witness: the server-side empty `OPS_TOKEN` refusal, an
+integration-level demo-route 404 with `DEMO_ROUTES` unset, the
+crafted-snapshot outbox replay the model explicitly accepts, and
+`/idp-config`'s unreachability from the public surface.  The first three are
+Phase 3, Cloudflare-side; keep them in that phase rather than pulling them
+forward.
 
 ## Specification placement
 

@@ -57,14 +57,22 @@ restriction and grants authority the issuer meant to withhold.
 
 ### E4 — Verification fails closed, in a fixed order
 
-Format and the envelope version pair first — nothing unrecognized is
-interpreted — then the signature against a known key id, then expiry, then
+Structure, then format and the envelope version pair — nothing unrecognized
+is interpreted — then the signature against a known key id, then expiry, then
 the caller's expected bindings.
 
-*Held by:* the single `verify` order; `OH-ACCESS-01` through `OH-ACCESS-04`
-and the vectors.
+Closed means *as a value*. The envelope is untrusted input whose declared type
+is erased at runtime, so the version gate refuses a non-object envelope or an
+absent claims payload before reading a field, and a verify predicate that
+throws is `invalid-signature`. Every caller of the gate — the verifier, the
+context, and command authorization — inherits this, and none of them may read
+a claim before it has run.
+
+*Held by:* the single `verify` order; the shared `envelopeVersionFailure`
+gate; `OH-ACCESS-01` through `OH-ACCESS-04` and the vectors.
 *If it breaks:* an unrecognized envelope gets interpreted before it is
-trusted, or a valid envelope dies for a reason it cannot name.
+trusted, a valid envelope dies for a reason it cannot name, or a malformed one
+leaves by an exception the closed taxonomy cannot describe.
 
 ### E5 — The key set is the rotation unit
 

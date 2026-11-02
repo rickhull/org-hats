@@ -303,14 +303,28 @@ export interface SignedAccessEnvelope {
  * and the claims' version must agree before a signature is trusted or claims
  * are read. The claims' `interfaceVersion` is provenance and is deliberately
  * not checked here. */
-export const envelopeVersionFailure = (envelope: SignedAccessEnvelope): Failure | undefined => {
-  if (envelope.format !== ACCESS_ENVELOPE_FORMAT) {
+export const envelopeVersionFailure = (envelope: unknown): Failure | undefined => {
+  // The parameter is `unknown` because the envelope is untrusted input: a host
+  // decodes it from a cookie or a request body, and the declared type is erased
+  // before it arrives. This gate is the only thing between that input and a
+  // field read, so it owns the structural checks too — a non-object envelope or
+  // an absent claims payload is a closed failure here, never an exception out
+  // of a caller that promised a failure as a value.
+  if (typeof envelope !== "object" || envelope === null || Array.isArray(envelope)) {
     return { kind: "wrong-interface-version", detail: "not a recognized access envelope" };
   }
-  if (envelope.v !== ACCESS_ENVELOPE_VERSION) {
+  const candidate = envelope as { readonly format?: unknown; readonly v?: unknown; readonly claims?: unknown };
+  if (candidate.format !== ACCESS_ENVELOPE_FORMAT) {
+    return { kind: "wrong-interface-version", detail: "not a recognized access envelope" };
+  }
+  if (candidate.v !== ACCESS_ENVELOPE_VERSION) {
     return { kind: "wrong-interface-version", detail: "unrecognized envelope version" };
   }
-  if (envelope.claims.v !== ACCESS_ENVELOPE_VERSION) {
+  const claims = candidate.claims;
+  if (typeof claims !== "object" || claims === null || Array.isArray(claims)) {
+    return { kind: "wrong-interface-version", detail: "the envelope carries no claims" };
+  }
+  if ((claims as { readonly v?: unknown }).v !== ACCESS_ENVELOPE_VERSION) {
     return { kind: "wrong-interface-version", detail: "envelope and claims disagree on the version" };
   }
   return undefined;

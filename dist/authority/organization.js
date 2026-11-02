@@ -48,10 +48,12 @@ export const createOrganizationCoordinator = (deps) => {
                 adminOfOrganization: org.admins.includes(link.actorId),
             };
         }
-        const claims = authorization.envelope.claims;
+        // The gate runs before the claims are read, not after: it is what makes
+        // the read safe on an envelope that arrived as untrusted JSON.
         const versionFailure = envelopeVersionFailure(authorization.envelope);
         if (versionFailure !== undefined)
             return versionFailure;
+        const claims = authorization.envelope.claims;
         if (!(await signer.verify(canonicalJson(asJson(claims)), authorization.envelope.signature))) {
             return { kind: "invalid-signature" };
         }

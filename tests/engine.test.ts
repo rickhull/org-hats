@@ -722,6 +722,23 @@ test("[E8] command and context use the envelope version gate, not just the signa
   assert.equal(failureOf(context).kind, "wrong-interface-version");
 });
 
+test("[E4] command authorization refuses a malformed envelope as a value, never a throw", async () => {
+  // The command path reads `authorization.envelope.claims` as it authorizes,
+  // so the version gate has to refuse a non-object envelope and an absent
+  // claims payload before any field is touched. A host decoding a bearer
+  // cookie into JSON supplies exactly these shapes.
+  const { engine } = await setup();
+  for (const envelope of [null, undefined, "envelope", {}, { format: "org-hats.access", v: 1 }]) {
+    const command = await engine.runtime.command(cmd(
+      { kind: "select-hat", operationId: OP, grantId: "g-mer-3" },
+      { kind: "access-envelope", envelope: envelope as never },
+      `malformed-${String(JSON.stringify(envelope))}`,
+    ));
+    assert.ok(!command.ok, `${String(JSON.stringify(envelope))} must fail as a value`);
+    assert.equal(failureOf(command).kind, "wrong-interface-version");
+  }
+});
+
 test("[A1] an organization revokes its own participation and its actors stop being admitted", async () => {
   const { engine } = await setup();
   const before = await engine.runtime.accessFromEvidence(evidence(DANA));

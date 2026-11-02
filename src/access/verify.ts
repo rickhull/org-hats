@@ -151,7 +151,16 @@ export const verify = async (
     return failed({ kind: "invalid-signature", detail: `unknown key id ${envelope.keyId}` });
   }
   const payload = canonicalJson(asJson(envelope.claims));
-  if (!(await key.verify(payload, envelope.signature))) {
+  // `verifyKeyOf` accepts any verify predicate, so a host-supplied key is as
+  // untrusted as the envelope: a predicate that throws has not verified
+  // anything, and saying so as a value is the whole contract.
+  let signed: boolean;
+  try {
+    signed = await key.verify(payload, envelope.signature);
+  } catch {
+    signed = false;
+  }
+  if (!signed) {
     return failed({ kind: "invalid-signature" });
   }
   const now = epochSeconds(context.now ?? Math.floor(Date.now() / 1000));

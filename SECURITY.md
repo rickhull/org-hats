@@ -9,9 +9,9 @@ best-effort public release mirrors.*
 | Version | Supported |
 | --- | --- |
 | `v3.x` (from `v3.0.0`) | current release line; fixes land as a new tag |
-| `cloudflare-v0.11.x` (from `cloudflare-v0.11.0`) | current Cloudflare runtime line; separate cadence |
+| `cloudflare-v0.12.x` (from `cloudflare-v0.12.0`) | current Cloudflare runtime line; separate cadence |
 | `v2.x` (from `v2.0.0`) | previous line; fixes land in the current line |
-| `cloudflare-v0.3.x` through `cloudflare-v0.10.x` | previous lines; fixes land in the current line |
+| `cloudflare-v0.3.x` through `cloudflare-v0.11.x` | previous lines; fixes land in the current line |
 | `v1.x` (from `v1.0.0`) | frozen at its tags; no fixes |
 | `v0.4.x` | frozen at its tags; no fixes |
 
@@ -55,11 +55,16 @@ release.
 
 In scope: the portable authority engine, the neutral access verifier, the
 signed envelope format and fixed vectors, the policy/read-reach model, the
-conformance inventory, and the build/package surface.
+conformance inventory, the build/package surface, and the Cloudflare reference
+runtime shipped as `packages/cloudflare` — its Worker routing, operator
+authentication and ops routes, provider-callback exchange, Durable Object
+coordination, and export/restore.
 
 Out of scope: consumer product code, deployment configuration, identity
-providers, the Cloudflare platform, and an operator's secret management. The
-deploying operator owns those; report there as appropriate.
+providers, Cloudflare's own platform and infrastructure, and an operator's
+secret management. The deploying operator owns those; report there as
+appropriate. The reference runtime is in scope; the platform it runs on is
+not.
 
 ## Posture
 
