@@ -9,7 +9,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { AUTHORITY_INTERFACE_VERSION } from "../src/contract.ts";
+import { ACCESS_CLAIMS_MAX_DEPTH, AUTHORITY_INTERFACE_VERSION, accessClaimsDepth } from "../src/contract.ts";
 import { createInMemoryAuthority } from "../src/authority/engine.ts";
 import { FESTIVAL, MERIDIAN } from "../src/authority/twins.ts";
 import { CONFORMANCE_PRINCIPALS, CONFORMANCE_WORLD } from "../src/conformance.ts";
@@ -56,6 +56,39 @@ test("the documented carriage sizes match the synthetic envelopes", async () => 
   assert.deepEqual(measured.get("dana/meridian"), { json: 600, encoded: 904 });
   assert.deepEqual(measured.get("dana/festival"), { json: 706, encoded: 1054 });
   assert.deepEqual(measured.get("iris/festival"), { json: 5_723, encoded: 7_843 });
+});
+
+test("[E2] claims depth is fixed by the shape, not by reach, and keeps headroom under the bound", async () => {
+  // The verifier refuses claims deeper than `ACCESS_CLAIMS_MAX_DEPTH`, so the
+  // dangerous direction is not an attacker: it is a future claims shape
+  // deepening past the bound and legitimate envelopes being refused in
+  // production. That must go red here, at the issuer, rather than at a
+  // verifier. Depth is pinned exactly for the same reason the sizes above are.
+  const handle = await createInMemoryAuthority({
+    fixtures: CONFORMANCE_WORLD.fixtures,
+    principalLinks: CONFORMANCE_WORLD.principalLinks,
+    orgAdmins: CONFORMANCE_WORLD.orgAdmins,
+  });
+  const depthOf = async (operationId: string, principal: string): Promise<number> => {
+    const evidence = CONFORMANCE_PRINCIPALS[principal as keyof typeof CONFORMANCE_PRINCIPALS]?.evidence;
+    if (evidence === undefined) throw new Error(`no principal ${principal}`);
+    const issued = await handle.runtime.accessFromEvidence({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      operationId,
+      evidence,
+    });
+    if ("failure" in issued) throw new Error(`failed to issue: ${issued.failure.kind}`);
+    return accessClaimsDepth(issued.envelope.claims);
+  };
+
+  // the smallest and the largest synthetic envelope nest identically: a 20x
+  // spread in bytes is all breadth, which is why only depth is bounded
+  assert.equal(await depthOf(MERIDIAN, "dana"), 5, "the professional twin's claims depth");
+  assert.equal(await depthOf(FESTIVAL_OPERATION, "iris"), 5, "the festival twin's claims depth");
+  assert.ok(
+    5 < ACCESS_CLAIMS_MAX_DEPTH,
+    "the bound must keep headroom for additive optional claims (E3)",
+  );
 });
 
 test("the host budget covers the professional envelopes and not the festival's site reach", async () => {

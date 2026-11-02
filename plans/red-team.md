@@ -359,16 +359,54 @@ What landed from Phase 1, and its evidence:
   concurrent organization claims"` is that witness; the gap came from a
   test-name search standing in for a read.
 
+## Phase 2 — the credential half is closed
+
+Three of the four hypotheses are disposed, two of them negative.
+
+- **Confirmed, medium — unbounded recursion on unverified claims.**
+  `canonicalJson` recurses, and canonical bytes are an input to the signature
+  check, so the verifier canonicalized claims before verifying them.  A deeply
+  nested payload threw `RangeError` out of `verify` — the same contract
+  violation as Phase 1's finding, by a path that fix did not cover, reachable
+  with a published key id and no valid signature.  Measured: depth ≥ ~2,500
+  (≈15 KB body) overflows on Node; the 4 KB cookie cap keeps the browser
+  session path clear, so it needs a JSON body.  Claims depth is now bounded by
+  the format at `ACCESS_CLAIMS_MAX_DEPTH` (8) and checked in the shared gate
+  before any caller canonicalizes, answering `unauthenticated`.  Witnesses at
+  all three entry points plus a depth pin on the twins in
+  `tests/envelope-size.test.ts`.  The bound is E2's; E4 does the refusing.
+- **Rejected — `__proto__`-shaped claim keys.**  From `JSON.parse` the key is
+  an own property, not a prototype write: the prototype is untouched and
+  `canonicalJson` serializes it as data, which is correct for a serializer.
+  Nothing assigns it anywhere, so there is no pollution path.
+- **Rejected — cross-organization grant targets.**  Grant targets are
+  operation-scoped by construction and the grantee's organization must
+  actively participate; an operation being multi-organization is the design.
+  The `sameOrganization` flag pairs only with `mode: "fresh"` and is a
+  fresh-evidence guard, not a missing cross-organization check.  This closes
+  the row Phase 1 disposed one layer shallower than the rest.
+- **Not bounded, deliberately — claims breadth.**  The twins nest identically
+  at depth 5 across a 20× spread in bytes, and the festival twin legitimately
+  exceeds the host cookie budget, which the host refuses at issuance
+  (`tests/envelope-size.test.ts`).  A verifier-side size cap would refuse
+  legitimate envelopes; oversized stays the host's budget and the platform's
+  request limits, where the threat model already puts it.
+
 ## Next action
 
-Phase 2's remaining credential and authority attacks, against the portable
-layer only.  The confirmed finding above is already closed, so what is left is
-the generative and state-machine half: adversarial claims shapes signed with a
-test key (oversized, deeply nested, `__proto__`-shaped keys) through
-`neutralAccess`; cross-organization grant targets in
-`src/authority/commands.ts`, which Phase 1 disposed one layer shallower than
-the rest; refresh reuse and concurrency; idempotency-key collision and payload
-substitution; and activation-secret replay.
+Phase 2's state-machine half, which the credential work did not touch: refresh
+reuse and concurrency, idempotency-key collisions and payload substitution,
+reordered or duplicate outbox delivery, and activation-secret replay — each
+distinguished from the bounded race and bearer replay A7, A13, and the threat
+model already accept.
+
+One Phase 3 hypothesis came out of this pass and should be recorded there
+rather than chased now: `packages/cloudflare/src/operation.ts:1306`
+canonicalizes `auth.amr`, which arrives from the provider's ID token, and
+`canonicalJson` is general and unbounded by design — the depth bound added
+here is a claims bound in the portable gate, not a serializer bound, so a
+hostile or careless provider's `amr` shape is a separate question on the
+runtime's side of the seam.
 
 Phase 1's open evidence gaps are the priority inside that, since each is a
 claim with no witness: the server-side empty `OPS_TOKEN` refusal, an

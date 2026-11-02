@@ -76,6 +76,19 @@ Signed bytes are the UTF-8 encoding of `canonicalJson(claims)`:
 - arrays keep their order; numbers and strings render as JSON renders them;
 - `canonicalJson` in `src/contract.ts` is the single implementation — both
   issuer and verifier call it, and a host never reimplements it.
+- claims nest no deeper than `ACCESS_CLAIMS_MAX_DEPTH` (8), leaf scalar
+  included; deeper claims are `unauthenticated` and are never canonicalized.
+
+The depth bound is part of the format rather than a tuning knob. Every
+synthetic envelope nests to exactly 5 — the professional twin at 600 bytes
+and the festival's site-wide reach at 5,723 alike — because depth follows the
+closed claims shape while breadth follows an actor's reach. The remaining
+headroom is what lets an additive optional claim appear without a
+format-version move. A verifier needs it because canonical bytes are an input
+to the signature check: it canonicalizes claims before it can verify them, so
+without a bound the recursion is reachable by anyone holding a published key
+id. Breadth is not bounded here — the authority issues claims too large for a
+cookie, and the host refuses those at issuance against its own budget.
 
 Signature: **Ed25519** (WebCrypto `Ed25519`), encoded unpadded base64url
 (RFC 4648 §5), over the signed bytes; `keyId` names the key. One algorithm

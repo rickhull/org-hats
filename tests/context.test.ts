@@ -113,26 +113,41 @@ test("[E8] the context refuses a forged envelope before it reads a hat", async (
   assert.equal(context.failure.kind, "invalid-signature");
 });
 
+const deepChain = (levels: number): unknown => {
+  let node: unknown = 1;
+  for (let i = 0; i < levels; i += 1) node = { a: node };
+  return node;
+};
+
 test("[E4] the context refuses a malformed envelope as a value, never a throw", async () => {
   // `context` shares the envelope version gate with the verifier, so it
   // inherits the same obligation: a non-object envelope, or one whose claims
   // are absent, must be a closed failure and not an exception out of the
   // runtime call.
   const { engine } = await setup();
-  const cases: readonly (readonly [unknown, string])[] = [
-    [null, "unauthenticated"],
-    [undefined, "unauthenticated"],
-    ["envelope", "unauthenticated"],
-    [{ format: "org-hats.access", v: 1 }, "unauthenticated"],
-    [{}, "wrong-interface-version"],
+  // Labelled rather than stringified: serializing the deep case for an
+  // assertion message would overflow the stack in the test itself.
+  const cases: readonly (readonly [string, unknown, string])[] = [
+    ["null", null, "unauthenticated"],
+    ["undefined", undefined, "unauthenticated"],
+    ["a string", "envelope", "unauthenticated"],
+    ["no claims", { format: "org-hats.access", v: 1 }, "unauthenticated"],
+    ["an empty object", {}, "wrong-interface-version"],
+    // deeper than the format's bound: refused before canonicalization, which
+    // is what the context does to claims it has not verified yet
+    [
+      "claims past the depth bound",
+      { format: "org-hats.access", v: 1, claims: { v: 1, deep: deepChain(5_000) }, keyId: "k", signature: "x" },
+      "unauthenticated",
+    ],
   ];
-  for (const [envelope, kind] of cases) {
+  for (const [label, envelope, kind] of cases) {
     const context = await engine.runtime.context({
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
       envelope: envelope as never,
     });
-    assert.ok(isFailed(context), `${String(JSON.stringify(envelope))} must fail as a value`);
-    assert.equal(context.failure.kind, kind);
+    assert.ok(isFailed(context), `${label} must fail as a value`);
+    assert.equal(context.failure.kind, kind, label);
   }
 });
 

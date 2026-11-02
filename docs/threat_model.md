@@ -65,7 +65,11 @@ new input class is a visible addition to the model rather than an assumption.
 - **Access envelopes and refresh handles** — untrusted bytes. The envelope
   arrives as JSON a host decoded from a cookie or body; its declared type is
   erased at runtime, so the shared version gate owns the structural checks
-  (non-object envelope, absent or non-object claims) before any field is read.
+  (non-object envelope, absent or non-object claims, claims deeper than the
+  format's bound) before any field is read or canonicalized. Canonical bytes
+  are an input to the signature check, so the verifier canonicalizes claims
+  before it can verify them — a published key id is enough to reach that work,
+  which is why the depth bound precedes it.
 - **Client and ops request bodies** — typed field-by-field by the HTTP
   validators; an unrecognized shape is `invalid-command`.
 - **Inter-coordinator relay bodies** — trusted structurally; see boundary 3.
@@ -102,7 +106,7 @@ new input class is a visible addition to the model rather than an assumption.
 | Accidental development signing | Deployment omits the signing trio | Full signing config is a proven pair; a partial set errors at runtime construction | The runtime cannot infer deployment intent, so a host gate must refuse the ephemeral dev signer in production |
 | Demo or harness surface reached | The Worker is routed publicly, or a service-binding caller asks for `/demo/*` | The reference production config attaches no routes and sets `workers_dev` false; the routes refuse to serve unless the deployment sets `DEMO_ROUTES: "1"`, which the reference config does not | An operator who sets the flag on a routed Worker re-opens the exposure: unauthenticated callers could reset coordinator state and mint envelopes |
 | Malicious or lost state | Database access, bad restore, operator mistake | Typed restore; schema version validated, with a future or unsupported version refused; atomic transactions; projections rebuild by pulling; audit rows | Direct storage access or an authorized restore can rewrite authority state. Restore validates structure, not truth: a crafted snapshot's undelivered outbox rows are re-delivered as if fresh, and its refresh-record and team-status flags come back as stated — A13's live organization read still gates the next refresh. No tamper-evident audit log |
-| Denial of service | Expensive envelope parsing, signature checks, provider fetches, or request floods | The [envelope-size baseline](consumer-session.md) documents the largest envelope the authority issues today — a budget input, not a bound; bounded provider caches; Durable Object alarms; fail-closed failures | No built-in rate limiting; the Worker platform and host must absorb volumetric traffic |
+| Denial of service | Expensive envelope parsing, signature checks, provider fetches, or request floods | Claims depth is bounded by the format and checked before canonicalization, so unverified claims cannot drive unbounded recursion; the [envelope-size baseline](consumer-session.md) documents the largest envelope the authority issues today — a budget input, not a bound; bounded provider caches; Durable Object alarms; fail-closed failures | No built-in rate limiting; the Worker platform and host must absorb volumetric traffic. Claims breadth is not bounded at the verifier: reach legitimately scales with the operation, so a large envelope is the host's budget question, not a refusal |
 | Clock and expiry skew | Verifier clock ahead/behind issuer | `exp` checked against the verifier's clock; no not-before check | Clock skew shortens or extends the usable window within the host's clock discipline |
 | Supply-chain or tag rewrite | Moved tag, rebuilt `dist/`, compromised release credentials | Immutable-tag policy; `bin/check-version`; tracked `dist/`; artifact gate; no registry publication | Git tags are names, not cryptographic commitments. Consumers should pin a commit where reproducibility matters |
 | Sensitive-data leakage through logs/notes | Secrets, exports, roster material copied into logs or relay notes | Activation stores only digests; refresh handles are hashed; notes are publishable by assumption; no secrets in audit | Host logs, exports, and browser storage are outside this repository's control |

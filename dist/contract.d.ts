@@ -127,6 +127,31 @@ export type IssuerInterfaceVersion = number;
  * change. */
 export declare const ACCESS_ENVELOPE_VERSION: 1;
 export declare const ACCESS_ENVELOPE_FORMAT: "org-hats.access";
+/** How deep a v1 claims payload may nest, leaf scalar included.
+ *
+ * Canonical bytes are an input to the signature check, so a verifier
+ * canonicalizes claims it has not verified yet, and `canonicalJson` recurses.
+ * Without a bound, a deeply nested payload is a stack overflow reachable with
+ * nothing but a public key id and no valid signature.
+ *
+ * The number comes from the format, not from a runtime's stack: every
+ * synthetic envelope nests to exactly 5 — the smallest and the largest, a 20x
+ * spread in bytes — because depth is fixed by the closed claims shape while
+ * breadth scales with an actor's reach. 8 keeps headroom so an additive
+ * optional claim (E3) can nest without moving `ACCESS_ENVELOPE_VERSION`.
+ * `tests/envelope-size.test.ts` pins the issued depth so a shape that grows
+ * past the headroom fails there rather than at a verifier.
+ *
+ * Breadth is deliberately not bounded here: the authority legitimately issues
+ * claims too large for a cookie, and the host refuses those at issuance
+ * against its own budget. */
+export declare const ACCESS_CLAIMS_MAX_DEPTH = 8;
+/** The nesting depth of a value, leaf scalar included: `{ v: 1 }` is 2.
+ *
+ * The walk is iterative on an explicit stack. A recursive depth check would
+ * overflow on exactly the input it exists to refuse, which is the defect
+ * rather than the guard. */
+export declare const accessClaimsDepth: (value: unknown) => number;
 export type FailureKind = "unavailable" | "unauthenticated" | "not-admitted" | "expired" | "wrong-interface-version" | "wrong-binding" | "invalid-signature" | "invalid-command" | "denied";
 export interface Failure {
     readonly kind: FailureKind;

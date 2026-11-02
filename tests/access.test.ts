@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+  ACCESS_CLAIMS_MAX_DEPTH,
   ACCESS_ENVELOPE_FORMAT,
   AUTHORITY_INTERFACE_VERSION,
   canonicalJson,
@@ -162,6 +163,45 @@ test("[E4] a structurally malformed envelope fails closed as a value, never a th
       `${String(JSON.stringify(envelope))} must fail as a value`,
     );
   }
+});
+
+// Claims nested to a given depth, measured the way `accessClaimsDepth` does:
+// the leaf scalar counts, so `{ v: 1, deep: 1 }` is depth 2.
+const claimsOfDepth = (depth: number): unknown => {
+  let node: unknown = 1;
+  for (let i = 0; i < depth - 2; i += 1) node = { a: node };
+  return { v: 1, deep: node };
+};
+
+test("[E4] claims deeper than the format's bound are refused before canonicalization", async () => {
+  // Canonical bytes are an input to the signature check, so the verifier
+  // canonicalizes claims it has not verified yet. `canonicalJson` recurses, so
+  // an unbounded claims payload was a stack overflow reachable with nothing
+  // but a public key id — the gate bounds the depth first, as a value.
+  const now = vectors.claims.iat + 1;
+  const envelopeAt = (depth: number) => ({
+    format: ACCESS_ENVELOPE_FORMAT,
+    v: 1,
+    keyId: vectors.keyId,
+    claims: claimsOfDepth(depth),
+    signature: vectors.signature,
+  });
+
+  // at the bound the gate passes and the signature decides
+  assert.equal(
+    failureOf(await verify(envelopeAt(ACCESS_CLAIMS_MAX_DEPTH) as never, keys, { now })).kind,
+    "invalid-signature",
+  );
+  // one level past it, the claims are never read
+  assert.equal(
+    failureOf(await verify(envelopeAt(ACCESS_CLAIMS_MAX_DEPTH + 1) as never, keys, { now })).kind,
+    "unauthenticated",
+  );
+  // and the depth that used to overflow the stack is now the same answer
+  assert.equal(
+    failureOf(await verify(envelopeAt(5_000) as never, keys, { now })).kind,
+    "unauthenticated",
+  );
 });
 
 test("[E4] a verify key that throws fails closed, not out of the call", async () => {

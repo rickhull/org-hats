@@ -728,21 +728,32 @@ test("[E4] command authorization refuses a malformed envelope as a value, never 
   // claims payload before any field is touched. A host decoding a bearer
   // cookie into JSON supplies exactly these shapes.
   const { engine } = await setup();
-  const cases: readonly (readonly [unknown, string])[] = [
-    [null, "unauthenticated"],
-    [undefined, "unauthenticated"],
-    ["envelope", "unauthenticated"],
-    [{ format: "org-hats.access", v: 1 }, "unauthenticated"],
-    [{}, "wrong-interface-version"],
+  // Labelled rather than stringified: the deep case is the idempotency key and
+  // the assertion message too, and serializing it would overflow the stack in
+  // the test itself.
+  const deep = (() => {
+    let node: unknown = 1;
+    for (let i = 0; i < 5_000; i += 1) node = { a: node };
+    return { format: "org-hats.access", v: 1, claims: { v: 1, deep: node }, keyId: "k", signature: "x" };
+  })();
+  const cases: readonly (readonly [string, unknown, string])[] = [
+    ["null", null, "unauthenticated"],
+    ["undefined", undefined, "unauthenticated"],
+    ["a string", "envelope", "unauthenticated"],
+    ["no claims", { format: "org-hats.access", v: 1 }, "unauthenticated"],
+    ["an empty object", {}, "wrong-interface-version"],
+    // deeper than the format's bound; the gate gets there before the
+    // canonicalization that used to overflow the stack
+    ["claims past the depth bound", deep, "unauthenticated"],
   ];
-  for (const [envelope, kind] of cases) {
+  for (const [label, envelope, kind] of cases) {
     const command = await engine.runtime.command(cmd(
       { kind: "select-hat", operationId: OP, grantId: "g-mer-3" },
       { kind: "access-envelope", envelope: envelope as never },
-      `malformed-${String(JSON.stringify(envelope))}`,
+      `malformed-${label}`,
     ));
-    assert.ok(!command.ok, `${String(JSON.stringify(envelope))} must fail as a value`);
-    assert.equal(failureOf(command).kind, kind);
+    assert.ok(!command.ok, `${label} must fail as a value`);
+    assert.equal(failureOf(command).kind, kind, label);
   }
 });
 

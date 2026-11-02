@@ -20,10 +20,22 @@ Signed bytes are the UTF-8 rendering of `canonicalJson(claims)` — keys
 sorted, no whitespace — and issuer, verifier, and vectors all call the one
 function in `src/contract.ts`. A host never reimplements it.
 
+Claims nest no deeper than `ACCESS_CLAIMS_MAX_DEPTH` (8), leaf scalar
+included.  The bound belongs to the format because the canonical bytes do:
+every synthetic envelope nests to exactly 5, the smallest and the largest
+alike, since depth follows the closed claims shape while breadth follows an
+actor's reach.  The headroom is what lets an additive optional claim (E3)
+appear without moving `ACCESS_ENVELOPE_VERSION`.  Breadth carries no such
+bound — the authority issues claims too large for a cookie, and the host
+refuses those at issuance against its own budget.
+
 *Held by:* both engines import the same function; the vectors pin exact
-bytes; `OH-ACCESS-03` fails tampered claims.
-*If it breaks:* signatures cross implementations only by coincidence, and
-every host that reimplemented the encoding owns a private format.
+bytes; `OH-ACCESS-03` fails tampered claims; `tests/envelope-size.test.ts`
+pins the issued depth so a deepening shape fails at the issuer, not at a
+verifier.  E4 does the refusing.
+*If it breaks:* signatures cross implementations only by coincidence, every
+host that reimplemented the encoding owns a private format, or canonicalizing
+unverified claims becomes unbounded recursion.
 
 ### E3 — Only authority-neutral claims grow additively
 
@@ -68,8 +80,15 @@ throws is `invalid-signature`. Every caller of the gate — the verifier, the
 context, and command authorization — inherits this, and none of them may read
 a claim before it has run.
 
+Structure includes depth. Canonical bytes are an input to the signature
+check, so a verifier canonicalizes claims it has not yet verified; the gate
+therefore refuses claims past E2's depth bound before any caller reaches
+`canonicalJson`, whose recursion would otherwise overflow on input that
+needs only a public key id and no valid signature.
+
 Unreadable and unsupported are different answers. Something that is not
-recognizable as an envelope declares no version, so it is `unauthenticated`:
+recognizable as an envelope — or too deep to read — declares no version, so
+it is `unauthenticated`:
 the caller presented no usable authority, and a fresh login is the remedy.
 Only a recognizable envelope can disagree with us about a version, and that
 stays `wrong-interface-version` — a deployment mismatch no login would fix.

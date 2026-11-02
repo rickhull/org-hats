@@ -174,6 +174,47 @@ export type IssuerInterfaceVersion = number;
 export const ACCESS_ENVELOPE_VERSION = 1 as const;
 export const ACCESS_ENVELOPE_FORMAT = "org-hats.access" as const;
 
+/** How deep a v1 claims payload may nest, leaf scalar included.
+ *
+ * Canonical bytes are an input to the signature check, so a verifier
+ * canonicalizes claims it has not verified yet, and `canonicalJson` recurses.
+ * Without a bound, a deeply nested payload is a stack overflow reachable with
+ * nothing but a public key id and no valid signature.
+ *
+ * The number comes from the format, not from a runtime's stack: every
+ * synthetic envelope nests to exactly 5 — the smallest and the largest, a 20x
+ * spread in bytes — because depth is fixed by the closed claims shape while
+ * breadth scales with an actor's reach. 8 keeps headroom so an additive
+ * optional claim (E3) can nest without moving `ACCESS_ENVELOPE_VERSION`.
+ * `tests/envelope-size.test.ts` pins the issued depth so a shape that grows
+ * past the headroom fails there rather than at a verifier.
+ *
+ * Breadth is deliberately not bounded here: the authority legitimately issues
+ * claims too large for a cookie, and the host refuses those at issuance
+ * against its own budget. */
+export const ACCESS_CLAIMS_MAX_DEPTH = 8;
+
+/** The nesting depth of a value, leaf scalar included: `{ v: 1 }` is 2.
+ *
+ * The walk is iterative on an explicit stack. A recursive depth check would
+ * overflow on exactly the input it exists to refuse, which is the defect
+ * rather than the guard. */
+export const accessClaimsDepth = (value: unknown): number => {
+  let deepest = 0;
+  const pending: { readonly node: unknown; readonly depth: number }[] = [{ node: value, depth: 1 }];
+  while (pending.length > 0) {
+    const next = pending.pop();
+    if (next === undefined) break;
+    const { node, depth } = next;
+    if (depth > deepest) deepest = depth;
+    if (typeof node !== "object" || node === null) continue;
+    for (const child of Array.isArray(node) ? node : Object.values(node)) {
+      pending.push({ node: child, depth: depth + 1 });
+    }
+  }
+  return deepest;
+};
+
 // --- the closed failure taxonomy -------------------------------------------------
 //
 // One closed list covers the session and command surfaces. New failure kinds
@@ -331,6 +372,13 @@ export const envelopeVersionFailure = (envelope: unknown): Failure | undefined =
   }
   if ((claims as { readonly v?: unknown }).v !== ACCESS_ENVELOPE_VERSION) {
     return { kind: "wrong-interface-version", detail: "envelope and claims disagree on the version" };
+  }
+  // Depth last, and before any caller canonicalizes: the version pair is two
+  // comparisons, while this walks the payload. Over the bound the claims are
+  // unreadable rather than a version we disagree about, so the answer is the
+  // same `unauthenticated` as an envelope that was never an object.
+  if (accessClaimsDepth(claims) > ACCESS_CLAIMS_MAX_DEPTH) {
+    return { kind: "unauthenticated", detail: "the claims nest deeper than the format allows" };
   }
   return undefined;
 };
