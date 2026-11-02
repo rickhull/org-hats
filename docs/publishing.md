@@ -4,9 +4,9 @@
 
 ## Canonical forge and public mirrors
 
-- **The NAS forge is canonical** — remote `nas` at
-  `ssh://forge@nas-ts/home/forge/repos/org-hats.git`. Its bare repository is
-  the release authority, and `main` tracks `nas/main`.
+- **The NAS forge is canonical** — remote `origin` at
+  `ssh://forge@nas/home/forge/repos/org-hats.git`. Its bare repository is
+  the release authority, and `main` tracks `origin/main`.
 - **Codeberg is a public release mirror** —
   <https://codeberg.org/rickhull/org-hats>, remote `codeberg`. Public project
   metadata and reporting intake remain there because the NAS forge is not a
@@ -16,29 +16,34 @@
 
 The public mirrors are reach and availability copies, not places to work.
 `bin/release` first atomically publishes the release branch and new tag to
-`nas`. Only after that succeeds does it push `HEAD --follow-tags` to each
+`origin`. Only after that succeeds does it push `HEAD --follow-tags` to each
 configured mirror. A missing or unavailable mirror warns but does not
 invalidate the canonical release. The next successful release push advances
 the mirror branch and sends every reachable annotated tag it missed.
 
-`nas-ts` is the Tailscale name; the LAN alias `nas` reaches the same host.
+`nas` is the LAN name; the Tailscale alias `nas-ts` reaches the same host.
 
 ### Provisioning the NAS authority (one-time; NAS owner)
 
-The maintainer does not create this repository. The NAS owner runs, as the
-`forge` account (whose shell is `git-shell`):
+The maintainer does not create this repository. The NAS owner creates it as
+root on `nas` with the forge task:
 
 ```sh
-sudo -u forge install -d -m 755 /home/forge/repos
-sudo -u forge git init --bare --initial-branch=main /home/forge/repos/org-hats.git
-sudo -u forge git -C /home/forge/repos/org-hats.git config receive.denyDeletes true
-sudo -u forge git -C /home/forge/repos/org-hats.git config receive.denyNonFastForwards true
-sudo -u forge git -C /home/forge/repos/org-hats.git config core.logAllRefUpdates true
+rake forge:repo[org-hats]
 ```
 
-`/home/forge` stays `0700 forge:forge`, the maintainer's SSH key is
-authorized for `forge`, and the owner pushes no content. No web UI, Caddy
-route, or hosted mirror is involved.
+The task initializes a bare repository, sets `core.logAllRefUpdates true`, and
+chowns it to `forge`. It leaves `HEAD` on an unborn `master`, so set it to the
+branch this repository publishes before seeding:
+
+```sh
+sudo -u forge git -C /home/forge/repos/org-hats.git symbolic-ref HEAD refs/heads/main
+```
+
+The task does not set `receive.denyDeletes` or
+`receive.denyNonFastForwards`; tag immutability is a release-process rule
+unless the owner adds those two settings. No web UI, Caddy route, or hosted
+mirror is involved, and the owner pushes no content.
 
 ### Configure a maintainer clone
 
@@ -46,17 +51,17 @@ A clone that predates the migration has `origin` pointing at Codeberg:
 
 ```sh
 git remote rename origin codeberg
-git remote add nas ssh://forge@nas-ts/home/forge/repos/org-hats.git
+git remote add origin ssh://forge@nas/home/forge/repos/org-hats.git
 git remote add github git@github.com:rickhull/org-hats.git   # if absent
 ```
 
-A fresh clone adds `nas`, `codeberg`, and `github` with the same URLs.
+A fresh clone adds `origin`, `codeberg`, and `github` with the same URLs.
 Then seed the authority once and set the upstream:
 
 ```sh
-git push --atomic nas --all --tags
-git fetch nas
-git branch --set-upstream-to=nas/main main
+git push --atomic origin --all --tags
+git fetch origin
+git branch --set-upstream-to=origin/main main
 ```
 
 The seed is the only push that carries every ref. The pre-push hook
@@ -67,7 +72,7 @@ the ordinary release `--follow-tags` path would not.
 For a release created with `--no-push`, publish in authority order:
 
 ```sh
-git push --atomic nas HEAD <tag>
+git push --atomic origin HEAD <tag>
 git push codeberg HEAD --follow-tags
 git push github HEAD --follow-tags
 ```
@@ -81,8 +86,8 @@ release.
 Verify authority and mirrors independently:
 
 ```sh
-git ls-remote --symref nas HEAD
-git ls-remote --heads nas main
+git ls-remote --symref origin HEAD
+git ls-remote --heads origin main
 git ls-remote --heads codeberg main
 git ls-remote --heads github main
 ```
@@ -234,7 +239,7 @@ From a clean `main`:
    the manifest and generated output, and tags the commit. It re-checks the
    new tag with `bin/check-version` before anything is pushed — the tag and
    manifest cannot disagree. It then atomically publishes the branch and tag
-   to `nas`. Only after that succeeds does it catch up configured `codeberg`
+   to `origin`. Only after that succeeds does it catch up configured `codeberg`
    and `github` mirrors. A NAS failure is fatal and preserves the local
    release; a mirror failure warns and is repaired by a later release.
    `--no-push` stops before publication. `--dry-run`
@@ -256,14 +261,14 @@ From a clean `main`:
    NAS failed, retry its command before either mirror; a failed mirror may be
    retried now or left for the next release:
    ```sh
-   git push --atomic nas HEAD <tag>
+   git push --atomic origin HEAD <tag>
    git push codeberg HEAD --follow-tags
    git push github HEAD --follow-tags
    ```
 3. Verify NAS shows the release. Check mirrors separately; lag is a warning,
    not a reason to rewrite or recut the tag:
    ```sh
-   git ls-remote --heads nas main
+   git ls-remote --heads origin main
    git ls-remote --heads codeberg main
    git ls-remote --heads github main
    ```

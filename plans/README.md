@@ -20,9 +20,9 @@ scaled bench's state; the measured verdict, the consumer-agreed design
 [`snapshot_cache.md`](snapshot_cache.md).
 
 The NAS release-authority migration is in
-[`nas-migration.md`](nas-migration.md): the code and docs are written, and
-the remaining work is the NAS owner's one-time bare-repository setup,
-followed by seeding, verification, and the Codeberg catch-up.
+[`nas-migration.md`](nas-migration.md): the NAS repository exists, and the
+remaining work is the seed, the upstream, verification, and the Codeberg
+catch-up.
 
 The specs-driven witness suite landed; its durable convention lives in
 `tests/README.md` and `specs/README.md`.

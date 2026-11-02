@@ -117,8 +117,8 @@ fi
 # Fail before changing the manifest when the required publication authority
 # is not configured. Transport failures later leave the local commit and tag
 # intact for an exact retry.
-if $push && ! git remote get-url nas >/dev/null 2>&1; then
-	die "required nas remote is not configured"
+if $push && ! git remote get-url origin >/dev/null 2>&1; then
+	die "required origin remote is not configured"
 fi
 
 [ -z "$(git status --porcelain)" ] || die "working tree is dirty — commit or stash first"
@@ -184,11 +184,11 @@ fi
 
 if $push; then
 	printf '\n== publication ==\n'
-	if ! git push --atomic nas HEAD "$tag"; then
-		printf 'release: publication to nas failed; the release exists locally. Retry with\n  git push --atomic nas HEAD %s\n' "$tag" >&2
+	if ! git push --atomic origin HEAD "$tag"; then
+		printf 'release: publication to origin failed; the release exists locally. Retry with\n  git push --atomic origin HEAD %s\n' "$tag" >&2
 		exit 1
 	fi
-	printf 'release: published branch and %s to nas\n' "$tag"
+	printf 'release: published branch and %s to origin\n' "$tag"
 
 	# Each mirror push advances the branch and sends every reachable annotated
 	# tag it missed. Mirror availability never changes canonical release status.
@@ -202,5 +202,5 @@ if $push; then
 		fi
 	done
 else
-	printf 'release: not published; push with\n  git push --atomic nas HEAD %s\n  git push codeberg HEAD --follow-tags\n  git push github HEAD --follow-tags\n' "$tag"
+	printf 'release: not published; push with\n  git push --atomic origin HEAD %s\n  git push codeberg HEAD --follow-tags\n  git push github HEAD --follow-tags\n' "$tag"
 fi

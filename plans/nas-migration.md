@@ -1,46 +1,59 @@
 # NAS release authority — migration in progress
 
 `docs/publishing.md` § Canonical forge and public mirrors is the durable
-design: the bare repository on the NAS is the release authority; Codeberg and
-GitHub are best-effort public mirrors. The release tooling, tests, and docs
-are written. The remaining work is out-of-band.
+design: the bare repository on the NAS is the release authority (remote
+`origin`); Codeberg and GitHub are best-effort public mirrors. The release
+tooling, tests, and docs are written. The NAS repository now exists; the
+remaining work is its `main` HEAD, the seed, the clone remotes, and the
+Codeberg catch-up.
 
-## Blocking fact
+## Current state
 
-As of 2026-11-02, `forge@nas-ts` (the same host as `forge@nas`, git 2.55.0)
-answers as a `git-shell` account, but
-`ssh://forge@nas-ts/home/forge/repos/org-hats.git` does not exist:
-`git ls-remote` reports “does not appear to be a git repository”. The NAS
-runs only Caddy, Samba, and SSH; there is no Forgejo or Gitea service, so
-there is nothing to provision through a web UI. The `forge` home is
-`0700 forge:forge`, and the maintainer SSH key is already authorized.
+The NAS owner created the repository with `rake forge:repo[org-hats]`. It is
+empty at `/home/forge/repos/org-hats.git` and owned by `forge`. The forge task
+sets `core.logAllRefUpdates true` and leaves `HEAD` on an unborn `master`; the
+owner has set `HEAD` to `refs/heads/main`. The task does not set
+`receive.denyDeletes` or `receive.denyNonFastForwards`.
+
+The maintainer clone now has `origin` at the NAS and `codeberg` at Codeberg.
+`main` still tracks `codeberg/main` until the seed and fetch create
+`origin/main`. Local `main` is two commits ahead of Codeberg at the release
+point, plus the migration commits; GitHub has the release commit but not the
+migration commits.
 
 ## Owner action
 
-The NAS owner runs the one-time provisioning in `docs/publishing.md`
-§ Provisioning the NAS authority. The maintainer does not run it, and the
-owner pushes no content. The owner confirms when the bare repository exists
-and is owned by `forge`.
+`HEAD` is set. The remaining owner decision is whether to add
+`receive.denyDeletes` and `receive.denyNonFastForwards`. The forge task
+intentionally relies on reflogs instead; tag immutability is a release-process
+rule unless those are set. The owner pushes no content.
 
-## Maintainer action after confirmation
+## Maintainer action
 
 1. Rick commits the in-tree migration change (release tooling, tests, docs).
-2. Rename `origin` to `codeberg`, add `nas`, seed every branch and tag,
-   fetch, and set `main` to track `nas/main` (commands in
-   `docs/publishing.md` § Configure a maintainer clone).
+2. Seed every branch and tag, then set the upstream:
+
+   ```sh
+   git push --atomic origin --all --tags
+   git fetch origin
+   git branch --set-upstream-to=origin/main main
+   ```
+
+   `--tags` is required: `cloudflare-v0.5.0` is not reachable from `main`, so
+   the ordinary release `--follow-tags` path would not carry it.
+
 3. Catch Codeberg up with `git push codeberg HEAD --follow-tags`. It is two
-   commits and the `cloudflare-v0.12.1` tag behind; GitHub is already
-   current.
+   release commits and the `cloudflare-v0.12.1` tag behind, plus the
+   migration commits.
 4. Tell Quartermaster the public-mirror contract is unchanged and when the
    tag is available on Codeberg.
 
 ## Done when
 
-- `git ls-remote --symref nas HEAD` reports `refs/heads/main`.
-- `git ls-remote nas` matches local `refs/heads/*` and `refs/tags/*` (one
-  branch, 41 tags), including `cloudflare-v0.5.0`, which is not reachable
-  from `main`.
-- `git status -sb` reports `## main...nas/main`.
+- `git ls-remote --symref origin HEAD` reports `refs/heads/main`.
+- `git ls-remote origin` matches local `refs/heads/*` and `refs/tags/*` (one
+  branch, 41 tags), including `cloudflare-v0.5.0`.
+- `git status -sb` reports `## main...origin/main`.
 - `git ls-remote --heads codeberg main` reports `f94fb47` (or a later
   commit), and `git ls-remote --tags codeberg cloudflare-v0.12.1` reports
   the tag.

@@ -180,7 +180,7 @@ test("a tag on the wrong commit or in the wrong family fails closed", () => {
 const releaseFixture = (): {
   root: string;
   base: string;
-  nas: string;
+  origin: string;
   codeberg: string;
   github: string;
   env: NodeJS.ProcessEnv;
@@ -208,13 +208,13 @@ const releaseFixture = (): {
   git(root, "add", ".");
   git(root, "commit", "-q", "-m", "release fixtures");
 
-  const nas = join(base, "nas.git");
+  const origin = join(base, "origin.git");
   const codeberg = join(base, "codeberg.git");
   const github = join(base, "github.git");
-  git(base, "init", "-q", "--bare", nas);
+  git(base, "init", "-q", "--bare", origin);
   git(base, "init", "-q", "--bare", codeberg);
   git(base, "init", "-q", "--bare", github);
-  git(root, "remote", "add", "nas", nas);
+  git(root, "remote", "add", "origin", origin);
   git(root, "remote", "add", "codeberg", codeberg);
   git(root, "remote", "add", "github", github);
 
@@ -224,7 +224,7 @@ const releaseFixture = (): {
   mkdirSync(path);
   writeFileSync(join(path, "pnpm"), "#!/usr/bin/env sh\nexit 0\n", { mode: 0o755 });
   const env = { ...testEnv, PATH: `${path}:${process.env["PATH"] ?? ""}` };
-  return { root, base, nas, codeberg, github, env };
+  return { root, base, origin, codeberg, github, env };
 };
 
 const release = (fixture: ReturnType<typeof releaseFixture>, ...args: string[]) =>
@@ -242,15 +242,15 @@ test("the release publishes to NAS and both public mirrors by default", () => {
   try {
     const result = release(fixture, "patch", "--no-verify");
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout ?? "", /published branch and v1\.2\.4 to nas/);
+    assert.match(result.stdout ?? "", /published branch and v1\.2\.4 to origin/);
     assert.match(result.stdout ?? "", /mirror codeberg is current/);
     assert.match(result.stdout ?? "", /mirror github is current/);
 
     const head = git(fixture.root, "rev-parse", "HEAD").trim();
-    assert.equal(git(fixture.base, "-C", fixture.nas, "rev-parse", "refs/heads/main").trim(), head);
+    assert.equal(git(fixture.base, "-C", fixture.origin, "rev-parse", "refs/heads/main").trim(), head);
     assert.equal(git(fixture.base, "-C", fixture.codeberg, "rev-parse", "refs/heads/main").trim(), head);
     assert.equal(git(fixture.base, "-C", fixture.github, "rev-parse", "refs/heads/main").trim(), head);
-    assert.equal(tagCommit(fixture.base, fixture.nas, "v1.2.4"), head);
+    assert.equal(tagCommit(fixture.base, fixture.origin, "v1.2.4"), head);
     assert.equal(tagCommit(fixture.base, fixture.codeberg, "v1.2.4"), head);
     assert.equal(tagCommit(fixture.base, fixture.github, "v1.2.4"), head);
   } finally {
@@ -269,7 +269,7 @@ test("--no-push keeps the tag local and prints the publication commands", () => 
     assert.equal(git(fixture.root, "rev-parse", "--verify", "refs/tags/v1.2.4^{}").trim(), head);
     const remoteTag = spawnSync(
       "git",
-      ["-C", fixture.nas, "rev-parse", "--verify", "refs/tags/v1.2.4"],
+      ["-C", fixture.origin, "rev-parse", "--verify", "refs/tags/v1.2.4"],
       { encoding: "utf8", env: testEnv },
     );
     assert.notEqual(remoteTag.status, 0, "NAS must not receive a --no-push release");
@@ -287,7 +287,7 @@ test("a failed Codeberg mirror catches up on the next release without failing ei
     assert.match(first.stderr ?? "", /mirror codeberg failed; it will catch up on a later release/);
 
     const firstHead = git(fixture.root, "rev-parse", "HEAD").trim();
-    assert.equal(tagCommit(fixture.base, fixture.nas, "v1.2.4"), firstHead);
+    assert.equal(tagCommit(fixture.base, fixture.origin, "v1.2.4"), firstHead);
     assert.equal(tagCommit(fixture.base, fixture.github, "v1.2.4"), firstHead);
 
     git(fixture.root, "remote", "set-url", "codeberg", fixture.codeberg);
@@ -309,7 +309,7 @@ test("a failed GitHub mirror is non-fatal", () => {
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stderr ?? "", /mirror github failed; it will catch up on a later release/);
     const head = git(fixture.root, "rev-parse", "HEAD").trim();
-    assert.equal(tagCommit(fixture.base, fixture.nas, "v1.2.4"), head);
+    assert.equal(tagCommit(fixture.base, fixture.origin, "v1.2.4"), head);
     assert.equal(tagCommit(fixture.base, fixture.codeberg, "v1.2.4"), head);
   } finally {
     rmSync(fixture.base, { recursive: true, force: true });
@@ -319,10 +319,10 @@ test("a failed GitHub mirror is non-fatal", () => {
 test("a failed NAS publication leaves the local release intact and does not advance mirrors", () => {
   const fixture = releaseFixture();
   try {
-    git(fixture.root, "remote", "set-url", "nas", join(fixture.base, "missing.git"));
+    git(fixture.root, "remote", "set-url", "origin", join(fixture.base, "missing.git"));
     const result = release(fixture, "patch", "--no-verify");
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr ?? "", /publication to nas failed/);
+    assert.match(result.stderr ?? "", /publication to origin failed/);
     const head = git(fixture.root, "rev-parse", "HEAD").trim();
     assert.equal(git(fixture.root, "rev-parse", "--verify", "refs/tags/v1.2.4^{}").trim(), head);
     for (const remote of [fixture.codeberg, fixture.github]) {
@@ -341,11 +341,11 @@ test("a failed NAS publication leaves the local release intact and does not adva
 test("a missing NAS remote fails before changing the repository", () => {
   const fixture = releaseFixture();
   try {
-    git(fixture.root, "remote", "remove", "nas");
+    git(fixture.root, "remote", "remove", "origin");
     const before = git(fixture.root, "rev-parse", "HEAD").trim();
     const result = release(fixture, "patch", "--no-verify");
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr ?? "", /required nas remote is not configured/);
+    assert.match(result.stderr ?? "", /required origin remote is not configured/);
     assert.equal(git(fixture.root, "rev-parse", "HEAD").trim(), before);
     assert.equal(JSON.parse(readFileSync(join(fixture.root, "package.json"), "utf8")).version, "1.2.3");
   } finally {
