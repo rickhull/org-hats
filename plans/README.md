@@ -19,11 +19,6 @@ scaled bench's state; the measured verdict, the consumer-agreed design
 (model-scoped epoch, trigger-backed), and the done-when are in
 [`snapshot_cache.md`](snapshot_cache.md).
 
-The NAS release-authority migration is in
-[`nas-migration.md`](nas-migration.md): the NAS repository is seeded and
-`main` tracks it; the remaining work is the Codeberg catch-up and retiring
-the plan.
-
 The specs-driven witness suite landed; its durable convention lives in
 `tests/README.md` and `specs/README.md`.
 

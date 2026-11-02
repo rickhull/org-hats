@@ -53,11 +53,13 @@ A clone that predates the migration has `origin` pointing at Codeberg:
 git remote rename origin codeberg
 git remote add origin ssh://forge@nas/home/forge/repos/org-hats.git
 git remote add github git@github.com:rickhull/org-hats.git   # if absent
+git config push.followTags true
 ```
 
-A fresh clone adds `origin`, `codeberg`, and `github` with the same URLs.
-Then seed the authority once and set the upstream. `--all` and `--tags` are
-mutually exclusive, so the seed is two pushes:
+A fresh clone adds `origin`, `codeberg`, and `github` with the same URLs and
+sets the same `push.followTags` default. Then seed the authority once and set
+the upstream. `--all` and `--tags` are mutually exclusive, so the seed is two
+pushes:
 
 ```sh
 git push --atomic origin --all
@@ -70,6 +72,13 @@ The seed is the only push that carries every ref. The pre-push hook
 validates every tag in the second push (the historical `v0.4.3` is skipped).
 `cloudflare-v0.5.0` is not reachable from `main`, so the `--tags` push
 carries it; the ordinary release `--follow-tags` path would not.
+
+`push.followTags true` makes every plain `git push <remote>` carry the
+annotated tags reachable from the pushed refs that the remote lacks — the same
+behavior as `--follow-tags`. All release tags are annotated. It does not carry
+tags outside the pushed history, so the one-time seed still needs `--tags`.
+The release script passes `--follow-tags` explicitly and does not depend on
+this clone setting.
 
 For a release created with `--no-push`, publish in authority order:
 
