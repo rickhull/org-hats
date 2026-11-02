@@ -72,6 +72,12 @@ const opsAuthorized = (request: Request, env: Env): boolean => {
   return crypto.subtle.timingSafeEqual(a, b);
 };
 
+/** Demo and harness routes serve only when the deployment opts in with
+ * `DEMO_ROUTES: "1"`. The reference production config does not set it, so
+ * a routed Worker — and any caller through the service binding — gets 404s
+ * rather than an unauthenticated coordinator reset or envelope mint. */
+export const demoRoutesEnabled = (env: Env): boolean => env.DEMO_ROUTES === "1";
+
 const DEMO_OPERATION = "op-9f2e6ad4";
 const DEMO_ORG = "org-4c1f9a2e";
 const DEMO_WEST = "site-b8d620fa";
@@ -364,6 +370,13 @@ export default {
           { status: 400 },
         );
       }
+    }
+
+    if (
+      !demoRoutesEnabled(env) &&
+      (url.pathname === "/" || url.pathname.startsWith("/demo/") || url.pathname === "/increment")
+    ) {
+      return new Response("not found\n", { status: 404 });
     }
 
     if (request.method === "GET" && url.pathname === "/") {

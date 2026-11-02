@@ -26,6 +26,11 @@
 //                                 directory (no global registry)
 //   AUTHORITY_ACTIVATION_LIFETIME_SECONDS
 //                                 positive seconds; default 86400
+//
+// DEMO_ROUTES is deliberately absent: the demo and harness routes refuse
+// to serve without it, so a routed deployment — and any service-binding
+// caller — gets 404s. Do not set it on a deployment that carries real
+// authority.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "org-hats-authority",

@@ -46,9 +46,10 @@ deploying host owns its product surface, IdP, secrets, and deployment; the
    resets and reseeds the coordinators, `POST /demo/login` mints an envelope
    and refresh handle, `/demo/access` verifies one, and `/increment` is a
    harness counter. The reference production config attaches no routes
-   (`workers_dev` false, service binding only); a host that routes the
-   Worker publicly — and any caller that can reach the service binding —
-   reaches them with no token.
+   (`workers_dev` false, service binding only). These routes refuse to serve
+   unless the deployment sets `DEMO_ROUTES: "1"`; the reference config does
+   not, so a host that routes the Worker publicly — and any caller that can
+   reach the service binding — gets 404s, not the routes.
 
 ## Threats
 
@@ -65,7 +66,7 @@ deploying host owns its product surface, IdP, secrets, and deployment; the
 | Sealed IdP configuration disclosure | Export/backup, database access, or ops-token use | Configuration is held by the organization object and resolved only by the exchange; named “sealed” because the portable core treats it as opaque | It is not encrypted by `org-hats`; export contains it. Protect exports and rotate the provider client secret if exposed |
 | Signing-key compromise | Secret leak, host compromise, bad deployment configuration | Key pair is proven at import; verifier-first rotation; verifiers keep only configured keys; development fallback is per-isolate | A leaked private key can mint valid envelopes. Removing the old verification key immediately invalidates live sessions but is the safe containment |
 | Accidental development signing | Deployment omits the signing trio | Full signing config is a proven pair; a partial set errors at runtime construction | The runtime cannot infer deployment intent, so a host gate must refuse the ephemeral dev signer in production |
-| Demo or harness surface reached | The Worker is routed publicly, or a service-binding caller asks for `/demo/*` | The reference production config attaches no routes and sets `workers_dev` false; the demo routes carry no secret, so nothing is exposed but authority state itself | Unauthenticated callers can reset coordinator state (`/demo/bootstrap`) and mint envelopes (`/demo/login`); a routed deployment must front or filter them |
+| Demo or harness surface reached | The Worker is routed publicly, or a service-binding caller asks for `/demo/*` | The reference production config attaches no routes and sets `workers_dev` false; the routes refuse to serve unless the deployment sets `DEMO_ROUTES: "1"`, which the reference config does not | An operator who sets the flag on a routed Worker re-opens the exposure: unauthenticated callers could reset coordinator state and mint envelopes |
 | Malicious or lost state | Database access, bad restore, operator mistake | Typed restore; atomic transactions; projections rebuild by pulling; audit rows | Direct storage access or an authorized restore can rewrite authority state, and a crafted snapshot's undelivered outbox rows are re-delivered as if fresh. No tamper-evident audit log |
 | Denial of service | Expensive envelope parsing, signature checks, provider fetches, or request floods | The [envelope-size baseline](consumer-session.md) documents the largest envelope the authority issues today — a budget input, not a bound; bounded provider caches; Durable Object alarms; fail-closed failures | No built-in rate limiting; the Worker platform and host must absorb volumetric traffic |
 | Clock and expiry skew | Verifier clock ahead/behind issuer | `exp` checked against the verifier's clock; no not-before check | Clock skew shortens or extends the usable window within the host's clock discipline |

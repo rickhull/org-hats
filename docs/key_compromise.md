@@ -184,10 +184,11 @@ bounded by the secret's entropy.
 The shipped Worker serves unauthenticated demo routes: `/demo/bootstrap`
 resets and reseeds the coordinators, `/demo/login` mints an envelope
 and refresh handle, `/demo/access` verifies one, and `/increment` is a
-harness counter. The reference production config attaches no routes
-and reaches the Worker only through the service binding. A deployment
-that routes the Worker publicly must front or filter these routes before
-it carries real authority.
+harness counter. They refuse to serve unless the deployment sets
+`DEMO_ROUTES: "1"`, and the reference production config deliberately
+does not set it: a routed deployment and its service-binding callers
+get 404s. Confirm no deployment that carries real authority sets the
+flag — an operator who does re-opens the exposure.
 
 ## Normal rotation
 

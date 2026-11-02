@@ -1,5 +1,20 @@
 import { SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { demoRoutesEnabled } from "../src/index";
+
+// The demo and harness routes refuse to serve unless `DEMO_ROUTES` is
+// "1"; the test config sets it, the reference production config does not,
+// so a routed deployment — and any service-binding caller — gets 404s
+// without ever knowing the flag exists.
+describe("the demo gate", () => {
+  it("serves only when DEMO_ROUTES is exactly 1", () => {
+    expect(demoRoutesEnabled({ DEMO_ROUTES: "1" } as never)).toBe(true);
+    for (const unset of [undefined, "", "0", "true", "yes"] as const) {
+      expect(demoRoutesEnabled({ DEMO_ROUTES: unset } as never)).toBe(false);
+    }
+    expect(demoRoutesEnabled({} as never)).toBe(false);
+  });
+});
 
 describe("the self-contained demo", () => {
   it("serves the page, signs in with dev evidence, and verifies neutral access", async () => {

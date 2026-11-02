@@ -10,6 +10,9 @@ export interface Env {
   readonly AUTHORITY_ACTIVATION_LIFETIME_SECONDS?: string;
   /** Ops bearer token. A deployment secret; the test var is a local value. */
   readonly OPS_TOKEN?: string;
+  /** Opt-in for the demo and harness routes (`"1"`); the reference
+   * production config does not set it, so those routes refuse to serve. */
+  readonly DEMO_ROUTES?: string;
   /** The signing-key set, all or none: pkcs8 base64 private key, raw base64
    * public half, and id. A partial set is rejected, and the halves are
    * proven a pair at import. */

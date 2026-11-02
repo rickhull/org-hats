@@ -324,11 +324,11 @@ runtime and verified through `org-hats/access`, with neutral facts and
 allow/deny checks. The `/demo/*` routes are not a product surface, and
 they carry no token: `GET /demo/bootstrap` resets and reseeds the
 coordinators, `POST /demo/login` mints an envelope and refresh handle,
-`/demo/access` verifies one, and `/increment` is a harness counter. The
-reference production config attaches no routes (`workers_dev: false`,
-service binding only); a deployment that routes the Worker publicly — and
-any caller that can reach the service binding — reaches them
-unauthenticated. The [threat model](threat_model.md) carries the boundary.
+`/demo/access` verifies one, and `/increment` is a harness counter. They
+refuse to serve unless the deployment sets `DEMO_ROUTES: "1"` — the test
+config sets it, the reference production config deliberately does not —
+so a routed deployment and its service-binding callers get 404s. The
+[threat model](threat_model.md) carries the boundary.
 
 ## Portability constraint
 
