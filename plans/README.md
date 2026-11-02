@@ -9,8 +9,13 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-No active plans. The specs-driven witness suite landed; its durable
-convention lives in `tests/README.md` and `specs/README.md`.
+The operation snapshot cache is deferred until a consumer approaches the
+scaled bench's state; the measured verdict, the consumer-agreed design
+(model-scoped epoch, trigger-backed), and the done-when are in
+[`snapshot_cache.md`](snapshot_cache.md).
+
+The specs-driven witness suite landed; its durable convention lives in
+`tests/README.md` and `specs/README.md`.
 
 The activation, roster, and team slices landed on 2026-10-28 and 2026-10-29;
 their durable facts are in `docs/activation.md`, `docs/roster.md`,
