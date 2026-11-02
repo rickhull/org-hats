@@ -52,7 +52,8 @@ public `org-hats` docs are normative for the seam.
   keys, verification trust, the ops token, sealed IdP configuration, and
   bearer credentials.
 - [`binding-conformance.md`](binding-conformance.md) — the documented
-  service-binding smoke subset and what it does not claim.
+  service-binding smoke subset, what it does not claim, and the one home
+  for live-deployment facts.
 - [`inventory.md`](inventory.md) — the story index: every conformance case
   bound to the document that tells it, enforced by `tests/docs.test.ts`.
 - [`deploy_runbook.md`](deploy_runbook.md) — the host-neutral deploy,
