@@ -161,7 +161,7 @@ Interface and envelope versions advance independently. See [v2 migration](docs/m
 
 ## Known gaps
 
-There is no AD/LDAP bulk-import or phased-cutover runbook (the mapping guide is [From Active Directory and LDAP](docs/from_ldap.md)), formal policy-bundle authoring guide, independent security audit, or documented deployment-cost estimate. These are **current limitations**, not promises of future features. The opt-in benchmark harness and its baseline are in [Performance](docs/performance.md); the security posture is in the [threat model](docs/threat_model.md) and [key-compromise runbook](docs/key_compromise.md).
+There is no AD/LDAP bulk-import or phased-cutover runbook (the mapping guide is [From Active Directory and LDAP](docs/personas/practitioner.md)), formal policy-bundle authoring guide, independent security audit, or documented deployment-cost estimate. These are **current limitations**, not promises of future features. The opt-in benchmark harness and its baseline are in [Performance](docs/performance.md); the security posture is in the [threat model](docs/threat_model.md) and [key-compromise runbook](docs/key_compromise.md).
 
 ## Documentation
 
