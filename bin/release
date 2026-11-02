@@ -1,9 +1,8 @@
 #!/usr/bin/env sh
 # Cut a release: bump the manifest, run the gates, build the artifact
-# (dist/), commit, tag, and publish the branch and tag to origin and the
-# mirror. Publication is best-effort per push: every push is attempted, any
-# failure is reported, and the release exits nonzero. `--no-push` keeps the
-# release local.
+# (dist/), commit, tag, and publish the branch and tag to the NAS authority.
+# Codeberg and GitHub are best-effort public mirrors: a later release catches
+# up an unavailable mirror. `--no-push` keeps the release local.
 #
 #   bin/release patch                 # root: vX.Y.Z from package.json
 #   bin/release minor
@@ -115,6 +114,13 @@ if $dry; then
 	exit 0
 fi
 
+# Fail before changing the manifest when the required publication authority
+# is not configured. Transport failures later leave the local commit and tag
+# intact for an exact retry.
+if $push && ! git remote get-url nas >/dev/null 2>&1; then
+	die "required nas remote is not configured"
+fi
+
 [ -z "$(git status --porcelain)" ] || die "working tree is dirty — commit or stash first"
 
 if $verify; then
@@ -177,41 +183,24 @@ if $verify && [ -z "$(git status --porcelain)" ]; then
 fi
 
 if $push; then
-	push_fail=0
 	printf '\n== publication ==\n'
-	if git push origin HEAD; then
-		printf 'release: pushed branch to origin\n'
-	else
-		printf 'release: branch push to origin failed\n' >&2
-		push_fail=1
-	fi
-	if git push origin "$tag"; then
-		printf 'release: pushed %s to origin\n' "$tag"
-	else
-		printf 'release: tag push to origin failed\n' >&2
-		push_fail=1
-	fi
-	if git remote get-url github >/dev/null 2>&1; then
-		if git push github HEAD; then
-			printf 'release: pushed branch to github\n'
-		else
-			printf 'release: branch push to github failed\n' >&2
-			push_fail=1
-		fi
-		if git push github "$tag"; then
-			printf 'release: pushed %s to github\n' "$tag"
-		else
-			printf 'release: tag push to github failed\n' >&2
-			push_fail=1
-		fi
-	else
-		printf 'release: no github remote; mirror skipped\n' >&2
-	fi
-	if [ "$push_fail" -ne 0 ]; then
-		printf 'release: publication incomplete; the release exists locally. Retry with\n  git push origin HEAD\n  git push origin %s\n  git push github HEAD\n  git push github %s\n' "$tag" "$tag" >&2
+	if ! git push --atomic nas HEAD "$tag"; then
+		printf 'release: publication to nas failed; the release exists locally. Retry with\n  git push --atomic nas HEAD %s\n' "$tag" >&2
 		exit 1
 	fi
-	printf 'release: published branch and %s to origin and github\n' "$tag"
+	printf 'release: published branch and %s to nas\n' "$tag"
+
+	# Each mirror push advances the branch and sends every reachable annotated
+	# tag it missed. Mirror availability never changes canonical release status.
+	for mirror in codeberg github; do
+		if ! git remote get-url "$mirror" >/dev/null 2>&1; then
+			printf 'release: no %s remote; mirror skipped\n' "$mirror" >&2
+		elif git push "$mirror" HEAD --follow-tags; then
+			printf 'release: mirror %s is current\n' "$mirror"
+		else
+			printf 'release: mirror %s failed; it will catch up on a later release\n' "$mirror" >&2
+		fi
+	done
 else
-	printf 'release: not published; push with\n  git push origin HEAD\n  git push origin %s\n  git push github HEAD\n  git push github %s\n' "$tag" "$tag"
+	printf 'release: not published; push with\n  git push --atomic nas HEAD %s\n  git push codeberg HEAD --follow-tags\n  git push github HEAD --follow-tags\n' "$tag"
 fi

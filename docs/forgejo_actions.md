@@ -1,8 +1,8 @@
 # Forgejo Actions — the third-party build witness
 
-Codeberg's hosted Forgejo Actions run the portable gate on every push. The
-run is assurance that a third party can build and test the repository from a
-clean checkout — not a gate of record. The local rings in
+Codeberg's hosted Forgejo Actions run the portable gate whenever that public
+release mirror catches up. The run is assurance that a third party can build
+and test the repository from a clean checkout — not a gate of record. The local rings in
 [`tests/README.md`](../tests/README.md) are the authority; remote red without
 local red means the *environment* broke, and that reading has held exactly
 once (see the incident below).
@@ -137,9 +137,8 @@ short `-r` pitfall (see `AGENTS.md`) the moment they exist.
   scheduling defeats push-blocking assurance), `paths` filters (Forgejo
   does not intend them combined with `tags`, and skipping pushes weakens
   the witness), and caching the 2.3 MB rg fetch (not worth a cache action).
-  The floor is one full gate per `main` push — Codeberg's "minimum
-  necessary to guarantee consistent quality" — and the duplicate run a
-  root `v*` tag still triggers is an accepted, bounded cost of that.
+  The floor is one full gate per mirrored release update. The duplicate run
+  a root `v*` tag triggers is an accepted, bounded cost of that.
 
 - Keep the job whole and short: one `CI=1 ci/run portable` invocation,
   ~90 s, well inside the `codeberg-small` five-minute cap.
@@ -156,10 +155,9 @@ short `-r` pitfall (see `AGENTS.md`) the moment they exist.
   `/api/v1/repos/<owner>/<repo>/actions/runs` (list; note the `id`) →
   `/actions/runs/<id>/jobs` (job id) → `/actions/jobs/<job id>/logs`,
   authenticated with the `fj` token.
-- The mirror is release-driven: its workflows are the copy from the last
-  `bin/release --push`, so a dispatch validates that snapshot, not a
-  just-written change — a new workflow reaches GitHub only with the next
-  release. `gh workflow run check --ref main` is still the pre-release
+- Both public mirrors are release-driven: their workflows are the copy from
+  the last successful catch-up push, so a dispatch validates that snapshot,
+  not a just-written change. `gh workflow run check --ref main` is still the pre-release
   canary: it fails in seconds when the mirror's tree can no longer satisfy
   its own CI contract (runner-image drift, a fence change not yet
   released). After a release, read the triggered mirror runs — the

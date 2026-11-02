@@ -170,7 +170,7 @@ The portable `src/` modules avoid Cloudflare imports and ambient runtime types. 
 | Access envelope format | 1 |
 | Cloudflare runtime | 0.11.0 (`cloudflare-v*` tags); operation schema 5 |
 
-Interface and envelope versions advance independently. See [v2 migration](docs/migration-v2.md), [v3 migration](docs/migration-v3.md), and [publishing](docs/publishing.md). Codeberg is canonical; GitHub is a release mirror. Git tag immutability depends on repository governance; verify an exact commit (and its `dist/`) where supply-chain reproducibility matters.
+Interface and envelope versions advance independently. See [v2 migration](docs/migration-v2.md), [v3 migration](docs/migration-v3.md), and [publishing](docs/publishing.md). The private NAS forge is canonical; Codeberg and GitHub are best-effort public release mirrors. Git tag immutability depends on repository governance; verify an exact commit (and its `dist/`) where supply-chain reproducibility matters.
 
 ## Known gaps
 

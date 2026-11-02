@@ -1,8 +1,8 @@
 # Security policy
 
 *How to report a vulnerability in `org-hats`, and what the maintainer commits
-to. The canonical repository is <https://codeberg.org/rickhull/org-hats>; the
-GitHub repository is a push-only mirror.*
+to. The private NAS forge is the release authority; Codeberg and GitHub are
+best-effort public release mirrors.*
 
 ## Supported versions
 
@@ -22,10 +22,11 @@ v0.4 and v1 lines live at their tags; `main` is the v3 line.
 
 **Do not open a public issue, pull request, or discussion.**
 
-Use the private vulnerability-reporting channel offered by the canonical
-Codeberg repository. If that channel is unavailable, contact the maintainer
+Use the private vulnerability-reporting channel offered by the Codeberg
+public mirror. If that channel is unavailable, contact the maintainer
 through the Codeberg profile (<https://codeberg.org/rickhull>) to arrange a
-private transfer. Do not report to the GitHub mirror; it is a copy.
+private transfer. Do not report to the GitHub mirror; it is a copy. Reporting
+intake on Codeberg does not make that mirror a release authority.
 
 Include:
 

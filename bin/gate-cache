@@ -3,8 +3,8 @@
 #
 # The marker lives under .git/ and is valid only for the exact HEAD commit, a
 # clean working tree, and the same toolchain/installed dependency tree. It is
-# a convenience for pushing the same commit to a second remote (origin, then
-# the mirror); it is never a release authority. `bin/release` and CI run their
+# a convenience for pushing the same commit to the authority and its mirrors;
+# it is never a release authority. `bin/release` and CI run their
 # own gates.
 #
 #   bin/gate-cache check  <commit>   exit 0 only on a valid marker

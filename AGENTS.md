@@ -15,10 +15,14 @@ a tag; pushing a tag is a push, and stays Rick's.
 working tree, so they proceed only with Rick's approval — ask for specific
 paths and say what each file is.  Never `git add -A` or `git add .`.
 
-Codeberg is canonical (remote `origin`); GitHub is a release mirror, updated
-by `bin/release`, which publishes by default (`--no-push` keeps a release
-local), never a second place to work.  The authority redesign
-is `main`'s line; the v0.4 surface stays frozen at its tags.
+The bare repository at `ssh://forge@nas-ts/home/forge/repos/org-hats.git` is
+canonical (remote `nas`); `main` tracks `nas/main`.  Codeberg (remote
+`codeberg`) and GitHub (remote `github`) are best-effort public release
+mirrors, updated by `bin/release`, which publishes by default (`--no-push`
+keeps a release local).  A mirror failure does not invalidate a NAS-published
+release; the next release catches up its branch and reachable annotated tags.
+Neither mirror is a second place to work.  The authority redesign is `main`'s
+line; the v0.4 surface stays frozen at its tags.
 
 ## The Quartermaster relay
 

@@ -2,63 +2,104 @@
 
 *Where `org-hats` is published, how it mirrors, how a release is cut, and the rules that keep it publishable to its subscribers.*
 
-## Canonical and mirror
+## Canonical forge and public mirrors
 
-- **Codeberg is canonical** — <https://codeberg.org/rickhull/org-hats>. The `repository`, `homepage`, and `bugs` fields point there; issues and pull requests live there.
-- **GitHub is a release mirror** — <https://github.com/rickhull/org-hats>. It is updated only when a release is cut, and is a hand-off copy for reach, not a second place to work.
+- **The NAS forge is canonical** — remote `nas` at
+  `ssh://forge@nas-ts/home/forge/repos/org-hats.git`. Its bare repository is
+  the release authority, and `main` tracks `nas/main`.
+- **Codeberg is a public release mirror** —
+  <https://codeberg.org/rickhull/org-hats>, remote `codeberg`. Public project
+  metadata and reporting intake remain there because the NAS forge is not a
+  public web service.
+- **GitHub is a public release mirror** —
+  <https://github.com/rickhull/org-hats>, remote `github`.
 
-## Mirroring to GitHub
+The public mirrors are reach and availability copies, not places to work.
+`bin/release` first atomically publishes the release branch and new tag to
+`nas`. Only after that succeeds does it push `HEAD --follow-tags` to each
+configured mirror. A missing or unavailable mirror warns but does not
+invalidate the canonical release. The next successful release push advances
+the mirror branch and sends every reachable annotated tag it missed.
 
-GitHub is updated by the release mechanism, not by a per-commit or periodic
-mirror. `bin/release` publishes the release commit and its tag to `origin`,
-then the same branch and tag to `github`; `--no-push` keeps the release
-local. There is no separate mirror push step.
+`nas-ts` is the Tailscale name; the LAN alias `nas` reaches the same host.
 
-Set the remote once per clone:
+### Provisioning the NAS authority (one-time; NAS owner)
+
+The maintainer does not create this repository. The NAS owner runs, as the
+`forge` account (whose shell is `git-shell`):
 
 ```sh
-git remote add github git@github.com:rickhull/org-hats.git
+sudo -u forge install -d -m 755 /home/forge/repos
+sudo -u forge git init --bare --initial-branch=main /home/forge/repos/org-hats.git
+sudo -u forge git -C /home/forge/repos/org-hats.git config receive.denyDeletes true
+sudo -u forge git -C /home/forge/repos/org-hats.git config receive.denyNonFastForwards true
+sudo -u forge git -C /home/forge/repos/org-hats.git config core.logAllRefUpdates true
 ```
 
-If there is no `github` remote, the release still pushes `origin` and says
-the mirror was skipped. Publication is best-effort per push: every push is
-attempted, any failure is reported, and the release exits nonzero while the
-local commit and tag remain. If the GitHub push fails after `origin`
-succeeded, retry:
+`/home/forge` stays `0700 forge:forge`, the maintainer's SSH key is
+authorized for `forge`, and the owner pushes no content. No web UI, Caddy
+route, or hosted mirror is involved.
+
+### Configure a maintainer clone
+
+A clone that predates the migration has `origin` pointing at Codeberg:
 
 ```sh
-git push github HEAD
-git push github <tag>
+git remote rename origin codeberg
+git remote add nas ssh://forge@nas-ts/home/forge/repos/org-hats.git
+git remote add github git@github.com:rickhull/org-hats.git   # if absent
 ```
 
-The pre-push gate runs on both pushes; the per-commit gate cache reuses the
-Codeberg pass for the mirror push when the tree is unchanged and clean. A
-first catch-up validates every tag except the historical `v0.4.3` mis-tag,
-which the hook skips explicitly (below).
-
-Verify both hosts:
+A fresh clone adds `nas`, `codeberg`, and `github` with the same URLs.
+Then seed the authority once and set the upstream:
 
 ```sh
-git ls-remote --heads origin main
+git push --atomic nas --all --tags
+git fetch nas
+git branch --set-upstream-to=nas/main main
+```
+
+The seed is the only push that carries every ref. The pre-push hook
+validates every tag in it (the historical `v0.4.3` is skipped).
+`cloudflare-v0.5.0` is not reachable from `main`, so `--tags` carries it;
+the ordinary release `--follow-tags` path would not.
+
+For a release created with `--no-push`, publish in authority order:
+
+```sh
+git push --atomic nas HEAD <tag>
+git push codeberg HEAD --follow-tags
+git push github HEAD --follow-tags
+```
+
+If the NAS push fails, `bin/release` exits nonzero, leaves the local release
+commit and tag intact, and does not advance either mirror. Retry the exact NAS
+command, then catch up the mirrors. Mirror failure is deliberately non-fatal;
+it may be retried immediately with the command above or left for the next
+release.
+
+Verify authority and mirrors independently:
+
+```sh
+git ls-remote --symref nas HEAD
+git ls-remote --heads nas main
+git ls-remote --heads codeberg main
 git ls-remote --heads github main
 ```
 
-No Forgejo push mirror is configured on Codeberg, and none should be. The
-release push is the only path to GitHub: a periodic mirror would push every
-branch commit, which is the posture this section rejects, and it fails
-silently once its token expires or loses a scope. Do not add one back.
+No hosted push-mirror feature is part of the design. Tokens expire and hosted
+mirroring failures can be silent; the repository-owned release command is the
+auditable replication path.
 
 Keep these true:
 
-- **GitHub is push-only.** Never commit or tag there. A commit on the mirror
-desyncs it, and the next push is rejected or would clobber it.
-- **A rewrite needs both hosts.** If history is ever rewritten, force-push
-Codeberg and then force-push the GitHub mirror; GitHub follows only when
-told.
-- **Codeberg is the truth.** GitHub holds no authority, only a copy.
-
-**Current status:** GitHub carries every release; branch commits
-after the last release wait for the next one.
+- **NAS is the authority.** A public mirror never substitutes for a failed
+  NAS publication.
+- **Both public hosts are push-only mirrors.** Never commit or tag there.
+- **Mirror lag is acceptable and self-repairing.** A later release catches up
+  the branch and reachable annotated tags.
+- **Tags are never rewritten.** Repair by adding a release or replaying the
+  ordinary catch-up push, never by moving or deleting a published tag.
 
 **Historical anomaly:** `v0.4.3` points at `8d2551d` ("docs update /
 cleanup"), whose `package.json` is `0.4.2`; `v0.4.4` is the commit that fixes
@@ -68,9 +109,9 @@ pre-push hook skips it explicitly so a catch-up can validate every other tag;
 
 ## CI
 
-Codeberg is the per-push CI. Hosted Forgejo Actions runs
-[`.forgejo/workflows/check.yml`](../.forgejo/workflows/check.yml) on every
-push and on `workflow_dispatch`, on `codeberg-small`:
+Codeberg hosted Forgejo Actions runs
+[`.forgejo/workflows/check.yml`](../.forgejo/workflows/check.yml) when the
+release mirror is updated and on `workflow_dispatch`, on `codeberg-small`:
 
 - checkout with tags (`fetch-depth: 0`), pnpm 11.21.0, Node 24;
 - `CI=1 ci/run portable` — the repository-owned contract performs the
@@ -93,11 +134,9 @@ Its distinct contribution is the workerd suites on a clean machine: `pnpm
 verify` already runs every gate locally, but only through the nix-ld loader,
 so CI is the one execution of the deployable artifact outside it.
 
-Codeberg's per-push job runs the portable gate only.  The workerd suites run
-in ring 2 locally and at release on this mirror, so a workerd regression can
-land on `main` and stay unseen until the next release.  That is accepted
-while `packages/cloudflare` is private and on `0.x`; revisit if a regression
-reaches a release tag or the package gains a second consumer.
+Codeberg's mirror job runs the portable gate only. The workerd suites run in
+ring 2 locally and at release on GitHub. Both hosted results are mirror
+evidence, not prerequisites for the already-published NAS release.
 
 A `cloudflare-v*` tag job restores the tag ref before the artifact gate reads
 it. The checkout action force-writes the peeled commit into `refs/tags/<tag>`,
@@ -105,8 +144,8 @@ so the annotated object the gate requires is absent until it is re-fetched;
 `bin/check-artifact` never touches the network, so the workflow repairs the
 ref and the gate stays offline.
 
-The live gate for a working checkout is still the local pre-push hook and
-`pnpm verify`; CI is the remote evidence.
+The live gate for a working checkout is the local pre-push hook and `pnpm
+verify`; public-host CI is asynchronous mirror evidence.
 
 `ci/run` is the backend-independent CI contract. In `CI=1` mode it requires
 a clean, full checkout before installing anything; a local dirty run is
@@ -140,16 +179,16 @@ first run was `success` in 1m25s. A manual dispatch is
 
 ## The release
 
-Releases are cut with `bin/release` (bump → verify → build → commit → tag; the tag comes from the manifest), which publishes the release commit and tag to both hosts by default; `--no-push` keeps a release local, and GitHub receives release updates only. `v0.4.4` is the last v0.4 release; `v1.0.0` is historical; the current line is v3.x, with v2.x the previous line. The Cloudflare reference runtime is released from the same script with `--package cloudflare`.
+Releases are cut with `bin/release` (bump → verify → build → commit → tag; the tag comes from the manifest). It publishes to NAS, then catches up both public mirrors by default; `--no-push` keeps a release local. `v0.4.4` is the last v0.4 release; `v1.0.0` is historical; the current line is v3.x, with v2.x the previous line. The Cloudflare reference runtime is released from the same script with `--package cloudflare`.
 
 A consumer pins one of:
 
 | Host | Dependency spec |
 | --- | --- |
-| Codeberg (canonical, immediate) | `git+https://codeberg.org/rickhull/org-hats.git#vX.Y.Z` |
-| GitHub (mirror, lagging) | `github:rickhull/org-hats#vX.Y.Z` |
+| Codeberg (public mirror) | `git+https://codeberg.org/rickhull/org-hats.git#vX.Y.Z` |
+| GitHub (public mirror) | `github:rickhull/org-hats#vX.Y.Z` |
 
-Replace `vX.Y.Z` with the release tag. `v0.4.4` remains the last frozen v0.4 pin; the latest tag is the pin target — no plan tracks it. The Cloudflare package releases on its own cadence as `cloudflare-vX.Y.Z`; the same guard validates it against `packages/cloudflare/package.json`. Prefer the Codeberg pin: the mirror's lag then never affects the consumer. The `github:` shorthand resolves only GitHub; a consumer whose CI is already GitHub-native may pin the mirror.
+Replace `vX.Y.Z` with the release tag. `v0.4.4` remains the last frozen v0.4 pin; the latest tag is the pin target — no plan tracks it. The Cloudflare package releases on its own cadence as `cloudflare-vX.Y.Z`; the same guard validates it against `packages/cloudflare/package.json`. Either public mirror may temporarily lag the NAS authority. A consumer that needs the newest release verifies the requested tag exists before updating its pin; the `github:` shorthand resolves only GitHub.
 
 Pick the bump from the surface: `minor` for an additive public export or model
 fact, `patch` for a fix within the released surface, and `major` when the
@@ -164,7 +203,7 @@ source change.
 Cutting and publishing an immutable `cloudflare-v*` tag is the upstream
 release act; deploying it is the consuming host's act. Publication is to
 subscribers ([lexicon.md](lexicon.md) § Delivery): org-hats publishes to
-the forge and the mirror, whose audience happens to be the public. The
+the canonical forge and public mirrors, whose audience happens to be the public. The
 host verifies the tag and the production configuration at that commit,
 snapshots state, uploads a Worker Version, activates it, and verifies it.
 The shape is in
@@ -194,10 +233,11 @@ From a clean `main`:
    (plus the Cloudflare suites for a root release), rebuilds `dist/`, commits
    the manifest and generated output, and tags the commit. It re-checks the
    new tag with `bin/check-version` before anything is pushed — the tag and
-   manifest cannot disagree. It then publishes the branch and tag to
-   `origin`, and the same to `github` when that remote exists; `--no-push`
-   stops before publication. Every push is attempted, any failure is
-   reported, and the release exits nonzero. `--dry-run`
+   manifest cannot disagree. It then atomically publishes the branch and tag
+   to `nas`. Only after that succeeds does it catch up configured `codeberg`
+   and `github` mirrors. A NAS failure is fatal and preserves the local
+   release; a mirror failure warns and is repaired by a later release.
+   `--no-push` stops before publication. `--dry-run`
    previews; `--no-cloudflare` skips the workspace suites on a root release.
    **Tag only through `bin/release`** — it keeps the tag and the manifest
    equal by construction; a hand-made tag (the agent exception in
@@ -212,34 +252,37 @@ From a clean `main`:
    the deployment paragraph in this file, `positioning.md`,
    `personas/practitioner.md`, and `migration-v2.md` move after the host
    deploy, because they describe what is running.
-2. If the release was cut with `--no-push`, or a push failed, send it to both
-   hosts:
+2. If the release was cut with `--no-push`, publish it in authority order. If
+   NAS failed, retry its command before either mirror; a failed mirror may be
+   retried now or left for the next release:
    ```sh
-   git push origin HEAD
-   git push origin <tag>
-   git push github HEAD
-   git push github <tag>
+   git push --atomic nas HEAD <tag>
+   git push codeberg HEAD --follow-tags
+   git push github HEAD --follow-tags
    ```
-3. Verify both hosts show the same commit and tag:
+3. Verify NAS shows the release. Check mirrors separately; lag is a warning,
+   not a reason to rewrite or recut the tag:
    ```sh
-   git ls-remote --heads origin main
+   git ls-remote --heads nas main
+   git ls-remote --heads codeberg main
    git ls-remote --heads github main
    ```
-   GitHub CI runs when the release is pushed; it is a release-time backstop.
+   Public-host CI runs when each mirror receives the release; it is
+   release-time evidence, not the publication authority.
 
 ## Discipline
 
 - **Tags are immutable.** Never move or delete `v0.1.0`; release by *adding* `v0.1.1`, never by rewriting a tagged commit. Force-pushing over a tag a consumer pinned is the one failure that breaks them silently.
 - **A release tag must match its manifest.** `bin/check-version` validates both families: `vX.Y.Z` against `package.json`, `cloudflare-vX.Y.Z` against `packages/cloudflare/package.json` (it also audits any tag: `bin/check-version v0.4.3`, `bin/check-version cloudflare-v0.2.0`). `bin/check` runs it, so CI enforces it on every mirror push; `bin/release` keeps the two equal by construction and re-checks the tag it just made. The committed `.githooks/pre-push` runs the root gate before a push leaves the machine — install it once with `git config core.hooksPath .githooks`. CI remains the backstop.
 - **`dist/` must be fresh.** `bin/check` runs the fence but does not emit; `pnpm build` does. `bin/check-dist` builds and fails if `git status --porcelain -- dist` is non-empty; the pre-push hook and **CI** both run it, so the local gate and the remote gate answer the same question in the same order.
-- **A gated commit is recorded locally.** A passing pre-push gate writes a marker under `.git/org-hats-gates/` keyed by the commit and a fingerprint of the runtime, compiler, and installed tree. A second push of the same clean commit (origin, then the mirror) reuses it; a dirty tree, a new commit, or a changed toolchain does not. The marker is local and never a release authority — `bin/release` and CI run their own gates.
-- **Codeberg CI is the per-push gate; GitHub CI is release-time.** `.forgejo/workflows/check.yml` runs on every Codeberg push; GitHub Actions runs only when the release mirror is updated. Workerd stays in the local and release rings.
-- **Know which host the consumer pins.** Codeberg is canonical and immediate; GitHub trails until the next release push. Prefer Codeberg.
+- **A gated commit is recorded locally.** A passing pre-push gate writes a marker under `.git/org-hats-gates/` keyed by the commit and a fingerprint of the runtime, compiler, and installed tree. Later pushes of the same clean commit to NAS and the mirrors reuse it; a dirty tree, a new commit, or a changed toolchain does not. The marker is local and never a release authority — `bin/release` and CI run their own gates.
+- **The local gate protects the canonical push.** Codeberg and GitHub Actions run when their release mirrors catch up. Workerd stays in the local and release rings.
+- **Know which host the consumer pins.** Both public mirrors may lag NAS. Verify the tag before changing a consumer pin.
 
 ## Metadata
 
-`package.json` carries `license: MIT`, `author: Rick <rick@thinkpad>`, and the three Codeberg URLs. `files: ["dist", "SECURITY.md"]` means the installable tarball is `dist/` plus the README, LICENSE, SECURITY.md, and `package.json`. Zero runtime dependencies.
+`package.json` carries `license: MIT`, `author: Rick <rick@thinkpad>`, and the three Codeberg URLs; those name the public mirror deliberately, because the private NAS authority is not a public URL. `files: ["dist", "SECURITY.md"]` means the installable tarball is `dist/` plus the README, LICENSE, SECURITY.md, and `package.json`. Zero runtime dependencies.
 
 ## Open
 
-- **GitHub repository cosmetics.** Set the mirror's description to *"Canonical: https://codeberg.org/rickhull/org-hats — a portable organizational authority subsystem"*; disable **Issues**, **Wiki**, **Discussions** on the mirror (PRs can't be disabled); add topics — `authorization`, `access-control`, `rbac`, `permissions`, `typescript`, `cloudflare-workers`, `ed25519`.
+- **Public mirror cosmetics.** Give each mirror the same description — *"Public mirror of the private NAS release authority — a portable organizational authority subsystem"*. On GitHub, disable **Issues**, **Wiki**, and **Discussions** (PRs can't be disabled) and add topics — `authorization`, `access-control`, `rbac`, `permissions`, `typescript`, `cloudflare-workers`, `ed25519`.

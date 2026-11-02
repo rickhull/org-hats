@@ -226,11 +226,11 @@ machinery.
   but not yet tagged. Downstream, a *released version* is a published
   artifact awaiting its deployer; the two words name different things.
 - **Tag** — the release act that names the revision: annotated and
-  version-matched. Publication pushes it to the canonical host and the
-  mirror; upstream ends at the published release.
+  version-matched. Publication pushes it to the canonical forge and the
+  public mirrors; upstream ends at the published release.
 - **Publish** (verb) — make a release artifact available to its
   subscriber; producer-side for every producer. org-hats publishes to the
-  forge and the mirror, whose audience happens to be the public;
+  canonical forge and public mirrors, whose audience happens to be the public;
   Quartermaster publishes to its own Cloudflare runtime. Publish is not
   "make public" — the subscriber, not the world, defines it — and it is
   never deploy-side.

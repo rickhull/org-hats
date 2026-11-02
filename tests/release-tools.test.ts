@@ -1,8 +1,8 @@
 // The release-metadata guard against throwaway repositories. This covers the
 // failure we actually hit — a release tag on the commit before the version
 // bump — and the Cloudflare tag family the guard did not previously know.
-// The release script's publication posture is covered here too: it pushes by
-// default, attempts every push, and exits nonzero when any of them fails.
+// The release script's publication posture is covered here too: it publishes
+// to the NAS authority first, then catches up both best-effort public mirrors.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -180,7 +180,8 @@ test("a tag on the wrong commit or in the wrong family fails closed", () => {
 const releaseFixture = (): {
   root: string;
   base: string;
-  origin: string;
+  nas: string;
+  codeberg: string;
   github: string;
   env: NodeJS.ProcessEnv;
 } => {
@@ -207,11 +208,14 @@ const releaseFixture = (): {
   git(root, "add", ".");
   git(root, "commit", "-q", "-m", "release fixtures");
 
-  const origin = join(base, "origin.git");
+  const nas = join(base, "nas.git");
+  const codeberg = join(base, "codeberg.git");
   const github = join(base, "github.git");
-  git(base, "init", "-q", "--bare", origin);
+  git(base, "init", "-q", "--bare", nas);
+  git(base, "init", "-q", "--bare", codeberg);
   git(base, "init", "-q", "--bare", github);
-  git(root, "remote", "add", "origin", origin);
+  git(root, "remote", "add", "nas", nas);
+  git(root, "remote", "add", "codeberg", codeberg);
   git(root, "remote", "add", "github", github);
 
   // The release runs `pnpm build` without the gates; the fixture supplies a
@@ -220,7 +224,7 @@ const releaseFixture = (): {
   mkdirSync(path);
   writeFileSync(join(path, "pnpm"), "#!/usr/bin/env sh\nexit 0\n", { mode: 0o755 });
   const env = { ...testEnv, PATH: `${path}:${process.env["PATH"] ?? ""}` };
-  return { root, base, origin, github, env };
+  return { root, base, nas, codeberg, github, env };
 };
 
 const release = (fixture: ReturnType<typeof releaseFixture>, ...args: string[]) =>
@@ -233,17 +237,21 @@ const release = (fixture: ReturnType<typeof releaseFixture>, ...args: string[]) 
 const tagCommit = (base: string, bare: string, tag: string): string =>
   git(base, "-C", bare, "rev-parse", "--verify", `refs/tags/${tag}^{}`).trim();
 
-test("the release publishes to both hosts by default", () => {
+test("the release publishes to NAS and both public mirrors by default", () => {
   const fixture = releaseFixture();
   try {
     const result = release(fixture, "patch", "--no-verify");
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout ?? "", /published branch and v1\.2\.4 to origin and github/);
+    assert.match(result.stdout ?? "", /published branch and v1\.2\.4 to nas/);
+    assert.match(result.stdout ?? "", /mirror codeberg is current/);
+    assert.match(result.stdout ?? "", /mirror github is current/);
 
     const head = git(fixture.root, "rev-parse", "HEAD").trim();
-    assert.equal(git(fixture.base, "-C", fixture.origin, "rev-parse", "refs/heads/main").trim(), head);
+    assert.equal(git(fixture.base, "-C", fixture.nas, "rev-parse", "refs/heads/main").trim(), head);
+    assert.equal(git(fixture.base, "-C", fixture.codeberg, "rev-parse", "refs/heads/main").trim(), head);
     assert.equal(git(fixture.base, "-C", fixture.github, "rev-parse", "refs/heads/main").trim(), head);
-    assert.equal(tagCommit(fixture.base, fixture.origin, "v1.2.4"), head);
+    assert.equal(tagCommit(fixture.base, fixture.nas, "v1.2.4"), head);
+    assert.equal(tagCommit(fixture.base, fixture.codeberg, "v1.2.4"), head);
     assert.equal(tagCommit(fixture.base, fixture.github, "v1.2.4"), head);
   } finally {
     rmSync(fixture.base, { recursive: true, force: true });
@@ -261,30 +269,85 @@ test("--no-push keeps the tag local and prints the publication commands", () => 
     assert.equal(git(fixture.root, "rev-parse", "--verify", "refs/tags/v1.2.4^{}").trim(), head);
     const remoteTag = spawnSync(
       "git",
-      ["-C", fixture.origin, "rev-parse", "--verify", "refs/tags/v1.2.4"],
+      ["-C", fixture.nas, "rev-parse", "--verify", "refs/tags/v1.2.4"],
       { encoding: "utf8", env: testEnv },
     );
-    assert.notEqual(remoteTag.status, 0, "the origin must not receive a --no-push release");
+    assert.notEqual(remoteTag.status, 0, "NAS must not receive a --no-push release");
   } finally {
     rmSync(fixture.base, { recursive: true, force: true });
   }
 });
 
-test("a failed push is reported per push, continues best-effort, and exits nonzero", () => {
+test("a failed Codeberg mirror catches up on the next release without failing either release", () => {
   const fixture = releaseFixture();
   try {
-    git(fixture.root, "remote", "set-url", "origin", join(fixture.base, "missing.git"));
-    const result = release(fixture, "patch", "--no-verify");
-    assert.notEqual(result.status, 0, "a failed push must not report a successful release");
-    assert.match(result.stderr ?? "", /branch push to origin failed/);
-    assert.match(result.stderr ?? "", /tag push to origin failed/);
-    assert.match(result.stderr ?? "", /publication incomplete/);
+    git(fixture.root, "remote", "set-url", "codeberg", join(fixture.base, "missing.git"));
+    const first = release(fixture, "patch", "--no-verify");
+    assert.equal(first.status, 0, first.stderr);
+    assert.match(first.stderr ?? "", /mirror codeberg failed; it will catch up on a later release/);
 
-    // Best effort: the mirror is still attempted after origin fails, and the
-    // local release survives either way.
+    const firstHead = git(fixture.root, "rev-parse", "HEAD").trim();
+    assert.equal(tagCommit(fixture.base, fixture.nas, "v1.2.4"), firstHead);
+    assert.equal(tagCommit(fixture.base, fixture.github, "v1.2.4"), firstHead);
+
+    git(fixture.root, "remote", "set-url", "codeberg", fixture.codeberg);
+    const second = release(fixture, "patch", "--no-verify");
+    assert.equal(second.status, 0, second.stderr);
+    const secondHead = git(fixture.root, "rev-parse", "HEAD").trim();
+    assert.equal(tagCommit(fixture.base, fixture.codeberg, "v1.2.4"), firstHead);
+    assert.equal(tagCommit(fixture.base, fixture.codeberg, "v1.2.5"), secondHead);
+  } finally {
+    rmSync(fixture.base, { recursive: true, force: true });
+  }
+});
+
+test("a failed GitHub mirror is non-fatal", () => {
+  const fixture = releaseFixture();
+  try {
+    git(fixture.root, "remote", "set-url", "github", join(fixture.base, "missing.git"));
+    const result = release(fixture, "patch", "--no-verify");
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr ?? "", /mirror github failed; it will catch up on a later release/);
     const head = git(fixture.root, "rev-parse", "HEAD").trim();
-    assert.equal(tagCommit(fixture.base, fixture.github, "v1.2.4"), head);
+    assert.equal(tagCommit(fixture.base, fixture.nas, "v1.2.4"), head);
+    assert.equal(tagCommit(fixture.base, fixture.codeberg, "v1.2.4"), head);
+  } finally {
+    rmSync(fixture.base, { recursive: true, force: true });
+  }
+});
+
+test("a failed NAS publication leaves the local release intact and does not advance mirrors", () => {
+  const fixture = releaseFixture();
+  try {
+    git(fixture.root, "remote", "set-url", "nas", join(fixture.base, "missing.git"));
+    const result = release(fixture, "patch", "--no-verify");
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr ?? "", /publication to nas failed/);
+    const head = git(fixture.root, "rev-parse", "HEAD").trim();
     assert.equal(git(fixture.root, "rev-parse", "--verify", "refs/tags/v1.2.4^{}").trim(), head);
+    for (const remote of [fixture.codeberg, fixture.github]) {
+      const remoteTag = spawnSync(
+        "git",
+        ["-C", remote, "rev-parse", "--verify", "refs/tags/v1.2.4"],
+        { encoding: "utf8", env: testEnv },
+      );
+      assert.notEqual(remoteTag.status, 0, "mirrors must not advance past NAS");
+    }
+  } finally {
+    rmSync(fixture.base, { recursive: true, force: true });
+  }
+});
+
+test("a missing NAS remote fails before changing the repository", () => {
+  const fixture = releaseFixture();
+  try {
+    git(fixture.root, "remote", "remove", "nas");
+    const before = git(fixture.root, "rev-parse", "HEAD").trim();
+    const result = release(fixture, "patch", "--no-verify");
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr ?? "", /required nas remote is not configured/);
+    assert.equal(git(fixture.root, "rev-parse", "HEAD").trim(), before);
+    assert.equal(JSON.parse(readFileSync(join(fixture.root, "package.json"), "utf8")).version, "1.2.3");
   } finally {
     rmSync(fixture.base, { recursive: true, force: true });
   }

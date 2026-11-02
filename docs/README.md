@@ -68,7 +68,7 @@ public `org-hats` docs are normative for the seam.
 - [`migration-v3.md`](migration-v3.md) — the 2.x → 3.0 break: interface
   version 3, the `action-not-carried` reason, and `teamReach()`; envelope
   format 1 keeps reading.
-- [`publishing.md`](publishing.md) — canonical host, mirror, CI, the
+- [`publishing.md`](publishing.md) — canonical forge, public mirrors, CI, the
   release ritual, and why deployment is the consuming host's act.
 - [`forgejo_actions.md`](forgejo_actions.md) — the Codeberg-hosted Forgejo
   Actions witness: the runner environment and its real tool inventory, the
