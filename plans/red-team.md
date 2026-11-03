@@ -406,6 +406,65 @@ The four carried gaps are closed (above). Since then:
   inline and serially; revisit only if a phase appears whose evidence does not
   need the harness.
 
+## Phase 4 — source to consumer pin
+
+Mostly a confirmation phase: the attack list was already witnessed, and the
+reading found the witnesses rather than assuming them.
+
+**Already covered, with names.** Tag-family selection (`[P6]` in
+`tests/release-tools.test.ts`); a tag on the wrong commit or in the wrong
+family failing closed; a lightweight tag refused; manifest disagreement
+through the `set-version` cases; all four mirror-failure modes (Codeberg
+fails and catches up, GitHub non-fatal, a failed NAS publication leaving the
+local release intact and not advancing mirrors, a missing NAS remote failing
+before anything changes); dirty-checkout behaviour, strict in CI and a warning
+locally (`tests/ci-run.test.ts`); CI credential scrubbing; and the clean build
+reproducing tracked `dist/`, which `bin/check-dist` asserted repeatedly during
+this campaign — every `src/` change this session was caught as stale until
+rebuilt. `bin/release` additionally refuses an existing tag and a dirty tree
+before it changes anything.
+
+**The dependency posture is the strongest part, and worth stating plainly.**
+Neither published package carries third-party runtime code: the root's
+`dependencies` are empty and the Cloudflare package's sole dependency is the
+workspace sibling. The whole lockfile is build and test tooling that never
+ships, so reachability of a third-party advisory into a consumer's runtime is
+zero by construction rather than by review. Install scripts are deny-by-default
+through an explicit `allowBuilds` allowlist — `esbuild` and `workerd` admitted
+with a written reason, `sharp` explicitly refused. CI installs
+`--frozen-lockfile`, pins pnpm to `11.21.0`, and pins the one downloaded binary
+by version *and* SHA-256.
+
+**Findings, both low and both procedural rather than exploitable.**
+
+- *Workflow actions are pinned by mutable tag* (`actions/checkout@v5`,
+  `pnpm/action-setup@v4`, `actions/setup-node@v5`) rather than by commit. The
+  blast radius is small and should be stated rather than inflated: the
+  workflow declares `permissions: contents: read`, references no secrets, and
+  CI is not the release authority — `bin/release` runs the gates locally and
+  publishes from there, and the mirror workflow is manual-dispatch only. So a
+  compromised action could tamper with an advisory signal, not with what
+  ships. SHA pinning is still the cheap improvement.
+- *Nothing in the artifact records that a release passed its gate.*
+  `bin/verify`'s marker is deliberately local — its own comment says "never a
+  release" — and lives in `.git/`, so it is not published. `bin/release
+  --no-verify` therefore produces a release indistinguishable from a verified
+  one. This is the same family as unsigned tags: release assurance here is
+  policy, not evidence. It belongs with
+  [`assurance.md`](assurance.md) Decision 4 rather than as a separate
+  decision.
+
+**Deliberately not recommended:** adding a `packageManager` field. It is the
+standard advice, and it is wrong here — `packageManager` is what corepack
+reads, and `AGENTS.md` forbids installing pnpm through corepack. The flake
+pins pnpm locally and the workflow pins it in CI; a `packageManager` field
+would be inert at best and an invitation to the forbidden path at worst.
+
+**Still owed:** `pnpm audit`. It needs network access, which the campaign's
+rules of engagement require Rick to authorize explicitly. Until then the
+advisory question is open — though reachability above bounds what any advisory
+can mean for a consumer.
+
 ## Carried decision — cap the outbox drain per invocation
 
 From the amplification review ([`docs/performance.md`](../docs/performance.md)

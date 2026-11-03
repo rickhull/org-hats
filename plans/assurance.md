@@ -121,11 +121,20 @@ attestation, and no reproducible-build claim. "Pin a commit" is sound and is
 what the threat model already says; it is weaker than a signature when an
 assessor asks how upstream artifacts are authenticated.
 
+The red-team campaign's Phase 4 added a second item of the same shape: nothing
+in a release records that it passed its gate. `bin/verify`'s marker is local
+by design and never published, so a `--no-verify` release is
+indistinguishable from a verified one. Both questions are "what can a
+consumer verify about an artifact without trusting us", and both are answered
+by the same mechanism if one is built.
+
 **Decision needed:** whether release signing is worth its key-custody cost,
 given that the NAS forge is the release authority and the mirrors are
-best-effort. **Done when:** either annotated tags are signed with a documented
-key and verification step, or `docs/assurance.md` records the deliberate choice
-and the commit-pinning alternative.
+best-effort — and if it is built, whether the signed object also attests that
+the gate passed. **Done when:** either annotated tags are signed with a
+documented key and verification step, covering both claims, or
+`docs/assurance.md` records the deliberate choice and the commit-pinning
+alternative.
 
 ## Not in scope here
 

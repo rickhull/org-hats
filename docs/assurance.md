@@ -38,6 +38,8 @@ artifact that evidences each.
 | How are vulnerabilities reported and fixed? | [`../SECURITY.md`](../SECURITY.md): private intake, acknowledgement and triage targets, coordinated disclosure, supported release lines. |
 | What is shipped, and from where? | Immutable tags, tracked `dist/`, `bin/check-version`, and a documented release path with no registry publication. |
 | What does it depend on? | The portable source has no runtime dependencies and compiles with `types: []`; the fence is enforced by `bin/check` (`P1`). |
+| What third-party code reaches our runtime? | None. The root declares no dependencies and the Cloudflare package's sole dependency is the workspace sibling; the entire lockfile is build and test tooling that never ships. Reachability of a third-party advisory into a deployment is zero by construction. |
+| Are install scripts controlled? | Deny-by-default: `pnpm-workspace.yaml` carries an explicit `allowBuilds` allowlist with a written reason per entry (`esbuild` and `workerd` admitted, `sharp` refused). CI installs `--frozen-lockfile` with pnpm pinned exactly. |
 
 The invariant-and-witness structure is the unusual part, and it is the one an
 assessor can use most directly: a control statement with a named test behind
@@ -105,6 +107,16 @@ name. There is no signed tag, no provenance attestation, and no reproducible
 build claim. A consumer who needs an immutable commitment pins a commit; an
 assessor asking how upstream artifacts are authenticated gets "we pin a
 commit", which is sound but weaker than a signature.
+
+**Nothing in a release records that it passed its gate.** `bin/verify` writes
+a marker, but deliberately as local convenience — its own comment says "never
+a release" — and it lives in `.git/`, so it is never published. A release cut
+with `bin/release --no-verify` is therefore indistinguishable from a verified
+one, and the honest answer to "how do you know what shipped was tested" is the
+repository's policy plus the branch's CI run, not a property of the artifact.
+Mirror CI is manual-dispatch only, so it is not that evidence either. This is
+the same gap as the unsigned tag and has the same fix shape, which is why it
+sits under the release-signing decision rather than beside it.
 
 ## How to read this
 
