@@ -465,6 +465,48 @@ rules of engagement require Rick to authorize explicitly. Until then the
 advisory question is open — though reachability above bounds what any advisory
 can mean for a consumer.
 
+## Phase 5 — compromise tabletop
+
+Nine scenarios walked as text; nothing executed against a deployment. The
+runbook was in good shape — it already states in three places that a
+signing-key rotation does not revoke refresh handles, which is the exit
+criterion the plan names explicitly, and no step relied on a credential the
+scenario had already assumed compromised.
+
+Three gaps, all now closed in [`key_compromise.md`](../docs/key_compromise.md).
+
+- **The ops token's parallel case was missing, and it is the sharpest
+  finding.** The runbook was careful that key rotation is not refresh
+  revocation, but never said that rotating `OPS_TOKEN` does not undo what the
+  token wrote. It does not: bootstrap inserts organization administrators and
+  never removes them, and inserts principal links for `(provider, subject)`
+  pairs that do not yet exist — a conflicting re-point is refused, but a fresh
+  subject bound to an administrator's actor is not. The holder can then
+  authenticate through the real provider, as an administrator, with no token
+  at all, and no ops route retires an administrator. Containment is a hunt
+  (`unlink-principal`, `revoke-activation`, `retire-administrator` under a
+  surviving administrator's fresh evidence, restore as the hammer), not only a
+  rotation. Generalised into a first principle, since the class is what
+  matters: *rotation contains future use, not past effects.*
+- **Malicious restore had no scenario**, only a passing mention as a remedy
+  for something else — one of the nine the plan names. It has a section now,
+  and the audit row this campaign added is its detection evidence: written
+  after the tables so the snapshot cannot overwrite the trace of the act that
+  applied it. The section states what a snapshot can assert (its own columns),
+  what is bounded (outbox replay, recognised by row id), and what it cannot
+  assert at all (an actor's standing, since the projection is not exportable).
+- **Two scenarios had no verification step**, against the plan's exit
+  criterion that every asset has one: the ops token now verifies that the old
+  token is refused and the new accepted on a route that changes nothing, and
+  the envelope/refresh section states the honest limit — an envelope cannot be
+  revoked, so verification is confirming the window you are accepting and when
+  it closes.
+
+Detection throughout now points at `GET /ops/audit` rather than a full export,
+with the caveat that attribution is a claim: a token holder can send any
+operator identity, so the facts are evidence and the actor column is a hint.
+That is the same honesty `docs/assurance.md` carries about attribution.
+
 ## Carried decision — cap the outbox drain per invocation
 
 From the amplification review ([`docs/performance.md`](../docs/performance.md)

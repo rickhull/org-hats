@@ -12,6 +12,13 @@ or bearer credentials. The design assumptions and residual risk are in
   last possible envelope expires. A compromised signing key is different:
   the old key can mint valid authority, so containment means removing it from
   verifiers, accepting that live sessions become invalid.
+- **Rotation contains future use, not past effects.** Replacing a credential
+  stops the holder using it again; it does not undo what they already did.
+  This runbook says in three places that a signing-key rotation does not
+  revoke refresh handles, and the same applies to the ops token: rotating it
+  does not remove an administrator it appointed or a principal link it bound.
+  For every compromised credential, ask separately what it could *write* and
+  contain that through the authority that owns it.
 - **Never print or relay secret material.** Compare key ids and public keys,
   not private keys. Notes, issues, and logs are assumed publishable.
 - **Tags are immutable.** A fix ships as a new tag. Do not move or delete a
@@ -26,10 +33,11 @@ or bearer credentials. The design assumptions and residual risk are in
 | --- | --- | --- |
 | Signing private key exposed | Generate replacement pair; distribute new public key; switch signer; remove old verification key | The normal envelope-lifetime overlap |
 | Unknown key in `AUTHORITY_VERIFICATION_KEYS` | Remove it; determine who could alter deployment configuration; consider full host compromise | A rotation window |
-| `OPS_TOKEN` exposed | Rotate the host secret and redeploy; review state; rotate sealed IdP secret if it could be read | A release |
+| `OPS_TOKEN` exposed | Rotate the host secret and redeploy; hunt the writes it could leave behind — links, administrators, sealed config, activations; rotate the sealed IdP secret if it could be read | A release |
 | Sealed IdP client secret exposed | Rotate at the provider; install new sealed config; destroy old exports/backups | Rebuilding authority state |
 | Envelope or refresh handle leaked | Invalidate the host session; revoke the affected refresh authority through the owning command | A signing-key rotation |
 | Activation secret exposed | Revoke the request through `/ops/organization/revoke-activation` and issue a fresh activation | The actor re-requesting |
+| Unexpected restore | Rotate `OPS_TOKEN`; read `GET /ops/audit` for the restore row; restore a known-good snapshot; re-check links and administrators first | A root-cause finding |
 | Deployment has no signing config | Treat as a deployment defect: ephemeral per-isolate keys; stop rollout and configure the signing trio | The next release |
 
 ## Signing-key compromise
@@ -117,10 +125,40 @@ tenant token and has no per-route scopes.
    outbox is part of what you are trusting.
 4. **Rotate the sealed IdP client secret** if the token could read it. An
    export contains the sealed configuration.
-5. **Check the release surface.** Confirm the deployed commit and tag, and
+5. **Hunt the writes the token could leave behind.** Rotation stops further
+   use; it does not undo these, and each outlives the token:
+   - **a principal link bound to an existing actor.** Bootstrap inserts links
+     for `(provider, subject)` pairs that do not yet exist — a conflicting
+     re-point is refused, but a *fresh* subject bound to an administrator's
+     actor is not. The holder can then authenticate through the real provider
+     as that subject, with no token at all. Contain with
+     `/ops/organization/unlink-principal` for the affected actor; compare
+     `GET /ops/organization/principal-links` against the roster you expect.
+   - **an administrator appointed.** Bootstrap adds organization
+     administrators and never removes them, so an added administrator stays
+     after rotation. There is no ops route that retires one: use the
+     `retire-administrator` command under a surviving administrator's fresh
+     evidence, or restore.
+   - **a replaced sealed provider configuration**, which redirects
+     authentication itself — see the sealed-configuration section, and treat
+     it as the most urgent of these.
+   - **issued activations**, each a live bearer secret until revoked or
+     expired. Revoke with `/ops/organization/revoke-activation`.
+   - **restored state**, which is the heavy hammer and leaves its own audit
+     row; see the malicious-restore section.
+6. **Read the audit trail.** `GET /ops/audit?coordinator=…&id=…` returns
+   `{ seq, at, actor, fact }` and nothing else, so it is the tool for this
+   review rather than a full export: it carries no sealed configuration to
+   protect while you read it. Attribution is only as good as the operator
+   identity callers were sending, and a holder of the token can claim any
+   identity, so read the facts and treat the actor column as a hint.
+7. **Check the release surface.** Confirm the deployed commit and tag, and
    that `dist/` matches the tag. An ops compromise does not by itself expose
    the signing private key, but it may expose every state fact the operator
    can read.
+8. **Verify the rotation took effect.** A request carrying the old token must
+   be refused, and one carrying the new token accepted, on a route that
+   changes nothing — `GET /ops/schema-status` or `GET /ops/audit`.
 
 ## Sealed identity-provider configuration
 
@@ -152,6 +190,56 @@ live organization read and revocation state.
    handles.
 4. Record the affected actor and operation; do not put the envelope or handle
    itself in the incident note.
+5. **Verify.** The handle is refused on a second use, and a context call with
+   the exposed envelope is refused once the owning command has landed — or, if
+   the envelope is merely unexpired, confirm the window you are accepting and
+   when it closes. An envelope cannot be revoked; only its lifetime and the
+   state behind it bound the exposure.
+
+## Malicious or unexpected restore
+
+A restore replaces every table in a coordinator with the snapshot's rows. It
+is authenticated by `OPS_TOKEN` and atomic, so an unexpected one means either
+that token or an operator process is compromised; classify it with the
+ops-token section as well as here.
+
+**Detection.** A restore writes one audit row recording itself, and it is
+written after the tables are replaced, so the snapshot cannot overwrite the
+trace of the act that applied it. `GET /ops/audit` shows it as
+`state restored from a snapshot of schema <n>`, attributed to the operator
+identity the caller claimed. That row is the one entry a snapshot cannot
+supply; its absence where you expected a restore, or its presence where you
+did not, is the signal.
+
+**What a snapshot can and cannot assert.** This bounds the response:
+
+- it **can** reinstate every column the coordinator owns, including
+  refresh-record `revoked` and `superseded` flags and team status, as stated —
+  a snapshot's facts are trusted, only its structure is validated;
+- its undelivered outbox rows **are** re-delivered on the next drain, but not
+  applied twice: the message id is the outbox row id, which survives the
+  restore, so the receiving coordinator recognises the replay;
+- it **cannot** assert an actor's standing. The operation's roster projection
+  is deliberately absent from the export and is rebuilt by pulling, so a
+  disabled actor stays refused however the snapshot's own rows read.
+
+**Containment.**
+
+1. Rotate `OPS_TOKEN` first and follow the ops-token section — the restore is
+   evidence of that credential's misuse, not a separate incident.
+2. Restore a known-good snapshot of your own. Prefer this to repairing rows:
+   the restore path is typed and atomic, and direct storage edits bypass every
+   control the rest of this runbook relies on.
+3. Re-check the facts a snapshot is trusted to state, in this order:
+   principal links, administrators, grants and participations, then refresh
+   records. The first two are persistence; the rest are reach.
+4. Expect the next drain to re-deliver the snapshot's undelivered outbox rows.
+   That is normal and bounded, but read the audit trail on the receiving
+   coordinator rather than assuming nothing arrived.
+
+**Verify.** A fresh export matches the snapshot you intended, apart from the
+audit row recording your own restore; issuance, refresh, and context work for
+a known actor; and a disabled actor is still refused.
 
 ## Development signer check
 
