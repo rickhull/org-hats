@@ -130,8 +130,8 @@ describe("the ops surface is a closed allowlist over the coordinators", () => {
   // exactly the property a future route addition breaks silently, so it is
   // worth a test rather than a reading.
   // Coordinator paths with no ops route. `/principal-links`, `/bootstrap`,
-  // `/activation-request`, `/routing-facts`, and the status/export pair are
-  // deliberately exposed and are not listed here.
+  // `/activation-request`, `/routing-facts`, `/audit`, and the status/export
+  // pair are deliberately exposed and are not listed here.
   const internalOnly = [
     "/idp-config",
     "/resolve",
@@ -163,6 +163,32 @@ describe("the ops surface is a closed allowlist over the coordinators", () => {
         expect(await posted.text(), `POST ${prefix}${path}`).not.toContain("sealed:");
       }
     }
+  });
+
+  it("produces the audit trail without the sealed configuration beside it", async () => {
+    // An operator under assessment has to hand over audit rows. Before this
+    // route the only path was `/ops/export`, which carries the provider
+    // client secret in the same response.
+    const organizationId = "org-ops-audit";
+    expect((await jsonPost("/ops/organization/bootstrap", {
+      ...orgBootstrap(organizationId),
+      principalLinks: [],
+    })).status).toBe(200);
+
+    const response = await ops(`/ops/audit?coordinator=organization&id=${organizationId}`);
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(text).not.toContain("sealed:ops-test");
+    const body = JSON.parse(text) as Envelope<readonly { seq: number; at: number; actor: string; fact: string }[]>;
+    expect(body.ok).toBe(true);
+    const rows = body.value ?? [];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(Object.keys(rows[0] ?? {}).sort()).toEqual(["actor", "at", "fact", "seq"]);
+    expect(rows.some((row) => row.fact.includes("bootstrapped"))).toBe(true);
+
+    // and it is gated like every other ops route
+    const denied = await SELF.fetch(`https://authority.internal/ops/audit?coordinator=organization&id=${organizationId}`);
+    expect(denied.status).toBe(401);
   });
 
   it("never returns the sealed provider configuration from a relayed ops route", async () => {

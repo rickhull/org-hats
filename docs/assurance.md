@@ -1,0 +1,110 @@
+# Assurance and audit evidence
+
+*What an operator being assessed against SOC 2 or TISAX can get from
+`org-hats`, what they still own, and where this library makes their evidence
+harder than it needs to be. The [threat model](threat_model.md) is about
+attackers; this is about assessors.*
+
+`org-hats` is a library. SOC 2 and TISAX assess an **organization and its
+environment** — people, policies, physical sites, suppliers, change
+management, monitoring — and no library is in scope for either. There is no
+"SOC 2 compliant" version of this repository, and a claim to the contrary
+would be false on its face.
+
+What a library can be is **friendly**: when the operator's assessor asks for
+evidence about the authority layer, the answer should already exist, be
+exportable without collateral disclosure, and attribute actions to someone.
+That is the standard this document holds the repository to.
+
+## What this repository supplies
+
+These are design properties an operator can point an assessor at, with the
+artifact that evidences each.
+
+| What an assessor asks | What exists here |
+| --- | --- |
+| How is access decided, and is it deterministic? | The authority engine computes claims once; verifiers compare ids and never recompute policy ([`authority_redesign.md`](authority_redesign.md), `A5`). |
+| Is the behaviour specified, or emergent? | Named invariants in [`../specs/`](../specs/), each with `Held by`, `If it breaks`, and a test-side witness. An invariant without a witness fails the suite. |
+| How are authorization changes made? | Typed commands with a declared owner, scope, standing, and mode ([`commands.md`](commands.md)). |
+| Is privileged action recorded? | Audit rows `(seq, at, actor, fact)` on both coordinators, written in the same transaction as the mutation. |
+| Can the audit trail be produced on its own? | `GET /ops/audit?coordinator=…&id=…` returns those rows and nothing else — secret-free by construction, unlike `/ops/export` ([`cloudflare.md`](cloudflare.md)). |
+| Are retries safe? | Idempotency claims commit with their mutation; a reused key with a different payload is named misuse (`A8`). |
+| Is access revoked promptly? | Disable, unlink, participation, team, and grant changes revoke refresh records; an issued envelope stands only to its expiry ([`consumer-session.md`](consumer-session.md), `A7`, `A13`). |
+| Are secrets stored? | Activation secrets are stored as digests only; refresh handles are hashed at rest ([`activation.md`](activation.md), `A16`). |
+| Who owns which control? | The threat model names the library, host, operator, and consumer per row, and the non-goals are explicit. |
+| How is a key compromise handled? | [`key_compromise.md`](key_compromise.md): detection, containment, the owning authority, and verification per asset. |
+| How are vulnerabilities reported and fixed? | [`../SECURITY.md`](../SECURITY.md): private intake, acknowledgement and triage targets, coordinated disclosure, supported release lines. |
+| What is shipped, and from where? | Immutable tags, tracked `dist/`, `bin/check-version`, and a documented release path with no registry publication. |
+| What does it depend on? | The portable source has no runtime dependencies and compiles with `types: []`; the fence is enforced by `bin/check` (`P1`). |
+
+The invariant-and-witness structure is the unusual part, and it is the one an
+assessor can use most directly: a control statement with a named test behind
+it is the shape both regimes ask for and most codebases cannot produce.
+
+## What the operator owns regardless
+
+Neither regime lets a library discharge these, and the threat model's
+assumptions already say so. Listed here because an assessor will ask and the
+answer is "the operator", not "upstream":
+
+- identity provision, authentication strength, and session UX;
+- custody of `OPS_TOKEN`, signing secrets, and the provider client secret;
+- who may reach the ops surface and the Durable Object bindings;
+- transport security, cookie attributes, CSRF defences, and step-up policy;
+- rate limiting and volumetric availability;
+- log shipping, retention, alerting, and monitoring;
+- backup schedule, restore drills, and recovery objectives;
+- personnel, physical, and supplier controls;
+- the product response to every closed failure kind.
+
+TISAX adds prototype protection and a data-protection module, and SOC 2 adds
+the Privacy criteria when in scope; both land on the operator's deployment,
+not on this library. What this library owes them is not getting in the way.
+
+## Where this repository makes evidence harder
+
+Recorded as facts, not promises. Each is a friction an operator will meet, and
+the owner of the fix.
+
+**Privileged actions are attributed to "operator", not to a person.** Every
+ops-token action records the literal actor `"operator"`. The token is
+all-or-nothing by design, so there is no per-operator identity to record and
+no separation of duties within the surface. An assessor asking "which
+administrator ran this restore?" gets no answer from the audit rows. Both
+regimes ask for individual accountability on privileged access; today the
+operator must answer it from their own transport logs, outside `org-hats`.
+
+**The audit log is not tamper-evident.** This is an explicit non-goal, and it
+is the right call for a library that does not own storage — but it is a stated
+gap rather than an absent one. Audit rows are ordinary rows: an authorized
+restore or direct storage access can rewrite them, and nothing detects it.
+Operators needing log integrity must ship rows to an append-only store they
+control, and should expect an assessor to test that path rather than this one.
+
+**Audit rows and idempotency claims are retained indefinitely.** There is no
+pruning, no retention policy, and no documented growth expectation. A
+long-lived operation accumulates one claim row per successful command and one
+audit row per privileged act, forever. Retention is a question both regimes
+ask directly, and the honest current answer is "unbounded, and the operator
+owns the policy."
+
+**There is no erasure path for personal data.** Actors can be created,
+updated, disabled, and retired as administrators, but never deleted, and actor
+display names are personal data. Audit facts also embed actor ids. An operator
+facing a GDPR erasure request, or TISAX's data-protection module, cannot
+satisfy it through the authority surface today; the deployment must act on
+storage directly, which is exactly the path that bypasses every control above.
+
+**Release integrity rests on policy, not cryptography.** Tags are immutable by
+repository rule and `bin/check-version` checks agreement, but a git tag is a
+name. There is no signed tag, no provenance attestation, and no reproducible
+build claim. A consumer who needs an immutable commitment pins a commit; an
+assessor asking how upstream artifacts are authenticated gets "we pin a
+commit", which is sound but weaker than a signature.
+
+## How to read this
+
+An operator should treat the first table as evidence they may cite, the second
+section as their own control scope, and the third as known findings to disclose
+rather than discover mid-assessment. Nothing here is a certification, a
+readiness assertion, or advice from an assessor.

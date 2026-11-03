@@ -51,6 +51,9 @@ public `org-hats` docs are normative for the seam.
 - [`key_compromise.md`](key_compromise.md) — the operator runbook for signing
   keys, verification trust, the ops token, sealed IdP configuration, and
   bearer credentials.
+- [`assurance.md`](assurance.md) — what an operator assessed against SOC 2 or
+  TISAX can evidence from this library, what stays theirs, and where the
+  repository makes their evidence harder than it needs to be.
 - [`binding-conformance.md`](binding-conformance.md) — the documented
   service-binding smoke subset, what it does not claim, and the one home
   for live-deployment facts.

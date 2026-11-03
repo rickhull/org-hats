@@ -342,6 +342,16 @@ export default {
           if (typeof body.operationId !== "string") throw new Error("operationId is required");
           return relay(env.OPERATION.get(env.OPERATION.idFromName(body.operationId)), "/routing-facts", body);
         }
+        // The audit trail on its own. `/ops/export` also carries these rows,
+        // but it carries `sealed_idp_config` with them, so producing an audit
+        // trail for an assessor meant disclosing the provider client secret
+        // alongside it. `auditRows()` selects `seq, at, actor, fact` and
+        // nothing else, so this route is secret-free by construction.
+        if (request.method === "GET" && url.pathname === "/ops/audit") {
+          const stub = coordinator(env, url.searchParams.get("coordinator"), url.searchParams.get("id") ?? "");
+          if (stub === undefined) throw new Error("coordinator must be organization or operation, with an id");
+          return relay(stub, "/audit");
+        }
         if (request.method === "GET" && url.pathname === "/ops/schema-status") {
           const stub = coordinator(env, url.searchParams.get("coordinator"), url.searchParams.get("id") ?? "");
           if (stub === undefined) throw new Error("coordinator must be organization or operation, with an id");

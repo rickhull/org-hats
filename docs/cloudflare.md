@@ -246,9 +246,17 @@ public key distribution:
 - `GET /ops/schema-status?coordinator=organization|operation&id=…` —
   includes the operation's roster-projection counts and freshness, plus
   `operationSlug`, `sitesWithPath`, and `routingFactsComplete`
-- `GET /ops/export?coordinator=…&id=…` — canonical JSON
+- `GET /ops/audit?coordinator=…&id=…` — the coordinator's audit rows,
+  `{ seq, at, actor, fact }` and nothing else. Secret-free by construction,
+  so an operator can produce an audit trail without the sealed provider
+  configuration that `/ops/export` carries alongside it; see
+  [`assurance.md`](assurance.md)
+- `GET /ops/export?coordinator=…&id=…` — canonical JSON. Carries every
+  table, `sealed_idp_config` included; prefer `/ops/audit` when the audit
+  trail is what is wanted
 - `POST /ops/restore` — `{ coordinator, id, snapshot }`, typed and atomic;
-  a snapshot's undelivered outbox rows are re-delivered by the next drain
+  a snapshot's undelivered outbox rows are re-delivered by the next drain,
+  and the receiving intake recognises the replay by the outbox row id
 - `GET /ops/verification-keys` — **public**, no token:
   `{ signingKeyId, keySet }` where `keySet` is the serialized
   `VerifyKeySet`
