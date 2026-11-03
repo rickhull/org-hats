@@ -40,7 +40,7 @@ artifact that evidences each.
 | What does it depend on? | The portable source has no runtime dependencies and compiles with `types: []`; the fence is enforced by `bin/check` (`P1`). |
 | What third-party code reaches our runtime? | None. The root declares no dependencies and the Cloudflare package's sole dependency is the workspace sibling; the entire lockfile is build and test tooling that never ships. Reachability of a third-party advisory into a deployment is zero by construction. |
 | Are install scripts controlled? | Deny-by-default: `pnpm-workspace.yaml` carries an explicit `allowBuilds` allowlist with a written reason per entry (`esbuild` and `workerd` admitted, `sharp` refused). CI installs `--frozen-lockfile` with pnpm pinned exactly. |
-| How are dependency advisories triaged? | `pnpm audit` reports against 0 production and 160 development dependencies, so an advisory is triaged by reachability first: into a consumer's runtime it is nil by construction, and into our build it is weighed against what the tool actually does. An advisory is not closed because an upgrade exists — where the fix is pinned by an upstream package, the acceptance and its re-check trigger are recorded rather than forced through an override. The standing triage is below. |
+| How are dependency advisories triaged? | `pnpm audit` reports against 0 production and 160 development dependencies, so an advisory is triaged by reachability first: into a consumer's runtime it is nil by construction, and into our build it is weighed against what the tool actually does. An advisory is not closed because an upgrade exists — where the fix is pinned by an upstream package, the acceptance and its re-check trigger are recorded rather than forced through an override. The latest audit and resolved triage are below. |
 
 The invariant-and-witness structure is the unusual part, and it is the one an
 assessor can use most directly: a control statement with a named test behind
@@ -68,31 +68,24 @@ not on this library. What this library owes them is not getting in the way.
 
 ## Standing advisory triage
 
-`pnpm audit`, 2026-11-02: five high, four moderate, no critical, across two
-modules — both development-only transitives of the Cloudflare package.
+`pnpm audit`, 2026-11-02, after the ordinary Cloudflare toolchain refresh: no
+known vulnerabilities across 0 production and 160 development dependencies.
+No override or forced remediation is present.
+
+The earlier audit that day found five high and four moderate advisories across
+two development-only transitives of the Cloudflare package:
 
 - **`undici`** (eight advisories), reached through `miniflare` from both
-  `@cloudflare/vitest-plugin` and `wrangler`.
-- **`zod`** (one high), reached through `@cloudflare/vitest-plugin`.
+  `@cloudflare/vitest-plugin` and `wrangler`, resolved by `undici` 7.30.1 in
+  `miniflare` 5.20261101.0-beta;
+- **`zod`** (one high), reached through `@cloudflare/vitest-plugin`, resolved
+  by `zod` 4.6.6 in `@cloudflare/vitest-plugin` 1.4.12.
 
-Disposition: **accepted, with a re-check trigger.**
-
-- *Consumer runtime reachability is nil.* Neither published artifact carries
-  third-party runtime code, so no advisory in this tree can reach a
-  deployment.
-- *Build and test reachability is real but not adversarial.* `undici` is
-  miniflare's HTTP client for the local test runtime and `zod` validates the
-  vitest plugin's configuration. The suites run against a local workerd with
-  no outbound network — the provider exchange is supplied in-process — and
-  CI's one download uses `curl` against a version-pinned, SHA-256-verified
-  URL rather than undici.
-- *The fix is not ours to take.* `miniflare` pins `undici` to an exact
-  version, and the vitest plugin resolves `zod` itself. A `pnpm.overrides`
-  entry would run miniflare against a dependency it never tested, to fix a
-  denial of service we cannot reach.
-- *Re-check trigger:* an ordinary dependency refresh once Cloudflare bumps
-  `miniflare` and `@cloudflare/vitest-plugin`. Both gaps are patch-level.
-  Re-run `pnpm audit` with that refresh rather than on a schedule.
+Disposition: **resolved when the recorded re-check trigger fired.** The direct
+tools move to `wrangler` 4.156.1 and `@cloudflare/vitest-plugin` 1.4.12;
+`@cloudflare/workers-types` moves with Wrangler's peer contract. Consumer
+runtime reachability remains nil: neither published artifact carries any of
+these development dependencies.
 
 ## Where this repository makes evidence harder
 
