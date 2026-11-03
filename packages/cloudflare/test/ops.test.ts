@@ -165,6 +165,40 @@ describe("the ops surface is a closed allowlist over the coordinators", () => {
     }
   });
 
+  it("an absent or wrong coordinator id reaches no other tenant's state", async () => {
+    // `coordinator()` takes `id ?? ""`, so a missing id names a real but
+    // uninitialized Durable Object rather than failing. That is bounded —
+    // the route is behind the ops token, and the ops token already permits
+    // export of any id — but the claim worth pinning is isolation by name: a
+    // typo must never return another coordinator's rows.
+    const organizationId = "org-ops-isolation";
+    expect((await jsonPost("/ops/organization/bootstrap", {
+      ...orgBootstrap(organizationId),
+      principalLinks: [],
+    })).status).toBe(200);
+    const real = await (await ops(`/ops/export?coordinator=organization&id=${organizationId}`)).json() as {
+      tables: Record<string, unknown[]>;
+    };
+    expect(real.tables["actors"]?.length).toBeGreaterThan(0);
+
+    for (const query of [
+      "coordinator=organization",
+      "coordinator=organization&id=",
+      "coordinator=organization&id=org-ops-isolation-typo",
+    ] as const) {
+      const response = await ops(`/ops/export?${query}`);
+      expect(response.status, query).toBe(200);
+      const body = await response.json() as { tables?: Record<string, unknown[]> };
+      expect(body.tables?.["actors"] ?? [], query).toEqual([]);
+      expect(body.tables?.["organization"] ?? [], query).toEqual([]);
+      expect(JSON.stringify(body), query).not.toContain("sealed:ops-test");
+      expect(JSON.stringify(body), query).not.toContain("actor-lead");
+    }
+
+    // an unrecognized coordinator name still fails closed
+    expect((await ops("/ops/export?coordinator=elsewhere&id=whatever")).status).toBe(400);
+  });
+
   it("refuses a bootstrap whose envelope lifetime is not a whole number", async () => {
     // `Number(...)` coerced this field, so the JSON literal 1e999 became
     // Infinity and bootstrap accepted it. The runtime then survived only

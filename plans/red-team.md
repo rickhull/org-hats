@@ -381,6 +381,20 @@ The four carried gaps are closed (above). Since then:
   and the retained test witnesses that combination. Route enumeration beyond
   the ops allowlist is otherwise complete: the dispatcher is a closed
   allowlist ending in a 404.
+- **Verified — coordinator races and partial cross-coordinator workflows.**
+  Already witnessed, and the witnesses were read rather than assumed: alarm
+  retry when the peer is not ready (`operation.test.ts` `[A2]`), refresh
+  refused after an unlink whose revocation has not drained
+  (`runtime.test.ts` `[A13]`), subject-guard serialization under concurrency
+  (`[A10]`), a stale projection refusing a disabled actor's fresh-evidence
+  command, an unreachable coordinator answering `unavailable`, and directory
+  ambiguity refusing rather than resolving the first organization — plus the
+  seven portable races in `tests/concurrency.test.ts`. No gap found.
+- **Verified — isolation by coordinator name.** A missing or empty `id` names
+  a real but uninitialized Durable Object rather than failing, which is
+  bounded (the route is token-gated and the token already permits exporting
+  any id). The claim worth pinning was that a typo can never return another
+  coordinator's rows, and it now has a test.
 - **Execution verdict: no pod for the rest of Phase 3.** The isolation
   question is settled rather than open. There is one `vitest.config.ts` and
   one `wrangler.jsonc`, and workerd runs with Durable Object bindings and
@@ -391,6 +405,37 @@ The four carried gaps are closed (above). Since then:
   at the cost of a per-worktree install of workerd and esbuild. Phase 3 runs
   inline and serially; revisit only if a phase appears whose evidence does not
   need the harness.
+
+## Carried decision — cap the outbox drain per invocation
+
+From the amplification review ([`docs/performance.md`](../docs/performance.md)
+§ Amplification review), which is otherwise clean: every other growth path is
+either bounded by construction or linear in something the tenant owns and
+meant to be.
+
+The drain iterates every pending message with no `LIMIT`, and the organization
+fans `roster` and `actor-disabled` out to every operation it has an invitation
+for, one coordinator subrequest each. A single invocation's subrequests are
+therefore the sum over pending messages of their target counts, against a
+platform cap. Exceeding it is a livelock, not a slowdown: the undelivered
+messages stay pending, the alarm reschedules a second later because `pending >
+0`, and the next invocation attempts the same oversized batch forever.
+
+No deployment is near it — it needs many participating operations or a large
+backlog — and it is a cliff rather than a curve, which is why it is written
+down rather than left to be discovered.
+
+The mechanism to fix it already exists: `drain` returns `{ delivered, pending }`
+and the alarm continues while anything is pending, so a bounded number of
+messages per invocation needs only a cap, not a new mechanism. **Decision
+needed:** the cap. It is a deployment fact rather than a derivable constant —
+the subrequest limit differs by Workers plan — and it trades fan-out latency
+for recoverability, so it wants the same treatment the claims-depth bound got:
+a number with a stated reason, documented where the format documents its
+bounds. **Done when:** the drain delivers at most a stated number of
+coordinator subrequests per invocation, with a test that a backlog larger than
+the cap drains across invocations rather than failing, or the risk is recorded
+as accepted with the operator owning the backlog.
 
 ## Carried decision — make the gate the only path to the value
 
