@@ -366,6 +366,21 @@ The four carried gaps are closed (above). Since then:
   attacks a gate that was never consulted. What a snapshot cannot express is
   a stronger boundary than what it is trusted to state; the model now says so.
   This closes Phase 1's second missing-boundary item.
+- **Rejected — the service binding is not a second way past the operator
+  bypass.** The organization coordinator skips its administrator check when
+  its input carries `operator: true`, which is how the ops surface mints a
+  first administrator for an organization with nobody to authorize it, and is
+  why that route is token-gated. The binding surface cannot reach it: the
+  runtime checks `adminOfOrganization` itself, the coordinator independently
+  checks `isAdmin(byActorId)`, and `byActorId` comes from resolved evidence
+  rather than caller input, so the relay body is built field by field and a
+  smuggled `operator` is dropped. Mutation showed each layer is individually
+  sufficient — removing the runtime check alone changes nothing because the
+  coordinator refuses with the same detail, and spreading caller input alone
+  changes nothing because the runtime refuses first. Both must fail together,
+  and the retained test witnesses that combination. Route enumeration beyond
+  the ops allowlist is otherwise complete: the dispatcher is a closed
+  allowlist ending in a 404.
 - **Execution verdict: no pod for the rest of Phase 3.** The isolation
   question is settled rather than open. There is one `vitest.config.ts` and
   one `wrangler.jsonc`, and workerd runs with Durable Object bindings and

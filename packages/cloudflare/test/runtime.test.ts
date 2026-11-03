@@ -291,3 +291,59 @@ describe("the Cloudflare runtime's cross-coordinator rules", () => {
     expect(issued.failure.detail).toMatch(/ambiguous/);
   }, 30_000);
 });
+
+describe("the service-binding surface and the operator bypass", () => {
+  // The organization coordinator's `activationRequest` skips the administrator
+  // check when its input carries `operator: true`. That is deliberate — it is
+  // how the ops surface mints a first administrator for an organization with
+  // nobody to authorize it — and it is why the ops route is gated by a token.
+  //
+  // The runtime surface must never be a second way in, and it is held shut
+  // three times over: the runtime checks `adminOfOrganization` itself, the
+  // coordinator independently checks `isAdmin(byActorId)`, and `byActorId`
+  // comes from resolved evidence rather than caller input — so the relay body
+  // is built field by field and a smuggled `operator: true` is dropped.
+  //
+  // Any one of those is sufficient, which this test demonstrates the hard
+  // way: removing the runtime check alone changes nothing, because the
+  // coordinator refuses with the same detail, and spreading the caller's
+  // input alone changes nothing, because the runtime refuses first. It takes
+  // both to open the gate, and then this fails. Defence in depth is the
+  // claim, so the combination is what is witnessed.
+  it("does not let a binding caller smuggle `operator` past the admin check", async () => {
+    const world = await createCloudflareConformanceWorld(env);
+    // Sam is in Dana's organization and is not one of its administrators.
+    const sam = CONFORMANCE_PRINCIPALS.sam;
+
+    const smuggled = await world.runtime.activationRequest({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      organizationId: sam.organizationId,
+      actorId: sam.actorId,
+      evidence: sam.evidence,
+      // not part of the portable input type; types are erased, so a caller
+      // can send it regardless
+      operator: true,
+    } as never);
+    expect(isFailed(smuggled)).toBe(true);
+    if (!isFailed(smuggled)) throw new Error("unreachable");
+    expect(smuggled.failure.kind).toBe("denied");
+    expect(smuggled.failure.detail).toBe("the caller does not administer this organization");
+
+    // Positive control: the same call as an administrator gets past the
+    // standing check, so the denial above is about standing and not about
+    // some unrelated refusal that would mask a real bypass.
+    const admin = CONFORMANCE_PRINCIPALS.dana;
+    const asAdmin = await world.runtime.activationRequest({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      organizationId: admin.organizationId,
+      actorId: admin.actorId,
+      evidence: admin.evidence,
+    });
+    // `denied` covers both "not an administrator" and "already has a
+    // principal link", so the control is the detail: an administrator must
+    // never be refused for standing.
+    if (isFailed(asAdmin)) {
+      expect(asAdmin.failure.detail).not.toBe("the caller does not administer this organization");
+    }
+  });
+});
