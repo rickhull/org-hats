@@ -21,6 +21,8 @@ import {
   value,
   type Result,
   operatorIdOf,
+  asPositiveWholeNumber,
+  asWholeNumber,
 } from "./parse";
 import type {
   AccessRequestCommand,
@@ -89,7 +91,7 @@ export const handleOperationRequest = async (
         policy,
         ...(body["adminRoles"] === undefined ? {} : { adminRoles: asArray(body["adminRoles"], "adminRoles").map((entry) => asString(entry, "adminRoles entry")) }),
         ...(body["configureActions"] === undefined ? {} : { configureActions: asArray(body["configureActions"], "configureActions").map((entry) => asString(entry, "configureActions entry")) }),
-        ...(body["envelopeLifetimeSeconds"] === undefined ? {} : { envelopeLifetimeSeconds: Number(body["envelopeLifetimeSeconds"]) }),
+        ...(body["envelopeLifetimeSeconds"] === undefined ? {} : { envelopeLifetimeSeconds: asPositiveWholeNumber(body["envelopeLifetimeSeconds"], "envelopeLifetimeSeconds") }),
         sites: asArray(body["sites"], "sites").map((entry) => {
           const site = asRecord(entry);
           return {
@@ -307,7 +309,7 @@ export const handleOperationRequest = async (
           ? undefined
           : {
               ...(body["amr"] === undefined ? {} : { amr: asArray(body["amr"], "amr").map((entry) => asString(entry, "amr entry")) }),
-              ...(body["authTime"] === undefined ? {} : { authTime: Number(body["authTime"]) }),
+              ...(body["authTime"] === undefined ? {} : { authTime: asWholeNumber(body["authTime"], "authTime") }),
             };
       const result = await host.issue(
         asOrganizationId(body["organizationId"], "organizationId"),

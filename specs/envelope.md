@@ -133,6 +133,14 @@ land no later than expiry, and privileged acts that need fresher authority
 call the runtime directly. The number itself is the consumer's security
 review's to own.
 
+The number is the consumer's; that it is *a number* is not. `exp` is
+`issuedAt + envelopeLifetimeSeconds`, so a lifetime that is not a positive
+whole number yields an `exp` no clock comparison can be true of, and the
+bound disappears with no error — the control fails open rather than closed.
+Claims assembly refuses such a lifetime, and the in-memory engine refuses it
+at construction, so a deployment that cannot bound expiry issues nothing
+instead of issuing forever.
+
 ```js spec=E7 traits=portable,unit
 // The clock is injected: the same envelope one second before exp, then at it.
 const s = await spec.world();

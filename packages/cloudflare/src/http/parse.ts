@@ -41,6 +41,29 @@ export const operatorIdOf = (request: Request): { readonly operatorId?: string }
   return given === null || given.length === 0 ? {} : { operatorId: given };
 };
 
+/** A finite whole number, refused rather than coerced.
+ *
+ * `Number(...)` is not a parser: it turns `"abc"` into `NaN`, `null` into `0`,
+ * and the JSON literal `1e999` into `Infinity`, and each of those then travels
+ * as if it were the number the caller meant. Where the value bounds a security
+ * control — an envelope lifetime bounds replay — a silently coerced one is the
+ * control failing open, so this refuses at the boundary. */
+export const asWholeNumber = (input: unknown, field: string): number => {
+  if (typeof input !== "number" || !Number.isInteger(input)) {
+    throw new Error(`${field} must be a whole number`);
+  }
+  return input;
+};
+
+/** A duration or count: whole and above zero. Separate from `asWholeNumber`
+ * because positivity is the field's constraint rather than the type's — an
+ * epoch second passes the first and a lifetime must pass this one. */
+export const asPositiveWholeNumber = (input: unknown, field: string): number => {
+  const parsed = asWholeNumber(input, field);
+  if (parsed <= 0) throw new Error(`${field} must be greater than zero`);
+  return parsed;
+};
+
 export const asRecord = (input: unknown): Record<string, unknown> => {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     throw new Error("the request body must be a JSON object");

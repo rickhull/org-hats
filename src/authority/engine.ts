@@ -133,6 +133,13 @@ export const createInMemoryAuthority = async (
   const clock = config.clock ?? systemClock();
   const signer = config.signer ?? (await webCryptoSigner(`key-${nextSigningKey()}`));
   const lifetime = config.envelopeLifetimeSeconds ?? 900;
+  // Fail fast, as a partial signing set does: an engine configured with a
+  // lifetime that cannot bound `exp` can issue nothing, so constructing it
+  // silently only moves the error to every later call. `assembleAccessClaims`
+  // refuses the same values for runtimes that configure later.
+  if (!Number.isInteger(lifetime) || lifetime <= 0) {
+    throw new Error("envelopeLifetimeSeconds must be a positive whole number of seconds");
+  }
   const activationLifetime = config.activationLifetimeSeconds ?? 86_400;
   const activationSecret = config.activationSecret ?? randomActivationSecret;
   const configureActions = config.configureActions ?? ["configure"];

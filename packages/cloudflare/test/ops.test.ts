@@ -165,6 +165,38 @@ describe("the ops surface is a closed allowlist over the coordinators", () => {
     }
   });
 
+  it("refuses a bootstrap whose envelope lifetime is not a whole number", async () => {
+    // `Number(...)` coerced this field, so the JSON literal 1e999 became
+    // Infinity and bootstrap accepted it. The runtime then survived only
+    // because SQLite refuses to bind a non-finite number and JSON cannot
+    // carry Infinity, which laundered the value into immediate expiry — two
+    // serialization accidents rather than a control. The boundary now refuses
+    // it, and `assembleAccessClaims` refuses it for every other runtime.
+    const organizationId = "org-ops-lifetime";
+    expect((await jsonPost("/ops/organization/bootstrap", {
+      ...orgBootstrap(organizationId),
+      principalLinks: [],
+    })).status).toBe(200);
+
+    for (const bad of [1e999, "900", null, 900.5, -900, 0] as const) {
+      const response = await jsonPost("/ops/operation/bootstrap", {
+        ...opBootstrap(`op-ops-lifetime-${String(bad)}`, organizationId),
+        envelopeLifetimeSeconds: bad,
+      });
+      expect(response.status, `lifetime ${String(bad)}`).toBe(400);
+      expect((await response.json() as Envelope<unknown>).failure?.kind, `lifetime ${String(bad)}`)
+        .toBe("invalid-command");
+    }
+
+    // the field remains optional, and a sane value is still accepted
+    expect((await jsonPost("/ops/operation/bootstrap", {
+      ...opBootstrap("op-ops-lifetime-ok", organizationId),
+      envelopeLifetimeSeconds: 600,
+    })).status).toBe(200);
+    expect((await jsonPost("/ops/operation/bootstrap", opBootstrap("op-ops-lifetime-absent", organizationId))).status)
+      .toBe(200);
+  });
+
   it("records the operator identity a caller claims, and refuses a malformed one", async () => {
     // The ops token is all-or-nothing, so this is attribution and not proof:
     // anyone holding the token can claim any identity. What it buys is a trail

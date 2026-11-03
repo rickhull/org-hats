@@ -76,6 +76,23 @@ export interface AccessClaimsInput {
  * empty action list describing the actor). */
 export const assembleAccessClaims = (input: AccessClaimsInput): AccessEnvelopeClaimsV1 | Failure => {
   const { snapshot, policy, operationId, organizationId, actorId, configureActions, issuedAt } = input;
+  // `exp` is `issuedAt + envelopeLifetimeSeconds`, and a short `exp` is the
+  // only thing bounding replay of a stolen bearer envelope. A non-finite
+  // addend produces an `exp` that `now >= exp` is never true of, so the
+  // control fails open silently — no error, just an envelope that never
+  // expires. The deployment supplies this value and its type is erased, so
+  // the check belongs here: every runtime assembles claims through this one
+  // function, and a runtime that survives a bad value does so by accident of
+  // its storage and transport rather than by checking.
+  if (
+    !Number.isInteger(input.envelopeLifetimeSeconds) ||
+    input.envelopeLifetimeSeconds <= 0
+  ) {
+    return {
+      kind: "unavailable",
+      detail: "the envelope lifetime must be a positive whole number of seconds",
+    };
+  }
   const wearable = wearableGrants(snapshot, organizationId, actorId, operationId);
   if (wearable.length === 0) return { kind: "not-admitted" };
   const hatGrant = firstByRank(wearable);

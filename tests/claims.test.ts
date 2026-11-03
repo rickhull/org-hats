@@ -150,3 +150,37 @@ test("claims: no wearable hat is not-admitted; a role missing from the bundle is
   assert.equal(failure.kind, "unavailable");
   assert.match(failure.detail ?? "", /coordinator/);
 });
+
+test("[E7] a lifetime that is not a finite, positive number cannot produce an envelope", async () => {
+  // `exp` is `issuedAt + envelopeLifetimeSeconds`, and nothing validated the
+  // addend. `NaN` and `Infinity` both yield an `exp` that `now >= exp` can
+  // never be true of, so the envelope never expires — the short lifetime is
+  // the only thing bounding replay of a stolen bearer envelope, so losing it
+  // silently is the whole control failing open.
+  //
+  // The Cloudflare runtime happens to survive this: SQLite refuses to bind
+  // NaN and JSON cannot carry Infinity, so a bad value launders into
+  // immediate expiry. That is two serialization accidents, not a control.
+  // The guard belongs here, at the one point every runtime passes through.
+  for (const lifetime of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 0, -1, 1.5]) {
+    const result = assembleAccessClaims({
+      snapshot: PROFESSIONAL_OPERATION.snapshot,
+      policy: PROFESSIONAL_OPERATION.policy,
+      operationId: OP,
+      organizationId: HARBOR_LOGISTICS,
+      actorId: DANA_OKAFOR,
+      configureActions: ["configure"],
+      envelopeLifetimeSeconds: lifetime,
+      issuedAt: epochSeconds(IAT),
+    });
+    assert.equal(
+      failureOf(result).kind,
+      "unavailable",
+      `lifetime ${String(lifetime)} must not produce claims`,
+    );
+  }
+
+  // and the ordinary case still works
+  const good = claimsFor(DANA_OKAFOR, HARBOR_LOGISTICS);
+  assert.equal("kind" in good, false);
+});

@@ -327,6 +327,46 @@ nothing until it has been shown to detect the absence.
   them forever.  Recognising the replay is what lets a redelivered message be
   retired.  `docs/threat_model.md` now says so.
 
+## Phase 3 — in progress
+
+The four carried gaps are closed (above). Since then:
+
+- **Confirmed, medium — an envelope lifetime that is not a positive whole
+  number removed expiry entirely.** `exp` is `issuedAt +
+  envelopeLifetimeSeconds` and nothing validated the addend, so `NaN` or
+  `Infinity` produced an `exp` that `now >= exp` is never true of: the
+  envelope never expired, silently, with issuance succeeding. Short `exp` is
+  the only thing bounding replay of a stolen bearer envelope, so the control
+  failed open. Demonstrated in the in-memory engine — still valid in the year
+  2096.
+  The Cloudflare runtime was not affected, **by accident**: SQLite refuses to
+  bind a non-finite number and JSON cannot carry `Infinity`, so a bad value
+  laundered into immediate expiry. Two serialization quirks, not a control,
+  which is why the guard went to the choke point every runtime passes through
+  (`assembleAccessClaims`) rather than only to the boundary. The in-memory
+  engine also refuses at construction, as a partial signing set already does.
+  Severity is medium rather than high: no attacker path — a deployment or host
+  supplies this value — and the affected engine is documented as not for
+  production. The reachable surface was `Number(...)` used as a parser at
+  `http/operation.ts`, which is the convention now in `AGENTS.md`, found by
+  looking for violations of it.
+- **Rejected — hostile `amr` from a provider ID token.** The Phase 2 carry.
+  `exchange.ts` validates `amr` is an array of non-empty strings and
+  `auth_time` a finite number before either is used, and the coordinator's
+  HTTP boundary coerces `amr` again. Both are instances of the parse-boundary
+  convention, already present. Evidence retained: it guards the claim that
+  provider documents are hostile input.
+- **Execution verdict: no pod for the rest of Phase 3.** The isolation
+  question is settled rather than open. There is one `vitest.config.ts` and
+  one `wrangler.jsonc`, and workerd runs with Durable Object bindings and
+  local persistence, so parallel workers contend on a shared runtime, which
+  disjoint file allowlists do not fix. The mutation-validation rule compounds
+  it: every new test for an existing guard must be run, broken, and run again,
+  so lanes would serialize on that runtime constantly. Worktrees would isolate
+  at the cost of a per-worktree install of workerd and esbuild. Phase 3 runs
+  inline and serially; revisit only if a phase appears whose evidence does not
+  need the harness.
+
 ## Carried decision — make the gate the only path to the value
 
 Not a finding, and not a cleanup: the structural remedy the findings point at,
