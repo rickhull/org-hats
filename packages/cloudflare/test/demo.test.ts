@@ -1,6 +1,7 @@
-import { SELF } from "cloudflare:test";
+import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { demoRoutesEnabled } from "../src/index";
+import worker, { demoRoutesEnabled } from "../src/index";
+import type { Env } from "../src/env";
 
 // The demo and harness routes refuse to serve unless `DEMO_ROUTES` is
 // "1"; the test config sets it, the reference production config does not,
@@ -13,6 +14,29 @@ describe("the demo gate", () => {
       expect(demoRoutesEnabled({ DEMO_ROUTES: unset } as never)).toBe(false);
     }
     expect(demoRoutesEnabled({} as never)).toBe(false);
+  });
+
+  it("closes every demo and harness route through the real dispatcher", async () => {
+    // The predicate test above cannot see the dispatcher, and `SELF` carries
+    // `wrangler.jsonc`, which always sets the flag — so the 404 a routed
+    // deployment would actually serve had no witness. Overriding the env on
+    // the worker's own fetch is what reaches it.
+    // An absent var and an empty one are different deployment states: the
+    // reference production config omits the key entirely, so `undefined`
+    // here means omitted rather than explicitly empty.
+    const withFlag = (value: string | undefined): Env => {
+      const next = { ...env } as Record<string, unknown>;
+      if (value === undefined) delete next["DEMO_ROUTES"];
+      else next["DEMO_ROUTES"] = value;
+      return next as unknown as Env;
+    };
+    const routes = ["/", "/demo/bootstrap", "/demo/login", "/demo/access", "/increment"] as const;
+    for (const value of [undefined, "", "0", "true", "yes"] as const) {
+      for (const path of routes) {
+        const response = await worker.fetch(new Request(`https://demo.internal${path}`), withFlag(value));
+        expect(response.status, `${path} with DEMO_ROUTES=${String(value)}`).toBe(404);
+      }
+    }
   });
 });
 

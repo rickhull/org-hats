@@ -135,64 +135,6 @@ use a pod or run serially.
 This execution model does not change the campaign's scope, sequencing,
 disclosure rules, or stop conditions.
 
-## Phase 1 — Claims-to-evidence map
-
-Build a traceability matrix from each threat, assumption, and residual risk in
-`docs/threat_model.md` to its enforcement and negative evidence.  Include the
-relevant `A#`, `E#`, or `P#` invariant, source boundary, existing test, and
-owner when the control belongs to the host or operator.
-
-Challenge in particular:
-
-- whether every reachable input is named, including stored snapshots, Durable
-  Object messages, environment configuration, OIDC documents, and release
-  metadata;
-- whether procedural controls are described as procedural rather than code
-  guarantees;
-- whether mitigations actually bound the residual risk claimed; and
-- whether the security policy's in-scope components match the shipped
-  Cloudflare package and current supported release families.
-
-**Evidence:** a review report delivered to Rick, with one disposition per
-threat-model row and separate lists of missing boundary, missing enforcement,
-missing test, and inaccurate claim.  Confirmed sensitive details remain
-private until fixed.
-
-**Exit:** every current threat-model row has an implementation owner and an
-evidence disposition; every newly found boundary is either added to the model
-or explicitly rejected with evidence.
-
-## Phase 2 — Portable credential and authority attacks
-
-Add focused negative and generative tests before changing portable code.
-
-Attack the credential boundary with malformed formats and versions, unknown or
-duplicate key ids, altered claims, non-canonical encodings, Unicode and numeric
-edge cases, expiry boundaries, wrong operation/site bindings, oversized
-claims, and key rotation or retirement mistakes.  Verify that untrusted input
-is rejected before a domain value or authorization decision is produced.
-
-Attack authority state with cross-organization subjects, cross-operation
-targets, selected-hat confusion, stale envelopes, disabled or unlinked actors,
-revoked participation/team/grant state, refresh reuse and concurrency,
-idempotency-key collisions and payload substitution, reordered or duplicate
-outbox delivery, and activation-secret replay.  Distinguish a real violation
-from the bounded race and bearer replay already accepted by A7, A13, and the
-threat model.
-
-**Evidence:** minimal tests in the existing portable suites, tagged with an
-existing invariant when one applies.  A new invariant is added to
-`specs/authority.md`, `specs/envelope.md`, or `specs/portability.md` only when
-the implementation already holds it and the same change supplies its witness.
-
-**Verification:** run the focused `node --test tests/<file>.test.ts` command
-while developing, then `pnpm check`.  Changes under `src/` also require
-`pnpm build` so tracked `dist/` agrees.
-
-**Exit:** each Phase 1 gap owned by the portable layer has a regression test,
-an explicit residual-risk disposition, or a documented reason that the host
-owns it.
-
 ## Phase 3 — Cloudflare boundary and state attacks
 
 Exercise the reference runtime through its local Vitest/workerd harness.  No
@@ -297,124 +239,117 @@ regression test or is explicitly accepted by Rick; the compromise table is
 executable as a local procedure; and the threat model accurately states the
 remaining host-, operator-, and consumer-owned risk.
 
-## Phase 1 — complete
+## Phases 1 and 2 — settled
 
-Run 2026-11-02 in Claude Code as a two-lane moshpit pod (Opus chair, Sonnet
-specialists, an unused Haiku helper tier), plus a bounded same-lane successor
-after the operator-to-ops lane retired at its context ceiling.  Every
-threat-model row, trust boundary, asset, assumption, the non-goals, and every
-`SECURITY.md` invariant bullet now carries an owner and an evidence
-disposition: 38 verified, 9 residual, 2 documentation defects, 1 confirmed,
-1 rejected, 3 deferred to Phase 4.  The threshold self-evaluation returned
-*earned its keep*, with the margin coming from integration judgment rather
-than from parallelism.
+Run 2026-11-02.  Phase 1 was the threshold-case moshpit pod (Opus chair, two
+Sonnet lanes, an unused Haiku helper tier, one bounded successor); its verdict
+was *earned its keep*, with the margin from integration judgment rather than
+parallelism.  Phase 2 ran inline — one area, one checkout, no fan-out.
 
-The disposition vocabulary needed a fifth value, `verified`, for a claim that
-holds with its enforcement located and a witness named; the plan's four
-describe outcomes of an attack, not of a claims-to-evidence map.
+Every threat-model row, trust boundary, asset, assumption, the non-goals, and
+every `SECURITY.md` invariant bullet carries an owner and a disposition.  The
+Phase 1 matrix closed at 38 verified, 9 residual, 2 documentation defects, 1
+confirmed, 1 rejected, and 3 deferred to Phase 4; Phase 2 then added a second
+confirmed finding and three more rejections, all below.  The disposition
+vocabulary needed a fifth value, `verified` — the plan's four describe the
+outcome of an attack, not of a claims-to-evidence map.
 
-What landed from Phase 1, and its evidence:
+**Fixed, both medium, both test-first.**  The shared envelope version gate
+threw instead of failing as a value: `envelopeVersionFailure` read `format`,
+`v`, and `claims.v` unguarded, and `canonicalJson` recursed on claims the
+verifier had not verified yet — canonical bytes being an input to the
+signature check.  Reachable through all three callers (the verifier, the
+context, command authorization), with nothing but a published key id.  Both
+now answer as values, and claims depth is bounded by the format at
+`ACCESS_CLAIMS_MAX_DEPTH`.  The classification matters as much as the fix:
+unreadable is `unauthenticated`, because a malformed envelope declares no
+version, and routing it to `wrong-interface-version` put a person with a
+damaged cookie behind a no-reauth 500.
 
-- **Confirmed, medium — the envelope version gate threw instead of failing as
-  a value.**  `envelopeVersionFailure` read `format`, `v`, and `claims.v`
-  with no structural guard, so a `null` envelope or one with `claims` absent
-  left `verify` by a `TypeError` — against the stated contract ("a
-  session-surface failure, as a value — never an exception"), E4, and A4's
-  closed taxonomy.  Reachable through all three callers: the verifier, the
-  context, and command authorization, where the claims were read one
-  statement *before* the gate.  A host-supplied verify predicate that threw
-  escaped the same way.  Fixed in `src/contract.ts`, `src/access/verify.ts`,
-  and `src/authority/organization.ts`; witnessed by the `[E4]` tests in
-  `tests/access.test.ts`, `tests/context.test.ts`, and `tests/engine.test.ts`,
-  each proven red first.  E4 now states that closed means *as a value*.
-- **The fix exposed a misclassification, and it is fixed too.**  An
-  unreadable envelope first answered `wrong-interface-version`, which the
-  taxonomy defines as the caller's *declared* version being unsupported — a
-  `null` envelope declares nothing, and the reference host maps that kind to a
-  no-reauth 500.  A person whose access cookie was truncated would have been
-  held in a loop by an outage that was not happening.  Unreadable is now
-  `unauthenticated` ("no usable authority"), which is the reauthenticate path;
-  a recognizable envelope declaring an unsupported version still answers
-  `wrong-interface-version`, so E8 and its witnesses are untouched.  The
-  taxonomy stays closed at nine kinds.  Consumer-visible: `docs/consumer-session.md`
-  carries the damaged-cookie guidance and `examples/consumer-access.ts` the
-  mapping rationale.
-- **Two documentation defects, low.**  `SECURITY.md` named
-  `cloudflare-v0.11.x` as the current runtime line while `0.12.1` shipped,
-  and its in-scope list never named the reference runtime at all while
-  "the Cloudflare platform" sat in out-of-scope — read literally, a report
-  about the ops-token gate had nowhere to go.  Both corrected.
-- **Four under-named reachable inputs**, now a named `Reachable inputs`
-  section in the threat model: inter-coordinator relay bodies (trusted
-  structurally, no provenance check, platform isolation only), the breadth of
-  what a restore trusts, `AUTHORITY_ORGANIZATION_IDS`, and the discovery
-  document's ignored fields.
-- **Rejected:** the confirmed defect is an instance, not a class.  The
-  exchange's `JSON.parse` sites are guarded (`decodeSegment` catches;
-  `parseSealedProviderConfig` type-checks), so the correct pattern was
-  already present in three places and bounded the fix to one function.
-  Evidence retained against regression.
-- **Retracted:** a reported absence of a concurrent subject-guard witness.
-  `runtime.test.ts` `"[A10] serializes one provider subject across
-  concurrent organization claims"` is that witness; the gap came from a
-  test-name search standing in for a read.
+**Fixed, documentation.**  `SECURITY.md` named a superseded Cloudflare line
+and never named the reference runtime in scope.  `docs/threat_model.md` gained
+a `Reachable inputs` section naming the four classes it had left implicit.
 
-## Phase 2 — the credential half is closed
+**Rejected, with evidence retained.**  The exchange's `JSON.parse` sites are
+guarded, so the gate defect was an instance rather than a class.
+`__proto__`-shaped claim keys are own properties from `JSON.parse`, not
+prototype writes.  Grant targets are operation-scoped by construction, and
+`sameOrganization` is a fresh-evidence guard, not a missing cross-organization
+check.  The shared idempotency keyspace is deliberate — it is what lets a
+second administrator retry the first's act (`docs/roster.md`).
 
-Three of the four hypotheses are disposed, two of them negative.
+**Verified with existing witnesses, no new tests needed.**  The state-machine
+half was already correct: refresh supersedes before issuing inside a
+synchronous critical section (`[A7] one handle cannot rotate twice under
+concurrent refreshes`), activation accept binds atomically
+(`[A16] accept binds the verified subject atomically`), payload substitution
+is named misuse (`generative.test.ts`), and outbox delivery dedupes by id with
+every handler guarded against terminal state (`an acceptance delivered after a
+revoke does not resurrect it`, and the drain counts that pin a second drain at
+zero).
 
-- **Confirmed, medium — unbounded recursion on unverified claims.**
-  `canonicalJson` recurses, and canonical bytes are an input to the signature
-  check, so the verifier canonicalized claims before verifying them.  A deeply
-  nested payload threw `RangeError` out of `verify` — the same contract
-  violation as Phase 1's finding, by a path that fix did not cover, reachable
-  with a published key id and no valid signature.  Measured: depth ≥ ~2,500
-  (≈15 KB body) overflows on Node; the 4 KB cookie cap keeps the browser
-  session path clear, so it needs a JSON body.  Claims depth is now bounded by
-  the format at `ACCESS_CLAIMS_MAX_DEPTH` (8) and checked in the shared gate
-  before any caller canonicalizes, answering `unauthenticated`.  Witnesses at
-  all three entry points plus a depth pin on the twins in
-  `tests/envelope-size.test.ts`.  The bound is E2's; E4 does the refusing.
-- **Rejected — `__proto__`-shaped claim keys.**  From `JSON.parse` the key is
-  an own property, not a prototype write: the prototype is untouched and
-  `canonicalJson` serializes it as data, which is correct for a serializer.
-  Nothing assigns it anywhere, so there is no pollution path.
-- **Rejected — cross-organization grant targets.**  Grant targets are
-  operation-scoped by construction and the grantee's organization must
-  actively participate; an operation being multi-organization is the design.
-  The `sameOrganization` flag pairs only with `mode: "fresh"` and is a
-  fresh-evidence guard, not a missing cross-organization check.  This closes
-  the row Phase 1 disposed one layer shallower than the rest.
-- **Not bounded, deliberately — claims breadth.**  The twins nest identically
-  at depth 5 across a 20× spread in bytes, and the festival twin legitimately
-  exceeds the host cookie budget, which the host refuses at issuance
-  (`tests/envelope-size.test.ts`).  A verifier-side size cap would refuse
-  legitimate envelopes; oversized stays the host's budget and the platform's
-  request limits, where the threat model already puts it.
+**Deliberately unbounded:** claims breadth at the verifier.  The twins nest
+identically at depth 5 across a 20x spread in bytes, and the festival twin
+legitimately exceeds the host cookie budget, which the host refuses at
+issuance.  A verifier-side size cap would refuse legitimate envelopes.
+
+## Phase 3 — the four carried gaps are closed
+
+Each was a claim Phase 1 located with no witness.  Every new test was
+mutation-validated: the guard it covers was removed, the test was proven to
+fail, and the guard restored.  A new test that passes on arrival proves
+nothing until it has been shown to detect the absence.
+
+- **The ops token gate.**  An absent or empty `OPS_TOKEN` now has a witness
+  across the headers a caller can actually send.  Two refinements came out of
+  writing it.  The empty-token branch is **unreachable** defence in depth, not
+  a hole it closes: with an empty token the expected value is `"Bearer "`, and
+  header values are trimmed in transit, so no caller can express the string
+  that would match.  Phase 1's gap is therefore retracted as stated — no test
+  can witness that branch's absence — and replaced by the externally visible
+  claim, which does have teeth: removing the gate returns `200` to an
+  unauthenticated export.
+- **The demo and harness routes.**  A dispatcher-level 404 now covers every
+  route with the flag absent, empty, or wrong.  The pre-existing predicate
+  test passed unchanged while the gate was removed, which confirms Phase 1's
+  reading exactly: a test on `demoRoutesEnabled` cannot see the dispatcher.
+- **The ops surface as a closed allowlist.**  Internal coordinator paths —
+  `/idp-config` above all — are refused under a valid token, and the sealed
+  provider configuration appears in no relayed ops response but `/ops/export`,
+  which the model records as its documented exception.
+- **The crafted-snapshot outbox replay.**  The model's accepted residual risk
+  now has a confirming test, and it is narrower than the model said.  Every
+  outbox row restored as undelivered *is* redelivered — the claim stands — but
+  delivery carries the outbox row id as the message id, that id survives the
+  restore, and the receiving intake is claim-deduped on it, so nothing applies
+  twice.  Removing the dedupe does not cause a double application either: the
+  replays stop applying, are never marked delivered, and the outbox retries
+  them forever.  Recognising the replay is what lets a redelivered message be
+  retired.  `docs/threat_model.md` now says so.
 
 ## Next action
 
-Phase 2's state-machine half, which the credential work did not touch: refresh
-reuse and concurrency, idempotency-key collisions and payload substitution,
-reordered or duplicate outbox delivery, and activation-secret replay — each
-distinguished from the bounded race and bearer replay A7, A13, and the threat
-model already accept.
+The rest of Phase 3, as specified above: provider documents treated as
+hostile, route enumeration beyond the ops allowlist, coordinator races and
+partial cross-coordinator workflows, hostile restore beyond the outbox row,
+and the complexity and amplification review.
 
-One Phase 3 hypothesis came out of this pass and should be recorded there
-rather than chased now: `packages/cloudflare/src/operation.ts:1306`
-canonicalizes `auth.amr`, which arrives from the provider's ID token, and
-`canonicalJson` is general and unbounded by design — the depth bound added
-here is a claims bound in the portable gate, not a serializer bound, so a
-hostile or careless provider's `amr` shape is a separate question on the
-runtime's side of the seam.
+One hypothesis carries over from Phase 2: `operation.ts` canonicalizes
+`auth.amr`, which arrives from the provider's ID token.  `canonicalJson` is
+general and unbounded by design — the depth bound added in Phase 2 is a claims
+bound in the portable gate, not a serializer bound — so a hostile or careless
+provider's `amr` shape belongs to the hostile-provider-document work.
 
-Phase 1's open evidence gaps are the priority inside that, since each is a
-claim with no witness: the server-side empty `OPS_TOKEN` refusal, an
-integration-level demo-route 404 with `DEMO_ROUTES` unset, the
-crafted-snapshot outbox replay the model explicitly accepts, and
-`/idp-config`'s unreachability from the public surface.  The first three are
-Phase 3, Cloudflare-side; keep them in that phase rather than pulling them
-forward.
+On execution: the four gaps ran inline, correctly — they were located, bounded,
+and mechanical once found.  The remainder has durable sub-areas (the provider
+exchange, the route and ops surface, coordinator state and restore) and is a
+genuine pod candidate, but the isolation question must be settled first and the
+answer is not obvious: there is one `vitest.config.ts` and one
+`wrangler.jsonc`, and workerd runs with Durable Object bindings and local
+persistence, so two workers running suites in this checkout contend on a
+shared runtime rather than on files.  Disjoint file allowlists do not solve
+that; worktrees would, at the cost of a per-worktree install of workerd and
+esbuild.  Decide at intake with that cost measured, not assumed.
 
 ## Specification placement
 

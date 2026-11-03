@@ -16,6 +16,7 @@ import { AUTHORITY_INTERFACE_VERSION, isFailed } from "org-hats/authority";
 import { CONFORMANCE_PRINCIPALS } from "org-hats/conformance";
 import { describe, expect, it } from "vitest";
 import { createCloudflareConformanceWorld } from "../src/conformance";
+import { call, organizationBootstrap } from "./helpers";
 import type { StateRow } from "../src/state";
 
 const OPS = { authorization: "Bearer test-ops-token" };
@@ -273,4 +274,106 @@ describe("the restore matrix", () => {
     );
     expect(futureOrganization.body.failure?.kind).toBe("invalid-command");
   }, 60_000);
+});
+
+describe("a crafted snapshot's undelivered outbox rows", () => {
+  // The threat model records this as residual risk: "a crafted snapshot's
+  // undelivered outbox rows are re-delivered as if fresh." It is the one
+  // accepted behaviour in the model with no test behind it, which is exactly
+  // the kind of claim that drifts. Both halves are pinned here — the
+  // redelivery happens, and the receiving coordinator absorbs it, because
+  // the organization drains with `messageId` set to the outbox row's id and
+  // the operation's intake is claim-deduped on `intake:<messageId>`. The row
+  // id survives a restore, so the replay is recognised.
+  //
+  // That dedupe does more than stop a double application. Remove it and the
+  // replayed messages no longer apply, so they are never marked delivered
+  // and the outbox retries them forever: the second drain reports zero
+  // delivered and the rows stay pending. Recognising the replay is what lets
+  // a redelivered message be accepted and retired.
+  const LEAD = "actor-lead";
+
+  it("are redelivered, and the receiving intake applies them only once", async () => {
+    const suffix = "replay-outbox";
+    const orgId = `org-${suffix}`;
+    const opId = `op-${suffix}`;
+    const org = env.ORGANIZATION.get(env.ORGANIZATION.idFromName(orgId));
+    const op = env.OPERATION.get(env.OPERATION.idFromName(opId));
+
+    expect((await call(org, "POST", "/bootstrap", organizationBootstrap(orgId))).body.ok).toBe(true);
+    expect((await call(op, "POST", "/bootstrap", {
+      operationId: opId,
+      slug: "replay-op",
+      displayName: "Replay Operation",
+      policy: {
+        format: 1,
+        id: "policy-replay",
+        version: "1",
+        actions: ["observe", "review", "configure"],
+        roles: [
+          { title: "field", actions: ["observe"] },
+          { title: "admin", actions: ["observe", "review", "configure"] },
+        ],
+        readPolicy: { organizations: "granted-teams" },
+      },
+      adminRoles: ["admin"],
+      configureActions: ["configure"],
+      sites: [{ siteId: "site-replay", path: "site", aliases: ["site"] }],
+      teams: [],
+      grants: [],
+      participations: [],
+    })).body.ok).toBe(true);
+
+    // walk the real workflow so the outbox row is a genuine delivered message
+    const invited = await call<{ invitationId?: string }>(op, "POST", "/invite", {
+      organizationId: orgId,
+      byActorId: LEAD,
+      idempotencyKey: "replay-invite",
+    });
+    expect(invited.body.ok).toBe(true);
+    expect((await call(op, "POST", "/drain")).body.ok).toBe(true);
+    expect((await call(org, "POST", "/accept", {
+      operationId: opId,
+      actorId: LEAD,
+      idempotencyKey: "replay-accept",
+    })).body.ok).toBe(true);
+
+    // bootstrap's roster pull queues its own messages alongside the
+    // acceptance, so the count is discovered rather than assumed
+    const firstDrain = await call<{ delivered: number; pending: number }>(org, "POST", "/drain");
+    expect(firstDrain.body.value?.pending).toBe(0);
+    const deliveredCount = firstDrain.body.value?.delivered ?? 0;
+    expect(deliveredCount).toBeGreaterThan(0);
+
+    const activations = async (): Promise<number> => {
+      const trail = await call<readonly { fact: string }[]>(op, "GET", "/audit");
+      return (trail.body.value ?? []).filter((entry) => entry.fact.includes("active (canonical)")).length;
+    };
+    expect(await activations()).toBe(1);
+
+    // craft the snapshot: the delivered acceptance becomes undelivered again,
+    // which is precisely what the model says an operator can hand back
+    const snapshot = await exportCoordinator("organization", orgId);
+    const outbox = snapshot.tables["outbox"] ?? [];
+    expect(outbox.length).toBe(deliveredCount);
+    for (const row of outbox) expect(row["delivered_at"]).not.toBeNull();
+    const crafted = {
+      ...snapshot,
+      tables: {
+        ...snapshot.tables,
+        outbox: outbox.map((row) => ({ ...row, delivered_at: null })),
+      },
+    };
+    expect((await restore("organization", orgId, crafted)).status).toBe(200);
+
+    // the redelivery is real — the model's claim stands, for every row
+    const second = await call<{ delivered: number; pending: number }>(org, "POST", "/drain");
+    expect(second.body.value?.delivered).toBe(deliveredCount);
+
+    // and it is absorbed: the consequence is narrower than "as if fresh"
+    expect(await activations()).toBe(1);
+    const participations = await call<Record<string, unknown>>(op, "GET", "/snapshot");
+    const rows = participations.body.value?.["participations"] as { organization_id: string; status: string }[];
+    expect(rows.find((row) => row.organization_id === orgId)?.status).toBe("active");
+  });
 });

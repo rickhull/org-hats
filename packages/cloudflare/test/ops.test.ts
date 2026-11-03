@@ -1,8 +1,8 @@
 import { SELF, env } from "cloudflare:test";
 import { ed25519VerifyKey, parseVerifyKeySet } from "org-hats/access";
 import { describe, expect, it } from "vitest";
-import { organizationBootstrap } from "./helpers";
-import { bindPrincipalLink } from "../src/index";
+import { organizationBootstrap, type Envelope } from "./helpers";
+import worker, { bindPrincipalLink } from "../src/index";
 import type { Env } from "../src/env";
 
 const OPS = { authorization: "Bearer test-ops-token" };
@@ -57,6 +57,134 @@ const opBootstrap = (operationId: string, organizationId: string) => ({
       primary: true,
     },
   ],
+});
+
+describe("the ops token gate when the deployment sets no token", () => {
+  // `wrangler.jsonc` always sets OPS_TOKEN, so a deployment that forgot it —
+  // a configuration mistake rather than an attacker, against the
+  // highest-authority surface in the system — had no witness. Overriding the
+  // env on the worker's own fetch is what reaches it. What this pins is the
+  // externally visible claim: no token, no ops route, whatever the caller
+  // sends.
+  const gated = "/ops/export?coordinator=organization&id=org-ops";
+
+  // An absent binding and an empty string are different deployment states, so
+  // the absent case omits the key rather than setting it to `undefined` —
+  // which `exactOptionalPropertyTypes` would reject, and which would not model
+  // a missing var anyway.
+  const withToken = (token: string | undefined): Env => {
+    const next = { ...env } as Record<string, unknown>;
+    if (token === undefined) delete next["OPS_TOKEN"];
+    else next["OPS_TOKEN"] = token;
+    return next as unknown as Env;
+  };
+
+  // The empty-token branch is unreachable defence in depth rather than a
+  // hole it closes, and the reason is worth writing down: with an empty
+  // token the expected value is `"Bearer "`, seven characters, and header
+  // values are trimmed on the way in — `new Request(url, { headers: {
+  // authorization: "Bearer " } })` arrives as `"Bearer"`, six. No caller can
+  // express the string that would match, so the length check already refuses
+  // it. Keep the branch; do not claim a test can witness its absence.
+  it("refuses an absent or empty token for every header a caller can send", async () => {
+    const cases: readonly (readonly [string, string | undefined, string | undefined])[] = [
+      ["absent binding, no header", undefined, undefined],
+      ["absent binding, bare scheme", undefined, "Bearer"],
+      ["absent binding, the real token", undefined, "Bearer test-ops-token"],
+      ["absent binding, arbitrary value", undefined, "Bearer anything"],
+      ["empty token, no header", "", undefined],
+      ["empty token, bare scheme", "", "Bearer"],
+      ["empty token, the real token", "", "Bearer test-ops-token"],
+    ];
+    for (const [label, token, authorization] of cases) {
+      const response = await worker.fetch(
+        new Request(`https://authority.internal${gated}`, {
+          ...(authorization === undefined ? {} : { headers: { authorization } }),
+        }),
+        withToken(token),
+      );
+      expect(response.status, label).toBe(401);
+      expect((await response.json() as Envelope<unknown>).failure?.kind, label).toBe("unauthenticated");
+    }
+  });
+
+  it("still serves the public verification keys, which are secret-free by design", async () => {
+    // The public route sits before the gate, so losing the token must not
+    // take key distribution down with it.
+    const response = await worker.fetch(
+      new Request("https://authority.internal/ops/verification-keys"),
+      withToken(undefined),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json() as { signingKeyId?: string; keySet?: string };
+    expect(body.signingKeyId).toBeTruthy();
+    expect(JSON.stringify(body)).not.toContain("test-ops-token");
+  });
+});
+
+describe("the ops surface is a closed allowlist over the coordinators", () => {
+  // The coordinators carry internal paths the ops surface deliberately does
+  // not expose — `/idp-config` above all, which resolves the sealed provider
+  // secret. Today that is true by construction: `index.ts` has no route for
+  // it, and an unmatched `/ops/` path is a 404. "No such route today" is
+  // exactly the property a future route addition breaks silently, so it is
+  // worth a test rather than a reading.
+  // Coordinator paths with no ops route. `/principal-links`, `/bootstrap`,
+  // `/activation-request`, `/routing-facts`, and the status/export pair are
+  // deliberately exposed and are not listed here.
+  const internalOnly = [
+    "/idp-config",
+    "/resolve",
+    "/activation-inspect",
+    "/activation-preflight",
+    "/activation-accept",
+    "/intake",
+    "/drain",
+    "/accept",
+    "/revoke",
+    "/disable",
+    "/invite",
+    "/create-actor",
+    "/appoint-administrator",
+  ] as const;
+
+  it("does not relay an internal coordinator path, even with a valid token", async () => {
+    expect((await jsonPost("/ops/organization/bootstrap", {
+      ...orgBootstrap("org-ops-allowlist"),
+      principalLinks: [],
+    })).status).toBe(200);
+
+    for (const path of internalOnly) {
+      for (const prefix of ["/ops", "/ops/organization", "/ops/operation"] as const) {
+        const got = await ops(`${prefix}${path}?coordinator=organization&id=org-ops-allowlist`);
+        expect(got.status, `GET ${prefix}${path}`).toBe(404);
+        const posted = await jsonPost(`${prefix}${path}`, { organizationId: "org-ops-allowlist" });
+        expect(posted.status, `POST ${prefix}${path}`).toBe(404);
+        expect(await posted.text(), `POST ${prefix}${path}`).not.toContain("sealed:");
+      }
+    }
+  });
+
+  it("never returns the sealed provider configuration from a relayed ops route", async () => {
+    // Export is the one ops route that legitimately carries the sealed value,
+    // which the threat model records as residual. Every other relayed route
+    // must not, so a leak through a new route is visible here.
+    const organizationId = "org-ops-sealed";
+    expect((await jsonPost("/ops/organization/bootstrap", {
+      ...orgBootstrap(organizationId),
+      principalLinks: [],
+    })).status).toBe(200);
+
+    const status = await ops(`/ops/schema-status?coordinator=organization&id=${organizationId}`);
+    expect(await status.text()).not.toContain("sealed:ops-test");
+
+    const links = await ops(`/ops/organization/principal-links?organizationId=${organizationId}`);
+    expect(await links.text()).not.toContain("sealed:ops-test");
+
+    // and the documented exception, stated rather than assumed
+    const exported = await ops(`/ops/export?coordinator=organization&id=${organizationId}`);
+    expect(await exported.text()).toContain("sealed:ops-test");
+  });
 });
 
 describe("typed ops routes", () => {
