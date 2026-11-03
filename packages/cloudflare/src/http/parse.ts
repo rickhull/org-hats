@@ -29,6 +29,18 @@ export const failure = (kind: Failure["kind"], detail?: string): { readonly ok: 
 
 export const value = <T>(input: T): { readonly ok: true; readonly value: T } => ({ ok: true, value: input });
 
+/** The operator identity the ops surface forwarded on `x-ops-operator`, as a
+ * spreadable fragment so an absent header stays an absent property rather
+ * than an explicit `undefined`.
+ *
+ * The edge validated and bounded the value; a coordinator is reached only
+ * through a binding, so there is nothing further to check here. It is an
+ * attribution aid, never an authorization input: no handler may branch on it. */
+export const operatorIdOf = (request: Request): { readonly operatorId?: string } => {
+  const given = request.headers.get("x-ops-operator");
+  return given === null || given.length === 0 ? {} : { operatorId: given };
+};
+
 export const asRecord = (input: unknown): Record<string, unknown> => {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     throw new Error("the request body must be a JSON object");

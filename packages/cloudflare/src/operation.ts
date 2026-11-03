@@ -1517,7 +1517,7 @@ export class OperationAuthority extends DurableObject<Env> {
    * object decides nothing from a stale roster: every actor reads as
    * unknown — `not-admitted` — until a rebuild lands. The caller rebuilds
    * by pulling immediately afterwards. */
-  private restoreSnapshot(input: unknown): Result<{ restored: boolean }> {
+  private restoreSnapshot(input: unknown, operatorId?: string): Result<{ restored: boolean }> {
     if (typeof input !== "object" || input === null) return failure("invalid-command", "snapshot must be an object");
     const snapshot = input as Partial<ExportSnapshot>;
     if (snapshot.coordinator !== "operation") return failure("invalid-command", "snapshot is not operation state");
@@ -1549,6 +1549,12 @@ export class OperationAuthority extends DurableObject<Env> {
       this.ctx.storage.sql.exec(
         "DELETE FROM meta WHERE key = 'roster_synced_at' OR key LIKE 'roster_at:%'",
       );
+      // After the tables, never before: restore replaces the audit table with
+      // the snapshot's rows, so a row written first would be overwritten by
+      // the very act it records. This is the one entry a snapshot cannot
+      // supply, and without it the most destructive privileged act in the
+      // system leaves no trace that it happened.
+      this.audit(operatorId ?? "operator", `state restored from a snapshot of schema ${String(snapshot.schemaVersion)}`, now());
     });
     return value({ restored: true });
   }
@@ -1646,7 +1652,7 @@ export class OperationAuthority extends DurableObject<Env> {
       drain: () => this.drain(),
       status: () => this.status(),
       exportSnapshot: () => this.exportSnapshot(),
-      restoreSnapshot: (input) => this.restoreSnapshot(input),
+      restoreSnapshot: (input, operatorId) => this.restoreSnapshot(input, operatorId),
       snapshot: () => this.snapshot(),
       auditRows: () => this.auditRows(),
       outboxRows: () => this.outboxRows(),

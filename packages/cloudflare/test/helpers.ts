@@ -49,3 +49,30 @@ export const organizationBootstrap = (
   orgAdmins: ["actor-lead"],
   sealedIdpConfig: overrides.sealedIdpConfig ?? "sealed:test-only",
 });
+
+export interface AuditRow {
+  readonly seq: number;
+  readonly at: number;
+  readonly actor: string;
+  readonly fact: string;
+}
+
+/** A restore appends one audit row recording itself, written after the tables
+ * are replaced so the snapshot cannot overwrite it. It is therefore the one
+ * row a round-trip comparison must account for: export → restore → export is
+ * faithful in every fact the snapshot carried, plus that trace.
+ *
+ * Tests compare against `withoutRestoreAudit(...)` and assert the row itself
+ * separately, so the appended trace stays visible rather than being absorbed
+ * into a looser equality. */
+export const restoreAuditOf = (tables: Readonly<Record<string, readonly unknown[]>>): AuditRow | undefined => {
+  const audit = tables["audit"] ?? [];
+  const last = audit[audit.length - 1] as AuditRow | undefined;
+  return last?.fact?.startsWith("state restored from a snapshot") === true ? last : undefined;
+};
+
+export const withoutRestoreAudit = <T extends { readonly tables: Record<string, unknown[]> }>(snapshot: T): T => {
+  if (restoreAuditOf(snapshot.tables) === undefined) return snapshot;
+  const audit = snapshot.tables["audit"] ?? [];
+  return { ...snapshot, tables: { ...snapshot.tables, audit: audit.slice(0, -1) } };
+};

@@ -10,34 +10,70 @@ nothing here moves toward a compliance claim. The goal is narrow — when an
 assessor asks about the authority layer, the operator should not have to
 apologise for us.
 
-The audit-trail friction is already closed: `GET /ops/audit` returns
+Two frictions are already closed. `GET /ops/audit` returns
 `{ seq, at, actor, fact }` and nothing else, so producing an audit trail no
-longer discloses the sealed provider configuration that `/ops/export` carries.
-What remains needs decisions, not just work.
+longer discloses the sealed provider configuration that `/ops/export` carries;
+and privileged actions now carry the operator identity the caller claimed,
+including the restore that previously recorded nothing at all. What remains
+needs decisions, not just work.
 
-## Decision 1 — operator attribution on privileged actions
+## Decision 1 — the operator is not an actor
 
-Every ops-token action records the literal actor `"operator"`. The token is
-all-or-nothing by design, so there is no identity to record and no separation
-of duties inside the surface. An assessor asking which administrator ran a
-restore gets no answer from the audit rows.
+The built part is settled; the concept underneath it is not, and it is upstream
+of all three decisions below.
 
-The options are not equivalent, and the choice is the consumer's as much as
-ours:
+**The absent concept.** The attribution and restore-audit gaps share one cause,
+and it is not an oversight in either function. The ops surface is deliberately
+all-or-nothing, so it has no identity to record — and nothing in the design
+forced the question "who did this?" to have an answer. `actor` exists in the
+model for authority commands and does not exist for operator actions. The
+header below records a *claim* where the model has no *concept*, which is why
+it cannot be more than an aid however carefully it is validated.
 
-- an optional caller-supplied operator identifier on ops requests, recorded in
-  the audit `actor` column — cheap, additive, and unauthenticated, so it is an
-  attribution aid and must not be described as proof;
-- per-operator tokens, which turns `OPS_TOKEN` into a token set and makes the
-  surface no longer all-or-nothing — a real custody and rotation change for the
-  operator, and a larger change here;
-- leave it, and document that attribution for the ops surface comes from the
-  operator's transport logs rather than from `org-hats`.
+That ordering matters for the rest of this plan. Retention, erasure, and log
+integrity all become easier to reason about once a privileged act has an
+owner, and harder to specify while it does not: a retention window on
+unattributed rows is a storage policy rather than an accountability one, and an
+erasure request cannot be traced to who served it. Take this decision before
+the other three, not after.
 
-**Decision needed:** which of these, and whether an unauthenticated identifier
-is worth having. **Done when:** the audit rows either carry an operator
-identity with its trust level stated, or `docs/assurance.md` says plainly that
-attribution is transport-owned and why.
+**Decision needed:** whether operator actions get a first-class actor in the
+model — with the custody consequences that implies, since an identity worth
+recording is one worth authenticating — or whether this library states
+permanently that operator identity is transport-owned and the audit `actor` is
+an aid. **Done when:** either the model carries an operator actor with its
+authentication stated, or `docs/assurance.md` records the deliberate absence
+and what an operator must do instead.
+
+**What is already built,** and keeps its value either way: the cheap, additive
+option. An ops caller may send `x-ops-operator`,
+validated at the edge (1–64 characters of `A-Za-z0-9._:@-`, refused rather
+than dropped so attribution is never silently lost), forwarded inward on the
+same header, and recorded as the audit row's `actor`. Absent header keeps the
+previous behaviour exactly. It is attribution and never authorization: no
+handler branches on it, and `docs/assurance.md` states plainly that anyone
+holding the all-or-nothing token can claim any identity.
+
+Per-operator tokens remain unbuilt and are the only thing that would make
+attribution resist its own holders. Revisit if a consumer needs separation of
+duties inside the ops surface; it is a custody and rotation change for them,
+not only a change here.
+
+**A finding came out of implementing it, and is fixed in the same change.**
+Neither coordinator recorded a restore at all. The most destructive privileged
+act in the system — replacing every table, the audit table included — left no
+trace, and a row written before the tables would have been erased by the act
+it recorded. Both coordinators now write that row *after* `restoreTables`,
+inside the same transaction, attributed to the claimed identity. It is the one
+audit row a snapshot cannot supply, so a restored export now differs from its
+snapshot by exactly that row; `withoutRestoreAudit` in the test helpers states
+that refined round-trip property rather than loosening the comparison.
+
+Two platform behaviours worth not re-deriving: a newline cannot be placed in
+the header at all (the fetch API refuses to construct it), so log injection by
+that route is unexpressible rather than merely validated; and `audit.seq` is
+`AUTOINCREMENT`, so an insert after a restore of explicit seq values cannot
+collide.
 
 ## Decision 2 — retention of audit rows and idempotency claims
 

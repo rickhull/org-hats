@@ -256,7 +256,17 @@ public key distribution:
   trail is what is wanted
 - `POST /ops/restore` — `{ coordinator, id, snapshot }`, typed and atomic;
   a snapshot's undelivered outbox rows are re-delivered by the next drain,
-  and the receiving intake recognises the replay by the outbox row id
+  and the receiving intake recognises the replay by the outbox row id. The
+  restore appends one audit row recording itself, written after the tables so
+  the snapshot cannot overwrite the trace of the act that applied it — so a
+  restored export differs from its snapshot by exactly that row
+
+Every `/ops/*` request may carry `x-ops-operator: <id>` — 1–64 characters of
+`A-Za-z0-9._:@-`, refused with `invalid-command` if malformed rather than
+silently dropped. It is recorded as the audit row's `actor` in place of the
+literal `operator`. Attribution only, never authorization: no handler branches
+on it, and because the ops token is all-or-nothing anyone holding the token can
+claim any identity. See [`assurance.md`](assurance.md).
 - `GET /ops/verification-keys` — **public**, no token:
   `{ signingKeyId, keySet }` where `keySet` is the serialized
   `VerifyKeySet`

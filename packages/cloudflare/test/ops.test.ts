@@ -1,7 +1,7 @@
 import { SELF, env } from "cloudflare:test";
 import { ed25519VerifyKey, parseVerifyKeySet } from "org-hats/access";
 import { describe, expect, it } from "vitest";
-import { organizationBootstrap, type Envelope } from "./helpers";
+import { organizationBootstrap, restoreAuditOf, withoutRestoreAudit, type Envelope } from "./helpers";
 import worker, { bindPrincipalLink } from "../src/index";
 import type { Env } from "../src/env";
 
@@ -165,6 +165,81 @@ describe("the ops surface is a closed allowlist over the coordinators", () => {
     }
   });
 
+  it("records the operator identity a caller claims, and refuses a malformed one", async () => {
+    // The ops token is all-or-nothing, so this is attribution and not proof:
+    // anyone holding the token can claim any identity. What it buys is a trail
+    // that names a person instead of the bare literal `operator`.
+    const organizationId = "org-ops-attribution";
+    const as = (operator: string) => ({ "x-ops-operator": operator });
+
+    expect((await ops("/ops/organization/bootstrap", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...as("nia@cedar.example") },
+      body: JSON.stringify({ ...orgBootstrap(organizationId), principalLinks: [] }),
+    })).status).toBe(200);
+
+    expect((await ops("/ops/organization/activation-request", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...as("nia@cedar.example") },
+      body: JSON.stringify({ organizationId, actorId: "actor-lead" }),
+    })).status).toBe(200);
+
+    const trail = await (await ops(`/ops/audit?coordinator=organization&id=${organizationId}`)).json() as
+      Envelope<readonly { actor: string; fact: string }[]>;
+    const issued = (trail.value ?? []).find((row) => row.fact.includes("activation for actor actor-lead issued"));
+    expect(issued?.actor).toBe("nia@cedar.example");
+
+    // absent header keeps the previous behaviour exactly
+    expect((await jsonPost("/ops/organization/activation-request", {
+      organizationId,
+      actorId: "actor-crew",
+    })).status).toBe(200);
+    const after = await (await ops(`/ops/audit?coordinator=organization&id=${organizationId}`)).json() as
+      Envelope<readonly { actor: string; fact: string }[]>;
+    expect((after.value ?? []).find((row) => row.fact.includes("actor-crew issued"))?.actor).toBe("operator");
+
+    // The value lands verbatim in a row people read, so it is bounded and
+    // charset-checked, and a bad value is refused rather than silently
+    // dropped. A newline is not in this list because it cannot be: the fetch
+    // API refuses to construct the header at all, so log injection by that
+    // route is unexpressible rather than merely validated.
+    for (const bad of ["a".repeat(65), "has space", "semi;colon", "quote\"d", "comma,separated"]) {
+      const refused = await ops(`/ops/audit?coordinator=organization&id=${organizationId}`, {
+        headers: as(bad),
+      });
+      expect(refused.status, JSON.stringify(bad)).toBe(400);
+      expect((await refused.json() as Envelope<unknown>).failure?.kind, JSON.stringify(bad)).toBe("invalid-command");
+    }
+  });
+
+  it("records who restored a coordinator, in a row the snapshot cannot overwrite", async () => {
+    // Restore replaces every table, the audit table included, so a row
+    // written before the tables would be erased by the act it records. This
+    // is the only trace that the most destructive privileged action happened.
+    const sourceId = "org-ops-restore-trace";
+    expect((await jsonPost("/ops/organization/bootstrap", {
+      ...orgBootstrap(sourceId),
+      principalLinks: [],
+    })).status).toBe(200);
+    const snapshot = await (await ops(`/ops/export?coordinator=organization&id=${sourceId}`)).json() as {
+      tables: Record<string, unknown[]>;
+    };
+    expect(restoreAuditOf(snapshot.tables)).toBeUndefined();
+
+    const targetId = "org-ops-restore-trace-target";
+    expect((await ops("/ops/restore", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...{ "x-ops-operator": "sam:oncall" } },
+      body: JSON.stringify({ coordinator: "organization", id: targetId, snapshot }),
+    })).status).toBe(200);
+
+    const trail = await (await ops(`/ops/audit?coordinator=organization&id=${targetId}`)).json() as
+      Envelope<readonly { actor: string; fact: string }[]>;
+    const row = (trail.value ?? []).at(-1);
+    expect(row?.fact).toContain("state restored from a snapshot");
+    expect(row?.actor).toBe("sam:oncall");
+  });
+
   it("produces the audit trail without the sealed configuration beside it", async () => {
     // An operator under assessment has to hand over audit rows. Before this
     // route the only path was `/ops/export`, which carries the provider
@@ -301,8 +376,13 @@ describe("typed ops routes", () => {
       snapshot: operationSnapshot,
     });
     expect(restored.status).toBe(200);
-    const restoredExport = await (await ops(`/ops/export?coordinator=operation&id=${RESTORED_OP}`)).json();
-    expect(restoredExport).toEqual(operationSnapshot);
+    const restoredExport = await (await ops(`/ops/export?coordinator=operation&id=${RESTORED_OP}`)).json() as {
+      tables: Record<string, unknown[]>;
+    };
+    // Faithful in every fact the snapshot carried, plus the one row the
+    // snapshot could not carry: the record that it was restored.
+    expect(withoutRestoreAudit(restoredExport)).toEqual(operationSnapshot);
+    expect(restoreAuditOf(restoredExport.tables)?.actor).toBe("operator");
 
     const orgExport = await (await ops(`/ops/export?coordinator=organization&id=${ORG}`)).json() as {
       coordinator: string;
@@ -317,8 +397,11 @@ describe("typed ops routes", () => {
       snapshot: orgExport,
     });
     expect(restoredOrg.status).toBe(200);
-    const restoredOrgExport = await (await ops(`/ops/export?coordinator=organization&id=${RESTORED_ORG}`)).json();
-    expect(restoredOrgExport).toEqual(orgExport);
+    const restoredOrgExport = await (await ops(`/ops/export?coordinator=organization&id=${RESTORED_ORG}`)).json() as {
+      tables: Record<string, unknown[]>;
+    };
+    expect(withoutRestoreAudit(restoredOrgExport)).toEqual(orgExport);
+    expect(restoreAuditOf(restoredOrgExport.tables)?.actor).toBe("operator");
   });
 
   it("restores a schema-1 organization export with an empty activation table", async () => {

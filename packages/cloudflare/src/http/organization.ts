@@ -11,6 +11,7 @@ import {
   readBody,
   value,
   type Result,
+  operatorIdOf,
 } from "./parse";
 import type {
   AcceptInput,
@@ -62,7 +63,7 @@ export interface OrganizationRouteHost {
   reset(): Result<unknown>;
   status(): Record<string, unknown>;
   exportSnapshot(): unknown;
-  restoreSnapshot(input: unknown): Result<unknown>;
+  restoreSnapshot(input: unknown, operatorId?: string): Result<unknown>;
   auditRows(): readonly Record<string, unknown>[];
   outboxRows(): readonly Record<string, unknown>[];
   markDelivered(id: string): Result<unknown>;
@@ -129,6 +130,7 @@ export const handleOrganizationRequest = async (
         byActorId: asString(input["byActorId"], "byActorId"),
         secretHash: asString(input["secretHash"], "secretHash"),
         ...(input["operator"] === true ? { operator: true } : {}),
+        ...operatorIdOf(request),
       }));
     }
 
@@ -156,6 +158,7 @@ export const handleOrganizationRequest = async (
         byActorId: asString(body["byActorId"], "byActorId"),
         idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
         ...(body["operator"] === true ? { operator: true } : {}),
+        ...operatorIdOf(request),
       };
       return json(url.pathname === "/revoke-activation"
         ? host.revokeActivation(input)
@@ -287,7 +290,9 @@ export const handleOrganizationRequest = async (
     }
 
     if (request.method === "POST" && url.pathname === "/restore") {
-      return json(host.restoreSnapshot(await request.json()));
+      // The identity rides the header, not the body: the body is the snapshot
+      // itself, and wrapping it would change the export/restore contract.
+      return json(host.restoreSnapshot(await request.json(), operatorIdOf(request).operatorId));
     }
 
     if (request.method === "GET" && url.pathname === "/audit") {

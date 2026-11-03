@@ -169,6 +169,14 @@ run ends with a short self-evaluation of whether the skill earned its keep.
   a local artifact.
 - The portable packages' suites must run without workerd or a Cloudflare
   account; runtime-specific tests belong to the future Cloudflare package.
+- A new test written for an **existing** guard is not evidence until the guard
+  has been removed and the test shown to fail.  A bugfix proves itself red
+  against the defect; a test added for a control that already holds proves
+  nothing by passing, and will pass for the wrong reason often enough to
+  matter — one such test asserted a condition that cannot occur, because
+  header values are trimmed in transit, and only removing the guard exposed
+  it.  Remove the guard, watch the test fail, restore the guard, and confirm
+  the tree is unmodified before handing back.
 - When a handoff carries a commit-sized chunk of work, propose a one-line
   commit message for it.
 
@@ -177,6 +185,21 @@ run ends with a short self-evaluation of whether the skill earned its keep.
 - The portable fence is law: everything under `src/` compiles with
   `types: []` and imports nothing Cloudflare.  `bin/check` enforces it; when
   code and the fence disagree, fix the code.
+- Every value crossing from untrusted JSON into a typed position passes a
+  named parser at the boundary.  `parseVerifyKeySet`,
+  `parseSealedProviderConfig`, and `decodeSegment` are the shape; the access
+  envelope had none, and three separate defects followed from that one
+  absence.  A declared parameter type is erased at runtime and reads as a
+  guarantee it does not provide, so a parameter that receives unparsed input
+  is declared `unknown` and narrowed by its parser — never typed as the thing
+  it has not yet been proven to be.  "Typed but unparsed" is the shape of the
+  bug; make it visible in the signature.
+- An audit row describing a whole-table replacement is written **after** the
+  replacement, inside the same transaction.  Restore deletes and reinserts
+  the `audit` table, so a row written first is erased by the act it records —
+  and a reviewer looking only for the presence of an audit call gets the
+  wrong answer.  Ordering is the control here, and nothing but this rule
+  enforces it.
 - The redesign line is a clean break with v0.4: the old model, port, spine,
   adapter, examples, and docs live at their tags, and content returns only
   by being re-specified against `docs/authority_redesign.md` — never copied

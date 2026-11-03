@@ -327,6 +327,35 @@ nothing until it has been shown to detect the absence.
   them forever.  Recognising the replay is what lets a redelivered message be
   retired.  `docs/threat_model.md` now says so.
 
+## Carried decision — make the gate the only path to the value
+
+Not a finding, and not a cleanup: the structural remedy the findings point at,
+to be adjudicated in Phase 6 rather than taken mid-campaign.
+
+The envelope version gate is shared by three callers, and the obligation to
+run it before reading a claim is **convention**. `organization.ts` read
+`.claims` one statement before the gate, which is how a shared control became
+a defect in one caller and not the others. The restore gap has the same shape:
+the invariant lives in a function, and nothing stops a caller from working
+around it.
+
+The structural answer is to make the gate the only path to the value — have it
+return parsed claims rather than `Failure | undefined`, so a caller cannot hold
+a claim it has not gated. That would have made the `organization.ts` line
+impossible rather than merely wrong, which is the difference between
+preventing an instance and catching one.
+
+It is a deep-module change to the portable core and consumer-visible, so it is
+a decision, not a tidy-up. Weigh it against the parse-boundary convention now
+in `AGENTS.md`, which addresses the same class more cheaply and without a
+surface change; the convention may be sufficient, and this plan should not
+assume the larger change is the right one.
+
+**Decide when:** Phase 6, with the full finding set in view. **Done when:**
+either the gate returns the parsed value and the three callers take it that
+way, or the convention is recorded as the chosen remedy and this decision is
+removed.
+
 ## Next action
 
 The rest of Phase 3, as specified above: provider documents treated as

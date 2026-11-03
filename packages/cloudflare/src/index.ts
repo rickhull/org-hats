@@ -163,12 +163,45 @@ const coordinator = (env: Env, name: string | null, id: string): DurableObjectSt
   return undefined;
 };
 
-const relay = async (stub: DurableObjectStub, path: string, body?: unknown): Promise<Response> => {
+/** The audit-trail identity an ops caller may claim, forwarded inward on
+ * `x-ops-operator`.
+ *
+ * It is an attribution aid and not proof. The ops token is all-or-nothing, so
+ * anyone holding it can send any value here; what this buys is a trail that
+ * names a person when the operator's tooling supplies one, instead of the bare
+ * literal `operator` for every privileged act. Treat it exactly as far as the
+ * operator's own control over who holds the token.
+ *
+ * The value is written verbatim into an audit row, which is read by people and
+ * exported to assessors, so it is bounded and restricted to a conservative
+ * charset: an unbounded header would be both a state-growth and a
+ * log-injection problem. A malformed value is refused rather than dropped —
+ * silently losing attribution is worse than a loud refusal, because the
+ * operator would believe it had been recorded. */
+const OPS_OPERATOR = /^[A-Za-z0-9._:@-]{1,64}$/;
+
+const opsOperator = (request: Request): string | undefined => {
+  const given = request.headers.get("x-ops-operator");
+  if (given === null || given.length === 0) return undefined;
+  if (!OPS_OPERATOR.test(given)) {
+    throw new Error("x-ops-operator must be 1-64 characters of A-Z a-z 0-9 . _ : @ -");
+  }
+  return given;
+};
+
+const relay = async (
+  stub: DurableObjectStub,
+  path: string,
+  body?: unknown,
+  operator?: string,
+): Promise<Response> => {
   const response = await stub.fetch(`https://authority.internal${path}`, {
     method: body === undefined ? "GET" : "POST",
-    ...(body === undefined
-      ? {}
-      : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+    headers: {
+      ...(body === undefined ? {} : { "content-type": "application/json" }),
+      ...(operator === undefined ? {} : { "x-ops-operator": operator }),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   return new Response(response.body, {
     status: response.status,
@@ -246,6 +279,8 @@ export default {
         return Response.json({ ok: false, failure: { kind: "unauthenticated" } }, { status: 401 });
       }
       try {
+        // Inside the try, so a malformed identity is the surface's own 400.
+        const operator = opsOperator(request);
         if (request.method === "POST" && url.pathname === "/ops/organization/bootstrap") {
           const body = await request.json() as {
             organizationId?: string;
@@ -306,7 +341,10 @@ export default {
           const secret = activationSecret();
           const response = await organizationStub(env, body.organizationId).fetch("https://authority.internal/activation-request", {
             method: "POST",
-            headers: { "content-type": "application/json" },
+            headers: {
+              "content-type": "application/json",
+              ...(operator === undefined ? {} : { "x-ops-operator": operator }),
+            },
             body: JSON.stringify({
               actorId: body.actorId,
               byActorId: "operator",
@@ -330,6 +368,7 @@ export default {
             organizationStub(env, body.organizationId),
             url.pathname.endsWith("unlink-principal") ? "/unlink-principal" : "/revoke-activation",
             { actorId: body.actorId, byActorId: "operator", operator: true, idempotencyKey: body.idempotencyKey },
+            operator,
           );
         }
         if (request.method === "POST" && url.pathname === "/ops/operation/bootstrap") {
@@ -371,7 +410,7 @@ export default {
           const body = await request.json() as { coordinator?: string; id?: string; snapshot?: unknown };
           const stub = coordinator(env, body.coordinator ?? null, body.id ?? "");
           if (stub === undefined) throw new Error("coordinator must be organization or operation, with an id");
-          return relay(stub, "/restore", body.snapshot);
+          return relay(stub, "/restore", body.snapshot, operator);
         }
         return Response.json({ ok: false, failure: { kind: "wrong-binding", detail: "unknown ops route" } }, { status: 404 });
       } catch (error) {

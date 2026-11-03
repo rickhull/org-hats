@@ -28,6 +28,8 @@ artifact that evidences each.
 | How are authorization changes made? | Typed commands with a declared owner, scope, standing, and mode ([`commands.md`](commands.md)). |
 | Is privileged action recorded? | Audit rows `(seq, at, actor, fact)` on both coordinators, written in the same transaction as the mutation. |
 | Can the audit trail be produced on its own? | `GET /ops/audit?coordinator=…&id=…` returns those rows and nothing else — secret-free by construction, unlike `/ops/export` ([`cloudflare.md`](cloudflare.md)). |
+| Is a restore recorded? | Yes, and it is the one audit row a snapshot cannot supply: restore writes it after replacing the tables, so the act cannot erase its own trace. |
+| Who performed a privileged action? | The identity the caller claimed on `x-ops-operator`, or the literal `operator` when none was sent. A claim, not proof — see below. |
 | Are retries safe? | Idempotency claims commit with their mutation; a reused key with a different payload is named misuse (`A8`). |
 | Is access revoked promptly? | Disable, unlink, participation, team, and grant changes revoke refresh records; an issued envelope stands only to its expiry ([`consumer-session.md`](consumer-session.md), `A7`, `A13`). |
 | Are secrets stored? | Activation secrets are stored as digests only; refresh handles are hashed at rest ([`activation.md`](activation.md), `A16`). |
@@ -66,13 +68,15 @@ not on this library. What this library owes them is not getting in the way.
 Recorded as facts, not promises. Each is a friction an operator will meet, and
 the owner of the fix.
 
-**Privileged actions are attributed to "operator", not to a person.** Every
-ops-token action records the literal actor `"operator"`. The token is
-all-or-nothing by design, so there is no per-operator identity to record and
-no separation of duties within the surface. An assessor asking "which
-administrator ran this restore?" gets no answer from the audit rows. Both
-regimes ask for individual accountability on privileged access; today the
-operator must answer it from their own transport logs, outside `org-hats`.
+**Operator attribution is a claim, not proof.** An ops caller may send
+`x-ops-operator: <id>`, and the audit row records it in place of the bare
+literal `operator`. That is worth having — an assessor asking "which
+administrator ran this restore?" now gets a name — but the ops token remains
+all-or-nothing, so anyone holding it can claim any identity. The trail is
+therefore exactly as trustworthy as the operator's control over who holds the
+token, and no further. There is still no separation of duties inside the
+surface. An operator who needs attribution that resists its own holders needs
+per-operator tokens, which this library does not provide.
 
 **The audit log is not tamper-evident.** This is an explicit non-goal, and it
 is the right call for a library that does not own storage — but it is a stated

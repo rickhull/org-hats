@@ -20,6 +20,7 @@ import {
   readBody,
   value,
   type Result,
+  operatorIdOf,
 } from "./parse";
 import type {
   AccessRequestCommand,
@@ -64,7 +65,7 @@ export interface OperationRouteHost {
   drain(): Promise<{ readonly delivered: number; readonly pending: number }>;
   status(): Record<string, unknown>;
   exportSnapshot(): unknown;
-  restoreSnapshot(input: unknown): Result<unknown>;
+  restoreSnapshot(input: unknown, operatorId?: string): Result<unknown>;
   snapshot(): Record<string, unknown>;
   auditRows(): readonly Record<string, unknown>[];
   outboxRows(): readonly Record<string, unknown>[];
@@ -356,7 +357,8 @@ export const handleOperationRequest = async (
     if (request.method === "GET" && url.pathname === "/status") return json(value(host.status()));
     if (request.method === "GET" && url.pathname === "/export") return json(value(host.exportSnapshot()));
     if (request.method === "POST" && url.pathname === "/restore") {
-      const restored = host.restoreSnapshot(await request.json());
+      // The identity rides the header: the body is the snapshot itself.
+      const restored = host.restoreSnapshot(await request.json(), operatorIdOf(request).operatorId);
       // rebuild the derived projection, so a restored operation can decide
       // again without waiting for the reconciliation interval
       if (restored.ok) await host.reconcileRosters(true);

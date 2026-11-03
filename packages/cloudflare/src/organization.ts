@@ -81,6 +81,9 @@ export interface ActivationRequestInput {
   readonly byActorId: string;
   readonly secretHash: string;
   readonly operator?: boolean;
+  /** Attribution only, never authorization: the identity the ops caller
+   * claimed, recorded in place of the bare literal `operator`. */
+  readonly operatorId?: string;
 }
 
 export interface ActivationAcceptInput {
@@ -94,6 +97,8 @@ export interface RecoveryInput {
   readonly byActorId: string;
   readonly idempotencyKey: string;
   readonly operator?: boolean;
+  /** Attribution only, never authorization. */
+  readonly operatorId?: string;
 }
 
 export interface CreateActorInput {
@@ -427,7 +432,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
         "INSERT INTO activation_requests (request_id, actor_id, secret_hash, issued_at, expires_at) VALUES (?, ?, ?, ?, ?)",
         requestId, input.actorId, input.secretHash, at, expiresAt,
       );
-      this.audit(input.operator ? "operator" : input.byActorId, `activation for actor ${input.actorId} issued`, at);
+      this.audit(input.operator ? (input.operatorId ?? "operator") : input.byActorId, `activation for actor ${input.actorId} issued`, at);
       return value({ requestId, expiresAt });
     });
   }
@@ -525,7 +530,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
         "UPDATE activation_requests SET revoked_at = ? WHERE actor_id = ? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at > ?",
         at, input.actorId, at,
       );
-      this.audit(input.operator ? "operator" : input.byActorId, `activation for actor ${input.actorId} revoked`, at);
+      this.audit(input.operator ? (input.operatorId ?? "operator") : input.byActorId, `activation for actor ${input.actorId} revoked`, at);
       this.claim(input.idempotencyKey, payload, at);
       return value({ applied: true });
     });
@@ -549,7 +554,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
       this.outbox("actor-unlinked", "*", {
         kind: "actor-unlinked", organizationId: this.organizationId(), actorId: input.actorId,
       }, at);
-      this.audit(input.operator ? "operator" : input.byActorId, `principal links for actor ${input.actorId} removed`, at);
+      this.audit(input.operator ? (input.operatorId ?? "operator") : input.byActorId, `principal links for actor ${input.actorId} removed`, at);
       this.claim(input.idempotencyKey, payload, at);
       return value({ applied: true });
     });
@@ -982,7 +987,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
     };
   }
 
-  private restoreSnapshot(input: unknown): Result<{ restored: boolean }> {
+  private restoreSnapshot(input: unknown, operatorId?: string): Result<{ restored: boolean }> {
     if (typeof input !== "object" || input === null) return failure("invalid-command", "snapshot must be an object");
     const snapshot = input as Partial<ExportSnapshot>;
     if (snapshot.coordinator !== "organization") return failure("invalid-command", "snapshot is not organization state");
@@ -997,6 +1002,12 @@ export class OrganizationAuthority extends DurableObject<Env> {
         organizationTables,
         snapshot.tables as Readonly<Record<string, readonly StateRow[]>>,
       );
+      // After the tables, never before: restore replaces the audit table with
+      // the snapshot's rows, so a row written first would be overwritten by
+      // the very act it records. This is the one entry that cannot come from
+      // the snapshot — a restore otherwise leaves no trace that the most
+      // destructive privileged act in the system happened at all.
+      this.audit(operatorId ?? "operator", `state restored from a snapshot of schema ${String(snapshot.schemaVersion)}`, now());
     });
     return value({ restored: true });
   }
@@ -1035,7 +1046,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
       reset: () => this.reset(),
       status: () => this.status(),
       exportSnapshot: () => this.exportSnapshot(),
-      restoreSnapshot: (input) => this.restoreSnapshot(input),
+      restoreSnapshot: (input, operatorId) => this.restoreSnapshot(input, operatorId),
       auditRows: () => this.auditRows(),
       outboxRows: () => this.outboxRows(),
       markDelivered: (id) => this.markDelivered(id),

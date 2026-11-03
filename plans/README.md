@@ -20,9 +20,11 @@ scaled bench's state; the measured verdict, the consumer-agreed design
 [`snapshot_cache.md`](snapshot_cache.md).
 
 Four decisions stand between this library and an operator's SOC 2 or TISAX
-assessment going smoothly — operator attribution, retention, erasure, and
-release signing. The durable posture is [`../docs/assurance.md`](../docs/assurance.md);
-the decisions and their done-whens are in [`assurance.md`](assurance.md).
+assessment going smoothly, and the first is upstream of the rest: whether an
+operator action has an owner in the model at all, before retention, erasure,
+and release signing.  The durable posture is
+[`../docs/assurance.md`](../docs/assurance.md); the decisions and their
+done-whens are in [`assurance.md`](assurance.md).
 
 The specs-driven witness suite landed; its durable convention lives in
 `tests/README.md` and `specs/README.md`.

@@ -16,7 +16,7 @@ import { AUTHORITY_INTERFACE_VERSION, isFailed } from "org-hats/authority";
 import { CONFORMANCE_PRINCIPALS } from "org-hats/conformance";
 import { describe, expect, it } from "vitest";
 import { createCloudflareConformanceWorld } from "../src/conformance";
-import { call, organizationBootstrap } from "./helpers";
+import { call, organizationBootstrap, restoreAuditOf, withoutRestoreAudit } from "./helpers";
 import type { StateRow } from "../src/state";
 
 const OPS = { authorization: "Bearer test-ops-token" };
@@ -143,7 +143,7 @@ describe("the restore matrix", () => {
 
       const after = await exportCoordinator("operation", target);
       expect(after.schemaVersion).toBe("5");
-      expect(after.tables).toEqual(asRestored(source, version));
+      expect(withoutRestoreAudit(after).tables).toEqual(asRestored(source, version));
 
       // The named claims, stated once for the record:
       if (version !== "5") {
@@ -244,8 +244,8 @@ describe("the restore matrix", () => {
     expect(restoredOrganization.status).toBe(200);
     expect(restoredOrganization.body.ok).toBe(true);
 
-    expect(await exportCoordinator("operation", targetOperation)).toEqual(sourceOperation);
-    expect(await exportCoordinator("organization", targetOrganization)).toEqual(sourceOrganization);
+    expect(withoutRestoreAudit(await exportCoordinator("operation", targetOperation))).toEqual(sourceOperation);
+    expect(withoutRestoreAudit(await exportCoordinator("organization", targetOrganization))).toEqual(sourceOrganization);
   }, 60_000);
 
   it("refuses a future schema version for both coordinators", async () => {
