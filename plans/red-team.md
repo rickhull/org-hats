@@ -77,167 +77,18 @@ next decision before the campaign continues.  Remediation follows the
 repository's bugfix rule: prove the defect red first, then fix it, and keep the
 test and fix in one commit-sized handoff.
 
-## Moshpit execution
+## Execution
 
-This campaign is the threshold-case test of the shared `moshpit` skill.  The
-orchestrator runs in a harness that can put the strongest model in the chair
-and choose a model per specialist; if this Pi harness cannot, hand the run to
-Claude Code or another capable harness.  The campaign plan remains
-authoritative over the harness.
+Phase 1 ran as the threshold-case `moshpit` pod and returned *earned its
+keep*; Phase 2 onward ran inline, and Phase 3 settled the question for good
+with reasons (below).  Both verdicts are recorded where they belong — the
+skill itself took the two lessons this campaign produced.  The remaining work
+is two decisions and needs no fan-out.
 
-The orchestrator owns the threat-model matrix, the gap register, the
-cross-area decisions, the stop conditions, and the final adjudication.  It
-settles these before any spawn:
-
-- the matrix schema and disposition vocabulary (`confirmed`, `residual`,
-  `documentation defect`, `rejected`);
-- the evidence standard (invariant, source path, test name, owner);
-- severity and owner classification; and
-- private-finding routing and the disclosure point.
-
-Specialists own boundary lanes; helpers do bounded extraction only.  A
-specialist that finds a cross-lane or cross-cutting issue reports it upward;
-it does not judge it alone.  No specialist receives another lane's transcript;
-pointers and row dispositions travel through the orchestrator.
-
-Phase 1 is the initial two-lane pod:
-
-- **issuer → verifier** — envelope format, canonical bytes, signature and key
-  set, claims, access verification, and the fixed vectors;
-- **operator → ops** — operator authentication, ops routes, the ops token,
-  sealed IdP configuration, bootstrap/export/restore, and the runtime's
-  operator boundary.
-
-The orchestrator integrates the two lane reports into one matrix, reconciles
-overlapping threat rows, and stops for Rick's review before any attack test is
-written.
-
-Later phases are sequenced, not parallel campaign lanes.  The orchestrator may
-form a phase-scoped pod when that phase has two or more durable, independent
-sub-areas; it must not run a later phase while an earlier phase's confirmed
-finding or open cross-area decision would change its premises.  A confirmed
-critical or high finding stops the current phase and goes to Rick privately;
-the pod does not continue around it.
-
-Phase 1 is read-only.  In phases that add tests, workers may run a single named
-suite; the orchestrator runs `pnpm check`, `pnpm check:cloudflare`, or
-`pnpm verify` at integration, never inside a worker.  Parallel writers use
-worktrees or disjoint file allowlists.  Mechanical breadth may use
-`agentic-sweep` in an isolated sweep lane; it is a batch tool, not a second
-command structure.
-
-Because Phase 1 is a threshold case, its report ends with the moshpit
-self-evaluation from the shared skill.  The evaluation covers process, not
-finding details; sensitive evidence stays in the private report.  A “should
-have been inline” verdict is a valid result and informs whether later phases
-use a pod or run serially.
-
-This execution model does not change the campaign's scope, sequencing,
-disclosure rules, or stop conditions.
-
-## Phase 3 — Cloudflare boundary and state attacks
-
-Exercise the reference runtime through its local Vitest/workerd harness.  No
-deployed endpoint is in scope.
-
-- Treat OIDC discovery, JWKS, token responses, headers, cache directives, and
-  JWTs as hostile.  Test endpoint substitution, redirect behavior, key
-  confusion, rotation/refetch bounds, malformed and oversized bodies, optional
-  claim shapes, time skew, and failure classification.  Verify where provider
-  trust ends and transport/input validation begins.
-- Enumerate the Worker fetch routes and prove that demo and harness routes are
-  closed unless explicitly enabled, ops routes use the timing-safe token gate,
-  and the public verification-key route discloses only its documented data.
-- Exercise organization-directory ambiguity, subject-guard serialization,
-  wrong coordinator ids, stale projections, duplicate/reordered alarms,
-  concurrent refresh/revocation, and partial cross-coordinator workflows.
-- Restore synthetically hostile snapshots: future schemas, invalid references,
-  fabricated claims, replayable outbox rows, and sealed configuration.  Prove
-  the exact boundary between validated structure and operator-authorized state.
-- Establish bounded local cost for expensive parsing, signature verification,
-  provider refetch, restore, and alarm paths.  This is a complexity and
-  amplification review, not a volumetric load test.
-
-**Evidence:** negative tests under `packages/cloudflare/test/`, plus threat
-model or runbook corrections where behavior is intentionally operator-owned.
-
-**Verification:** run focused tests with
-`pnpm --filter org-hats-cloudflare exec vitest run <test-file>`, then
-`pnpm check` and `pnpm check:cloudflare`.  Do not run these concurrently with
-`bin/check-dist` or `pnpm verify`.
-
-**Exit:** every Cloudflare-owned boundary in the traceability map has hostile
-input evidence, race evidence where ordering matters, and an explicit owner
-for any unmitigated availability or deployment risk.
-
-## Phase 4 — Supply-chain and release attacks
-
-Review the path from source to the commit a consumer pins:
-
-- corroborate the package manager, workspace boundaries, lockfile, CI pins,
-  and dependency-script policy;
-- inspect new and transitive dependencies for install scripts, provenance,
-  maintenance, and reachability, then run `pnpm audit` with network access only
-  after Rick authorizes it;
-- prove a clean build reproduces tracked `dist/` and that the artifact exports
-  only the declared surface;
-- attack tag-family selection, wrong-commit tags, manifest disagreement,
-  mirror publication failure, dirty checkout behavior, CI credential
-  scrubbing, and source/artifact divergence; and
-- separate repository policy (tags do not move) from cryptographic assurance
-  (a consumer pins a commit when it needs an immutable commitment).
-
-**Evidence:** focused release-tool tests, artifact comparisons, and a dependency
-triage for every reachable high or critical advisory.  An advisory is not
-closed merely because an upgrade exists; reachability and the tested fix are
-recorded.
-
-**Verification:** run focused release/tooling suites, then `pnpm verify` after
-all code, test, configuration, and generated-artifact changes settle.
-
-**Exit:** the committed source, built artifact, version, tag family, and
-consumer pin form one explainable chain, and no reachable high or critical
-advisory is left without a recorded decision.
-
-## Phase 5 — Compromise tabletop
-
-Run local, synthetic walkthroughs for signing-key compromise, unknown verifier
-key, ops-token disclosure, sealed IdP-secret disclosure, stolen envelope,
-stolen refresh handle, exposed activation secret, malicious restore, and an
-accidental development signer.
-
-For each scenario, identify detection evidence, the first containment action,
-the authority that owns it, session and refresh consequences, verification
-steps, cutback limits, and the point where consumer or operator coordination is
-required.  Commands that would mutate a live deployment are reviewed as text,
-not executed.
-
-**Evidence:** corrections to `docs/key_compromise.md` and
-`docs/threat_model.md`, plus local tests for any repository-owned mechanism the
-tabletop reveals as missing.  Consumer-owned decisions are requested through
-the relay without including secrets or exploit material.
-
-**Exit:** every asset in the threat model has a containment path, an owner, and
-a verification step; the runbook never relies on a credential already assumed
-compromised and never mistakes signing-key rotation for refresh revocation.
-
-## Phase 6 — Adjudication and closeout
-
-Re-run the claims-to-evidence map against the final tree.  Classify every
-hypothesis, ensure every confirmed defect has a reproducing test and an owner,
-and distinguish fixes from consciously accepted residual risks.  Remove this
-plan when all work lands; durable conclusions remain in `docs/`, named
-invariants remain in `specs/`, and executable evidence remains in the suites.
-
-**Final verification:** `pnpm verify` passes on the complete change set, the
-documentation links resolve through `pnpm check`, and a clean diff review finds
-no secret, real roster, exploit transcript, or unsupported security guarantee.
-
-**Done when:** all threat-model rows and newly discovered boundaries have a
-recorded disposition; every repository-owned confirmed defect is fixed with a
-regression test or is explicitly accepted by Rick; the compromise table is
-executable as a local procedure; and the threat model accurately states the
-remaining host-, operator-, and consumer-owned risk.
+The rules that still bind: a confirmed critical or high finding stops the
+phase and goes to Rick before the campaign continues, and remediation follows
+the repository's bugfix rule — red first, then the fix, in one commit-sized
+handoff.
 
 ## Phases 1 and 2 — settled
 
@@ -293,9 +144,9 @@ identically at depth 5 across a 20x spread in bytes, and the festival twin
 legitimately exceeds the host cookie budget, which the host refuses at
 issuance.  A verifier-side size cap would refuse legitimate envelopes.
 
-## Phase 3 — the four carried gaps are closed
+## Phase 3 — complete
 
-Each was a claim Phase 1 located with no witness.  Every new test was
+Four carried gaps closed first, each a claim Phase 1 located with no witness.  Every new test was
 mutation-validated: the guard it covers was removed, the test was proven to
 fail, and the guard restored.  A new test that passes on arrival proves
 nothing until it has been shown to detect the absence.
@@ -327,9 +178,7 @@ nothing until it has been shown to detect the absence.
   them forever.  Recognising the replay is what lets a redelivered message be
   retired.  `docs/threat_model.md` now says so.
 
-## Phase 3 — in progress
-
-The four carried gaps are closed (above). Since then:
+Since then:
 
 - **Confirmed, medium — an envelope lifetime that is not a positive whole
   number removed expiry entirely.** `exp` is `issuedAt +
@@ -460,10 +309,36 @@ reads, and `AGENTS.md` forbids installing pnpm through corepack. The flake
 pins pnpm locally and the workflow pins it in CI; a `packageManager` field
 would be inert at best and an invitation to the forbidden path at worst.
 
-**Still owed:** `pnpm audit`. It needs network access, which the campaign's
-rules of engagement require Rick to authorize explicitly. Until then the
-advisory question is open — though reachability above bounds what any advisory
-can mean for a consumer.
+**`pnpm audit`, run 2026-11-02 with Rick's authorization.** 5 high, 4
+moderate, 0 critical, across exactly two modules — and the line that matters
+most is `"dependencies": 0` against 160 devDependencies.
+
+- `undici@7.29.1` (eight advisories, needs ≥7.30.1), reached through
+  `miniflare` from both `@cloudflare/vitest-plugin` and `wrangler`.
+- `zod@4.6.5` (one high, needs ≥4.6.6), reached through
+  `@cloudflare/vitest-plugin`.
+
+Per this plan's rule, an advisory is not closed because an upgrade exists.
+Recorded instead:
+
+- **Reachability into a consumer's runtime: none.** Both are dev-only
+  transitives of the Cloudflare package, and nothing third-party ships in
+  either published artifact.
+- **Reachability into our own build and test: present, not adversarial.**
+  `undici` is miniflare's HTTP client for the local test runtime and `zod`
+  validates the vitest plugin's config. The suites run against a local
+  workerd with no outbound network — the exchange tests supply the provider
+  in-process — and CI's one download uses `curl` against a version-pinned,
+  SHA-256-verified URL rather than undici.
+- **The fix is not ours to take.** `miniflare` pins `undici` at exactly
+  `7.29.1`, and the vitest plugin resolves `zod` itself; neither is a range we
+  can satisfy. A `pnpm.overrides` entry would run miniflare against an undici
+  it never tested, to fix a denial of service we cannot reach — worse than the
+  advisory.
+- **Disposition: accepted, with a re-check trigger.** It clears on an ordinary
+  dependency refresh once Cloudflare bumps `miniflare` and
+  `@cloudflare/vitest-plugin`. Re-run `pnpm audit` with that refresh rather
+  than on a schedule; the gap is patch-level in both cases.
 
 ## Phase 5 — compromise tabletop
 
@@ -567,29 +442,69 @@ either the gate returns the parsed value and the three callers take it that
 way, or the convention is recorded as the chosen remedy and this decision is
 removed.
 
+## Phase 6 — adjudication
+
+Re-run against the final tree. `pnpm verify` passes on the complete change
+set: the consumer fence, the portable suites, and 108 Cloudflare tests. The
+diff review found no secret, no real roster, no exploit transcript, and no
+security guarantee the tree does not hold — the only identifier added is
+`nia@cedar.example`, a reserved-TLD name matching an existing synthetic actor.
+
+**Five confirmed defects, each fixed test-first with a reproducing witness,
+all owned by the library.**
+
+1. The shared envelope version gate threw instead of failing as a value, on
+   three callers. `[E4]` tests in `tests/access.test.ts`,
+   `tests/context.test.ts`, `tests/engine.test.ts`.
+2. An unreadable envelope answered `wrong-interface-version`, which the
+   reference host maps to a no-reauth 500 — a damaged cookie became an
+   unrecoverable loop. Now `unauthenticated`.
+3. `canonicalJson` recursed on claims the verifier had not verified, reachable
+   with a published key id. Bounded by `ACCESS_CLAIMS_MAX_DEPTH`, with the
+   twins' depth pinned so the bound fails at the issuer rather than at a
+   verifier.
+4. A lifetime that is not a positive whole number removed expiry entirely.
+   Refused at claims assembly, at engine construction, and at the Cloudflare
+   boundary.
+5. A restore recorded nothing at all. Both coordinators now write that row
+   after the tables, so the act cannot erase its own trace.
+
+**Nine hypotheses rejected, evidence retained** where it guards a plausible
+regression: the exchange's parse sites (the gate defect was an instance, not a
+class), `__proto__`-shaped claim keys, cross-organization grant targets, the
+shared idempotency keyspace, hostile provider `amr`, the service binding
+reaching the operator bypass, and a crafted snapshot resurrecting an actor's
+standing. Two were **retractions of our own claims**: the concurrent
+subject-guard "gap" had a witness all along, and the empty-`OPS_TOKEN` branch
+cannot be witnessed at all because header values are trimmed in transit.
+
+**Residual risks, consciously accepted and recorded** — distinct from the
+above, and none of them defects: claims breadth uncapped at the verifier;
+a bearer envelope replayable within its lifetime with no revocation; no
+tamper-evident audit log; the ops token all-or-nothing with attribution that
+is a claim rather than proof; unbounded retention of audit rows and
+idempotency claims; no erasure path for personal data; tags that are names
+rather than signatures, and no artifact-level evidence that a release passed
+its gate; workflow actions pinned by mutable tag; the dev-only
+`undici`/`zod` advisories whose fix is pinned upstream; and inter-coordinator
+relay bodies trusted structurally on platform isolation alone.
+
+**No new invariant ids**, as this plan's *Specification placement* requires.
+The campaign's durable properties went beside the boundaries they govern:
+E2 gained the claims depth bound, E4 that closed means *as a value* and that
+unreadable and unsupported are different answers, E7 that a lifetime which
+cannot bound expiry is refused.
+
 ## Next action
 
-The rest of Phase 3, as specified above: provider documents treated as
-hostile, route enumeration beyond the ops allowlist, coordinator races and
-partial cross-coordinator workflows, hostile restore beyond the outbox row,
-and the complexity and amplification review.
+Two decisions, both recorded above with their done-whens, and both for Rick:
+the **outbox drain cap** and whether to make the **gate the only path to the
+value**. They are the last campaign work; everything else has landed.
 
-One hypothesis carries over from Phase 2: `operation.ts` canonicalizes
-`auth.amr`, which arrives from the provider's ID token.  `canonicalJson` is
-general and unbounded by design — the depth bound added in Phase 2 is a claims
-bound in the portable gate, not a serializer bound — so a hostile or careless
-provider's `amr` shape belongs to the hostile-provider-document work.
-
-On execution: the four gaps ran inline, correctly — they were located, bounded,
-and mechanical once found.  The remainder has durable sub-areas (the provider
-exchange, the route and ops surface, coordinator state and restore) and is a
-genuine pod candidate, but the isolation question must be settled first and the
-answer is not obvious: there is one `vitest.config.ts` and one
-`wrangler.jsonc`, and workerd runs with Durable Object bindings and local
-persistence, so two workers running suites in this checkout contend on a
-shared runtime rather than on files.  Disjoint file allowlists do not solve
-that; worktrees would, at the cost of a per-worktree install of workerd and
-esbuild.  Decide at intake with that cost measured, not assumed.
+This plan is retired when those two are settled — not before, because a plan
+with an open decision is the one thing `plans/README.md` says a plan is for.
+The compliance decisions live separately in [`assurance.md`](assurance.md) and
+do not block this one.
 
 ## Specification placement
 
@@ -602,3 +517,10 @@ new durable property, place that invariant beside the boundary it governs in
 red-team invariant family only if a recurring, mechanically enforced security
 practice exists after the campaign; process guidance alone is not such an
 invariant.
+
+Settled: no such family.  The campaign produced three recurring practices —
+a named parser at every untrusted boundary, an audit row written after the
+state it describes, and a new test for an existing guard proven by removing
+the guard — and all three are conventions in `AGENTS.md` rather than
+invariants, because none has a mechanical witness.  The durable properties
+they protect are already E2, E4, and E7.

@@ -40,6 +40,7 @@ artifact that evidences each.
 | What does it depend on? | The portable source has no runtime dependencies and compiles with `types: []`; the fence is enforced by `bin/check` (`P1`). |
 | What third-party code reaches our runtime? | None. The root declares no dependencies and the Cloudflare package's sole dependency is the workspace sibling; the entire lockfile is build and test tooling that never ships. Reachability of a third-party advisory into a deployment is zero by construction. |
 | Are install scripts controlled? | Deny-by-default: `pnpm-workspace.yaml` carries an explicit `allowBuilds` allowlist with a written reason per entry (`esbuild` and `workerd` admitted, `sharp` refused). CI installs `--frozen-lockfile` with pnpm pinned exactly. |
+| How are dependency advisories triaged? | `pnpm audit` reports against 0 production and 160 development dependencies, so an advisory is triaged by reachability first: into a consumer's runtime it is nil by construction, and into our build it is weighed against what the tool actually does. An advisory is not closed because an upgrade exists — where the fix is pinned by an upstream package, the acceptance and its re-check trigger are recorded rather than forced through an override. The current triage is in [`../plans/red-team.md`](../plans/red-team.md). |
 
 The invariant-and-witness structure is the unusual part, and it is the one an
 assessor can use most directly: a control statement with a named test behind
