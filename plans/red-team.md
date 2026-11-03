@@ -382,36 +382,40 @@ with the caveat that attribution is a claim: a token holder can send any
 operator identity, so the facts are evidence and the actor column is a hint.
 That is the same honesty `docs/assurance.md` carries about attribution.
 
-## Carried decision — cap the outbox drain per invocation
+## Decided — the outbox drain is capped
 
-From the amplification review ([`docs/performance.md`](../docs/performance.md)
-§ Amplification review), which is otherwise clean: every other growth path is
-either bounded by construction or linear in something the tenant owns and
-meant to be.
+Taken: expand fan-out at enqueue, cap the drain at 25 rows per invocation,
+prune delivered rows after seven days. `OUTBOX_DRAIN_LIMIT` and
+`OUTBOX_DELIVERED_RETENTION_SECONDS` are constants in `state.ts` with their
+reasons beside them, not configuration — the campaign already fixed one defect
+caused by an unvalidated numeric config.
 
-The drain iterates every pending message with no `LIMIT`, and the organization
-fans `roster` and `actor-disabled` out to every operation it has an invitation
-for, one coordinator subrequest each. A single invocation's subrequests are
-therefore the sum over pending messages of their target counts, against a
-platform cap. Exceeding it is a livelock, not a slowdown: the undelivered
-messages stay pending, the alarm reschedules a second later because `pending >
-0`, and the next invocation attempts the same oversized batch forever.
+Why expansion rather than a subrequest budget: one row becomes one subrequest,
+so the row cap *is* the subrequest bound with no arithmetic and no "one
+message too wide to ever deliver" edge. It also deletes `FAN_OUT_KINDS` and
+the `"*"` sentinel, stops a partial fan-out failure forcing redelivery to the
+targets that already succeeded, and matches the portable engine, which only
+ever addressed one target per message.
 
-No deployment is near it — it needs many participating operations or a large
-backlog — and it is a cliff rather than a curve, which is why it is written
-down rather than left to be discovered.
+Two behaviour changes, both documented in `docs/cloudflare.md` § The outbox:
+an operation joining after a fan-out is enqueued no longer receives that
+message — reconciliation is the backstop, and an unlink that never arrived is
+still refused by refresh's live organization read, which an existing `[A13]`
+test pins — and an organization with no participating operation enqueues
+nothing rather than one undeliverable row.
 
-The mechanism to fix it already exists: `drain` returns `{ delivered, pending }`
-and the alarm continues while anything is pending, so a bounded number of
-messages per invocation needs only a cap, not a new mechanism. **Decision
-needed:** the cap. It is a deployment fact rather than a derivable constant —
-the subrequest limit differs by Workers plan — and it trades fan-out latency
-for recoverability, so it wants the same treatment the claims-depth bound got:
-a number with a stated reason, documented where the format documents its
-bounds. **Done when:** the drain delivers at most a stated number of
-coordinator subrequests per invocation, with a test that a backlog larger than
-the cap drains across invocations rather than failing, or the risk is recorded
-as accepted with the operator owning the backlog.
+Pruning came with it because the two interact: the outbox is append-only, so
+one row per target multiplies what an event retains. Pruning a *delivered*
+row is safe in a way pruning `audit` or `claims` is not — it is spent, it is
+not evidence, and it is not what makes a retry safe — and `state.ts` says so
+to head off the symmetry argument.
+
+Two implementation notes worth keeping. The cap belongs to the drain and not
+to reads: putting it in the shared `outboxRows()` capped the operator's
+`/outbox` read and the status count too, under-reporting a backlog at the one
+moment it matters, so the drain takes `outboxBatch()` instead. And the
+operation coordinator got the same cap and pruning even though it never fanned
+out — one subrequest per row is still unbounded in the number of rows.
 
 ## Carried decision — make the gate the only path to the value
 

@@ -7,6 +7,37 @@
 export type StateValue = string | number | null;
 export type StateRow = Record<string, StateValue>;
 
+/** How many outbox messages one drain may deliver.
+ *
+ * Each pending row costs one coordinator subrequest, and the platform caps
+ * subrequests per invocation. Without a bound a large enough backlog exceeds
+ * the cap, fails partway, and the one-second alarm re-attempts the same
+ * oversized batch forever — a livelock rather than a slowdown, which is the
+ * failure this number exists to prevent.
+ *
+ * 25 sits under even the free tier's 50-subrequest limit, so the bound does
+ * not depend on which plan a deployment runs. The alarm reschedules a second
+ * out while anything is pending, so this is also the drain rate: a thousand
+ * queued messages clear in forty seconds. Fan-out is expanded at enqueue, so
+ * one row is one subrequest and this count is the subrequest bound. */
+export const OUTBOX_DRAIN_LIMIT = 25;
+
+/** How long a delivered outbox row is kept before the drain prunes it.
+ *
+ * A delivered row's only remaining use is forensic — whether a message went
+ * out, and when — and the audit trail carries the durable version of that. A
+ * week spans a weekend plus a working day, which is the realistic window for
+ * noticing a delivery problem and looking into it.
+ *
+ * Age rather than count: a count cap would prune a busy organization's rows
+ * faster than a quiet one's, which makes the retention window depend on
+ * traffic instead of on time, and time is the axis the question is asked on.
+ *
+ * This is safe in a way pruning `audit` or `claims` is not. A delivered
+ * outbox row is spent: it is not evidence, and it is not what makes a retry
+ * safe. Do not read this as a precedent for those tables. */
+export const OUTBOX_DELIVERED_RETENTION_SECONDS = 7 * 86_400;
+
 export interface TableSpec {
   readonly name: string;
   readonly columns: readonly string[];

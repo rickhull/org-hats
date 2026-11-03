@@ -43,6 +43,8 @@ import {
   restoreTables,
   type ExportSnapshot,
   type StateRow,
+  OUTBOX_DELIVERED_RETENTION_SECONDS,
+  OUTBOX_DRAIN_LIMIT,
 } from "./state";
 import { initializeOperationSchema } from "./schema/operation";
 import { displayNameFailure, identifierFailure } from "./validation";
@@ -1084,7 +1086,7 @@ export class OperationAuthority extends DurableObject<Env> {
 
   private async drain(): Promise<{ delivered: number; pending: number }> {
     let delivered = 0;
-    for (const row of this.outboxRows()) {
+    for (const row of this.outboxBatch()) {
       const target = String(row["target"]);
       if (target === "*") continue;
       const stub = this.env.ORGANIZATION.get(this.env.ORGANIZATION.idFromName(target));
@@ -1099,7 +1101,10 @@ export class OperationAuthority extends DurableObject<Env> {
         delivered += 1;
       }
     }
-    const pending = this.outboxRows().length;
+    this.pruneDeliveredOutbox(now());
+    const pending = Number(
+      this.one("SELECT COUNT(*) AS pending FROM outbox WHERE delivered_at IS NULL")?.["pending"] ?? 0,
+    );
     if (pending > 0) await this.ctx.storage.setAlarm(Date.now() + 1000);
     // Reconciliation rides the drain the Worker already calls around every
     // command, so an operation in use converges without a standing alarm.
@@ -1110,9 +1115,31 @@ export class OperationAuthority extends DurableObject<Env> {
     return { delivered, pending };
   }
 
+  /** Every pending row, for the operator read and the status count: a capped
+   * read would under-report a backlog. */
   private outboxRows(): Row[] {
     return this.rows(
       "SELECT id, kind, target, payload, created_at FROM outbox WHERE delivered_at IS NULL ORDER BY created_at, id",
+    );
+  }
+
+  /** At most `OUTBOX_DRAIN_LIMIT` rows per invocation: one row is one
+   * coordinator subrequest, so this is the subrequest bound. The operation
+   * side never fanned out, but an unbounded backlog is the same cliff. */
+  private outboxBatch(): Row[] {
+    return this.rows(
+      `SELECT id, kind, target, payload, created_at FROM outbox WHERE delivered_at IS NULL
+         ORDER BY created_at, id LIMIT ${OUTBOX_DRAIN_LIMIT}`,
+    );
+  }
+
+  /** Spent rows leave after `OUTBOX_DELIVERED_RETENTION_SECONDS`; the outbox
+   * is otherwise append-only. A delivered row is not evidence — the audit
+   * trail is — and it is not what makes a retry safe. */
+  private pruneDeliveredOutbox(at: number): void {
+    this.ctx.storage.sql.exec(
+      "DELETE FROM outbox WHERE delivered_at IS NOT NULL AND delivered_at < ?",
+      at - OUTBOX_DELIVERED_RETENTION_SECONDS,
     );
   }
 

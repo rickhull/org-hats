@@ -124,7 +124,7 @@ threat model says so, and nothing here changes that.
   scaled world above and deferred by consumer advice; see
   [`../plans/snapshot_cache.md`](../plans/snapshot_cache.md).
 
-**Unbounded per invocation, and the one finding of this review.**
+**Was unbounded per invocation — the one finding of this review, now fixed.**
 
 The outbox drain iterates *every* pending message — `outboxRows()` carries no
 `LIMIT` — and the organization fans `roster` and `actor-disabled` messages out

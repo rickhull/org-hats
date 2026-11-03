@@ -10,6 +10,8 @@ import {
   organizationTables,
   readTables,
   restoreTables,
+  OUTBOX_DELIVERED_RETENTION_SECONDS,
+  OUTBOX_DRAIN_LIMIT,
   type ExportSnapshot,
   type StateRow,
 } from "./state";
@@ -29,11 +31,6 @@ type Result<T> =
   | { readonly ok: false; readonly failure: Failure };
 
 const now = (): number => Math.floor(Date.now() / 1000);
-
-/** Messages addressed to every operation this organization is known to,
- * rather than to one named target: a roster image and an actor disable are
- * both facts every participating operation must learn. */
-const FAN_OUT_KINDS = new Set(["actor-disabled", "actor-unlinked", "roster"]);
 
 const failure = (kind: FailureKind, detail?: string): { readonly ok: false; readonly failure: Failure } => ({
   ok: false,
@@ -151,17 +148,37 @@ export class OrganizationAuthority extends DurableObject<Env> {
     );
   }
 
-  private outbox(kind: string, target: string, payload: Record<string, unknown>, at: number): string {
-    const id = `ob-${crypto.randomUUID()}`;
+  private outbox(kind: string, target: string, payload: Record<string, unknown>, at: number): void {
     this.ctx.storage.sql.exec(
       "INSERT INTO outbox (id, kind, target, payload, created_at) VALUES (?, ?, ?, ?, ?)",
-      id,
+      `ob-${crypto.randomUUID()}`,
       kind,
       target,
       payloadOf(payload),
       at,
     );
-    return id;
+  }
+
+  /** A fact every participating operation must learn, enqueued as one
+   * addressed row per operation rather than one row resolved at delivery.
+   *
+   * Resolving targets in the drain made a single row cost one subrequest per
+   * operation, so the subrequests one invocation issues had no bound. One row
+   * per target restores the bound, marks progress per operation — a target
+   * that failed no longer forces a redelivery to the ones that succeeded —
+   * and matches the portable engine, which has only ever addressed one target
+   * per message.
+   *
+   * The cost is that an operation joining after this returns does not receive
+   * this message. Reconciliation is the backstop: the roster pull carries
+   * `disabled`, and an unlink that never arrived is still refused by the
+   * operation's live organization read on refresh. */
+  private outboxFanOut(kind: string, payload: Record<string, unknown>, at: number): void {
+    for (const row of this.rows("SELECT DISTINCT operation_id FROM invitations")) {
+      const target = String(row["operation_id"]);
+      if (target.length === 0) continue;
+      this.outbox(kind, target, payload, at);
+    }
   }
 
   private claim(key: string, payload: string, at: number): void {
@@ -211,9 +228,8 @@ export class OrganizationAuthority extends DurableObject<Env> {
    * immediate channel: a disable must not wait for the operations'
    * reconciliation interval. The caller owns the transaction. */
   private pushRoster(at: number): void {
-    this.outbox(
+    this.outboxFanOut(
       "roster",
-      "*",
       {
         kind: "roster",
         organizationId: this.organizationId(),
@@ -551,7 +567,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
         "UPDATE activation_requests SET revoked_at = ? WHERE actor_id = ? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at > ?",
         at, input.actorId, at,
       );
-      this.outbox("actor-unlinked", "*", {
+      this.outboxFanOut("actor-unlinked", {
         kind: "actor-unlinked", organizationId: this.organizationId(), actorId: input.actorId,
       }, at);
       this.audit(input.operator ? (input.operatorId ?? "operator") : input.byActorId, `principal links for actor ${input.actorId} removed`, at);
@@ -687,9 +703,8 @@ export class OrganizationAuthority extends DurableObject<Env> {
         "UPDATE activation_requests SET revoked_at = ? WHERE actor_id = ? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at > ?",
         at, input.actorId, at,
       );
-      this.outbox(
+      this.outboxFanOut(
         "actor-disabled",
-        "*",
         {
           kind: "actor-disabled",
           organizationId: this.organizationId(),
@@ -925,9 +940,23 @@ export class OrganizationAuthority extends DurableObject<Env> {
     }));
   }
 
+  /** Every pending row, for the operator read and the status count. The cap
+   * belongs to the drain, not to reads: a capped read would under-report a
+   * backlog, which is the one moment an operator most needs to see it. */
   private outboxRows(): readonly Record<string, unknown>[] {
+    return this.outboxSelect("");
+  }
+
+  /** The rows one drain may deliver. One row is one coordinator subrequest,
+   * so this count is the subrequest bound. */
+  private outboxBatch(): readonly Record<string, unknown>[] {
+    return this.outboxSelect(`LIMIT ${OUTBOX_DRAIN_LIMIT}`);
+  }
+
+  private outboxSelect(limit: string): readonly Record<string, unknown>[] {
     return this.rows(
-      "SELECT id, kind, target, payload, created_at FROM outbox WHERE delivered_at IS NULL ORDER BY created_at, id",
+      `SELECT id, kind, target, payload, created_at FROM outbox WHERE delivered_at IS NULL
+         ORDER BY created_at, id ${limit}`,
     ).map((row) => ({
       id: String(row["id"]),
       kind: String(row["kind"]),
@@ -949,34 +978,50 @@ export class OrganizationAuthority extends DurableObject<Env> {
 
   /** Deliver queued messages to operation authority. A failure leaves the
    * message pending and schedules a retry; the operation's `/intake` is the
-   * only receiver. */
+   * only receiver.
+   *
+   * At most `OUTBOX_DRAIN_LIMIT` rows per invocation. Every row is addressed
+   * to one operation — fan-out is expanded at enqueue — so that count is also
+   * the subrequest bound, and a backlog larger than the cap drains across
+   * invocations on the alarm that already runs rather than failing as one
+   * oversized batch. */
   private async drain(): Promise<{ delivered: number; pending: number }> {
     let delivered = 0;
-    for (const message of this.outboxRows()) {
-      const kind = String(message["kind"]);
+    for (const message of this.outboxBatch()) {
+      const target = String(message["target"]);
+      if (target.length === 0) continue;
       const payload = message["payload"] as Record<string, unknown>;
-      const targets = FAN_OUT_KINDS.has(kind)
-        ? [...new Set(this.rows("SELECT DISTINCT operation_id FROM invitations").map((row) => String(row["operation_id"])))]
-        : [String(message["target"])];
-      let ok = true;
-      for (const target of targets) {
-        if (target.length === 0) continue;
-        const stub = this.env.OPERATION.get(this.env.OPERATION.idFromName(target));
-        const response = await stub.fetch("https://operation.internal/intake", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ...payload, messageId: String(message["id"]) }),
-        });
-        if (!response.ok) ok = false;
-      }
-      if (ok) {
+      const stub = this.env.OPERATION.get(this.env.OPERATION.idFromName(target));
+      const response = await stub.fetch("https://operation.internal/intake", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...payload, messageId: String(message["id"]) }),
+      });
+      if (response.ok) {
         this.markDelivered(String(message["id"]));
         delivered += 1;
       }
     }
-    const pending = this.outboxRows().length;
+    this.pruneDeliveredOutbox(now());
+    const pending = this.pendingOutboxCount();
     if (pending > 0) await this.ctx.storage.setAlarm(Date.now() + 1000);
     return { delivered, pending };
+  }
+
+  /** Spent rows leave after `OUTBOX_DELIVERED_RETENTION_SECONDS`. The outbox
+   * is otherwise append-only, and expanding fan-out at enqueue multiplies the
+   * rows one event retains by the number of participating operations, so the
+   * pruning is what keeps that trade neutral. A delivered row is not evidence
+   * — the audit trail is — and it is not what makes a retry safe. */
+  private pruneDeliveredOutbox(at: number): void {
+    this.ctx.storage.sql.exec(
+      "DELETE FROM outbox WHERE delivered_at IS NOT NULL AND delivered_at < ?",
+      at - OUTBOX_DELIVERED_RETENTION_SECONDS,
+    );
+  }
+
+  private pendingOutboxCount(): number {
+    return Number(this.one("SELECT COUNT(*) AS pending FROM outbox WHERE delivered_at IS NULL")?.["pending"] ?? 0);
   }
 
   private exportSnapshot(): ExportSnapshot {

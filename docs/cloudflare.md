@@ -261,6 +261,33 @@ public key distribution:
   the snapshot cannot overwrite the trace of the act that applied it — so a
   restored export differs from its snapshot by exactly that row
 
+### The outbox
+
+A fact every participating operation must learn — a roster image, an actor
+disable, an unlink — is enqueued as **one addressed row per operation**, at
+enqueue time. It used to be one row resolved at delivery, which made a single
+row cost one coordinator subrequest per operation and left the subrequests one
+invocation issues unbounded; a backlog past the platform cap then failed
+partway and the one-second alarm re-attempted the same batch indefinitely.
+
+Two consequences an operator can observe:
+
+- **A drain delivers at most 25 rows** and reports the remainder as `pending`.
+  A larger backlog clears across invocations on the alarm that already runs,
+  at roughly 25 a second. One row is one subrequest, so that count is the
+  subrequest bound.
+- **An operation that joins after a fan-out is enqueued does not receive that
+  message.** Reconciliation is the backstop, not delivery: the roster pull
+  carries `disabled`, and an unlink that never arrived is still refused by the
+  operation's live organization read on refresh. An organization with no
+  participating operation enqueues nothing rather than one undeliverable row.
+
+Delivered rows are pruned after seven days. The outbox is otherwise
+append-only, and one row per target multiplies what an event retains, so the
+pruning keeps that trade neutral. A delivered row is spent — it is not
+evidence, and it is not what makes a retry safe, which is why the same
+reasoning does not extend to `audit` or `claims`.
+
 Every `/ops/*` request may carry `x-ops-operator: <id>` — 1–64 characters of
 `A-Za-z0-9._:@-`, refused with `invalid-command` if malformed rather than
 silently dropped. It is recorded as the audit row's `actor` in place of the

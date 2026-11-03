@@ -1,6 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { call, organizationBootstrap } from "./helpers";
+import { OUTBOX_DRAIN_LIMIT } from "../src/state";
 
 const organization = (name: string) =>
   env.ORGANIZATION.get(env.ORGANIZATION.idFromName(name));
@@ -22,6 +23,9 @@ const accept = async (
     actorId,
     idempotencyKey,
   });
+
+const drain = async (stub: DurableObjectStub) =>
+  call<{ delivered: number; pending: number }>(stub, "POST", "/drain");
 
 const outbox = async (stub: DurableObjectStub) =>
   call<readonly { id: string; kind: string; target: string; payload: unknown }[]>(
@@ -168,6 +172,10 @@ describe("OrganizationAuthority", () => {
   it("disables an actor and emits the actor-disabled message", async () => {
     const stub = organization("org-disable");
     await bootstrap(stub, "org/disable");
+    // A fan-out is expanded at enqueue into one row per participating
+    // operation, so the organization needs one to address. With none, the
+    // event is correctly enqueued nowhere — asserted separately below.
+    await invite(stub, "op-disable-watcher");
     const disabled = await call(stub, "POST", "/disable", {
       actorId: "actor-crew",
       byActorId: "actor-lead",
@@ -183,7 +191,9 @@ describe("OrganizationAuthority", () => {
     expect(crew.body.value?.disabled).toBe(true);
 
     const messages = await outbox(stub);
-    expect(messages.body.value?.some((message) => message.kind === "actor-disabled")).toBe(true);
+    const disabledMessages = messages.body.value?.filter((message) => message.kind === "actor-disabled") ?? [];
+    expect(disabledMessages.length).toBe(1);
+    expect(disabledMessages[0]?.target).toBe("op-disable-watcher");
 
     const trail = await audit(stub);
     expect(trail.body.value?.some((entry) => entry.fact.includes("actor actor-crew disabled"))).toBe(true);
@@ -209,6 +219,7 @@ describe("OrganizationAuthority", () => {
   it("creates, renames, appoints, and retires administrators without a deployment", async () => {
     const stub = organization("org-roster");
     expect((await call(stub, "POST", "/bootstrap", organizationBootstrap("org/roster"))).body.ok).toBe(true);
+    await invite(stub, "op-roster-watcher");
 
     const created = await call<{ applied: boolean }>(stub, "POST", "/create-actor", {
       actorId: "actor-new",
@@ -368,4 +379,75 @@ describe("OrganizationAuthority", () => {
     expect(unknown.body.ok).toBe(false);
     expect(unknown.body.failure?.kind).toBe("invalid-command");
   });
+});
+
+describe("the outbox drain is bounded per invocation", () => {
+  // Before the bound, a drain issued one coordinator subrequest per pending
+  // message per fan-out target, against a platform cap on subrequests per
+  // invocation. Exceeding it was a livelock rather than a slowdown: the
+  // undelivered rows stayed pending, the alarm rescheduled a second later,
+  // and the next invocation attempted the same oversized batch forever.
+  it("expands a fan-out into one addressed row per participating operation", async () => {
+    const stub = organization("org-fanout");
+    await bootstrap(stub, "org/fanout");
+    const operations = ["op-fan-a", "op-fan-b", "op-fan-c"];
+    for (const [index, operationId] of operations.entries()) {
+      await invite(stub, operationId, `inv-fan-${index}`);
+    }
+
+    await call(stub, "POST", "/disable", {
+      actorId: "actor-crew",
+      byActorId: "actor-lead",
+      idempotencyKey: "fanout-disable",
+    });
+
+    const messages = (await outbox(stub)).body.value ?? [];
+    const disabled = messages.filter((message) => message.kind === "actor-disabled");
+    expect(disabled.length).toBe(operations.length);
+    expect(disabled.map((message) => message.target).sort()).toEqual([...operations].sort());
+    // one row per target is what makes a row one subrequest, and what lets a
+    // target that failed stop forcing redelivery to the ones that succeeded
+    expect(new Set(disabled.map((message) => message.id)).size).toBe(operations.length);
+  });
+
+  it("drains a backlog larger than the cap across invocations rather than failing", async () => {
+    const stub = organization("org-backlog");
+    await bootstrap(stub, "org/backlog");
+    // more participating operations than the cap, so one disable alone
+    // produces a backlog that must be drained in batches
+    const count = OUTBOX_DRAIN_LIMIT + 7;
+    for (let index = 0; index < count; index += 1) {
+      await invite(stub, `op-backlog-${index}`, `inv-backlog-${index}`);
+    }
+    await call(stub, "POST", "/disable", {
+      actorId: "actor-crew",
+      byActorId: "actor-lead",
+      idempotencyKey: "backlog-disable",
+    });
+    // a disable emits two facts to every participating operation — the
+    // disable itself and the refreshed roster image — so the backlog is twice
+    // the operation count, and well over the cap
+    const total = ((await outbox(stub)).body.value ?? []).length;
+    expect(total).toBe(count * 2);
+    expect(total).toBeGreaterThan(OUTBOX_DRAIN_LIMIT);
+
+    // every invocation delivers at most the cap, and reports the remainder
+    // rather than throwing or wedging
+    const first = await drain(stub);
+    expect(first.body.ok).toBe(true);
+    expect(first.body.value?.delivered).toBe(OUTBOX_DRAIN_LIMIT);
+    expect(first.body.value?.pending).toBe(total - OUTBOX_DRAIN_LIMIT);
+
+    // and it keeps draining in capped batches until the backlog clears,
+    // which is the alarm's job in a deployment
+    let remaining = first.body.value?.pending ?? 0;
+    let invocations = 1;
+    while (remaining > 0) {
+      const next = await drain(stub);
+      expect(next.body.value?.delivered).toBe(Math.min(OUTBOX_DRAIN_LIMIT, remaining));
+      remaining = next.body.value?.pending ?? 0;
+      invocations += 1;
+    }
+    expect(invocations).toBe(Math.ceil(total / OUTBOX_DRAIN_LIMIT));
+  }, 30_000);
 });
