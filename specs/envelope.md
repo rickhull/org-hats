@@ -74,11 +74,19 @@ is interpreted — then the signature against a known key id, then expiry, then
 the caller's expected bindings.
 
 Closed means *as a value*. The envelope is untrusted input whose declared type
-is erased at runtime, so the version gate refuses a non-object envelope or an
-absent claims payload before reading a field, and a verify predicate that
-throws is `invalid-signature`. Every caller of the gate — the verifier, the
-context, and command authorization — inherits this, and none of them may read
-a claim before it has run.
+is erased at runtime, so the gate refuses a non-object envelope, an absent
+claims payload, and a missing key id or signature before reading a field, and
+a verify predicate that throws is `invalid-signature`. Every caller of the
+gate — the verifier, the context, and command authorization — inherits this,
+and none of them may read a claim before it has run.
+
+The gate returns the parsed envelope rather than a verdict about one, so that
+obligation is discharged by the only expression that yields a claim: a caller
+reads `keyId`, `signature`, and `claims` from the gate's result and never from
+the input beside it. That is a property of an implementation, not of the
+format — a reimplementation inherits the ordering rule above, not this shape —
+but it is what makes the ordering hard to get wrong rather than merely
+documented.
 
 Structure includes depth. Canonical bytes are an input to the signature
 check, so a verifier canonicalizes claims it has not yet verified; the gate

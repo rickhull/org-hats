@@ -10,7 +10,7 @@
 // reach, fallback, or worn-hat rules: the issuer computed those; the
 // verifier compares ids and evaluates the selected hat locally. Product
 // verbs are host code mapping onto these neutral targets.
-import { base64Decode, base64UrlDecode, asJson, canonicalJson, envelopeVersionFailure, epochSeconds, utf8, } from "../contract.js";
+import { base64Decode, base64UrlDecode, asJson, canonicalJson, parseAccessEnvelope, epochSeconds, utf8, } from "../contract.js";
 const failed = (failure) => ({ failure });
 /** Pure and platform-free, for tests and alternate runtimes: accepts any
  * verify predicate. */
@@ -80,20 +80,23 @@ const neutralAccess = (claims) => ({
  * and that is what this checks.
  */
 export const verify = async (envelope, keys, context = {}) => {
-    const versionFailure = envelopeVersionFailure(envelope);
-    if (versionFailure !== undefined)
-        return failed(versionFailure);
-    const key = keys.get(envelope.keyId);
+    // Everything below reads the gate's result, never the argument: the gate is
+    // the only expression that yields a claim.
+    const parsed = parseAccessEnvelope(envelope);
+    if ("kind" in parsed)
+        return failed(parsed);
+    const { keyId, signature, claims } = parsed;
+    const key = keys.get(keyId);
     if (key === undefined) {
-        return failed({ kind: "invalid-signature", detail: `unknown key id ${envelope.keyId}` });
+        return failed({ kind: "invalid-signature", detail: `unknown key id ${keyId}` });
     }
-    const payload = canonicalJson(asJson(envelope.claims));
+    const payload = canonicalJson(asJson(claims));
     // `verifyKeyOf` accepts any verify predicate, so a host-supplied key is as
     // untrusted as the envelope: a predicate that throws has not verified
     // anything, and saying so as a value is the whole contract.
     let signed;
     try {
-        signed = await key.verify(payload, envelope.signature);
+        signed = await key.verify(payload, signature);
     }
     catch {
         signed = false;
@@ -102,15 +105,15 @@ export const verify = async (envelope, keys, context = {}) => {
         return failed({ kind: "invalid-signature" });
     }
     const now = epochSeconds(context.now ?? Math.floor(Date.now() / 1000));
-    if (now >= envelope.claims.exp) {
+    if (now >= claims.exp) {
         return failed({ kind: "expired" });
     }
-    if (context.expectedOperationId !== undefined && envelope.claims.operationId !== context.expectedOperationId) {
+    if (context.expectedOperationId !== undefined && claims.operationId !== context.expectedOperationId) {
         return failed({ kind: "wrong-binding", detail: "envelope belongs to another operation" });
     }
     if (context.expectedSiteId !== undefined &&
-        !envelope.claims.sites.some((site) => site.siteId === context.expectedSiteId)) {
+        !claims.sites.some((site) => site.siteId === context.expectedSiteId)) {
         return failed({ kind: "wrong-binding", detail: "envelope is not admitted to this site" });
     }
-    return { claims: envelope.claims, access: neutralAccess(envelope.claims) };
+    return { claims, access: neutralAccess(claims) };
 };

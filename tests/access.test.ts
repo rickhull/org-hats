@@ -204,6 +204,31 @@ test("[E4] claims deeper than the format's bound are refused before canonicaliza
   );
 });
 
+test("[E4] an envelope missing its key id or signature is unreadable, not mis-signed", async () => {
+  // These used to fail closed only by accident downstream: an absent key id
+  // became `invalid-signature` ("unknown key id undefined") and an absent
+  // signature was caught inside the Ed25519 key's own decode. The gate parses
+  // them, so the refusal is its own and names what is actually wrong.
+  const now = vectors.claims.iat + 1;
+  const base = { format: ACCESS_ENVELOPE_FORMAT, v: 1, claims: vectors.claims };
+  const cases: readonly (readonly [string, unknown])[] = [
+    ["no key id", { ...base, signature: vectors.signature }],
+    ["empty key id", { ...base, keyId: "", signature: vectors.signature }],
+    ["non-string key id", { ...base, keyId: 7, signature: vectors.signature }],
+    ["no signature", { ...base, keyId: vectors.keyId }],
+    ["empty signature", { ...base, keyId: vectors.keyId, signature: "" }],
+    ["non-string signature", { ...base, keyId: vectors.keyId, signature: 7 }],
+  ];
+  for (const [label, envelope] of cases) {
+    assert.equal(failureOf(await verify(envelope as never, keys, { now })).kind, "unauthenticated", label);
+  }
+
+  // an unknown but well-formed key id stays a signature problem: the envelope
+  // is readable, we simply do not trust the key that signed it
+  const unknown = envelopeOf(vectors.claims, vectors.signature, "key-never-configured");
+  assert.equal(failureOf(await verify(unknown, keys, { now })).kind, "invalid-signature");
+});
+
 test("[E4] a verify key that throws fails closed, not out of the call", async () => {
   // `verifyKeyOf` is a public escape hatch accepting any verify predicate, so
   // a host-supplied key that throws is a real input. The defensive catch in

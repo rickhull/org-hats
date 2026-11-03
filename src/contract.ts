@@ -339,12 +339,29 @@ export interface SignedAccessEnvelope {
   readonly signature: string;
 }
 
-/** The envelope version gate shared by the verifier and the runtime's command
- * and context authorization. The format marker, the envelope's own version,
- * and the claims' version must agree before a signature is trusted or claims
- * are read. The claims' `interfaceVersion` is provenance and is deliberately
- * not checked here. */
-export const envelopeVersionFailure = (envelope: unknown): Failure | undefined => {
+/** A signed envelope that has passed the gate: the verifier, the context, and
+ * command authorization all read these three fields and never the input they
+ * came from. */
+export interface ParsedAccessEnvelope {
+  readonly keyId: string;
+  readonly signature: string;
+  readonly claims: AccessEnvelopeClaimsV1;
+}
+
+/** The envelope gate shared by the verifier and the runtime's command and
+ * context authorization. The format marker, the envelope's own version, and
+ * the claims' version must agree before a signature is trusted or claims are
+ * read. The claims' `interfaceVersion` is provenance and is deliberately not
+ * checked here.
+ *
+ * It returns the parsed envelope rather than a verdict about one, so the
+ * obligation to gate before reading is discharged by the only expression that
+ * yields a claim. A caller that reads `envelope.claims` directly is working
+ * around the gate; it read claims one statement before the gate once, and
+ * returning the value is what makes the mistake unnatural rather than merely
+ * forbidden. E4 is the statement a reimplementation inherits; this is the
+ * shape that holds for this one. */
+export const parseAccessEnvelope = (envelope: unknown): ParsedAccessEnvelope | Failure => {
   // The parameter is `unknown` because the envelope is untrusted input: a host
   // decodes it from a cookie or a request body, and the declared type is erased
   // before it arrives. This gate is the only thing between that input and a
@@ -380,7 +397,24 @@ export const envelopeVersionFailure = (envelope: unknown): Failure | undefined =
   if (accessClaimsDepth(claims) > ACCESS_CLAIMS_MAX_DEPTH) {
     return { kind: "unauthenticated", detail: "the claims nest deeper than the format allows" };
   }
-  return undefined;
+  // The carriage fields last, and for the same reason as the claims: an absent
+  // `keyId` or `signature` used to fail closed only by accident downstream —
+  // an unknown key id, or a decode that threw inside the Ed25519 key and was
+  // caught there. Parsing them here makes the refusal the gate's own and names
+  // it honestly: an envelope missing its signature is unreadable, not
+  // mis-signed.
+  const carriage = envelope as { readonly keyId?: unknown; readonly signature?: unknown };
+  if (typeof carriage.keyId !== "string" || carriage.keyId.length === 0) {
+    return { kind: "unauthenticated", detail: "the envelope names no key id" };
+  }
+  if (typeof carriage.signature !== "string" || carriage.signature.length === 0) {
+    return { kind: "unauthenticated", detail: "the envelope carries no signature" };
+  }
+  return {
+    keyId: carriage.keyId,
+    signature: carriage.signature,
+    claims: claims as AccessEnvelopeClaimsV1,
+  };
 };
 
 /** What happened to the refresh handle alongside a new envelope. A host never

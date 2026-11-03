@@ -14,7 +14,7 @@ import {
   actorId,
   asJson,
   canonicalJson,
-  envelopeVersionFailure,
+  parseAccessEnvelope,
   operationId,
   organizationId,
   type ActorId,
@@ -118,12 +118,13 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
         adminOfOrganization: org.admins.includes(link.actorId),
       };
     }
-    // The gate runs before the claims are read, not after: it is what makes
-    // the read safe on an envelope that arrived as untrusted JSON.
-    const versionFailure = envelopeVersionFailure(authorization.envelope);
-    if (versionFailure !== undefined) return versionFailure;
-    const claims = authorization.envelope.claims;
-    if (!(await signer.verify(canonicalJson(asJson(claims)), authorization.envelope.signature))) {
+    // The claims come from the gate, not from the input beside it. This read
+    // used to sit one statement above the gate, which is how a shared control
+    // became a defect in one caller and not the others.
+    const parsed = parseAccessEnvelope(authorization.envelope);
+    if ("kind" in parsed) return parsed;
+    const { signature, claims } = parsed;
+    if (!(await signer.verify(canonicalJson(asJson(claims)), signature))) {
       return { kind: "invalid-signature" };
     }
     if (clock.now() >= claims.exp) return { kind: "expired" };

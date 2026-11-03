@@ -11,7 +11,7 @@
 // the actor exists and is not disabled. The reference world shares one
 // process; the deployed shape projects those facts into the operation
 // instead (docs/authority_redesign.md § State ownership).
-import { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, actorId, asJson, canonicalJson, envelopeVersionFailure, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";
+import { ACCESS_ENVELOPE_FORMAT, ACCESS_ENVELOPE_VERSION, actorId, asJson, canonicalJson, parseAccessEnvelope, isFailed, operationId, organizationId, siteId, teamId, } from "../contract.js";
 import { applyParticipationEvent, firstByRank, wearableGrants, } from "../model.js";
 import { actionsOf } from "../policy.js";
 import { sha256Hex } from "./internal.js";
@@ -110,22 +110,22 @@ export const createOperationCoordinator = (deps) => {
         return isFailed(result) ? { failure: result.failure } : result;
     };
     const context = async (input) => {
-        const { envelope } = input;
-        const versionFailure = envelopeVersionFailure(envelope);
-        if (versionFailure !== undefined)
-            return { failure: versionFailure };
-        if (!(await signer.verify(canonicalJson(asJson(envelope.claims)), envelope.signature))) {
+        const parsed = parseAccessEnvelope(input.envelope);
+        if ("kind" in parsed)
+            return { failure: parsed };
+        const { signature, claims } = parsed;
+        if (!(await signer.verify(canonicalJson(asJson(claims)), signature))) {
             return { failure: { kind: "invalid-signature" } };
         }
-        if (clock.now() >= envelope.claims.exp)
+        if (clock.now() >= claims.exp)
             return { failure: { kind: "expired" } };
-        const op = ops.get(operationId(envelope.claims.operationId));
+        const op = ops.get(operationId(claims.operationId));
         const snapshot = op !== undefined ? snapshotOf(op.operationId) : undefined;
         if (op === undefined || snapshot === undefined)
             return { failure: { kind: "wrong-binding" } };
         // the same seam, on the context path
-        const organizationId_ = organizationId(envelope.claims.actor.organizationId);
-        const actorId_ = actorId(envelope.claims.actor.actorId);
+        const organizationId_ = organizationId(claims.actor.organizationId);
+        const actorId_ = actorId(claims.actor.actorId);
         const wearable = wearableGrants(snapshot, organizationId_, actorId_, op.operationId);
         const actor = orgs.get(organizationId_)?.actors.find((a) => a.actorId === actorId_);
         const orgName = orgs.get(organizationId_)?.displayName;
@@ -177,8 +177,8 @@ export const createOperationCoordinator = (deps) => {
                 ? {}
                 : {
                     selectedHat: {
-                        role: envelope.claims.hat.role,
-                        actions: [...envelope.claims.hat.actions],
+                        role: claims.hat.role,
+                        actions: [...claims.hat.actions],
                         target: selected.target,
                         primary: selected.primary === true,
                         grantId: selected.grantId,
@@ -187,9 +187,9 @@ export const createOperationCoordinator = (deps) => {
                             : {}),
                     },
                 }),
-            sites: [...envelope.claims.sites],
-            ...(envelope.claims.amr !== undefined ? { amr: [...envelope.claims.amr] } : {}),
-            ...(envelope.claims.auth_time !== undefined ? { authTime: envelope.claims.auth_time } : {}),
+            sites: [...claims.sites],
+            ...(claims.amr !== undefined ? { amr: [...claims.amr] } : {}),
+            ...(claims.auth_time !== undefined ? { authTime: claims.auth_time } : {}),
         };
     };
     // --- operation commands -------------------------------------------------------------

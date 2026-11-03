@@ -238,12 +238,28 @@ export interface SignedAccessEnvelope {
     readonly claims: AccessEnvelopeClaimsV1;
     readonly signature: string;
 }
-/** The envelope version gate shared by the verifier and the runtime's command
- * and context authorization. The format marker, the envelope's own version,
- * and the claims' version must agree before a signature is trusted or claims
- * are read. The claims' `interfaceVersion` is provenance and is deliberately
- * not checked here. */
-export declare const envelopeVersionFailure: (envelope: unknown) => Failure | undefined;
+/** A signed envelope that has passed the gate: the verifier, the context, and
+ * command authorization all read these three fields and never the input they
+ * came from. */
+export interface ParsedAccessEnvelope {
+    readonly keyId: string;
+    readonly signature: string;
+    readonly claims: AccessEnvelopeClaimsV1;
+}
+/** The envelope gate shared by the verifier and the runtime's command and
+ * context authorization. The format marker, the envelope's own version, and
+ * the claims' version must agree before a signature is trusted or claims are
+ * read. The claims' `interfaceVersion` is provenance and is deliberately not
+ * checked here.
+ *
+ * It returns the parsed envelope rather than a verdict about one, so the
+ * obligation to gate before reading is discharged by the only expression that
+ * yields a claim. A caller that reads `envelope.claims` directly is working
+ * around the gate; it read claims one statement before the gate once, and
+ * returning the value is what makes the mistake unnatural rather than merely
+ * forbidden. E4 is the statement a reimplementation inherits; this is the
+ * shape that holds for this one. */
+export declare const parseAccessEnvelope: (envelope: unknown) => ParsedAccessEnvelope | Failure;
 /** What happened to the refresh handle alongside a new envelope. A host never
  * infers session state; the issuer states it. */
 export type RefreshHandleOutcome = {

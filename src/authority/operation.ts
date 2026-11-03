@@ -18,7 +18,7 @@ import {
   actorId,
   asJson,
   canonicalJson,
-  envelopeVersionFailure,
+  parseAccessEnvelope,
   isFailed,
   operationId,
   organizationId,
@@ -189,19 +189,19 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
   };
 
   const context = async (input: ContextRequest): Promise<AuthorityContext | Failed> => {
-    const { envelope } = input;
-    const versionFailure = envelopeVersionFailure(envelope);
-    if (versionFailure !== undefined) return { failure: versionFailure };
-    if (!(await signer.verify(canonicalJson(asJson(envelope.claims)), envelope.signature))) {
+    const parsed = parseAccessEnvelope(input.envelope);
+    if ("kind" in parsed) return { failure: parsed };
+    const { signature, claims } = parsed;
+    if (!(await signer.verify(canonicalJson(asJson(claims)), signature))) {
       return { failure: { kind: "invalid-signature" } };
     }
-    if (clock.now() >= envelope.claims.exp) return { failure: { kind: "expired" } };
-    const op = ops.get(operationId(envelope.claims.operationId));
+    if (clock.now() >= claims.exp) return { failure: { kind: "expired" } };
+    const op = ops.get(operationId(claims.operationId));
     const snapshot = op !== undefined ? snapshotOf(op.operationId) : undefined;
     if (op === undefined || snapshot === undefined) return { failure: { kind: "wrong-binding" } };
     // the same seam, on the context path
-    const organizationId_ = organizationId(envelope.claims.actor.organizationId);
-    const actorId_ = actorId(envelope.claims.actor.actorId);
+    const organizationId_ = organizationId(claims.actor.organizationId);
+    const actorId_ = actorId(claims.actor.actorId);
     const wearable = wearableGrants(snapshot, organizationId_, actorId_, op.operationId);
     const actor = orgs.get(organizationId_)?.actors.find((a) => a.actorId === actorId_);
     const orgName = orgs.get(organizationId_)?.displayName;
@@ -254,8 +254,8 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
         ? {}
         : {
             selectedHat: {
-              role: envelope.claims.hat.role,
-              actions: [...envelope.claims.hat.actions],
+              role: claims.hat.role,
+              actions: [...claims.hat.actions],
               target: selected.target,
               primary: selected.primary === true,
               grantId: selected.grantId,
@@ -264,9 +264,9 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
                 : {}),
             },
           }),
-      sites: [...envelope.claims.sites],
-      ...(envelope.claims.amr !== undefined ? { amr: [...envelope.claims.amr] } : {}),
-      ...(envelope.claims.auth_time !== undefined ? { authTime: envelope.claims.auth_time } : {}),
+      sites: [...claims.sites],
+      ...(claims.amr !== undefined ? { amr: [...claims.amr] } : {}),
+      ...(claims.auth_time !== undefined ? { authTime: claims.auth_time } : {}),
     };
   };
 
