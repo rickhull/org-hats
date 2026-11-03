@@ -356,6 +356,16 @@ The four carried gaps are closed (above). Since then:
   HTTP boundary coerces `amr` again. Both are instances of the parse-boundary
   convention, already present. Evidence retained: it guards the claim that
   provider documents are hostile input.
+- **Rejected — a crafted snapshot cannot resurrect an actor's standing**, and
+  the threat model named the wrong field. Writing the witness for its own
+  residual-risk sentence showed that a disable never revokes the handle: the
+  handle stays live and *issuance* refuses, because the operation's roster
+  projection says the actor is disabled. That projection is deliberately
+  absent from the export — `state.ts` already said why — so a snapshot has no
+  field in which to state standing, and un-revoking every refresh record
+  attacks a gate that was never consulted. What a snapshot cannot express is
+  a stronger boundary than what it is trusted to state; the model now says so.
+  This closes Phase 1's second missing-boundary item.
 - **Execution verdict: no pod for the rest of Phase 3.** The isolation
   question is settled rather than open. There is one `vitest.config.ts` and
   one `wrangler.jsonc`, and workerd runs with Durable Object bindings and

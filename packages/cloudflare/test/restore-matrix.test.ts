@@ -377,3 +377,102 @@ describe("a crafted snapshot's undelivered outbox rows", () => {
     expect(rows.find((row) => row.organization_id === orgId)?.status).toBe("active");
   });
 });
+
+describe("a crafted snapshot and an actor's standing", () => {
+  // The threat model says a restore reinstates `revoked`/`superseded` as the
+  // snapshot states them, and that A13's live organization read still gates
+  // the next refresh. That was a reading, not a test, and a residual-risk
+  // statement with no witness is the claim most likely to drift.
+  //
+  // Writing it showed the sentence names the wrong field. A disable does not
+  // revoke the handle at all: the handle stays live and *issuance* refuses,
+  // because the operation's `org_actors` projection says the actor is
+  // disabled. And that projection is deliberately absent from the export
+  // (`state.ts`: "a snapshot that carried it would restore a stale roster as
+  // authority"), so a crafted snapshot has no field in which to express an
+  // actor's standing. Un-revoking every refresh record is a no-op against a
+  // gate that never consulted them.
+  const LEAD = "actor-lead";
+  const CREW = "actor-crew";
+
+  it("cannot resurrect the handle of an actor the organization disabled", async () => {
+    const orgId = "org-restore-unrevoke";
+    const opId = "op-restore-unrevoke";
+    const org = env.ORGANIZATION.get(env.ORGANIZATION.idFromName(orgId));
+    const op = env.OPERATION.get(env.OPERATION.idFromName(opId));
+
+    expect((await call(org, "POST", "/bootstrap", organizationBootstrap(orgId))).body.ok).toBe(true);
+    expect((await call(op, "POST", "/bootstrap", {
+      operationId: opId,
+      slug: "unrevoke-op",
+      policy: {
+        format: 1,
+        id: "policy-unrevoke",
+        version: "1",
+        actions: ["observe"],
+        roles: [{ title: "field", actions: ["observe"] }],
+        readPolicy: { organizations: "granted-teams" },
+      },
+      adminRoles: ["admin"],
+      configureActions: ["configure"],
+      sites: [{ siteId: "site-unrevoke", path: "s", aliases: [] }],
+      teams: [{ teamId: "team-unrevoke", siteId: "site-unrevoke", organizationId: orgId }],
+      grants: [{
+        grantId: "g-unrevoke",
+        organizationId: orgId,
+        actorId: CREW,
+        role: "field",
+        target: { kind: "team", teamId: "team-unrevoke" },
+        primary: true,
+      }],
+      participations: [{ organizationId: orgId, status: "active" }],
+    })).body.ok).toBe(true);
+
+    const issued = await call<{ refresh: { handle: string } }>(op, "POST", "/issue", {
+      organizationId: orgId,
+      actorId: CREW,
+    });
+    expect(issued.body.ok).toBe(true);
+    const handle = issued.body.value?.refresh.handle ?? "";
+    expect(handle).toBeTruthy();
+
+    expect((await call(org, "POST", "/disable", {
+      actorId: CREW,
+      byActorId: LEAD,
+      idempotencyKey: "unrevoke-disable",
+    })).body.ok).toBe(true);
+    expect((await call(org, "POST", "/drain")).body.ok).toBe(true);
+
+    // the gate is the projection, not the record
+    const afterDisable = await call(op, "POST", "/refresh", { handle });
+    expect(afterDisable.body.ok).toBe(false);
+    expect(afterDisable.body.failure?.kind).toBe("not-admitted");
+    expect(afterDisable.body.failure?.detail).toBe("actor disabled");
+
+    const snapshot = await exportCoordinator("operation", opId);
+    // the structural defence, which nothing asserted before: standing is not
+    // a field a snapshot can carry
+    expect(Object.keys(snapshot.tables)).not.toContain("org_actors");
+    // and the records a snapshot *can* carry were never the gate
+    const records = snapshot.tables["refresh_records"] ?? [];
+    expect(records.length).toBeGreaterThan(0);
+    expect(records.every((row) => Number(row["revoked"]) === 0)).toBe(true);
+
+    const crafted = {
+      ...snapshot,
+      tables: {
+        ...snapshot.tables,
+        refresh_records: records.map((row) => ({ ...row, revoked: 0, superseded: 0 })),
+        // an attacker's best attempt at standing: a table the restore ignores
+        org_actors: [{ organization_id: orgId, actor_id: CREW, disabled: 0 }],
+      },
+    };
+    expect((await restore("operation", opId, crafted)).status).toBe(200);
+
+    // the handle still buys nothing: the projection rebuilt by pulling the
+    // organization's current state, where the actor is disabled
+    const afterRestore = await call(op, "POST", "/refresh", { handle });
+    expect(afterRestore.body.ok).toBe(false);
+    expect(afterRestore.body.failure?.kind).toBe("not-admitted");
+  }, 30_000);
+});
