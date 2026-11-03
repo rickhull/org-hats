@@ -121,8 +121,8 @@ attestation, and no reproducible-build claim. "Pin a commit" is sound and is
 what the threat model already says; it is weaker than a signature when an
 assessor asks how upstream artifacts are authenticated.
 
-The red-team campaign's Phase 4 added a second item of the same shape: nothing
-in a release records that it passed its gate. `bin/verify`'s marker is local
+The red-team campaign found a second item of the same shape: nothing in a
+release records that it passed its gate. `bin/verify`'s marker is local
 by design and never published, so a `--no-verify` release is
 indistinguishable from a verified one. Both questions are "what can a
 consumer verify about an artifact without trusting us", and both are answered
@@ -144,6 +144,7 @@ the honest gap. `docs/assurance.md` tells operators needing log integrity to
 ship rows to an append-only store they control. Revisit only if the authority
 ever owns its own storage.
 
-The incident-response half of both regimes is the red-team campaign's Phase 5
-([`red-team.md`](red-team.md)), which walks the compromise runbook and fixes
-what it finds. Do not duplicate that work here.
+The incident-response half of both regimes is the compromise runbook,
+[`../docs/key_compromise.md`](../docs/key_compromise.md), which the red-team
+campaign walked scenario by scenario and corrected. Do not restate it here;
+cite it.

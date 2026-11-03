@@ -216,3 +216,22 @@ interface is a design bug, not a test gap.
 `fixtures/envelope-vectors.json` carries a committed **test-only** Ed25519
 keypair; it has never signed real authority. Every fixture is synthetic: no
 customer names, rosters, or real-person data.
+
+## Running suites in parallel
+
+Don't, for the Cloudflare ring. There is one `vitest.config.ts` and one
+`wrangler.jsonc`, and workerd runs with Durable Object bindings and local
+persistence, so two concurrent suite runs in this checkout contend on a shared
+runtime rather than on files — disjoint file sets do not make them safe. Give a
+parallel writer its own git worktree, at the cost of a per-worktree install of
+workerd and esbuild, or run serially.
+
+The portable ring has no such constraint: `node --test tests/<file>.test.ts`
+is independent per file.
+
+One discipline that is not optional. A new test written for a guard that
+already holds is not evidence until the guard has been removed and the test
+shown to fail — a passing new test proves nothing by itself, and will
+occasionally pass for a reason that does not exist. Remove the guard, watch it
+fail, restore the guard, and confirm the tree is unmodified. `AGENTS.md` states
+this as a rule; it is here because this is where it gets applied.

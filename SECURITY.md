@@ -41,7 +41,19 @@ Include:
 
 - **Acknowledge** within three business days.
 - **Triage** within ten business days, including severity and the affected
-  versions.
+  versions. Severity follows demonstrated impact, not the importance of the
+  component involved:
+  - **critical** — unauthenticated signing authority, cross-tenant
+    administration, release compromise, or broad secret disclosure with a
+    practical path;
+  - **high** — authentication or authorization bypass, durable
+    cross-boundary state mutation, or practical credential forgery or reuse
+    outside the documented window;
+  - **medium** — bounded information disclosure, denial of service at modest
+    attacker cost, or a required security control that fails under a
+    realistic condition;
+  - **low** — a defence-in-depth weakness or misleading security behaviour
+    with no demonstrated privilege or confidentiality impact.
 - **Agree a disclosure date** with the reporter, fix and verify before public
   disclosure, and credit the reporter unless anonymity is requested.
 - **Publish an advisory** with the fix and any operational guidance.
@@ -77,9 +89,15 @@ credentials.
 The invariants a report may rely on:
 
 - envelopes are Ed25519-signed over canonical JSON, versioned, and bounded by
-  `iat`/`exp`; an unrecognized envelope format or version fails closed, and a
-  call with an unrecognized interface version is refused before its body is
-  interpreted;
+  `iat`/`exp`; a call with an unrecognized interface version is refused before
+  its body is interpreted;
+- an envelope that cannot be read fails closed **as a value, never as an
+  exception**: a non-object envelope, absent claims, a missing key id or
+  signature, and claims nested deeper than the format allows are all closed
+  failures, and so is a host-supplied verify predicate that throws. An
+  unrecognized format or version is `wrong-interface-version`; something that
+  is not recognizable as an envelope at all declares no version and is
+  `unauthenticated`;
 - verification checks the format, the signature, expiry, and the caller's
   operation/site binding, in that order of trust;
 - the authority engine owns signing, idempotency, audit, and refresh

@@ -124,31 +124,34 @@ threat model says so, and nothing here changes that.
   scaled world above and deferred by consumer advice; see
   [`../plans/snapshot_cache.md`](../plans/snapshot_cache.md).
 
-**Was unbounded per invocation — the one finding of this review, now fixed.**
+**Was unbounded per invocation — the one finding of this review, since fixed.**
 
-The outbox drain iterates *every* pending message — `outboxRows()` carries no
-`LIMIT` — and the organization fans `roster` and `actor-disabled` messages out
-to every operation in its `invitations`, one coordinator `fetch` each. So the
-subrequests issued by a single drain are the sum, over pending messages, of
-their target counts: unbounded in both dimensions, against a platform cap on
-subrequests per invocation.
+The drain iterated *every* pending message, and the organization fanned
+`roster`, `actor-disabled`, and `actor-unlinked` out to every operation in its
+`invitations` with one coordinator `fetch` each. The subrequests a single
+drain issued were therefore the sum, over pending messages, of their target
+counts: unbounded in both dimensions, against a platform cap on subrequests
+per invocation.
 
-The failure mode is worse than slowness. A drain that exceeds the cap fails
-partway; the messages it did not deliver stay pending, the alarm reschedules
-one second out because `pending > 0`, and the next invocation attempts the
-same oversized batch. It retries forever at one attempt per second and never
-completes — a livelock rather than a degradation, and the retry is what makes
-it permanent.
+The failure mode was worse than slowness. A drain that exceeded the cap failed
+partway; the messages it had not delivered stayed pending, the alarm
+rescheduled one second out because `pending > 0`, and the next invocation
+attempted the same oversized batch. It retried forever at one attempt per
+second and never completed — a livelock rather than a degradation, and the
+retry was what made it permanent. A cliff rather than a curve: fine until
+unrecoverable, with no error an operator would read as "too many at once".
 
-Reaching it needs an organization participating in many operations, or a
-backlog of fan-out messages, so no current deployment is near it. It is
-recorded here because it is a cliff rather than a curve: the cost is fine
-until it is unrecoverable, with nothing in between and no error an operator
-would read as "too many at once".
+**Fixed 2026-11-02.** Fan-out is expanded at enqueue into one addressed row
+per operation, so one row is one subrequest; the drain takes at most
+`OUTBOX_DRAIN_LIMIT` (25) rows and leaves the remainder pending for the alarm
+that already runs, clearing a backlog at roughly 25 a second. 25 sits under
+even the free tier's 50-subrequest limit, so the bound does not depend on the
+plan. Delivered rows are pruned after seven days, which keeps the extra rows
+one event now retains from trading a bounded cliff for unbounded growth.
 
-The shape of the fix is already in the design: `drain` returns
-`{ delivered, pending }` and the alarm continues while anything is pending, so
-draining a bounded number of messages per invocation and leaving the rest
-pending needs no new mechanism — only a cap. Choosing that cap is a
-deployment fact (the subrequest limit differs by plan), so it is
-[a decision](../plans/red-team.md), not a cleanup.
+Witnessed in `packages/cloudflare/test/organization.test.ts`: a 64-row backlog
+drains across three invocations, and removing the cap fails that test. The two
+behaviour changes that came with it — a late-joining operation no longer
+receives an already-enqueued fan-out, and a partial failure no longer forces
+redelivery to the targets that succeeded — are in
+[`cloudflare.md`](cloudflare.md) § The outbox.

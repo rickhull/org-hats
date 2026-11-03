@@ -9,11 +9,6 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-The authority, Cloudflare runtime, release path, and compromise procedures
-need one bounded adversarial campaign.  Its local-only rules of engagement,
-moshpit execution, phases, evidence, stop conditions, and done-when are in
-[`red-team.md`](red-team.md).
-
 The operation snapshot cache is deferred until a consumer approaches the
 scaled bench's state; the measured verdict, the consumer-agreed design
 (model-scoped epoch, trigger-backed), and the done-when are in
@@ -28,6 +23,18 @@ done-whens are in [`assurance.md`](assurance.md).
 
 The specs-driven witness suite landed; its durable convention lives in
 `tests/README.md` and `specs/README.md`.
+
+The red-team campaign landed on 2026-11-02 and is retired.  Its conclusions
+are where they belong rather than in a plan: the invariants it sharpened are
+E2, E4, and E7 in [`../specs/envelope.md`](../specs/envelope.md); the
+reachable-input list, the amplification review, the advisory triage, and the
+severity bands are in [`../docs/threat_model.md`](../docs/threat_model.md),
+[`../docs/performance.md`](../docs/performance.md),
+[`../docs/assurance.md`](../docs/assurance.md), and
+[`../SECURITY.md`](../SECURITY.md); the tabletop corrections are in
+[`../docs/key_compromise.md`](../docs/key_compromise.md); the recurring
+practices it produced are conventions in `AGENTS.md`; and the regression
+evidence is in the suites.
 
 The activation, roster, and team slices landed on 2026-10-28 and 2026-10-29;
 their durable facts are in `docs/activation.md`, `docs/roster.md`,
