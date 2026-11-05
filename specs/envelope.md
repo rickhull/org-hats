@@ -84,8 +84,9 @@ the caller's expected bindings.
 
 Closed means *as a value*. The envelope is untrusted input whose declared type
 is erased at runtime, so the gate refuses a non-object envelope, an absent
-claims payload, and a missing key id or signature before reading a field, and
-a verify predicate that throws is `invalid-signature`. Every caller of the
+claims payload, a missing key id or signature, and an invalid expiry before
+yielding typed claims. A verify predicate that throws is `invalid-signature`.
+Every caller of the
 gate — the verifier, the context, and command authorization — inherits this,
 and none of them may read a claim before it has run.
 
@@ -158,6 +159,13 @@ Claims assembly refuses such a lifetime, and the in-memory engine refuses it
 at construction, so a deployment that cannot bound expiry issues nothing
 instead of issuing forever.
 
+The shared envelope parser also requires `exp` to be a finite whole number.
+Missing or invalid expiry is `unauthenticated` before signature verification;
+a structurally valid expiry is compared with the clock after the signature
+check, so an elapsed integer expiry remains `expired`. This gate covers the
+access verifier, context, and envelope-based command authorization in both
+runtimes, including malformed claims signed by a trusted issuer.
+
 ```js spec=E7 traits=portable,unit
 // The clock is injected: the same envelope one second before exp, then at it.
 const s = await spec.world();
@@ -167,8 +175,10 @@ spec.expect(stillLive.access !== undefined, "one second before exp the envelope 
 spec.expectFailure(await s.verifyAt(envelope, envelope.claims.exp), "expired", "at exp it is dead");
 ```
 
-*Held by:* issuance and verification on both engines; `OH-ACCESS-02`; the
-engine default is 900 seconds, configurable; the E7 executable example.
+*Held by:* issuance and verification on both engines; the signed malformed
+expiry cases in the access, engine, and Cloudflare runtime suites;
+`OH-ACCESS-02`; the engine default is 900 seconds, configurable; the E7
+executable example.
 *If it breaks:* revocation latency becomes unbounded, or ordinary reads
 regain a control-plane dependency the projection exists to remove.
 

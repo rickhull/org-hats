@@ -41,7 +41,7 @@ lifetimes, the 4 KB budget, and refresh rotation — are
 | `readableOrganizationIds` | read reach, **computed by the issuer** under the active policy bundle |
 | `readableTeamIds` | exceptional team grants only — a reached team whose organization is not in `readableOrganizationIds`; never an expanded list of every readable team |
 | `configurableSiteIds` | where the holder may configure |
-| `iat`, `exp` | epoch seconds; `exp` bounds the revocation window |
+| `iat`, `exp` | epoch seconds; `exp` is a required finite whole number and bounds the revocation window |
 | `amr`, `auth_time` | the authentication event: opaque method references (RFC 8176) and its epoch seconds, copied from principal evidence at issuance and preserved through refresh; absent when the evidence carried none |
 
 Read reach is an issuer computation, not a verifier reconstruction: the
@@ -139,6 +139,12 @@ key is trusting the issuer's computation: the verifier does not re-derive
 policy, read reach, or hat selection, so a valid signature proves provenance
 and integrity, not that the issuer applied the right policy. Key custody and
 rotation are the trust anchor; an unknown key id fails closed.
+
+The shared envelope parser refuses missing, nonnumeric, non-finite, or
+fractional `exp` as `unauthenticated`, before signature verification. A valid
+integer expiry is compared with the clock only after signature verification;
+`now >= exp` returns `expired`. Context and envelope-based command authorization
+inherit the same expiry-shape gate.
 
 The access verifier owns a deeply frozen copy of the depth-bounded claims
 before awaiting signature verification, and exposes frozen claims and an

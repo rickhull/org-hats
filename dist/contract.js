@@ -147,6 +147,13 @@ export const parseAccessEnvelope = (envelope) => {
     if (typeof carriage.signature !== "string" || carriage.signature.length === 0) {
         return { kind: "unauthenticated", detail: "the envelope carries no signature" };
     }
+    // Comparing a clock with an absent or nonnumeric expiry can never bound
+    // access. Parse its shape here; authentic, elapsed integer expiries remain
+    // the verifier's `expired` decision after the signature check.
+    const exp = claims.exp;
+    if (typeof exp !== "number" || !Number.isInteger(exp)) {
+        return { kind: "unauthenticated", detail: "the claims carry no finite whole-number expiry" };
+    }
     return {
         keyId: carriage.keyId,
         signature: carriage.signature,

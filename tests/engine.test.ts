@@ -745,6 +745,32 @@ test("[E8] command and context use the envelope version gate, not just the signa
   assert.equal(failureOf(context).kind, "wrong-interface-version");
 });
 
+test("[E4][E7] context and commands refuse signed claims without expiry", async (t) => {
+  const { engine, signer } = await setup();
+  const issued = successOf(await engine.runtime.accessFromEvidence(evidence(DANA)));
+  const { exp: _exp, ...claims } = issued.envelope.claims;
+  const envelope = {
+    ...issued.envelope,
+    claims: claims as never,
+    signature: await signer.sign(canonicalJson(asJson(claims))),
+  };
+  await t.test("context", async () => {
+    const result = await engine.runtime.context({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      envelope,
+    });
+    assert.equal(failureOf(result).kind, "unauthenticated");
+  });
+  await t.test("command", async () => {
+    const result = await engine.runtime.command(cmd(
+      { kind: "select-hat", operationId: OP, grantId: "g-mer-3" },
+      { kind: "access-envelope", envelope },
+      "missing-expiry",
+    ));
+    assert.equal(failureOf(result).kind, "unauthenticated");
+  });
+});
+
 test("[E4] command authorization refuses a malformed envelope as a value, never a throw", async () => {
   // The command path reads `authorization.envelope.claims` as it authorizes,
   // so the version gate has to refuse a non-object envelope and an absent

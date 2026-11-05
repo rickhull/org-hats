@@ -4,7 +4,7 @@
 // in-memory reference engine enforces.
 
 import { env } from "cloudflare:test";
-import { AUTHORITY_INTERFACE_VERSION, isFailed } from "org-hats/authority";
+import { AUTHORITY_INTERFACE_VERSION, canonicalJson, isFailed } from "org-hats/authority";
 import {
   CONFORMANCE_PRINCIPALS,
   CONFORMANCE_WORLD,
@@ -59,6 +59,41 @@ const conformanceOrganizationIds = (): readonly string[] => [...new Set(
 )];
 
 describe("the Cloudflare runtime's cross-coordinator rules", () => {
+  it("[E4][E7] context and commands refuse signed claims without expiry", async () => {
+    await createCloudflareConformanceWorld(env);
+    const signer = await createEphemeralSigner("key-missing-expiry");
+    const key = await verificationKeyOf(signer);
+    const runtime = createCloudflareRuntime({
+      env: env as Env,
+      signer,
+      keys: new Map([[key.keyId, key]]),
+      organizationIds: conformanceOrganizationIds(),
+    });
+    const issued = await runtime.accessFromEvidence({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      operationId: MERIDIAN,
+      evidence: CONFORMANCE_PRINCIPALS.dana.evidence,
+    });
+    if (isFailed(issued)) throw new Error(`issuance failed: ${issued.failure.kind}`);
+    const { exp: _exp, ...claims } = issued.envelope.claims;
+    const envelope = {
+      ...issued.envelope,
+      claims: claims as never,
+      signature: await signer.sign(canonicalJson(claims as never)),
+    };
+    const context = await runtime.context({ interfaceVersion: AUTHORITY_INTERFACE_VERSION, envelope });
+    const command = await runtime.command({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      idempotencyKey: "missing-expiry",
+      authorization: { kind: "access-envelope", envelope },
+      kind: "select-hat",
+      operationId: MERIDIAN,
+      grantId: "g-mer-3",
+    });
+    expect.soft(context).toMatchObject({ failure: { kind: "unauthenticated" } });
+    expect.soft(command).toMatchObject({ ok: false, failure: { kind: "unauthenticated" } });
+  }, 30_000);
+
   it("[A13] fails refresh after unlink even when the revocation outbox has not drained", async () => {
     const world = await createCloudflareConformanceWorld(env);
     const dana = CONFORMANCE_PRINCIPALS.dana;

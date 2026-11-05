@@ -2,36 +2,14 @@
 
 ## Goal and scope
 
-Enforce the expiry shape and reconcile E4's failure order with its existing
-witnesses. These are bounded follow-ups to the access and envelope review, not
-a redesign of policy or the authority seam.
+Reconcile E4's failure order with its existing witnesses and close the key-set
+compatibility witness gap. These are bounded follow-ups to the access and
+envelope review, not a redesign of policy or the authority seam.
 
-The missing-expiry reproduction requires malformed claims from a trusted
-signer. It is a robustness gap, not a demonstrated remote signature bypass.
 E4 is a disagreement between text and deliberately tested behavior; resolve
 that disagreement explicitly.
 
 ## Next work
-
-Each numbered item is a separate, testable slice. Expiry parsing precedes the
-E4 clarification so its wording describes the resulting order.
-
-### 3. Validate expiry at the envelope boundary
-
-**Work:** Have the named envelope parser in `src/contract.ts` reject an absent
-or invalid `exp` before it yields typed claims. Require a finite whole number
-of epoch seconds and return a closed failure value for malformed expiry;
-retain `expired` for a structurally valid expiry at or before `now`.
-
-**Done when:** a genuinely signed payload without `exp`, or with a nonnumeric
-or fractional expiry, cannot yield verified access. Parser inputs containing
-non-finite numbers also fail closed. Valid envelopes still verify one second
-before expiry and fail at expiry. Optional claims remain compatible.
-
-**Closing evidence:** access tests first reproduce successful verification of
-signed claims without `exp` at epoch `9999999999`, then prove rejection after
-the fix. Add focused invalid-shape cases and inspect all parser callers,
-including runtime context and command authorization, for failure mapping.
 
 ### 4. Reconcile E4's failure precedence with its witnesses
 

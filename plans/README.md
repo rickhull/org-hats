@@ -9,9 +9,9 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-The access review's next work is expiry parsing and an explicit E4 failure
-order. The ordered slices, regression evidence, and lower-priority key-set
-compatibility witness are in [`access_integrity.md`](access_integrity.md).
+The access review's next work is an explicit E4 failure order and the key-set
+compatibility witness. The slices and regression evidence are in
+[`access_integrity.md`](access_integrity.md).
 
 The operation snapshot cache is deferred until a consumer approaches the
 scaled bench's state; the measured verdict, the consumer-agreed design

@@ -153,6 +153,39 @@ test("[E7] expiry: the envelope dies at exp, verified one second before", async 
   assert.equal(dead.kind, "expired");
 });
 
+test("[E4][E7] signed claims need a finite whole-number expiry", async (t) => {
+  const signer = await webCryptoSigner("key-invalid-expiry");
+  const signerKey = await ed25519VerifyKey(signer.keyId, await signer.publicKey());
+  const { exp: _exp, ...bare } = vectors.claims;
+  // Non-finite numbers exercise direct JS callers; JSON serializes them as
+  // null, which is independently refused below.
+  const invalid: readonly (readonly [string, unknown])[] = [
+    ["missing", undefined],
+    ["null", null],
+    ["numeric string", "1000000000000"],
+    ["nonnumeric string", "never"],
+    ["fractional", 1_000_000_000_000.5],
+    ["NaN", Number.NaN],
+    ["positive infinity", Number.POSITIVE_INFINITY],
+    ["negative infinity", Number.NEGATIVE_INFINITY],
+  ];
+  for (const [label, exp] of invalid) {
+    await t.test(label, async () => {
+      const claims = exp === undefined ? bare : { ...bare, exp };
+      const envelope = {
+        ...envelopeOf(vectors.claims),
+        keyId: signer.keyId,
+        claims,
+        signature: await signer.sign(canonicalJson(asJson(claims))),
+      };
+      const result = await verify(envelope as never, new Map([[signerKey.keyId, signerKey]]), {
+        now: 9_999_999_999,
+      });
+      assert.equal(failureOf(result).kind, "unauthenticated");
+    });
+  }
+});
+
 test("[E4] verification fails closed in a fixed order when faults combine", async () => {
   // versions before the signature: a wrong version with a forged signature
   // is a version failure, not a signature failure
@@ -236,7 +269,7 @@ test("[E4] a structurally malformed envelope fails closed as a value, never a th
 const claimsOfDepth = (depth: number): unknown => {
   let node: unknown = 1;
   for (let i = 0; i < depth - 2; i += 1) node = { a: node };
-  return { v: 1, deep: node };
+  return { v: 1, exp: vectors.claims.exp, deep: node };
 };
 
 test("[E4] claims deeper than the format's bound are refused before canonicalization", async () => {
