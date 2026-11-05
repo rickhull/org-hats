@@ -163,14 +163,18 @@ The portable `src/` modules avoid Cloudflare imports and ambient runtime types. 
 
 ## Versions and distribution
 
-| Surface | Current version in this source archive |
+| Surface | Version source in this archive |
 | --- | --- |
-| `org-hats` | 3.5.0 |
+| `org-hats` | [`package.json`](package.json), `version` |
 | Authority interface | 3 |
 | Access envelope format | 1 |
-| Cloudflare runtime | 0.11.0 (`cloudflare-v*` tags); operation schema 5 |
+| Cloudflare runtime | [`packages/cloudflare/package.json`](packages/cloudflare/package.json), `version` (`cloudflare-v*` tags); operation schema 5 |
 
 Interface and envelope versions advance independently. See [v2 migration](docs/migration-v2.md), [v3 migration](docs/migration-v3.md), and [publishing](docs/publishing.md). The private NAS forge is canonical; Codeberg and GitHub are best-effort public release mirrors. Git tag immutability depends on repository governance; verify an exact commit (and its `dist/`) where supply-chain reproducibility matters.
+
+The [next patch's upgrade notes](docs/migration-v3.md#370--371) describe the
+access-verification hardening and ES2024 baseline. The Cloudflare package is
+versioned separately.
 
 ## Known gaps
 

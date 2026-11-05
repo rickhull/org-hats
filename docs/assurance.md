@@ -68,11 +68,11 @@ not on this library. What this library owes them is not getting in the way.
 
 ## Standing advisory triage
 
-`pnpm audit`, 2026-11-02, after the ordinary Cloudflare toolchain refresh: no
+`pnpm audit`, 2026-11-04, after the ordinary Cloudflare toolchain refresh: no
 known vulnerabilities across 0 production and 160 development dependencies.
 No override or forced remediation is present.
 
-The earlier audit that day found five high and four moderate advisories across
+An earlier audit on 2026-11-02 found five high and four moderate advisories across
 two development-only transitives of the Cloudflare package:
 
 - **`undici`** (eight advisories), reached through `miniflare` from both

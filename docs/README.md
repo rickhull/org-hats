@@ -70,7 +70,11 @@ public `org-hats` docs are normative for the seam.
   1 keeps reading across it; plus the additive 2.1 surface.
 - [`migration-v3.md`](migration-v3.md) — the 2.x → 3.0 break: interface
   version 3, the `action-not-carried` reason, and `teamReach()`; envelope
-  format 1 keeps reading.
+  format 1 keeps reading; plus the 3.7.1 patch hardening and its host
+  acceptance checks.
+- [`release_review_v3.7.1.md`](release_review_v3.7.1.md) — the bounded
+  standards/spec review and source-level consumer acceptance for the
+  access-integrity patch pair.
 - [`publishing.md`](publishing.md) — canonical forge, public mirrors, CI, the
   release ritual, and why deployment is the consuming host's act.
 - [`forgejo_actions.md`](forgejo_actions.md) — the manual-dispatch

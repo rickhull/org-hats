@@ -106,3 +106,71 @@ version.
 The Cloudflare package follows its own `0.x` cadence; `cloudflare-v0.6.0`
 is the first release carrying interface 3. Its operation schema and
 envelope format do not move.
+
+## 3.7.0 → 3.7.1
+
+These changes follow `v3.7.0` and `cloudflare-v0.13.0`; those tags do not
+contain them. The authority interface
+stays 3, the envelope format stays 1, and the organization and operation
+schemas stay 2 and 5. No storage migration or export/restore is introduced
+by this patch window. Publication and host deployment remain separate acts.
+
+### Verified access owns its claims
+
+The access verifier copies and deeply freezes the depth-bounded claims before
+awaiting signature verification. Its returned claims and access object refer
+to that snapshot: changing the original envelope during or after verification,
+or attempting to write through returned views, cannot change verified facts.
+Unknown optional claims still contribute to the signed bytes.
+
+Hosts consume the declared readonly views. Code that needs an editable copy
+for transport or test construction makes its own copy; writes to frozen views
+may throw in strict mode. Product authorization continues to use
+`NeutralAccess`, not edited claims.
+
+### Malformed expiry is refused at the shared parser
+
+`exp` must be a finite whole number of epoch seconds. Missing, nonnumeric,
+non-finite, and fractional expiry return `unauthenticated` before signature
+verification, including when a trusted issuer signed the malformed payload.
+The access verifier, runtime context, and envelope-based command authorization
+share this gate. A valid integer expiry is still checked after the signature,
+and `now >= exp` still returns `expired`.
+
+The [E4 stage table](../specs/envelope.md#e4--verification-fails-closed-in-a-fixed-order)
+states failure precedence, including combined faults. The wording clarification
+preserves the existing format/version classification. Hosts continue to map
+the closed failure kinds; `detail` is not another taxonomy.
+
+### Injected v1 signers declare Ed25519
+
+`createInMemoryAuthority` refuses a signer declaring another algorithm at
+construction. Default and injected Ed25519 signers remain supported. The
+callback implementation remains the host's responsibility; checking its
+declaration does not attest to what it does.
+
+### The compiler baseline is ES2024
+
+The build, portable fence, tests, and Cloudflare package target ES2024 and
+use its standard-library declarations. Node's minimum remains 24. The access
+mutation test and the Worker's subject queue use `Promise.withResolvers()`;
+the queue retains its existing ordering and release behavior.
+
+The pinned workerd runtime runs these changes at the existing
+`2026-10-24` compatibility date. A different host runtime must provide the
+standard APIs it executes; compiler declarations do not install polyfills.
+The separate ES2022 consumer type fence still checks the exported declarations
+and does not promise an ES2022 runtime.
+
+### Consumer acceptance
+
+Exercise login and local verification, refresh, context, and an authorized
+command through the host's real session wiring. Check that the host reads
+verified views without mutating them and retains its `unauthenticated` versus
+`expired` response mapping. Ordinary envelopes from the existing issuer remain
+compatible; this patch does not itself require clearing sessions, rotating
+keys, or restoring state.
+
+Unknown top-level and per-key fields in a verification-key set remain
+accepted. The new E5 witness verifies the committed signed envelope through
+both shapes; this is evidence for the existing compatibility promise.
