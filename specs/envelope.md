@@ -142,8 +142,10 @@ retire the old key after its last envelope expires. An empty set, a
 duplicate id, or a wrong algorithm fails closed at parse; unknown fields are
 ignored, so an additive field cannot brick live verifiers.
 
-*Held by:* `parseVerifyKeySet`'s closed failures; the rotation and
-retirement vector; `/ops/verification-keys` returns exactly the set.
+*Held by:* `parseVerifyKeySet`'s closed failures; the E5 key-set test loads
+unknown top-level and per-key fields and verifies the committed envelope;
+the rotation and retirement vector; `/ops/verification-keys` returns exactly
+the set.
 *If it breaks:* rotation stalls on distribution, or a verifier verifies
 nothing while looking healthy — the deployment failure that looks like a
 credential problem.

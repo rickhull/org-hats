@@ -9,10 +9,6 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-The access review's remaining work is the key-set compatibility witness.
-Its acceptance condition and regression evidence are in
-[`access_integrity.md`](access_integrity.md).
-
 The operation snapshot cache is deferred until a consumer approaches the
 scaled bench's state; the measured verdict, the consumer-agreed design
 (model-scoped epoch, trigger-backed), and the done-when are in

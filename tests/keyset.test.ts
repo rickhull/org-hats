@@ -72,6 +72,30 @@ test("a key set round-trips and verifies the committed vector", async () => {
   assert.equal(canonicalJson(asJson(verified.claims)), vectors.canonical);
 });
 
+test("[E5] unknown key-set and per-key fields preserve verification", async (t) => {
+  const base = { format: VERIFY_KEY_SET_FORMAT, v: VERIFY_KEY_SET_VERSION, keys: [material] };
+  const cases = [
+    { label: "key-set field", input: { ...base, futureMetadata: { note: "additive" } } },
+    { label: "per-key field", input: { ...base, keys: [{ ...material, futureLabel: "additive" }] } },
+  ];
+  for (const { label, input } of cases) {
+    await t.test(label, async () => {
+      // Use raw JSON: the current serializer would discard unknown fields
+      // before the loader had a chance to prove compatibility with them.
+      const keys = await verificationKeysFrom(JSON.stringify(input));
+      const envelope: SignedAccessEnvelope = {
+        format: ACCESS_ENVELOPE_FORMAT,
+        v: 1,
+        keyId: vectors.keyId,
+        claims: vectors.claims,
+        signature: vectors.signature,
+      };
+      const verified = successOf(await verify(envelope, keys, { now: vectors.claims.iat + 1 }));
+      assert.equal(canonicalJson(asJson(verified.claims)), vectors.canonical);
+    });
+  }
+});
+
 test("an empty key set is refused", () => {
   assert.throws(() => serializeVerifyKeySet([]), /at least one key/);
   assert.throws(() => parseVerifyKeySet(JSON.stringify({ format: VERIFY_KEY_SET_FORMAT, v: 1, keys: [] })), /at least one key/);
