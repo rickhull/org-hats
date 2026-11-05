@@ -132,7 +132,17 @@ widening the provenance field must never widen the call surface with it.
 
 ## Compiler fences and checked tests
 
-The compiler is used as a boundary enforcer, not only as a build step:
+The compiler is used as a boundary enforcer, not only as a build step.
+
+The build, portable fence, tests, and Cloudflare package use ES2024 for
+`target` and `lib`. Node 24 is the minimum Node runtime; the reference Worker
+uses the pinned workerd runtime and its configured compatibility date. New
+standard APIs must work in both runtime rings; compiler declarations alone
+do not supply runtime implementations. ES2024 enables APIs such as
+`Promise.withResolvers`, used by the access mutation test and the Worker's
+subject queue. The baseline follows TypeScript's
+[Node 24 mapping](https://github.com/microsoft/TypeScript/wiki/Node-Target-Mapping#node-24)
+and [ES2024 support](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-7.html#support-for---target-es2024-and---lib-es2024).
 
 - `tsconfig.authority.json` compiles `src/` with `types: []`; `bin/check`
   also rejects any Cloudflare import under `src/`. `erasableSyntaxOnly`
@@ -140,7 +150,9 @@ The compiler is used as a boundary enforcer, not only as a build step:
   suites and the examples directly; the root and the Cloudflare package are
   aligned on TypeScript 5.9.
 - `tsconfig.json` builds the published declarations; `tsconfig.consumer.json`
-  compiles the consumer surface against `dist/`.
+  compiles the consumer surface against `dist/` with ES2022 declarations.
+  This narrower type fence checks that exported types remain usable without
+  newer standard-library declarations; it is not an ES2022 runtime promise.
 - `tsconfig.tests.json` typechecks `src`, `tests`, and `examples` in
   `bin/check`, so a fixture can no longer drift from a public type and fail
   only at runtime.

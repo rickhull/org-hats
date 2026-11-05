@@ -31,13 +31,13 @@ export class PrincipalSubjectGuard extends DurableObject<Env> {
 
   private async exclusive<T>(work: () => Promise<T>): Promise<T> {
     const previous = this.tail;
-    let release: (() => void) | undefined;
-    this.tail = new Promise<void>((resolve) => { release = resolve; });
+    const { promise, resolve: release } = Promise.withResolvers<void>();
+    this.tail = promise;
     await previous;
     try {
       return await work();
     } finally {
-      release?.();
+      release();
     }
   }
 

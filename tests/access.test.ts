@@ -75,28 +75,26 @@ test("vector: tampered claims no longer match the signature", async () => {
 
 test("[E2][A5] mutation during signature verification cannot add unsigned authority", { timeout: 5_000 }, async () => {
   const claims = structuredClone(vectors.claims);
-  let enter: (() => void) | undefined;
-  let release: (() => void) | undefined;
-  const entered = new Promise<void>((resolve) => { enter = resolve; });
-  const resumed = new Promise<void>((resolve) => { release = resolve; });
+  const entered = Promise.withResolvers<void>();
+  const resumed = Promise.withResolvers<void>();
   const delayedKey: VerifyKey = {
     keyId: key.keyId,
     verify: async (payload, signature) => {
-      enter?.();
-      await resumed;
+      entered.resolve();
+      await resumed.promise;
       return key.verify(payload, signature);
     },
   };
   const pending = verify(envelopeOf(claims), new Map([[key.keyId, delayedKey]]), {
     now: vectors.claims.iat + 1,
   });
-  await entered;
+  await entered.promise;
   try {
     assert.equal(Reflect.set(claims.hat.actions, claims.hat.actions.length, "unsigned-action"), true);
     Reflect.set(claims.hat.teamIds, claims.hat.teamIds.length, "unsigned-team");
     Reflect.set(claims, "exp", vectors.claims.exp + 86_400);
   } finally {
-    release?.();
+    resumed.resolve();
   }
   const { access } = successOf(await pending);
   assert.equal(access.mayAct("unsigned-action", { kind: "team", teamId: "unsigned-team" }), false);
