@@ -132,6 +132,15 @@ in v1; another is a format-version change, not a bundle option.
 
 ## Trust boundary
 
+Parser refusals follow the ordered stages in
+[E4](../specs/envelope.md#e4--verification-fails-closed-in-a-fixed-order):
+outer container, format, wrapper version, claims container and version,
+depth, carriage fields, then expiry shape. The first failed stage wins.
+In particular, a missing format marker on an object or an unsupported wrapper
+version is `wrong-interface-version`, even when the payload is also malformed.
+An unsupported claims version wins over excessive depth. With supported
+versions, unreadable claims are `unauthenticated`.
+
 The verifier's guarantee is the envelope's: the format and version pair, the
 signature against a known key id, expiry, and the caller's bindings are
 checked, then the signed layers are exposed for local comparison. Accepting a

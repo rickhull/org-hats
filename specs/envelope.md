@@ -78,43 +78,58 @@ restriction and grants authority the issuer meant to withhold.
 
 ### E4 — Verification fails closed, in a fixed order
 
-Structure, then format and the envelope version pair — nothing unrecognized
-is interpreted — then the signature against a known key id, then expiry, then
-the caller's expected bindings.
+The shared envelope parser returns the first refusal in the following order.
+Basic container checks precede declaration checks; the remaining payload
+checks follow the declarations they interpret.
 
-Closed means *as a value*. The envelope is untrusted input whose declared type
-is erased at runtime, so the gate refuses a non-object envelope, an absent
-claims payload, a missing key id or signature, and an invalid expiry before
-yielding typed claims. A verify predicate that throws is `invalid-signature`.
-Every caller of the
-gate — the verifier, the context, and command authorization — inherits this,
-and none of them may read a claim before it has run.
+| Stage | Refusal | Failure kind |
+| --- | --- | --- |
+| Outer container | Not a non-null, non-array object | `unauthenticated` |
+| Format marker | Missing or different from `org-hats.access` | `wrong-interface-version` |
+| Wrapper version | Missing or unsupported `envelope.v` | `wrong-interface-version` |
+| Claims container | Missing, null, an array, or not an object | `unauthenticated` |
+| Claims version | Missing or unsupported `claims.v` | `wrong-interface-version` |
+| Claims depth | Exceeds E2's depth bound | `unauthenticated` |
+| Carriage fields | Missing, empty, or non-string key id or signature | `unauthenticated` |
+| Expiry shape | Missing, nonnumeric, non-finite, or fractional `exp` | `unauthenticated` |
 
-The gate returns the parsed envelope rather than a verdict about one, so that
-obligation is discharged by the only expression that yields a claim: a caller
-reads `keyId`, `signature`, and `claims` from the gate's result and never from
-the input beside it. That is a property of an implementation, not of the
-format — a reimplementation inherits the ordering rule above, not this shape —
-but it is what makes the ordering hard to get wrong rather than merely
-documented.
+Only after parsing succeeds does verification check the signature against a
+known key id (`invalid-signature`), elapsed expiry (`expired`), and then the
+caller's expected operation and site bindings (`wrong-binding`). A
+verification-key predicate that throws is `invalid-signature`.
 
-Structure includes depth. Canonical bytes are an input to the signature
-check, so a verifier canonicalizes claims it has not yet verified; the gate
-therefore refuses claims past E2's depth bound before any caller reaches
-`canonicalJson`, whose recursion would otherwise overflow on input that
-needs only a public key id and no valid signature.
+This order also governs combined faults. An object without a format marker
+is a format mismatch, even if it also lacks claims. An unsupported wrapper
+version wins over an absent claims payload; an unsupported wrapper or claims
+version wins over excessive claims depth. With supported versions, absent
+claims, excessive depth, and invalid expiry are `unauthenticated`. No
+signature check can repair any of these parser refusals.
 
-Unreadable and unsupported are different answers. Something that is not
-recognizable as an envelope — or too deep to read — declares no version, so
-it is `unauthenticated`:
-the caller presented no usable authority, and a fresh login is the remedy.
-Only a recognizable envelope can disagree with us about a version, and that
-stays `wrong-interface-version` — a deployment mismatch no login would fix.
-Collapsing the two would tell a person with a damaged cookie to wait for an
-outage that is not happening.
+Declaration checks precede payload scans so an unsupported format or version
+is refused without interpreting its payload. The distinction between
+`unauthenticated` and `wrong-interface-version` follows the first failed
+stage: the former means no usable authority and permits fresh login; the
+latter identifies a declaration mismatch for the host to handle. It is not
+a blanket rule that every malformed object receives `unauthenticated`.
 
-*Held by:* the single `verify` order; the shared `envelopeVersionFailure`
-gate; `OH-ACCESS-01` through `OH-ACCESS-04` and the vectors.
+Closed means *as a value*. The envelope is untrusted input whose declared
+type is erased at runtime. The gate returns parsed `keyId`, `signature`, and
+`claims`; the verifier, context, and command authorization read that result
+rather than fields from the input beside it. No caller may read a claim
+before the gate succeeds. This returned shape makes the obligation hard to
+bypass; a reimplementation inherits the ordered checks, not the shape of
+this implementation.
+
+Canonical bytes are an input to the signature check, so supported claims
+must pass the depth bound before any caller reaches `canonicalJson`. Its
+recursion would otherwise overflow on input requiring only a public key id
+and no valid signature. Unsupported declarations stop before that walk.
+
+*Held by:* `parseAccessEnvelope` and `verify`; the E4 access tests for
+structurally malformed envelopes, combined faults, unsupported versions with
+excessive depth, claims depth, and missing carriage fields; the E4/E7 signed
+expiry tests in the access, engine, and Cloudflare runtime suites;
+`OH-ACCESS-01` through `OH-ACCESS-04` and the vectors.
 *If it breaks:* an unrecognized envelope gets interpreted before it is
 trusted, a valid envelope dies for a reason it cannot name, or a malformed one
 leaves by an exception the closed taxonomy cannot describe.

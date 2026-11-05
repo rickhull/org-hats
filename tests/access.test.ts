@@ -303,6 +303,24 @@ test("[E4] claims deeper than the format's bound are refused before canonicaliza
   );
 });
 
+test("[E4] unsupported versions precede excessive claims depth", async (t) => {
+  const cases = [
+    { label: "wrapper version", v: 2, claimsVersion: 1 },
+    { label: "claims version", v: 1, claimsVersion: 2 },
+  ];
+  for (const { label, v, claimsVersion } of cases) {
+    await t.test(label, async () => {
+      const envelope = {
+        ...envelopeOf(vectors.claims),
+        v,
+        claims: { v: claimsVersion, exp: vectors.claims.exp, deep: claimsOfDepth(ACCESS_CLAIMS_MAX_DEPTH) },
+      };
+      const result = await verify(envelope as never, keys, { now: vectors.claims.iat + 1 });
+      assert.equal(failureOf(result).kind, "wrong-interface-version");
+    });
+  }
+});
+
 test("[E4] an envelope missing its key id or signature is unreadable, not mis-signed", async () => {
   // These used to fail closed only by accident downstream: an absent key id
   // became `invalid-signature` ("unknown key id undefined") and an absent
