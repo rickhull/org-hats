@@ -26,9 +26,9 @@ export interface InMemoryAuthorityConfig {
      * determinism; verifiers should pass `now` when the issuer's clock is
      * not the verifier's. */
     readonly clock?: ClockLike;
-    /** Defaults to a fresh Ed25519 key with a distinct id per engine. The
-     * in-memory engine is single-signer; rotation is the Cloudflare runtime's
-     * concern (T6.4). */
+    /** Only Ed25519 is accepted for envelope v1. Defaults to a fresh Ed25519
+     * key with a distinct id per engine. The in-memory engine is single-signer;
+     * rotation is the Cloudflare runtime's concern (T6.4). */
     readonly signer?: SignerLike;
     readonly envelopeLifetimeSeconds?: number;
     /** Defaults to 24 hours. */

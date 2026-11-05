@@ -4,6 +4,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { webcrypto } from "node:crypto";
 
 import { actorId, canonicalJson, isFailed, operationId, organizationId, siteId, teamId } from "../src/contract.ts";
 import type { TwinFixture } from "../src/authority/twins.ts";
@@ -80,6 +81,28 @@ const evidence = (subject: PrincipalEvidence, operationId: string = OP) => ({
 });
 
 const cmd = buildCommand;
+
+test("[E1] engine construction refuses a signer declaring another algorithm", async () => {
+  const pair = await webcrypto.subtle.generateKey(
+    { name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"],
+  );
+  const signer = {
+    keyId: "key-ecdsa",
+    algorithm: "ECDSA",
+    publicKey: async () => Buffer.from(await webcrypto.subtle.exportKey("raw", pair.publicKey)).toString("base64"),
+    sign: async (payload: string) => Buffer.from(await webcrypto.subtle.sign(
+      { name: "ECDSA", hash: "SHA-256" }, pair.privateKey, Buffer.from(payload),
+    )).toString("base64url"),
+    verify: async (payload: string, signature: string) => webcrypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" }, pair.publicKey,
+      Buffer.from(signature, "base64url"), Buffer.from(payload),
+    ),
+  };
+  await assert.rejects(
+    createInMemoryAuthority({ signer }),
+    /signer must use Ed25519/,
+  );
+});
 
 test("issuance: evidence resolves the actor, computes reach, and signs", async () => {
   const { engine, signer } = await setup();

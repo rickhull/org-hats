@@ -84,9 +84,9 @@ export interface InMemoryAuthorityConfig {
    * determinism; verifiers should pass `now` when the issuer's clock is
    * not the verifier's. */
   readonly clock?: ClockLike;
-  /** Defaults to a fresh Ed25519 key with a distinct id per engine. The
-   * in-memory engine is single-signer; rotation is the Cloudflare runtime's
-   * concern (T6.4). */
+  /** Only Ed25519 is accepted for envelope v1. Defaults to a fresh Ed25519
+   * key with a distinct id per engine. The in-memory engine is single-signer;
+   * rotation is the Cloudflare runtime's concern (T6.4). */
   readonly signer?: SignerLike;
   readonly envelopeLifetimeSeconds?: number;
   /** Defaults to 24 hours. */
@@ -132,6 +132,9 @@ export const createInMemoryAuthority = async (
 ): Promise<InMemoryAuthorityHandle> => {
   const clock = config.clock ?? systemClock();
   const signer = config.signer ?? (await webCryptoSigner(`key-${nextSigningKey()}`));
+  if (signer.algorithm !== "Ed25519") {
+    throw new Error("the envelope v1 signer must use Ed25519");
+  }
   const lifetime = config.envelopeLifetimeSeconds ?? 900;
   // Fail fast, as a partial signing set does: an engine configured with a
   // lifetime that cannot bound `exp` can issue nothing, so constructing it

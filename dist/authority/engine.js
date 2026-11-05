@@ -24,6 +24,9 @@ const nextSigningKey = counter();
 export const createInMemoryAuthority = async (config = {}) => {
     const clock = config.clock ?? systemClock();
     const signer = config.signer ?? (await webCryptoSigner(`key-${nextSigningKey()}`));
+    if (signer.algorithm !== "Ed25519") {
+        throw new Error("the envelope v1 signer must use Ed25519");
+    }
     const lifetime = config.envelopeLifetimeSeconds ?? 900;
     // Fail fast, as a partial signing set does: an engine configured with a
     // lifetime that cannot bound `exp` can issue nothing, so constructing it

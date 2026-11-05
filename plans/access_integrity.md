@@ -3,19 +3,18 @@
 ## Goal and scope
 
 Make the access verifier expose the claims whose bytes it verified, enforce
-the v1 signing algorithm and expiry shape, and reconcile E4's failure order
-with its existing witnesses. These are bounded follow-ups to the access and
-envelope review, not a redesign of policy or the authority seam.
+the expiry shape, and reconcile E4's failure order with its existing witnesses.
+These are bounded follow-ups to the access and envelope review, not a redesign
+of policy or the authority seam.
 
 The mutable-claims and missing-expiry reproductions require shared-object
 mutation or malformed claims from a trusted signer. They are robustness gaps,
-not demonstrated remote signature bypasses. The signer-algorithm gap requires
-trusted configuration. E4 is a disagreement between text and deliberately
-tested behavior; resolve that disagreement explicitly.
+not demonstrated remote signature bypasses. E4 is a disagreement between text
+and deliberately tested behavior; resolve that disagreement explicitly.
 
 ## Next work
 
-Each numbered item is a separate, testable slice. Items 1–3 can proceed
+Each numbered item is a separate, testable slice. Items 1 and 3 can proceed
 independently; item 4 follows the parser and verifier changes so its wording
 describes the resulting order.
 
@@ -37,22 +36,6 @@ observe decisions through `NeutralAccess`. Prove the unsigned action/team
 mutation succeeds against the current code before fixing it; confirm the
 same test rejects that authority after the fix and an unchanged envelope
 still verifies.
-
-### 2. Refuse a non-Ed25519 signer for envelope v1
-
-**Work:** Validate the injected signer's declared algorithm at
-`createInMemoryAuthority` construction in `src/authority/engine.ts`, following
-[E1](../specs/envelope.md#e1--one-algorithm-per-format-version). Preserve the
-Ed25519 injection seam used by existing tests.
-
-**Done when:** an injected signer declaring another algorithm is refused
-before the engine can issue a v1 envelope; default and injected Ed25519
-signers still issue envelopes accepted by the standard verifier. Checking
-the declaration does not attest to the behavior of an arbitrary callback.
-
-**Closing evidence:** an engine test using a real ECDSA signer demonstrates
-that the current engine issues v1, then fails until the constructor refuses
-it. Existing Ed25519 issuance and verification tests remain green.
 
 ### 3. Validate expiry at the envelope boundary
 

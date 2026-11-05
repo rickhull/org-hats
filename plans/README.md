@@ -9,9 +9,9 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-The access review's next work is isolated verified claims, Ed25519 signer
-validation, expiry parsing, and an explicit E4 failure order. The ordered
-slices, regression evidence, and lower-priority key-set compatibility witness
+The access review's next work is isolated verified claims, expiry parsing,
+and an explicit E4 failure order. The ordered slices, regression evidence,
+and lower-priority key-set compatibility witness
 are in [`access_integrity.md`](access_integrity.md).
 
 The operation snapshot cache is deferred until a consumer approaches the

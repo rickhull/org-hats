@@ -9,8 +9,11 @@ Distilled from `docs/envelope.md` and held by `src/contract.ts`,
 v1 signs with Ed25519 and nothing else. Another algorithm is a
 format-version change, never a bundle option or a deployment setting.
 
-*Held by:* the single sign/verify path in both engines; the fixed vectors
-commit its bytes.
+*Held by:* the single sign/verify path in both engines; the in-memory engine
+refuses an injected signer declaring another algorithm at construction,
+witnessed by the E1 engine test; the fixed vectors commit its bytes. An
+injected callback remains host-owned: checking its algorithm declaration
+does not attest to its implementation.
 *If it breaks:* what a verifier accepts becomes configuration-dependent,
 and key material stops being comparable across a deployment.
 
