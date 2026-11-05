@@ -140,6 +140,12 @@ policy, read reach, or hat selection, so a valid signature proves provenance
 and integrity, not that the issuer applied the right policy. Key custody and
 rotation are the trust anchor; an unknown key id fails closed.
 
+The access verifier owns a deeply frozen copy of the depth-bounded claims
+before awaiting signature verification, and exposes frozen claims and an
+access object over that copy. Changes to the original envelope during or after verification,
+or attempted writes through returned views, cannot rewrite the verified facts.
+Unknown optional claims remain part of the copied and signed payload.
+
 The issuer's guarantee is narrower than a session. Issuance and refresh say
 the actor was eligible when the claims were built; they do not renew
 authentication (`amr` and `auth_time` are copied, A6) and they do not make an

@@ -18,7 +18,9 @@ export interface VerifyContext {
     expectedSiteId?: Unbranded<SiteId>;
 }
 export interface Verified {
+    /** An owned, deeply frozen copy of the claims covered by the signature. */
     readonly claims: AccessEnvelopeClaimsV1;
+    /** Immutable access over that same snapshot. */
     readonly access: NeutralAccess;
 }
 /** Pure and platform-free, for tests and alternate runtimes: accepts any

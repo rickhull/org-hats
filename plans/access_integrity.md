@@ -2,40 +2,19 @@
 
 ## Goal and scope
 
-Make the access verifier expose the claims whose bytes it verified, enforce
-the expiry shape, and reconcile E4's failure order with its existing witnesses.
-These are bounded follow-ups to the access and envelope review, not a redesign
-of policy or the authority seam.
+Enforce the expiry shape and reconcile E4's failure order with its existing
+witnesses. These are bounded follow-ups to the access and envelope review, not
+a redesign of policy or the authority seam.
 
-The mutable-claims and missing-expiry reproductions require shared-object
-mutation or malformed claims from a trusted signer. They are robustness gaps,
-not demonstrated remote signature bypasses. E4 is a disagreement between text
-and deliberately tested behavior; resolve that disagreement explicitly.
+The missing-expiry reproduction requires malformed claims from a trusted
+signer. It is a robustness gap, not a demonstrated remote signature bypass.
+E4 is a disagreement between text and deliberately tested behavior; resolve
+that disagreement explicitly.
 
 ## Next work
 
-Each numbered item is a separate, testable slice. Items 1 and 3 can proceed
-independently; item 4 follows the parser and verifier changes so its wording
-describes the resulting order.
-
-### 1. Keep verified authority tied to signed bytes
-
-**Work:** In `src/access/verify.ts`, take an owned snapshot of the claims
-before the asynchronous signature check and build access from that snapshot.
-Keep the verified projection protected from mutation through the original
-envelope, returned claims, or arrays exposed by accessors. Choose the ownership
-mechanism during implementation; a shallow copy does not isolate nested grants.
-
-**Done when:** changing the original claims while verification is pending or
-after it returns cannot add actions, expand reach, change bindings, or extend
-expiry. Mutating a returned view cannot change subsequent access decisions.
-
-**Closing evidence:** regression tests in `tests/access.test.ts` use a real
-Ed25519 signature, control the pending verification deterministically, and
-observe decisions through `NeutralAccess`. Prove the unsigned action/team
-mutation succeeds against the current code before fixing it; confirm the
-same test rejects that authority after the fix and an unchanged envelope
-still verifies.
+Each numbered item is a separate, testable slice. Expiry parsing precedes the
+E4 clarification so its wording describes the resulting order.
 
 ### 3. Validate expiry at the envelope boundary
 

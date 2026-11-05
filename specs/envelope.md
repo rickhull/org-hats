@@ -32,10 +32,16 @@ appear without moving `ACCESS_ENVELOPE_VERSION`.  Breadth carries no such
 bound — the authority issues claims too large for a cookie, and the host
 refuses those at issuance against its own budget.
 
+The access verifier takes an owned, deeply frozen copy of the depth-bounded
+claims before the asynchronous signature check. Signed bytes and returned access
+refer to that same copy, including unknown optional claims. Input mutations
+and writes through returned views cannot change verified authority.
+
 *Held by:* both engines import the same function; the vectors pin exact
 bytes; `OH-ACCESS-03` fails tampered claims; `tests/envelope-size.test.ts`
 pins the issued depth so a deepening shape fails at the issuer, not at a
-verifier.  E4 does the refusing.
+verifier. The mutation tests in `tests/access.test.ts` witness the snapshot
+and immutable views. E4 does the refusing.
 *If it breaks:* signatures cross implementations only by coincidence, every
 host that reimplemented the encoding owns a private format, or canonicalizing
 unverified claims becomes unbounded recursion.

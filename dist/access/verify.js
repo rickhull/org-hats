@@ -12,6 +12,16 @@
 // verbs are host code mapping onto these neutral targets.
 import { base64Decode, base64UrlDecode, asJson, canonicalJson, parseAccessEnvelope, epochSeconds, utf8, } from "../contract.js";
 const failed = (failure) => ({ failure });
+// Only depth-bounded JSON reaches this copy. Preserve unknown optional claims
+// as well as known fields: all of them contribute to the signed bytes.
+const immutableJsonCopy = (value) => {
+    if (typeof value !== "object" || value === null)
+        return value;
+    const copy = Array.isArray(value)
+        ? value.map((child) => immutableJsonCopy(child))
+        : Object.fromEntries(Object.entries(value).map(([name, child]) => [name, immutableJsonCopy(child)]));
+    return Object.freeze(copy);
+};
 /** Pure and platform-free, for tests and alternate runtimes: accepts any
  * verify predicate. */
 export const verifyKeyOf = (keyId, verify) => ({
@@ -39,7 +49,7 @@ export const ed25519VerifyKey = async (keyId, rawPublicKeyBase64) => {
     };
 };
 /** Neutral access over verified claims — the predicates hosts call. */
-const neutralAccess = (claims) => ({
+const neutralAccess = (claims) => Object.freeze({
     operationId: claims.operationId,
     sites: claims.sites,
     mayAct: (action, target) => {
@@ -85,11 +95,14 @@ export const verify = async (envelope, keys, context = {}) => {
     const parsed = parseAccessEnvelope(envelope);
     if ("kind" in parsed)
         return failed(parsed);
-    const { keyId, signature, claims } = parsed;
+    const { keyId, signature } = parsed;
     const key = keys.get(keyId);
     if (key === undefined) {
         return failed({ kind: "invalid-signature", detail: `unknown key id ${keyId}` });
     }
+    // Own the full claim tree before awaiting the key. Later input writes and
+    // writes through returned views cannot change the facts the signature covers.
+    const claims = immutableJsonCopy(parsed.claims);
     const payload = canonicalJson(asJson(claims));
     // `verifyKeyOf` accepts any verify predicate, so a host-supplied key is as
     // untrusted as the envelope: a predicate that throws has not verified

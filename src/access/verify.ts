@@ -62,11 +62,23 @@ export interface VerifyContext {
 }
 
 export interface Verified {
+  /** An owned, deeply frozen copy of the claims covered by the signature. */
   readonly claims: AccessEnvelopeClaimsV1;
+  /** Immutable access over that same snapshot. */
   readonly access: NeutralAccess;
 }
 
 const failed = (failure: Failure): Failed => ({ failure });
+
+// Only depth-bounded JSON reaches this copy. Preserve unknown optional claims
+// as well as known fields: all of them contribute to the signed bytes.
+const immutableJsonCopy = <T>(value: T): T => {
+  if (typeof value !== "object" || value === null) return value;
+  const copy = Array.isArray(value)
+    ? value.map((child: unknown) => immutableJsonCopy(child))
+    : Object.fromEntries(Object.entries(value).map(([name, child]: [string, unknown]) => [name, immutableJsonCopy(child)]));
+  return Object.freeze(copy) as T;
+};
 
 /** Pure and platform-free, for tests and alternate runtimes: accepts any
  * verify predicate. */
@@ -101,7 +113,7 @@ export const ed25519VerifyKey = async (keyId: string, rawPublicKeyBase64: string
 };
 
 /** Neutral access over verified claims — the predicates hosts call. */
-const neutralAccess = (claims: AccessEnvelopeClaimsV1): NeutralAccess => ({
+const neutralAccess = (claims: AccessEnvelopeClaimsV1): NeutralAccess => Object.freeze<NeutralAccess>({
   operationId: claims.operationId,
   sites: claims.sites,
   mayAct: (action, target) => {
@@ -148,11 +160,14 @@ export const verify = async (
   // the only expression that yields a claim.
   const parsed = parseAccessEnvelope(envelope);
   if ("kind" in parsed) return failed(parsed);
-  const { keyId, signature, claims } = parsed;
+  const { keyId, signature } = parsed;
   const key = keys.get(keyId);
   if (key === undefined) {
     return failed({ kind: "invalid-signature", detail: `unknown key id ${keyId}` });
   }
+  // Own the full claim tree before awaiting the key. Later input writes and
+  // writes through returned views cannot change the facts the signature covers.
+  const claims = immutableJsonCopy(parsed.claims);
   const payload = canonicalJson(asJson(claims));
   // `verifyKeyOf` accepts any verify predicate, so a host-supplied key is as
   // untrusted as the envelope: a predicate that throws has not verified

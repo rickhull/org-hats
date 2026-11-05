@@ -73,6 +73,74 @@ test("vector: tampered claims no longer match the signature", async () => {
   assert.equal(result.kind, "invalid-signature");
 });
 
+test("[E2][A5] mutation during signature verification cannot add unsigned authority", { timeout: 5_000 }, async () => {
+  const claims = structuredClone(vectors.claims);
+  let enter: (() => void) | undefined;
+  let release: (() => void) | undefined;
+  const entered = new Promise<void>((resolve) => { enter = resolve; });
+  const resumed = new Promise<void>((resolve) => { release = resolve; });
+  const delayedKey: VerifyKey = {
+    keyId: key.keyId,
+    verify: async (payload, signature) => {
+      enter?.();
+      await resumed;
+      return key.verify(payload, signature);
+    },
+  };
+  const pending = verify(envelopeOf(claims), new Map([[key.keyId, delayedKey]]), {
+    now: vectors.claims.iat + 1,
+  });
+  await entered;
+  try {
+    assert.equal(Reflect.set(claims.hat.actions, claims.hat.actions.length, "unsigned-action"), true);
+    Reflect.set(claims.hat.teamIds, claims.hat.teamIds.length, "unsigned-team");
+    Reflect.set(claims, "exp", vectors.claims.exp + 86_400);
+  } finally {
+    release?.();
+  }
+  const { access } = successOf(await pending);
+  assert.equal(access.mayAct("unsigned-action", { kind: "team", teamId: "unsigned-team" }), false);
+  assert.equal(access.mayAct("resolve", { kind: "team", teamId: "team-2e8c64b9" }), true);
+  assert.equal(access.expiresAt(), vectors.claims.exp);
+  Reflect.set(claims.hat.actions, claims.hat.actions.length, "later-action");
+  Reflect.set(claims.hat.teamIds, claims.hat.teamIds.length, "later-team");
+  assert.equal(access.mayAct("later-action", { kind: "team", teamId: "later-team" }), false);
+});
+
+test("[A5][A14] returned claims and access views cannot rewrite verified authority", async () => {
+  const verified = successOf(await verify(envelopeOf(structuredClone(vectors.claims)), keys, {
+    now: vectors.claims.iat + 1,
+  }));
+  const { claims, access } = verified;
+  // Reflect models untyped callers without requiring refused writes to throw.
+  Reflect.set(claims.hat.actions, claims.hat.actions.length, "unsigned-action");
+  Reflect.set(claims.hat.teamIds, claims.hat.teamIds.length, "unsigned-team");
+  Reflect.set(claims.configurableSiteIds, 0, "unsigned-site");
+  Reflect.set(claims, "exp", vectors.claims.exp + 86_400);
+  Reflect.set(claims.actor, "actorId", "unsigned-actor");
+  Reflect.set(access, "operationId", "unsigned-operation");
+  Reflect.set(access.readableOrganizationIds(), 0, "unsigned-organization");
+  Reflect.set(access.readableTeamIds(), 0, "unsigned-team");
+  Reflect.set(access.teamReach(), 0, "unsigned-team");
+  Reflect.set(access.authenticatedWith(), 0, "unsigned-method");
+  const site = access.sites[0];
+  assert.ok(site !== undefined);
+  Reflect.set(site, "siteId", "unsigned-site");
+  Reflect.set(site.aliases, 0, "unsigned-alias");
+
+  assert.equal(access.mayAct("unsigned-action", { kind: "team", teamId: "unsigned-team" }), false);
+  assert.equal(access.mayConfigure("unsigned-site"), false);
+  assert.equal(access.operationId, vectors.claims.operationId);
+  assert.equal(access.expiresAt(), vectors.claims.exp);
+  assert.deepEqual(access.actor(), vectors.claims.actor);
+  assert.deepEqual(access.sites, vectors.claims.sites);
+  assert.deepEqual(access.readableOrganizationIds(), vectors.claims.readableOrganizationIds);
+  assert.deepEqual(access.readableTeamIds(), vectors.claims.readableTeamIds);
+  assert.deepEqual(access.teamReach(), vectors.claims.memberTeamIds);
+  assert.deepEqual(access.authenticatedWith(), vectors.claims.amr);
+  assert.equal(canonicalJson(asJson(claims)), vectors.canonical);
+});
+
 test("an unknown key id cannot verify", async () => {
   const unknown = envelopeOf(vectors.claims, vectors.signature, "key-retired");
   const result = failureOf(await verify(unknown, keys, { now: vectors.claims.iat + 1 }));
