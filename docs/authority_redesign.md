@@ -398,6 +398,25 @@ One operation-authority instance owns operation-local authority:
 - refresh/session authority and access-projection issuance; and
 - operation-administration audit events.
 
+Operation lifecycle annotations belong to the deploying host:
+`purpose` describes the host's product lifecycle and containment rules;
+`leadingOrganization` identifies program ownership without granting authority;
+and `customer` is commercial information. These are not fields on the
+authority's operation record. Keeping them with host configuration gives each
+fact one owner and keeps product lifecycle and commercial vocabulary out of
+the authority interface. The existing `bounded` label remains supported;
+its presence does not make the other annotations authority data or schedule
+an operation's closure.
+
+The host preserves these annotations in its own durable configuration and
+backup path, keyed by the permanent operation id, and passes only authority
+fields through bootstrap. Where the host designates a leading organization,
+it validates that designation against active operation participation; the
+designation itself confers no grants or administrator standing. An authority
+export/restore preserves authority state and does not carry these host-owned
+annotations. A complete operation recovery therefore also restores the host's
+configuration.
+
 The operation slug and site paths are authority facts, not registry-manifest
 input: the registry is their projection. Operation authority validates one
 DNS label for the slug, one path segment per site, unique paths within the
@@ -572,6 +591,7 @@ The distinction between platform and deployed configuration is explicit:
 | Deployed authority runtime | deploying operator: pinned version, instances, bindings, routes, jurisdiction, release cadence |
 | Deployment topology and migrations | deploying operator, using runtime-package tooling |
 | Bootstrap intent | deploying consumer's protected input, applied once or explicitly reapplied |
+| Operation lifecycle annotations (`purpose`, `leadingOrganization`, `customer`) | deploying host's durable configuration and backup path; excluded from authority bootstrap and export/restore |
 | Edited organizations, teams, hats, and labels | owning authority state |
 | Real rosters and principal links | organization authority state |
 | Secrets and signing keys | deploying operator's secret management or sealed runtime state |
@@ -582,7 +602,8 @@ and content hash. Reapplying platform configuration never silently restores a
 renamed label or revoked grant. Production secrets, customer names,
 and real-person rosters do not enter this public repository; real bootstrap
 material stays in the deploying consumer's protected, untracked input and
-becomes state owned by the appropriate authority object after provisioning.
+its authority fields become state owned by the appropriate authority object
+after provisioning. Host-owned operation annotations remain host configuration.
 
 In this document, source ownership and deployed-state ownership are distinct.
 The `org-hats` repository owns the rules and interfaces. A particular
