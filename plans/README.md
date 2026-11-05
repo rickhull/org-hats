@@ -9,10 +9,6 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-The access-integrity patch window proposes `v3.7.1` and
-`cloudflare-v0.13.1`. The remaining release commits, tag checks, and
-publication evidence are in [`patch_release.md`](patch_release.md).
-
 The operation snapshot cache is deferred until a consumer approaches the
 scaled bench's state; the measured verdict, the consumer-agreed design
 (model-scoped epoch, trigger-backed), and the done-when are in

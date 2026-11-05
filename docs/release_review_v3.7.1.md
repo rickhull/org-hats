@@ -2,10 +2,9 @@
 
 The bounded source review covers candidate
 `bc6bce90a6dac8d002324c67b840e762220fec52` against `v3.7.0` for the portable
-package and `cloudflare-v0.13.0` for the reference runtime. The proposed
-release pair is `v3.7.1` and `cloudflare-v0.13.1`. Version metadata and
-publication follow the source review; this report does not assert that a tag
-or deployment exists.
+package and `cloudflare-v0.13.0` for the reference runtime. The reviewed
+release pair is `v3.7.1` and `cloudflare-v0.13.1`; publication receipts are
+recorded below. Deployment remains a separate consumer act.
 
 The fixed comparisons are:
 
@@ -53,9 +52,8 @@ upgrade contracts remain in the architecture and migration documentation.
 
 ## Source preflight checks
 
-The production source and tracked `dist/` are unchanged from the reviewed
-commit. The remaining changes are release documentation; version increments
-belong to Rick's `bin/release` invocations.
+The published production source, tests, and tracked `dist/` match the reviewed
+commit. The differences are release documentation and package version metadata.
 
 The source preflight passes `pnpm verify`: build freshness, compiler fences,
 240 portable tests, examples, and 111 Cloudflare tests. `pnpm audit` reports
@@ -63,6 +61,31 @@ no known vulnerabilities across 0 production and 160 development dependencies.
 `bin/check-artifact` validates the production configuration and bundles the
 current Worker successfully. These preflight results do not replace the gates,
 version checks, and publication performed by the release script.
+
+## Publication receipts
+
+Read-back on 2026-11-05 confirms that NAS, Codeberg, and GitHub advertise the
+same annotated tag objects and peeled commits:
+
+| Tag | Annotated tag object | Commit |
+| --- | --- | --- |
+| `v3.7.1` | `f6cfa509f868808ae6ad9bfd378a482702ed1067` | `8b8b392c5f31b19286ec1d49bc8835735e168792` |
+| `cloudflare-v0.13.1` | `2a50a19c4970842e16dd1691628dcd84a077ded7` | `7ef5ec69227d27b49ce1ccec470fa247a42fa5e1` |
+
+Both tags pass `bin/check-version`. `bin/check-artifact cloudflare-v0.13.1`
+validates the tagged production configuration and successfully bundles its
+Worker. NAS `main` points to the Cloudflare release commit. There is no mirror
+lag for these tags.
+
+The published comparisons are reproducible from the release tags:
+
+```sh
+git diff v3.7.0...v3.7.1
+git diff cloudflare-v0.13.0...cloudflare-v0.13.1 -- packages/cloudflare
+```
+
+These receipts establish publication, not live deployment or consumer pin
+adoption. Quartermaster owns those follow-up acts.
 
 ## Moshpit self-evaluation
 
