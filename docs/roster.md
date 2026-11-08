@@ -62,29 +62,18 @@ the organization appoints and retires its own administrators. Operation
 administration is separate: `adminRoles` remains runtime configuration, and no
 command here appoints an operation administrator.
 
-Bootstrap seeds actors the same way it seeds standing: it adds an actor the
-organization does not know, and leaves a known actor's name and enabled state
-alone. A re-bootstrap therefore cannot revert a rename, re-enable a disabled
-actor, or drop standing — those are the organization's facts once it exists.
+Bootstrap seeds actors one at a time: it adds an actor the organization does
+not know, and leaves a known actor's name and enabled state alone. Standing
+is different in one way: the configured `orgAdmins` seeds only the bootstrap
+that creates the organization. Every later bootstrap seeds none, even for an
+actor it adds, so a re-bootstrap cannot revert a rename, re-enable a disabled
+actor, restore a retired administrator, or appoint a new one. Appointing
+after creation is `appoint-administrator`'s act.
 
 An unclaimed actor may be appointed. Administrator standing can therefore
 exist before its holder has linked a principal. Holding standing and being
 able to exercise it are different facts; the usable-successor rule checks
 both when an administrator retires.
-
-### Known Cloudflare bootstrap gap
-
-The ownership rule above is the contract, but the current Cloudflare
-bootstrap does not fully preserve it. Each bootstrap inserts every supplied
-`orgAdmins` entry with `INSERT OR IGNORE`; retirement deletes that row.
-Reapplying an old bootstrap can therefore reappoint a retired administrator.
-The existing rename/disable re-bootstrap test does not exercise this case.
-
-This is a gap in A9 enforcement, not a change to organization ownership.
-The focused repair and its regression witness are tracked in
-[`../plans/bootstrap_standing.md`](../plans/bootstrap_standing.md). Until it
-is repaired, review supplied administrator seeds before reapplying an
-organization bootstrap.
 
 ### The usable successor
 

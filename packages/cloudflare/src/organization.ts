@@ -292,8 +292,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
       );
       // Bootstrap seeds; it does not overwrite a roster fact the organization
       // now owns. A re-bootstrap adds unknown actors and leaves known ones
-      // alone: it cannot revert a rename, re-enable a disabled actor, or
-      // change standing (standing is INSERT OR IGNORE below as well).
+      // alone: it cannot revert a rename or re-enable a disabled actor.
       for (const actor of input.actors) {
         this.ctx.storage.sql.exec(
           `INSERT INTO actors (actor_id, display_name, disabled, created_at, updated_at)
@@ -316,12 +315,19 @@ export class OrganizationAuthority extends DurableObject<Env> {
           at,
         );
       }
-      for (const admin of input.orgAdmins) {
-        this.ctx.storage.sql.exec(
-          "INSERT OR IGNORE INTO org_admins (actor_id, created_at) VALUES (?, ?)",
-          admin,
-          at,
-        );
+      // Standing is a seed of creation, not a live writer. Once the
+      // organization exists, its own appoint and retire commands own
+      // standing; a re-bootstrap that names an administrator — including one
+      // the organization retired — adds none. Retirement deletes the row, so
+      // an idempotent insert here would silently undo it.
+      if (existing === undefined) {
+        for (const admin of input.orgAdmins) {
+          this.ctx.storage.sql.exec(
+            "INSERT OR IGNORE INTO org_admins (actor_id, created_at) VALUES (?, ?)",
+            admin,
+            at,
+          );
+        }
       }
       if (existing === undefined) {
         this.audit("bootstrap", `organization ${input.organizationId} bootstrapped`, at);

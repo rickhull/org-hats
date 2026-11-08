@@ -9,12 +9,6 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-The next executable repair is
-[`bootstrap_standing.md`](bootstrap_standing.md): prove that reapplying an
-old organization bootstrap can reappoint a retired administrator, then fix
-the writer to preserve organization-owned standing under A9. The plan names
-the red/green witness and checks that close it.
-
 The operation snapshot cache is deferred until a consumer approaches the
 scaled bench's state; the measured verdict, the consumer-agreed design
 (model-scoped epoch, trigger-backed), and the done-when are in

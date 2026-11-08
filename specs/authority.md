@@ -144,12 +144,11 @@ record seeds standing at bootstrap, and from then on the organization
 appoints and retires its own administrators through typed commands.
 
 *Held by:* `adminRoles` for operation titles; administrator standing in
-organization state, written by `appoint-administrator` and
+organization state, seeded by the bootstrap that creates the organization and
+written afterwards only by `appoint-administrator` and
 `retire-administrator` under fresh administrator evidence; the authorization
-cases assert denials for non-administrators.
-*Known enforcement gap:* Cloudflare organization re-bootstrap can reinsert a
-retired administrator from an old seed. The contract remains unchanged;
-see [the bootstrap gap](../docs/roster.md#known-cloudflare-bootstrap-gap).
+cases assert denials for non-administrators, including a retired
+administrator after a replayed bootstrap.
 *If it breaks:* administration becomes a hardcoded title, or an organization
 cannot appoint or retire its own administrator without a deployment.
 

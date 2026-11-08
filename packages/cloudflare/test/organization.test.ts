@@ -339,6 +339,57 @@ describe("OrganizationAuthority", () => {
     expect(crew.body.value?.disabled).toBe(true);
   });
 
+  it("[A9] a re-bootstrap cannot reappoint a retired administrator", async () => {
+    const stub = organization("org-standing");
+    expect((await call(stub, "POST", "/bootstrap", organizationBootstrap("org/standing"))).body.ok).toBe(true);
+
+    // the successor holds standing before the predecessor retires
+    expect((await call(stub, "POST", "/appoint-administrator", {
+      actorId: "actor-crew",
+      byActorId: "actor-lead",
+      idempotencyKey: "standing-appoint",
+    })).body.ok).toBe(true);
+    expect((await call(stub, "POST", "/retire-administrator", {
+      actorId: "actor-lead",
+      byActorId: "actor-lead",
+      idempotencyKey: "standing-retire",
+    })).body.ok).toBe(true);
+
+    // the operator replays an old payload that still seeds the predecessor
+    expect((await call(stub, "POST", "/bootstrap", organizationBootstrap("org/standing"))).body.ok).toBe(true);
+
+    const retired = await call(stub, "POST", "/create-actor", {
+      actorId: "actor-after",
+      byActorId: "actor-lead",
+      idempotencyKey: "standing-after",
+    });
+    expect(retired.body.failure?.kind).toBe("denied");
+    const successor = await call(stub, "POST", "/create-actor", {
+      actorId: "actor-after",
+      byActorId: "actor-crew",
+      idempotencyKey: "standing-after",
+    });
+    expect(successor.body.ok).toBe(true);
+  });
+
+  it("[A9] a bootstrap of an existing organization seeds no standing", async () => {
+    const stub = organization("org-late-seed");
+    // an organization created without standing has no seed writer afterwards:
+    // a later payload cannot appoint its first administrator by replay
+    expect((await call(stub, "POST", "/bootstrap", {
+      ...organizationBootstrap("org/late-seed"),
+      orgAdmins: [],
+    })).body.ok).toBe(true);
+    expect((await call(stub, "POST", "/bootstrap", organizationBootstrap("org/late-seed"))).body.ok).toBe(true);
+
+    const denied = await call(stub, "POST", "/create-actor", {
+      actorId: "actor-after",
+      byActorId: "actor-lead",
+      idempotencyKey: "late-seed-create",
+    });
+    expect(denied.body.failure?.kind).toBe("denied");
+  });
+
   it("[A10] refuses a principal link that would make one identity two actors", async () => {
     const stub = organization("org-links");
     const first = await call(stub, "POST", "/bootstrap", {
