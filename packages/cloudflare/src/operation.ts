@@ -590,6 +590,57 @@ export class OperationAuthority extends DurableObject<Env> {
     });
   }
 
+  /** Run the real local writes, observe their data delta, and always roll
+   * them back. Keep this synchronous: reconciliation and delivery are not
+   * part of a preview, and no mutable in-memory state may escape it. */
+  private bootstrapPreview(input: BootstrapInput): Result<{
+    readonly coordinator: "operation";
+    readonly changes: readonly {
+      readonly table: string;
+      readonly key: StateRow;
+      readonly before: StateRow | null;
+      readonly after: StateRow;
+    }[];
+  }> {
+    const specs = operationTables.filter((spec) =>
+      ["operation", "sites", "teams", "grants", "participations"].includes(spec.name));
+    const data = (row: StateRow): StateRow => Object.fromEntries(
+      Object.entries(row).filter(([column]) => column !== "created_at" && column !== "updated_at"),
+    );
+    const rollback = {};
+    let result: ReturnType<OperationAuthority["bootstrapPreview"]> = failure("unavailable");
+    try {
+      this.ctx.storage.transactionSync(() => {
+        const before = readTables(this.ctx.storage.sql, specs);
+        const applied = this.bootstrap(input);
+        if (!applied.ok) {
+          result = applied;
+        } else {
+          const after = readTables(this.ctx.storage.sql, specs);
+          const changes = specs.flatMap((spec) => {
+            const columns = spec.orderBy.split(", ");
+            const keyOf = (row: StateRow): StateRow => Object.fromEntries(columns.map((key) => [key, row[key] ?? null]));
+            const previous = new Map((before[spec.name] ?? []).map((row) => [JSON.stringify(keyOf(row)), data(row)]));
+            return (after[spec.name] ?? []).flatMap((row) => {
+              const key = keyOf(row);
+              const prior = previous.get(JSON.stringify(key)) ?? null;
+              const next = data(row);
+              return JSON.stringify(prior) === JSON.stringify(next)
+                ? [] : [{ table: spec.name, key, before: prior, after: next }];
+            });
+          });
+          result = value({ coordinator: "operation" as const, changes });
+        }
+        // Throw even on success: a returned value would commit the outer
+        // transaction, including the nested bootstrap's audit and timestamps.
+        throw rollback;
+      });
+    } catch (error) {
+      if (error !== rollback) throw error;
+    }
+    return result;
+  }
+
   private invite(input: InviteInput): Result<{ applied: boolean; invitationId?: string }> {
     const at = now();
     const invitationId = input.invitationId ?? `inv-${crypto.randomUUID()}`;
@@ -1652,6 +1703,7 @@ export class OperationAuthority extends DurableObject<Env> {
   override async fetch(request: Request): Promise<Response> {
     return handleOperationRequest(request, {
       bootstrap: (input) => this.bootstrap(input),
+      bootstrapPreview: (input) => this.bootstrapPreview(input),
       reconcileRosters: (force) => this.reconcileRosters(force),
       setRoutingFacts: (input) => this.setRoutingFacts(input),
       invite: (input) => this.invite(input),

@@ -33,6 +33,7 @@ import { base64UrlEncode, utf8, verify, type Failed, type VerifyKey } from "org-
 import { CONFORMANCE_PRINCIPALS, type ConformanceWorld } from "org-hats/conformance";
 import { createCloudflareConformanceWorld } from "./conformance";
 import { subjectGuardName } from "./subject-guard";
+import { asRecord, asString } from "./http/parse";
 
 export { Counter } from "./counter";
 export { OrganizationAuthority } from "./organization";
@@ -371,10 +372,11 @@ export default {
             operator,
           );
         }
-        if (request.method === "POST" && url.pathname === "/ops/operation/bootstrap") {
-          const body = await request.json() as { operationId?: string };
-          if (typeof body.operationId !== "string") throw new Error("operationId is required");
-          return relay(env.OPERATION.get(env.OPERATION.idFromName(body.operationId)), "/bootstrap", body);
+        if (request.method === "POST" && (url.pathname === "/ops/operation/bootstrap" || url.pathname === "/ops/operation/bootstrap-preview")) {
+          const body = asRecord(await request.json());
+          const operationId = asString(body["operationId"], "operationId");
+          return relay(env.OPERATION.get(env.OPERATION.idFromName(operationId)),
+            url.pathname.endsWith("/bootstrap-preview") ? "/bootstrap-preview" : "/bootstrap", body);
         }
         if (request.method === "POST" && url.pathname === "/ops/operation/routing-facts") {
           const body = await request.json() as { operationId?: string };

@@ -229,6 +229,8 @@ public key distribution:
 
 - `POST /ops/organization/bootstrap`, `POST /ops/operation/bootstrap` —
   typed, idempotent bootstrap
+- `POST /ops/operation/bootstrap-preview` — the operation's local data
+  changes without committing bootstrap; see [Bootstrap preview](#bootstrap-preview)
 - `GET /ops/organization/principal-links?organizationId=…` — list the
   organization's `(provider, subject, actorId)` principal links
 - `POST /ops/organization/principal-link` — bind a verified provider subject
@@ -260,6 +262,60 @@ public key distribution:
   restore appends one audit row recording itself, written after the tables so
   the snapshot cannot overwrite the trace of the act that applied it — so a
   restored export differs from its snapshot by exactly that row
+
+### Bootstrap preview
+
+`POST /ops/operation/bootstrap-preview` takes the same body and ops token
+as operation bootstrap. It reports the operation's local data changes:
+
+```json
+{
+  "ok": true,
+  "value": {
+    "coordinator": "operation",
+    "changes": [
+      {
+        "table": "sites",
+        "key": { "site_id": "site-example" },
+        "before": { "site_id": "site-example", "display_name": "Old name", "path": "yard", "aliases_json": "[]" },
+        "after": { "site_id": "site-example", "display_name": "New name", "path": "yard", "aliases_json": "[]" }
+      }
+    ]
+  }
+}
+```
+
+Each change names a table and its stable row key. `before: null` means a
+new row; otherwise the row changes from `before` to `after`. Rows contain
+the export's column names and values, excluding `created_at` and
+`updated_at`. JSON-valued columns remain JSON strings, as in export. The
+report covers `operation`, `sites`, `teams`, `participations`, and `grants`;
+it contains changed rows only. An empty `changes` array means no change to
+these data fields, even though applying bootstrap can update timestamps.
+Consumers should identify rows by table and key rather than array position.
+
+The preview executes the real synchronous bootstrap inside an outer
+transaction that always rolls back. It inherits the writer's defaults,
+validation, and conflict rules: existing team and grant facts are preserved,
+so an attempted seeded rename or grant change does not appear as an update.
+It does not enumerate those ignored input differences. Audit rows, outbox
+state, and sequence increments also roll back; none is part of the report.
+It never reconciles roster projections or delivers messages. A first call
+can initialize an empty coordinator's schema, as other coordinator reads do;
+it leaves no bootstrap data behind.
+
+This is an observation of current local state, not a reservation or an apply
+ticket. Apply validates again and may observe changes made since preview.
+Success does not establish directory availability, a successful roster pull,
+deployment-wide hostname uniqueness, or a usable login. Organization
+bootstrap and its directory-guarded principal binding have no preview route
+in this slice. The host retains responsibility for manifest review, registry
+checks, deployment, and explaining ignored input differences.
+
+Rollback uses Cloudflare's documented
+[`transactionSync` exception semantics](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/#transactionsync).
+The workerd suite witnesses the nested transaction, unchanged exports and
+sequence state, the absence of roster pulls, and correspondence with apply.
 
 ### The outbox
 

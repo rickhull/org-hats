@@ -42,6 +42,7 @@ import type {
 
 export interface OperationRouteHost {
   bootstrap(input: BootstrapInput): Result<unknown>;
+  bootstrapPreview(input: BootstrapInput): Result<unknown>;
   reconcileRosters(force?: boolean): Promise<{ readonly synced: number; readonly organizations: number }>;
   setRoutingFacts(input: RoutingFactsInput): Result<unknown>;
   invite(input: InviteInput): Result<unknown>;
@@ -73,6 +74,61 @@ export interface OperationRouteHost {
   outboxRows(): readonly Record<string, unknown>[];
 }
 
+/** Both bootstrap paths narrow the same untrusted body before use. */
+const parseOperationBootstrap = (input: unknown): BootstrapInput => {
+  const body = asRecord(input);
+  const policy = asRecord(body["policy"]) as unknown as PolicyBundle;
+  return {
+    operationId: asString(body["operationId"], "operationId"),
+    slug: asString(body["slug"], "slug"),
+    ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
+    ...(body["bounded"] === true ? { bounded: true } : {}),
+    policy,
+    ...(body["adminRoles"] === undefined ? {} : { adminRoles: asArray(body["adminRoles"], "adminRoles").map((entry) => asString(entry, "adminRoles entry")) }),
+    ...(body["configureActions"] === undefined ? {} : { configureActions: asArray(body["configureActions"], "configureActions").map((entry) => asString(entry, "configureActions entry")) }),
+    ...(body["envelopeLifetimeSeconds"] === undefined ? {} : { envelopeLifetimeSeconds: asPositiveWholeNumber(body["envelopeLifetimeSeconds"], "envelopeLifetimeSeconds") }),
+    sites: asArray(body["sites"], "sites").map((entry) => {
+      const site = asRecord(entry);
+      return {
+        siteId: asString(site["siteId"], "siteId"),
+        path: asString(site["path"], "path"),
+        ...(site["displayName"] === undefined ? {} : { displayName: asString(site["displayName"], "displayName") }),
+        aliases: asArray(site["aliases"] ?? [], "aliases").map((alias) => asString(alias, "alias")),
+      };
+    }),
+    teams: asArray(body["teams"], "teams").map((entry) => {
+      const team = asRecord(entry);
+      return {
+        teamId: asString(team["teamId"], "teamId"),
+        siteId: asString(team["siteId"], "siteId"),
+        organizationId: asString(team["organizationId"], "organizationId"),
+        ...(team["displayName"] === undefined ? {} : { displayName: asString(team["displayName"], "displayName") }),
+      };
+    }),
+    grants: asArray(body["grants"] ?? [], "grants").map((entry) => {
+      const grant = asRecord(entry);
+      return {
+        grantId: asString(grant["grantId"], "grantId"),
+        organizationId: asString(grant["organizationId"], "organizationId"),
+        actorId: asString(grant["actorId"], "actorId"),
+        role: asString(grant["role"], "role"),
+        target: asGrantTarget(grant["target"], "target"),
+        ...(grant["primary"] === true ? { primary: true } : {}),
+        ...(grant["revoked"] === true ? { revoked: true } : {}),
+      };
+    }),
+    participations: asArray(body["participations"] ?? [], "participations").map((entry) => {
+      const participation = asRecord(entry);
+      const status = asString(participation["status"], "status");
+      if (!["invited", "accepted", "active", "revoked"].includes(status)) throw new Error("invalid participation status");
+      return {
+        organizationId: asString(participation["organizationId"], "organizationId"),
+        status: status as "invited" | "accepted" | "active" | "revoked",
+      };
+    }),
+  };
+};
+
 export const handleOperationRequest = async (
   request: Request,
   host: OperationRouteHost,
@@ -80,58 +136,10 @@ export const handleOperationRequest = async (
   const url = new URL(request.url);
 
   try {
-    if (request.method === "POST" && url.pathname === "/bootstrap") {
+    if (request.method === "POST" && (url.pathname === "/bootstrap" || url.pathname === "/bootstrap-preview")) {
       const body = await readBody(request);
-      const policy = asRecord(body["policy"]) as unknown as PolicyBundle;
-      const input: BootstrapInput = {
-        operationId: asString(body["operationId"], "operationId"),
-        slug: asString(body["slug"], "slug"),
-        ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
-        ...(body["bounded"] === true ? { bounded: true } : {}),
-        policy,
-        ...(body["adminRoles"] === undefined ? {} : { adminRoles: asArray(body["adminRoles"], "adminRoles").map((entry) => asString(entry, "adminRoles entry")) }),
-        ...(body["configureActions"] === undefined ? {} : { configureActions: asArray(body["configureActions"], "configureActions").map((entry) => asString(entry, "configureActions entry")) }),
-        ...(body["envelopeLifetimeSeconds"] === undefined ? {} : { envelopeLifetimeSeconds: asPositiveWholeNumber(body["envelopeLifetimeSeconds"], "envelopeLifetimeSeconds") }),
-        sites: asArray(body["sites"], "sites").map((entry) => {
-          const site = asRecord(entry);
-          return {
-            siteId: asString(site["siteId"], "siteId"),
-            path: asString(site["path"], "path"),
-            ...(site["displayName"] === undefined ? {} : { displayName: asString(site["displayName"], "displayName") }),
-            aliases: asArray(site["aliases"] ?? [], "aliases").map((alias) => asString(alias, "alias")),
-          };
-        }),
-        teams: asArray(body["teams"], "teams").map((entry) => {
-          const team = asRecord(entry);
-          return {
-            teamId: asString(team["teamId"], "teamId"),
-            siteId: asString(team["siteId"], "siteId"),
-            organizationId: asString(team["organizationId"], "organizationId"),
-            ...(team["displayName"] === undefined ? {} : { displayName: asString(team["displayName"], "displayName") }),
-          };
-        }),
-        grants: asArray(body["grants"] ?? [], "grants").map((entry) => {
-          const grant = asRecord(entry);
-          return {
-            grantId: asString(grant["grantId"], "grantId"),
-            organizationId: asString(grant["organizationId"], "organizationId"),
-            actorId: asString(grant["actorId"], "actorId"),
-            role: asString(grant["role"], "role"),
-            target: asGrantTarget(grant["target"], "target"),
-            ...(grant["primary"] === true ? { primary: true } : {}),
-            ...(grant["revoked"] === true ? { revoked: true } : {}),
-          };
-        }),
-        participations: asArray(body["participations"] ?? [], "participations").map((entry) => {
-          const participation = asRecord(entry);
-          const status = asString(participation["status"], "status");
-          if (!["invited", "accepted", "active", "revoked"].includes(status)) throw new Error("invalid participation status");
-          return {
-            organizationId: asString(participation["organizationId"], "organizationId"),
-            status: status as "invited" | "accepted" | "active" | "revoked",
-          };
-        }),
-      };
+      const input = parseOperationBootstrap(body);
+      if (url.pathname === "/bootstrap-preview") return json(host.bootstrapPreview(input));
       const bootstrapped = host.bootstrap(input);
       // Populate the projection before anything reads it. A bootstrap that
       // declares active participations and grants must be able to issue on
