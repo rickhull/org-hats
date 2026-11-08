@@ -9,6 +9,12 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
+The next executable repair is
+[`bootstrap_standing.md`](bootstrap_standing.md): prove that reapplying an
+old organization bootstrap can reappoint a retired administrator, then fix
+the writer to preserve organization-owned standing under A9. The plan names
+the red/green witness and checks that close it.
+
 The operation snapshot cache is deferred until a consumer approaches the
 scaled bench's state; the measured verdict, the consumer-agreed design
 (model-scoped epoch, trigger-backed), and the done-when are in
@@ -21,27 +27,6 @@ and release signing.  The durable posture is
 [`../docs/assurance.md`](../docs/assurance.md); the decisions and their
 done-whens are in [`assurance.md`](assurance.md).
 
-The specs-driven witness suite landed; its durable convention lives in
-`tests/README.md` and `specs/README.md`.
-
-The red-team campaign landed on 2026-11-02 and is retired.  Its conclusions
-are where they belong rather than in a plan: the invariants it sharpened are
-E2, E4, and E7 in [`../specs/envelope.md`](../specs/envelope.md); the
-reachable-input list, the amplification review, the advisory triage, and the
-severity bands are in [`../docs/threat_model.md`](../docs/threat_model.md),
-[`../docs/performance.md`](../docs/performance.md),
-[`../docs/assurance.md`](../docs/assurance.md), and
-[`../SECURITY.md`](../SECURITY.md); the tabletop corrections are in
-[`../docs/key_compromise.md`](../docs/key_compromise.md); the recurring
-practices it produced are conventions in `AGENTS.md`; and the regression
-evidence is in the suites.
-
-The activation, roster, and team slices landed on 2026-10-28 and 2026-10-29;
-their durable facts are in `docs/activation.md`, `docs/roster.md`,
-`docs/teams.md`, and `specs/`.
-
-Durable decisions live in `docs/` and `specs/`; the lexicon register is
-[`docs/lexicon_use_concerns.md`](../docs/lexicon_use_concerns.md).
-
-Retired plans are removed; their results live in `docs/` and the commit
-history. Completed work is not kept here.
+Durable decisions and completed work live in [`docs/`](../docs/README.md),
+[`specs/`](../specs/README.md), and commit history. Retired plans are removed;
+the index contains current forward work only.

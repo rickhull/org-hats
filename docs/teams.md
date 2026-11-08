@@ -36,8 +36,9 @@ the Cloudflare route carries both the caller's organization id and the
 operation-administrator flag resolved from the principal. Organization acts
 require fresh evidence; an access envelope carries only operation standing.
 
-`admit-team` is the placement decision. The operation administrator sees the
-requested site in the command and either admits or retires the pending team.
+`admit-team` is the placement decision. `request-team` names the site;
+`admit-team` names the pending team by its id. An operation administrator
+admits or retires that pending team.
 
 ## Ids and names
 

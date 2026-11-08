@@ -100,6 +100,11 @@ public `org-hats` docs are normative for the seam.
 
 ## Tutorial
 
+- [`../examples/playground/README.md`](../examples/playground/README.md) —
+  the local browser teaching prototype: operation-local hats, independent
+  reach layers, binding and revocation, plus a separate actor-to-access
+  lesson over the real engine and verifier. Synthetic evidence replaces a
+  provider login; the prototype adds no production interface.
 - [`walkthrough.md`](walkthrough.md) — the layperson's first read: the
   same story as the tutorial in plain English, every term glossed, each
   section closed by three of the four personas from `personas/README.md`.

@@ -265,6 +265,10 @@ public key distribution:
 
 ### Bootstrap preview
 
+This route first enters source at `640a93f` and is absent from
+`cloudflare-v0.13.1`. A consumer must adopt a runtime tag containing that
+commit before calling it; source availability is not deployment evidence.
+
 `POST /ops/operation/bootstrap-preview` takes the same body and ops token
 as operation bootstrap. It reports the operation's local data changes:
 

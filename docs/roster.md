@@ -67,10 +67,24 @@ organization does not know, and leaves a known actor's name and enabled state
 alone. A re-bootstrap therefore cannot revert a rename, re-enable a disabled
 actor, or drop standing — those are the organization's facts once it exists.
 
-An unclaimed actor may be appointed. That is the normal state between
-provisioning and claiming, and it keeps the at-rest invariant — an organization
-always has at least one administrator — true while a person has not yet signed
-in.
+An unclaimed actor may be appointed. Administrator standing can therefore
+exist before its holder has linked a principal. Holding standing and being
+able to exercise it are different facts; the usable-successor rule checks
+both when an administrator retires.
+
+### Known Cloudflare bootstrap gap
+
+The ownership rule above is the contract, but the current Cloudflare
+bootstrap does not fully preserve it. Each bootstrap inserts every supplied
+`orgAdmins` entry with `INSERT OR IGNORE`; retirement deletes that row.
+Reapplying an old bootstrap can therefore reappoint a retired administrator.
+The existing rename/disable re-bootstrap test does not exercise this case.
+
+This is a gap in A9 enforcement, not a change to organization ownership.
+The focused repair and its regression witness are tracked in
+[`../plans/bootstrap_standing.md`](../plans/bootstrap_standing.md). Until it
+is repaired, review supplied administrator seeds before reapplying an
+organization bootstrap.
 
 ### The usable successor
 
@@ -81,9 +95,11 @@ that standing yet. The check runs in the same transaction as the removal, so a
 concurrent claim or disable cannot slip between the test and the write.
 
 A sole administrator therefore appoints and claims a successor before retiring.
-A retired actor's fresh evidence no longer authorizes anything, including a
-retry of the retirement; another administrator can replay the same idempotency
-key and receives `applied: false` without a second application.
+A retired administrator's fresh evidence no longer authorizes organization
+roster or standing changes, including a retry of the retirement. Another
+administrator can replay the same idempotency key and receives
+`applied: false` without a second application. Retiring administrator
+standing does not remove the actor's operation grants.
 
 `disable-actor` is deliberately not guarded. It is the offboarding act: an
 organization may disable its last administrator, and a departing administrator
@@ -120,7 +136,7 @@ already uses.
 
 ## Not in this slice
 
-Team create, update, and retire wait for retirement's effects on grants and
-refresh authority, and for the site-fielding constraint. Site delegation needs
-its own model decision. Re-enabling a disabled actor is not asked for, so
-offboarding stays terminal.
+Team request, admission, update, and retirement are implemented separately;
+their placement and revocation rules are in [teams.md](teams.md). Site
+placement is approved through operation admission. Re-enabling a disabled
+actor remains outside this surface, so offboarding stays terminal.

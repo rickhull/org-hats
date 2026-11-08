@@ -7,37 +7,34 @@ remains the workerd suite against the real coordinators
 binding and entrypoint preserve the public runtime behaviour for a dedicated,
 pre-bootstrapped operation without resetting it.*
 
-*The reference runtime is deployed by the consuming host. The live
-deployment is `cloudflare-v0.11.0` (Worker Version
-`48bec7e9-9789-4fdf-9823-fdcf02d1b5bc`, tagged
-`b161d339ef6f7393d963399197aa0c1faa21201c`), deployed on 2026-11-01. Its
-deployment post-checks passed — tag and manifest verified, the unchanged
-signing key id, schema status, and an export read-back — but the six-group
-binding smoke has not been rerun on it: the dedicated smoke organization
-is spent and needs fresh fixture ids.
+## Latest reported deployment and acceptance
 
-The last full acceptance remains `cloudflare-v0.6.1` (Worker Version
-`fc3d9e1d-651e-4e40-bc6c-1f2152db288b`, tagged
-`a020ed6f81a9e4b64c57d0f7ff0f345f4c64cd1a`), accepted on 2026-10-27 with
-fresh fixture `org-authority-smoke-20261027b`; the subset passed all six
-groups, and `exec authority verify` and schema status passed. The previous
-accepted code release, `cloudflare-v0.6.0`, passed with fresh fixture
-`org-authority-smoke-20261027a`; its last configuration,
-`e4940c33-e8d1-43c2-9d45-4333d0de3287`, tagged
-`2720efd9478b7cc609f0155f49f0b33459cf94d9-config-2cdcb1368840`, was the
-rollback target before the migration.
+Consumer receipts reconciled on 2026-11-08 report the authority deployed at
+`cloudflare-v0.13.1`, with portable consumer pin `v3.7.1`. The published
+runtime tag resolves to `7ef5ec69227d27b49ce1ccec470fa247a42fa5e1`; upstream
+publication evidence is in [the release review](release_review_v3.7.1.md).
+Publication, consumer pin adoption, deployment, and live acceptance are
+separate evidence, not consequences inferred from one another.
 
-`cloudflare-v0.7.0` carries the `v2` Durable Object migration, which is
-one-way: a version from before it cannot be activated across it, so
-`cloudflare-v0.6.1` and `cloudflare-v0.6.0` are not rollback targets for the
-live deployment. The next deployment is. `cloudflare-v0.5.0` (configuration
-`e7b4529…-config-627ee8a6f000`, fresh fixture
-`org-authority-smoke-20261026c`) also passed all six groups on 2026-10-26;
-`cloudflare-v0.4.0` (configuration
-`c22a252efdcb391d796503c760b90a1a20392381-config-5ad6c5e46589`, fixture
-`org-authority-smoke-20261026b`) passed the same day, and the host recorded
-each acceptance. The live pointer is the host's acceptance: upstream records
-it only after the host has deployed and accepted the version.*
+The consumer's later receipt, **six-group binding smoke passes on v0.13.1**,
+reports a fresh dedicated organization/operation fixture and all six groups
+passing: `issue-and-verify`, `refresh-and-supersede`, `context`,
+`denied-command`, `wrong-binding-and-expired`, and
+`stale-projection-refresh`. The reported organization schema is 2 and the
+operation schema is 5, with complete routing facts and repeat canonical
+exports. This supersedes the earlier spent-fixture smoke limitation; a
+spent actor is still unsuitable for another run.
+
+The consumer reports tagged release identity and matching live drift on its
+surfaces. Its signed-in human acceptance remains outstanding in the latest
+receipt. These are host-reported results, not a new upstream probe or a claim
+that the full inventory ran live. The local browser playground is synthetic
+teaching evidence and does not close that human acceptance.
+
+The deployment receipt names `cloudflare-v0.13.0` as its authority cutback.
+The `v2` Durable Object migration in `cloudflare-v0.7.0` remains one-way;
+`cloudflare-v0.6.1` and earlier versions are not rollback targets across it.
+Record another live version only after the host supplies its receipt.
 
 ## Preconditions
 

@@ -95,23 +95,24 @@ the measured per-command cost.
 
 ## Decision 3 — erasure of personal data
 
-Actors can be created, updated, disabled, and retired, never deleted. Actor
-display names are personal data, and audit facts embed actor ids. An operator
-facing a GDPR erasure request, or TISAX's data-protection module, cannot
-satisfy it through the authority surface; the deployment must edit storage
-directly, which bypasses every control the rest of this repository provides.
+Actors can be created, renamed, and disabled; administrator standing can be
+retired. `update-actor` already accepts `displayName: null`, clearing the
+name while retaining the actor id. That is implemented behavior, not a
+future model change. It does not clear principal links, grants, audit actor
+references, exported snapshots, or downstream data.
 
-The tension is real: erasure and a tamper-resistant audit trail pull against
-each other, and the model deliberately keeps tombstones so ids are never
-reused. Pseudonymisation — clearing the display name while keeping the id and
-its audit history — is probably the shape that satisfies both, but it is a
-model change and needs the consumer's view.
+The remaining question is what broader erasure contract this library owns.
+Keeping identifiers for history and removing identifying data need an
+explicit boundary, including which facts remain deployment-owned; name
+clearing alone does not settle it.
 
-**Decision needed:** whether erasure is in scope for this library, and if so
-whether it is deletion or pseudonymisation. **Done when:** either a typed
-command exists with its effect on grants, refresh, participation, and audit
-specified and witnessed, or `docs/assurance.md` states that erasure is
-storage-owned and names what the deployment must do.
+**Decision needed:** whether this library owns additional erasure behavior
+beyond name clearing, and the retained facts and deployment obligations in
+either case. **Done when:** either the chosen behavior is documented and
+witnessed with its effects on links, grants, refresh, participation, and
+audit, or `docs/assurance.md` explicitly bounds the existing command and
+records what stays with the deployment, including backups and downstream
+data. Do not add a second name-clearing command to close this decision.
 
 ## Decision 4 — cryptographic release integrity
 

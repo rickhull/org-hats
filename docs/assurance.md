@@ -116,12 +116,14 @@ audit row per privileged act, forever. Retention is a question both regimes
 ask directly, and the honest current answer is "unbounded, and the operator
 owns the policy."
 
-**There is no erasure path for personal data.** Actors can be created,
-updated, disabled, and retired as administrators, but never deleted, and actor
-display names are personal data. Audit facts also embed actor ids. An operator
-facing a GDPR erasure request, or TISAX's data-protection module, cannot
-satisfy it through the authority surface today; the deployment must act on
-storage directly, which is exactly the path that bypasses every control above.
+**Name clearing exists; a complete erasure workflow does not.**
+`update-actor` with `displayName: null` clears an actor's display name through
+the ordinary authority command. It does not delete the actor, principal
+links, grant references, audit history, or previously exported snapshots.
+Actors can be disabled and administrator standing can be retired; neither
+deletes the actor. The broader erasure scope and the deployment's treatment
+of retained identifiers, backups, and downstream data remain an explicit
+decision in [the assurance plan](../plans/assurance.md#decision-3--erasure-of-personal-data).
 
 **Release integrity rests on policy, not cryptography.** Tags are immutable by
 repository rule and `bin/check-version` checks agreement, but a git tag is a
@@ -136,9 +138,11 @@ a release" — and it lives in `.git/`, so it is never published. A release cut
 with `bin/release --no-verify` is therefore indistinguishable from a verified
 one, and the honest answer to "how do you know what shipped was tested" is the
 repository's policy plus the branch's CI run, not a property of the artifact.
-Mirror CI is manual-dispatch only, so it is not that evidence either. This is
-the same gap as the unsigned tag and has the same fix shape, which is why it
-sits under the release-signing decision rather than beside it.
+Codeberg's CI witness is manual-dispatch only; GitHub's release-mirror CI
+runs on push and provides separate portable, workerd, and tag-artifact
+evidence as described in [publishing.md](publishing.md#ci). Those run logs
+are not an attestation carried by the release artifact. This is the same
+gap as the unsigned tag and sits under the release-signing decision.
 
 ## How to read this
 

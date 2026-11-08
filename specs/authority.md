@@ -147,6 +147,9 @@ appoints and retires its own administrators through typed commands.
 organization state, written by `appoint-administrator` and
 `retire-administrator` under fresh administrator evidence; the authorization
 cases assert denials for non-administrators.
+*Known enforcement gap:* Cloudflare organization re-bootstrap can reinsert a
+retired administrator from an old seed. The contract remains unchanged;
+see [the bootstrap gap](../docs/roster.md#known-cloudflare-bootstrap-gap).
 *If it breaks:* administration becomes a hardcoded title, or an organization
 cannot appoint or retire its own administrator without a deployment.
 
