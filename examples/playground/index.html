@@ -13,13 +13,14 @@
       <p class="eyebrow">A hands-on authority experiment</p>
       <h1 id="title">One person, several kinds of reach</h1>
       <p class="question">How does an action hat differ from read, configuration, and team reach? Why does revocation stop refresh while an issued envelope survives until expiry?</p>
-      <p>This synthetic Professional Operation adds a West Yard administrator grant for Dana. Choose a person and a hat, then watch the decisions change. Everything runs in this browser and resets when you leave.</p>
+      <p>Explore the synthetic Professional Operation and Festival. Professional adds a West Yard administrator grant for Dana. Choose an operation, person and hat, then watch the decisions change. Everything runs in this browser and resets when you leave.</p>
     </section>
 
     <section class="workspace" aria-label="Explore authority">
       <div class="controls panel">
         <div class="section-heading"><div><p class="eyebrow">01 / Choose</p><h2>Who and which hat?</h2></div><button type="button" id="reset" class="text-button">Reset playground</button></div>
         <div class="fields">
+          <label for="operation">Operation <select id="operation" disabled></select></label>
           <label for="actor">Person <select id="actor" disabled></select></label>
           <label for="hat">Available action hat <select id="hat" disabled></select></label>
         </div>
@@ -37,11 +38,15 @@
         <h2 id="envelope-heading">What is being worn?</h2>
         <div id="envelope-state"></div>
         <p class="hint">The model clock is paused. Only “Advance to expiry” moves time.</p>
+        <button type="button" id="probe" class="secondary probe" disabled>Try envelope in other operation</button>
+        <p id="probe-result" class="hint" role="status" aria-live="polite">Other-operation check not attempted.</p>
       </aside>
     </section>
 
     <section class="reach" aria-labelledby="reach-heading">
       <div class="section-heading"><div><p class="eyebrow">03 / Decisions</p><h2 id="reach-heading">Reach across the operation</h2></div><p>Decisions from the verified envelope at model time.</p></div>
+      <p id="read-policy" class="policy"></p>
+      <p class="hint">A broad read policy can make more teams readable without expanding the action hat or team reach. Compare the decisions below.</p>
       <div id="sites" class="sites"></div>
     </section>
 
@@ -62,6 +67,15 @@
         </ol>
         <p class="hint">You can also use the controls above in any order.</p>
       </div>
+    </section>
+    <section class="panel walkthrough contrast" aria-labelledby="contrast-heading">
+      <p class="eyebrow">Try another sequence</p><h2 id="contrast-heading">Compare operations</h2>
+      <p>Start with Dana in Professional, then switch to Festival. Compare the read policy, team decisions, and the envelope’s operation binding.</p>
+      <ol>
+        <li><button type="button" data-step="reset">Start fresh</button><span>Notice Professional’s read policy and team decisions.</span></li>
+        <li><button type="button" data-step="other">Switch operation</button><span>Compare Festival’s read policy and the same person’s reach.</span></li>
+        <li><button type="button" data-step="probe">Try other operation</button><span>Check the current envelope against the other operation.</span></li>
+      </ol>
     </section>
   </main>
   <footer>Local teaching prototype · Synthetic data · No sign-in or saved state</footer>

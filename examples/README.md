@@ -34,5 +34,5 @@ they are repository proof.
 
 The [authority playground](playground/README.md) is a browser teaching
 prototype over the actual engine and verifier. Run `pnpm playground` to
-explore hat selection, the independent reach layers, and the revocation
+explore operation binding, hat selection, the independent reach layers, and the revocation
 window in a disposable synthetic world.

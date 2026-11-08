@@ -88,7 +88,7 @@ All example worlds use synthetic data. The [tutorial](docs/tutorial.md) follows 
 
 For a visual experiment, run `pnpm playground` and open
 <http://127.0.0.1:4173>. The [authority playground](examples/playground/README.md)
-lets you switch hats, compare the authority layers, revoke a grant, and
+lets you switch operations and hats, compare the authority layers, revoke a grant, and
 advance to expiry using the real engine and verifier in browser memory.
 
 ```sh

@@ -6,7 +6,7 @@ button, select { min-height: 2.75rem; border: 1px solid var(--accent); border-ra
 button { padding: .55rem .9rem; background: var(--accent); color: white; cursor: pointer; font-weight: 650; }
 button:hover:not(:disabled) { background: #0d514a; }
 button:disabled, select:disabled { opacity: .55; cursor: wait; }
-button:focus-visible, select:focus-visible { outline: 3px solid #ca8c43; outline-offset: 3px; }
+button:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid #ca8c43; outline-offset: 3px; }
 select { display: block; width: 100%; margin-top: .35rem; padding: .5rem 2rem .5rem .65rem; background: var(--surface); color: var(--ink); border-color: #a5b3ab; }
 h1, h2, h3, p { margin: 0; }
 h1, h2, h3 { line-height: 1.2; }
@@ -37,17 +37,22 @@ label { font-size: .875rem; font-weight: 700; }
 .notice { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: .7rem .8rem; margin-top: 1.2rem; font-size: .9rem; }
 .notice.error { border-color: var(--bad); background: #f8ebe5; }
 .envelope { background: #edf3ed; }
+.probe { margin-top: 1rem; }
 .envelope dl { margin: 1rem 0 0; }
 .envelope dl div { display: grid; grid-template-columns: 7rem 1fr; gap: .5rem; padding: .5rem 0; border-top: 1px solid #cbd9d0; }
 dt { color: var(--muted); font-size: .875rem; }
 dd { margin: 0; font-weight: 650; overflow-wrap: anywhere; }
 .reach { margin-top: 2.5rem; }
+.policy { margin-top: 1rem; font-weight: 700; }
 .sites { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
 .site { background: var(--surface); border: 1px solid var(--line); }
 .site-header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: 1rem 1.2rem; border-bottom: 1px solid var(--line); }
 .site-header span { text-align: right; font-size: .8rem; font-weight: 700; }
 .team { padding: 1rem 1.2rem; }
 .team + .team { border-top: 1px solid var(--line); }
+.site details { border-top: 1px solid var(--line); }
+.site summary { padding: .8rem 1.2rem; color: var(--accent); font-weight: 700; cursor: pointer; }
+.site details .team { border-top: 1px solid var(--line); }
 .team-name { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; }
 .team-name span { color: var(--muted); font-size: .8rem; }
 .decisions { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-top: .75rem; }
@@ -56,6 +61,7 @@ dd { margin: 0; font-weight: 650; overflow-wrap: anywhere; }
 .decision.actions-cell { grid-column: 1 / -1; }
 .yes { color: var(--accent); } .no { color: var(--bad); }
 .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2.5rem; }
+.contrast { margin-top: 1rem; }
 .grant-list { list-style: none; padding: 0; margin: 1rem 0 0; }
 .grant-list li { padding: .65rem 0; border-top: 1px solid var(--line); }
 .grant-list small { display: block; color: var(--muted); }
