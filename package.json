@@ -39,6 +39,7 @@
     "coverage": "node --test --experimental-test-coverage --test-coverage-include='src/**' tests/*.test.ts",
     "bench": "node bench/portable.ts",
     "bench:binding": "pnpm --filter org-hats-cloudflare bench",
+    "playground": "node examples/playground/server.mjs",
     "test:tools": "node --test tests/release-tools.test.ts tests/gate-cache.test.ts tests/artifact-check.test.ts tests/tooling-policy.test.ts tests/git-guards.test.ts tests/ci-run.test.ts",
     "spec:unit": "node --test $(bin/spec-suite unit)",
     "spec:smoke": "node --test $(bin/spec-suite smoke)",

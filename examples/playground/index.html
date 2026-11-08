@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Authority playground · org-hats</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="masthead"><span>org-hats</span><span>Learning playground / prototype</span></header>
+  <main>
+    <section class="intro" aria-labelledby="title">
+      <p class="eyebrow">A hands-on authority experiment</p>
+      <h1 id="title">One person, several kinds of reach</h1>
+      <p class="question">How does an action hat differ from read, configuration, and team reach? Why does revocation stop refresh while an issued envelope survives until expiry?</p>
+      <p>This synthetic Professional Operation adds a West Yard administrator grant for Dana. Choose a person and a hat, then watch the decisions change. Everything runs in this browser and resets when you leave.</p>
+    </section>
+
+    <section class="workspace" aria-label="Explore authority">
+      <div class="controls panel">
+        <div class="section-heading"><div><p class="eyebrow">01 / Choose</p><h2>Who and which hat?</h2></div><button type="button" id="reset" class="text-button">Reset playground</button></div>
+        <div class="fields">
+          <label for="actor">Person <select id="actor" disabled></select></label>
+          <label for="hat">Available action hat <select id="hat" disabled></select></label>
+        </div>
+        <p class="hint">Choosing a hat requests an envelope for that action scope. Other kinds of reach are evaluated independently.</p>
+        <div class="actions">
+          <button type="button" id="revoke" disabled>Revoke worn grant</button>
+          <button type="button" id="refresh" class="secondary" disabled>Try refresh</button>
+          <button type="button" id="expire" class="secondary" disabled>Advance to expiry</button>
+        </div>
+        <p id="notice" class="notice" role="status" aria-live="polite">Preparing the playground…</p>
+      </div>
+
+      <aside class="envelope panel" aria-labelledby="envelope-heading">
+        <p class="eyebrow">02 / Issued envelope</p>
+        <h2 id="envelope-heading">What is being worn?</h2>
+        <div id="envelope-state"></div>
+        <p class="hint">The model clock is paused. Only “Advance to expiry” moves time.</p>
+      </aside>
+    </section>
+
+    <section class="reach" aria-labelledby="reach-heading">
+      <div class="section-heading"><div><p class="eyebrow">03 / Decisions</p><h2 id="reach-heading">Reach across the operation</h2></div><p>Decisions from the verified envelope at model time.</p></div>
+      <div id="sites" class="sites"></div>
+    </section>
+
+    <section class="bottom-grid">
+      <div class="panel" aria-labelledby="grants-heading">
+        <p class="eyebrow">04 / Source of authority</p><h2 id="grants-heading">Grant ledger</h2>
+        <p class="hint">These are live grant facts. Revoking a grant changes this ledger; it does not rewrite an envelope already issued.</p>
+        <div id="grants"></div>
+      </div>
+      <div class="panel walkthrough" aria-labelledby="walkthrough-heading">
+        <p class="eyebrow">Try a sequence</p><h2 id="walkthrough-heading">Revocation and expiry</h2>
+        <p>Start fresh, then follow the steps. Compare the grant ledger with the issued envelope after each action.</p>
+        <ol>
+          <li><button type="button" data-step="reset">Start fresh</button><span>Return to the initial person and hat.</span></li>
+          <li><button type="button" data-step="revoke">Revoke grant</button><span>Look at the ledger and envelope.</span></li>
+          <li><button type="button" data-step="refresh">Try refresh</button><span>See whether the session can be renewed.</span></li>
+          <li><button type="button" data-step="expire">Advance to expiry</button><span>Check the retained envelope again.</span></li>
+        </ol>
+        <p class="hint">You can also use the controls above in any order.</p>
+      </div>
+    </section>
+  </main>
+  <footer>Local teaching prototype · Synthetic data · No sign-in or saved state</footer>
+  <script type="module" src="/app.mjs"></script>
+</body>
+</html>

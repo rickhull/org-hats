@@ -86,6 +86,11 @@ node examples/consumer-access.ts
 
 All example worlds use synthetic data. The [tutorial](docs/tutorial.md) follows commands, refresh, disable, and crossed grants.
 
+For a visual experiment, run `pnpm playground` and open
+<http://127.0.0.1:4173>. The [authority playground](examples/playground/README.md)
+lets you switch hats, compare the authority layers, revoke a grant, and
+advance to expiry using the real engine and verifier in browser memory.
+
 ```sh
 pnpm verify
 ```

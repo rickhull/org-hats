@@ -1,0 +1,71 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createPlayground } from "../examples/playground/model.ts";
+
+test("worn actions and union reach are independent, and switching hats refreshes", async () => {
+  const playground = await createPlayground();
+  const initial = await playground.view();
+  assert.equal(initial.verification, "valid");
+  assert.equal(initial.selectedHat?.role, "coordinator");
+  assert.equal(initial.hats.length, 2);
+  const yard = initial.teams.find((team) => team.label === "Yard crew")!;
+  const desk = initial.teams.find((team) => team.label === "Facilities desk")!;
+  assert.ok(yard.actions.includes("review"));
+  assert.deepEqual(desk.actions, []);
+  assert.equal(desk.readable, true);
+  assert.equal(desk.reachable, true);
+  assert.equal(initial.sites.find((site) => site.label === "West Yard")?.configurable, true);
+  const admin = initial.hats.find((hat) => hat.role === "admin")!;
+  const switched = await playground.selectHat(admin.grantId);
+  assert.equal(switched.selectedHat?.grantId, admin.grantId);
+  assert.ok(switched.teams.find((team) => team.label === "Facilities desk")!.actions.includes("configure"));
+  assert.deepEqual(switched.teams.map(({ id, readable, reachable }) => ({ id, readable, reachable })), initial.teams.map(({ id, readable, reachable }) => ({ id, readable, reachable })));
+  assert.deepEqual(switched.sites, initial.sites);
+  assert.ok(switched.teams.filter((team) => team.siteLabel === "East Hall").every((team) => team.actions.length === 0));
+});
+
+test("revocation invalidates refresh while the old envelope lasts to exact expiry", async () => {
+  const playground = await createPlayground();
+  const before = await playground.view();
+  const revoked = await playground.revokeHat();
+  assert.equal(revoked.verification, "valid");
+  assert.equal(revoked.selectedHat?.grantId, before.selectedHat?.grantId);
+  assert.equal(revoked.grants.find((grant) => grant.id === before.selectedHat?.grantId)?.revoked, true);
+  const refreshed = await playground.refresh();
+  assert.equal(refreshed.refreshOutcome, "unauthenticated");
+  assert.equal(refreshed.verification, "valid");
+  const expired = await playground.expire();
+  assert.equal(expired.now, before.expiresAt);
+  assert.equal(expired.verification, "expired");
+  assert.ok(expired.teams.every((team) => team.actions.length === 0 && !team.readable && !team.reachable));
+  assert.ok(expired.sites.every((site) => !site.configurable));
+});
+
+test("sessions survive actor changes; reset and ordinary denials are safe", async () => {
+  const playground = await createPlayground();
+  const before = await playground.view();
+  const unknown = await playground.chooseActor("unknown");
+  assert.equal(unknown.selectedActorId, before.selectedActorId);
+  assert.ok(unknown.message);
+  const badHat = await playground.selectHat("unknown");
+  assert.equal(badHat.selectedHat?.grantId, before.selectedHat?.grantId);
+  await playground.revokeHat();
+  const len = before.actors.find((actor) => actor.label === "Len Chu")!;
+  await playground.chooseActor(len.id);
+  const back = await playground.chooseActor(before.selectedActorId);
+  assert.equal((await playground.refresh()).refreshOutcome, "unauthenticated");
+  assert.equal(back.selectedHat?.grantId, before.selectedHat?.grantId);
+  const reset = await (await createPlayground()).view();
+  assert.equal(reset.grants.find((grant) => grant.id === before.selectedHat?.grantId)?.revoked, false);
+  await playground.chooseActor(len.id);
+  const lenRevoked = await playground.revokeHat();
+  assert.equal(lenRevoked.verification, "valid");
+  const denied = await playground.revokeHat();
+  assert.match(denied.message, /Administrator access failed: not-admitted/);
+  const lenRefresh = await playground.refresh();
+  assert.equal(lenRefresh.refreshOutcome, "unauthenticated");
+  assert.equal(lenRefresh.verification, "valid");
+  const lenExpired = await playground.expire();
+  assert.equal(lenExpired.now, lenRevoked.expiresAt);
+  assert.equal(lenExpired.verification, "expired");
+});
