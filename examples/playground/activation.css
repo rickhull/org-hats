@@ -1,0 +1,17 @@
+.activation-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(19rem, 1fr); gap: 1rem; align-items: start; }
+.stage-list { list-style: none; counter-reset: stage; padding: 0; margin: 1.25rem 0 0; }
+.stage-list li { counter-increment: stage; display: grid; grid-template-columns: 1.75rem minmax(0, 1fr); gap: .3rem .75rem; padding: 1rem 0; border-top: 1px solid var(--line); }
+.stage-list li::before { content: counter(stage, decimal-leading-zero); color: var(--accent); font-size: .75rem; font-weight: 750; padding-top: .2rem; }
+.stage-list li > button, .stage-actions { grid-column: 2; justify-self: start; margin-top: .45rem; }
+.stage-list p { color: var(--muted); font-size: .9rem; margin-top: .3rem; }
+.stage-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.state { background: #edf3ed; }
+.state h3 { margin: 1.3rem 0 .35rem; }
+.state dl { margin: 0; }
+.state dl div { display: grid; grid-template-columns: minmax(7rem, .8fr) minmax(0, 1.2fr); gap: .5rem; padding: .45rem 0; border-top: 1px solid #cbd9d0; }
+.activation-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; align-items: start; }
+.events { list-style: none; padding: 0; margin: 1rem 0 0; }
+.events li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; border-top: 1px solid var(--line); padding: .55rem 0; }
+.events span { overflow-wrap: anywhere; }
+@media (max-width: 760px) { .activation-layout, .activation-bottom { grid-template-columns: 1fr; } .steps .notice { position: sticky; top: .5rem; z-index: 1; } }
+@media (max-width: 440px) { .stage-list li > button { max-width: 100%; } .state dl div { grid-template-columns: 1fr; gap: .1rem; } }

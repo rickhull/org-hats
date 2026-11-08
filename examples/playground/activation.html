@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>From actor to access · org-hats</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/activation.css">
+</head>
+<body>
+  <header class="masthead"><span>org-hats</span><span>Learning playground / prototype</span></header>
+  <nav class="lesson-nav" aria-label="Lessons"><a href="/">Explore authority</a><a href="/activation" aria-current="page">From actor to access</a></nav>
+  <main>
+    <section class="intro">
+      <p class="eyebrow">A hands-on authority experiment</p>
+      <h1>From actor to access</h1>
+      <p class="question">What does it take for a person to act, and what survives when their identity link is removed?</p>
+      <p>Follow a synthetic person from an actor record to a linked identity, a hat grant and an issued envelope. The provider evidence is prepared for this lesson. Activation links an identity; it grants no authority by itself. Everything runs in this browser and resets when you leave.</p>
+    </section>
+
+    <div class="activation-layout">
+      <section class="panel steps" aria-labelledby="steps-heading">
+        <div class="section-heading"><div><p class="eyebrow">The sequence</p><h2 id="steps-heading">Build access, then remove the link</h2></div><button id="reset" class="text-button" type="button">Start fresh</button></div>
+        <p id="notice" class="notice" role="status" aria-live="polite">Preparing the lesson…</p>
+        <ol class="stage-list">
+          <li><div><strong>Create the actor</strong><p>Dana, an organization administrator, creates the record and checks access. Without an identity link, issuance is unauthenticated.</p></div><button id="createActor" type="button" disabled>Create actor and check</button></li>
+          <li><div><strong>Activate the identity</strong><p>Dana requests activation; the new teammate accepts it with the prepared synthetic evidence. The lesson then checks access. Without a hat, a link alone does not admit a person.</p></div><button id="activate" type="button" disabled>Activate and check</button></li>
+          <li><div><strong>Grant a field hat</strong><p>Len, an operation administrator, grants the hat at Yard crew and checks whether an envelope can be issued. A known actor can be granted a hat before their identity is linked.</p></div><button id="grantHat" type="button" disabled>Grant hat and check</button></li>
+          <li><div><strong>Unlink the identity</strong><p>Dana unlinks the principal. The actor, grant and issued envelope remain. Try a refresh or a new access request to see the effect of removing the link.</p></div><div class="stage-actions"><button id="unlink" type="button" disabled>Unlink principal</button><button id="refresh" class="secondary" type="button" disabled>Try refresh</button><button id="tryAccess" class="secondary" type="button" disabled>Try access</button></div></li>
+          <li><div><strong>Advance to expiry</strong><p>Verify the retained envelope again at its expiry.</p></div><button id="expire" type="button" disabled>Advance to expiry</button></li>
+        </ol>
+      </section>
+
+      <aside class="panel state" aria-labelledby="state-heading">
+        <p class="eyebrow">Current state</p><h2 id="state-heading">What exists now?</h2>
+        <div id="state"></div>
+        <p class="hint">The model clock is paused. “Advance to expiry” moves time; starting fresh resets it.</p>
+      </aside>
+    </div>
+
+    <div class="activation-bottom">
+      <section class="panel" aria-labelledby="replay-heading">
+        <p class="eyebrow">Explore a boundary</p><h2 id="replay-heading">Try the activation again</h2>
+        <p class="hint">After activation, compare accepting the same request with the same subject and trying it with another subject. Neither action renews a session.</p>
+        <div class="actions"><button id="replay" type="button" class="secondary" disabled>Replay same subject</button><button id="tryOtherSubject" type="button" class="secondary" disabled>Try another subject</button></div>
+      </section>
+      <section class="panel" aria-labelledby="events-heading">
+        <p class="eyebrow">Activity</p><h2 id="events-heading">Recent results</h2>
+        <p class="hint">The most recent model actions and their outcomes.</p>
+        <div id="events" aria-live="polite"><p class="hint">No actions yet.</p></div>
+      </section>
+    </div>
+  </main>
+  <footer>Local teaching prototype · Synthetic data · No sign-in or saved state</footer>
+  <script type="module" src="/activation-app.mjs"></script>
+</body>
+</html>

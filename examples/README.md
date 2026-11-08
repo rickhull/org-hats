@@ -36,3 +36,6 @@ The [authority playground](playground/README.md) is a browser teaching
 prototype over the actual engine and verifier. Run `pnpm playground` to
 explore operation binding, hat selection, the independent reach layers, and the revocation
 window in a disposable synthetic world.
+
+Its separate **From actor to access** lesson follows actor creation,
+activation, granting, and principal unlinking through the real APIs.

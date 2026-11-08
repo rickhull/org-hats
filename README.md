@@ -90,6 +90,8 @@ For a visual experiment, run `pnpm playground` and open
 <http://127.0.0.1:4173>. The [authority playground](examples/playground/README.md)
 lets you switch operations and hats, compare the authority layers, revoke a grant, and
 advance to expiry using the real engine and verifier in browser memory.
+Its **From actor to access** lesson separates actor creation, identity
+activation, and granting authority.
 
 ```sh
 pnpm verify

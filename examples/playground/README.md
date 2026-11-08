@@ -58,6 +58,42 @@ session usable. The simulated clock is shared: advancing to expiry can also
 expire envelopes already issued in the other operation. Reset discards both
 worlds and all sessions.
 
+## From actor to access
+
+Open <http://127.0.0.1:4173/activation> or choose **From actor to access**
+in the lesson navigation. This page has its own engine and reset; it does
+not change the exploration page's world.
+
+1. **Create actor and check access.** Dana, an explicitly seeded organization
+   administrator, creates a new Harbor Logistics actor. It has no principal
+   link or hat. The learner's synthetic evidence is still `unauthenticated`.
+2. **Activate identity and check access.** The lesson requests an activation
+   as Dana and accepts it using the learner's synthetic provider evidence.
+   The link now exists, but issuance is `not-admitted` because no hat exists.
+3. **Grant hat and check access.** Len, an operation administrator under the
+   example configuration, grants the `field` role at Yard crew. Issuance and
+   local verification now succeed, and `observe` is allowed there.
+4. **Replay activation.** Repeating the same secret with the same subject
+   reports `applied: false`; another subject is refused. These probes do not
+   issue or refresh an envelope.
+5. **Unlink the principal.** Dana removes the link. The actor and grant stay.
+   Try refresh and fresh issuance: both are refused, while the retained
+   signed envelope still verifies. Advance to its exact expiry to see local
+   access stop too.
+
+This is a guided order, not a dependency rule. Authority also permits a
+known actor to receive a grant before activation; the lesson lets you try
+that order. Issuance stays `unauthenticated` until evidence is linked, then
+succeeds because the grant is already present. Creating an actor never
+creates a link, and activation never creates a grant.
+
+The activation secret and refresh handle stay inside the disposable
+controller. Its view and event log contain outcomes, not those values. Actor
+and grant facts come from the engine snapshot; the displayed link state
+records successful acceptance and unlink transitions. The lesson supplies
+synthetic authenticated-provider evidence; it does not implement or prove a
+real provider login, redirect, delivery channel, or account-recovery flow.
+
 ## Boundaries
 
 Each tab owns a fresh engine, signing key, synthetic principal links,
@@ -79,6 +115,6 @@ and the verifier's explicit `now`.
 
 This browser shell is an experiment in teaching the model. It is not a
 production administration UI, an authentication flow, or a hosted service.
-The model's acceptance witnesses live in `tests/playground.test.ts`; run
-`pnpm check` for the repository gate. No package export or Cloudflare runtime
-is added by this example.
+The model's acceptance witnesses live in `tests/playground.test.ts` and
+`tests/playground-activation.test.ts`; run `pnpm check` for the repository
+gate. No package export or Cloudflare runtime is added by this example.

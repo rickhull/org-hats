@@ -7,11 +7,18 @@ import ts from "typescript";
 const root = new URL("../../", import.meta.url);
 const assets = new Map([
   ["/", [new URL("./index.html", import.meta.url), "text/html; charset=utf-8"]],
+  ["/activation", [new URL("./activation.html", import.meta.url), "text/html; charset=utf-8"]],
+  ["/activation-app.mjs", [new URL("./activation-app.mjs", import.meta.url), "text/javascript; charset=utf-8"]],
+  ["/activation.css", [new URL("./activation.css", import.meta.url), "text/css; charset=utf-8"]],
   ["/app.mjs", [new URL("./app.mjs", import.meta.url), "text/javascript; charset=utf-8"]],
   ["/style.css", [new URL("./style.css", import.meta.url), "text/css; charset=utf-8"]],
 ]);
 const port = Number(process.env.PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PORT must be an integer from 1 to 65535");
+const controllers = new Map([
+  ["/model.js", new URL("./model.ts", import.meta.url)],
+  ["/activation-model.js", new URL("./activation-model.ts", import.meta.url)],
+]);
 
 const server = createServer(async (request, response) => {
   response.setHeader("Cache-Control", "no-store");
@@ -25,10 +32,11 @@ const server = createServer(async (request, response) => {
     const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
     let content;
     let type;
-    if (path === "/model.js") {
-      const source = await readFile(new URL("./model.ts", import.meta.url), "utf8");
+    const controller = controllers.get(path);
+    if (controller !== undefined) {
+      const source = await readFile(controller, "utf8");
       const compiled = ts.transpileModule(source, {
-        fileName: "model.ts",
+        fileName: controller.pathname,
         reportDiagnostics: true,
         compilerOptions: { target: ts.ScriptTarget.ES2024, module: ts.ModuleKind.ESNext },
       });
