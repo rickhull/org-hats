@@ -9,17 +9,15 @@ pre-bootstrapped operation without resetting it.*
 
 ## Latest reported deployment and acceptance
 
-The consumer's relay receipt reports pin adoption at `cloudflare-v0.14.0`
-(resolving to `c1f3d32`, portable pin still `v3.7.1`), with consumer
-conformance passed at the pin — typecheck clean, 743 tests, all browser
-journeys — and the standing repair and preview adopted into its operator
-review. Deployment at the pin is not separately reported; publication,
-consumer pin adoption, deployment, and live acceptance are separate
-evidence, not consequences inferred from one another.
-
-`v3.8.0` and `cloudflare-v0.15.0` (the organization roster read and
-administrator standing on the context) are published; the consumer reports
-adoption under way, and no receipt exists for them yet.
+The consumer's relay receipt reports both pins taken together: four
+manifests on `org-hats` `v3.8.0` and the tenant on `org-hats-cloudflare`
+`cloudflare-v0.15.0`, the workspace peer re-keyed, its `pin_state` check
+green, and acceptance recorded in its login spec. Consumer conformance
+passed at the pin: 44 cases, zero failures, with `OH-ROSTER-06..08` named
+explicitly in its consumer assertion — the delegation gate caught `roster`
+as designed. Deployment at the pin is not separately reported;
+publication, consumer pin adoption, deployment, and live acceptance are
+separate evidence, not consequences inferred from one another.
 
 The consumer's later receipt, **six-group binding smoke passes on v0.13.1**,
 reports a fresh dedicated organization/operation fixture and all six groups
