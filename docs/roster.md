@@ -138,6 +138,13 @@ false` and is refused the roster, and a disabled actor's envelope reads
 until expiry — the bounded envelope is the authority `disable` deliberately
 leaves in place.
 
+A membership join, if a consumer ever asks for one, is **direct team grants
+only**, intersected with this read's own actor list: the grant's target is
+the team, the holder is in the organization, and no actor outside the read
+can appear. Wearable reach is deliberately not the join's semantics — reach
+answers who may act there, a site grant crosses organizations in a shared
+operation, and it would report actors this read is scoped never to return.
+
 Operation-administrator standing is deliberately absent from the context:
 it is hat-derived (the worn hat carries a configure action or its role is
 declared in `adminRoles`) and the envelope already projects it as
