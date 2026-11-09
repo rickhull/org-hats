@@ -17,6 +17,8 @@ import {
   type CommandResult,
   type ContextRequest,
   type RefreshInput,
+  type RosterRead,
+  type RosterRequest,
   type JsonValue,
 } from "org-hats/authority";
 import type { Env } from "./env";
@@ -152,6 +154,9 @@ export class AuthorityRuntimeEntrypoint extends WorkerEntrypoint<Env> implements
   }
   context(input: ContextRequest): Promise<AuthorityContext | Failed> {
     return runtime(this.env).then((value) => value.context(input));
+  }
+  roster(input: RosterRequest): Promise<RosterRead | Failed> {
+    return runtime(this.env).then((value) => value.roster(input));
   }
   command(input: AuthorityCommand): Promise<CommandResult> {
     return runtime(this.env).then((value) => value.command(input));

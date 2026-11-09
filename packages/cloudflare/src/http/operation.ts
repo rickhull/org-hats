@@ -57,6 +57,13 @@ export interface OperationRouteHost {
   admitTeam(input: TeamAdmitInput): Result<unknown>;
   updateTeam(input: TeamUpdateInput): Result<unknown>;
   retireTeam(input: TeamRetireInput): Result<unknown>;
+  /** The teams one organization fields in this operation, with lifecycle
+   * status — the teams half of the runtime's roster read. */
+  teamsOf(organizationId: string): readonly {
+    readonly teamId: string;
+    readonly displayName?: string;
+    readonly status: "pending" | "active" | "retired";
+  }[];
   recordRefresh(handleHash: string, organizationId: string, actorId: string): Result<unknown>;
   issue(organizationId: OrganizationId, actorId: ActorId, auth?: AuthenticationFacts): Promise<Result<unknown>>;
   refresh(handle: string): Promise<Result<unknown>>;
@@ -299,6 +306,11 @@ export const handleOperationRequest = async (
         asOperationAdmin: body["asOperationAdmin"] === true,
         idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
       }));
+    }
+
+    if (request.method === "POST" && url.pathname === "/teams-of") {
+      const body = await readBody(request);
+      return json(value({ teams: host.teamsOf(asString(body["organizationId"], "organizationId")) }));
     }
 
     if (request.method === "POST" && url.pathname === "/refresh-record") {

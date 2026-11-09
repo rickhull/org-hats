@@ -247,6 +247,9 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
       operationId: op.operationId,
       ...(op.displayName !== undefined ? { operationDisplayName: op.displayName } : {}),
       participation: participation?.status ?? "revoked",
+      // standing read live at the organization: presentation for hiding a
+      // surface, never an authorization — the commands check at the handler
+      administrator: orgs.get(organizationId_)?.admins.includes(actorId_) ?? false,
       wearableHats: hats,
       // absent when no wearable grant matches the envelope's hat: the
       // context cannot name a target it does not hold

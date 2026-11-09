@@ -216,6 +216,13 @@ export const createInMemoryAuthority = async (config = {}) => {
             await deliver();
             return operations.context(input);
         },
+        async roster(input) {
+            const versionFail = checkVersion(input.interfaceVersion);
+            if (versionFail !== undefined)
+                return failed(versionFail);
+            await deliver();
+            return organizations.roster(input);
+        },
         async command(inputCommand) {
             const versionFail = checkVersion(inputCommand.interfaceVersion);
             if (versionFail !== undefined)

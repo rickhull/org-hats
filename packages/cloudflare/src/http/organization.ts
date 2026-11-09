@@ -28,6 +28,13 @@ import type {
 
 export interface OrganizationRouteHost {
   bootstrap(input: BootstrapInput): Result<unknown>;
+  /** The organization's actor directory, names included — the actors half
+   * of the runtime's roster read. */
+  actorDirectory(): readonly {
+    readonly actorId: string;
+    readonly displayName?: string;
+    readonly disabled: boolean;
+  }[];
   resolve(provider: string, subject: string): Result<unknown>;
   principalLinks(): readonly { readonly provider: string; readonly subject: string; readonly actorId: string }[];
   linkPrincipal(input: { readonly provider: string; readonly subject: string; readonly actorId: string }): Result<unknown>;
@@ -261,6 +268,12 @@ export const handleOrganizationRequest = async (
       return actor === undefined
         ? json(failure("unauthenticated", "unknown actor"), 404)
         : json(value(actor));
+    }
+
+    if (request.method === "GET" && url.pathname === "/actor-directory") {
+      // the runtime's roster read lists the organization's actors; the
+      // standing gate runs at the runtime before this is called
+      return json(value({ actors: host.actorDirectory() }));
     }
 
     if (request.method === "GET" && url.pathname === "/roster") {

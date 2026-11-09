@@ -95,6 +95,48 @@ organization may disable its last administrator, and a departing administrator
 may disable herself, keeping only the bounded access envelope already issued.
 Retirement removes standing; disable ends a person. They are different acts.
 
+## The roster read
+
+A valid access envelope lets an organization **administrator** read the
+organization's roster — a read, not a mutation, so no fresh evidence; the
+step-up contract reserves fresh evidence for the acts that change the
+roster. The gate is standing itself, checked live at the organization:
+the envelope proves the caller, standing decides who reads, and a member
+without standing is `denied`. The roster is not member-visible; a member
+directory, if one is ever wanted, is a separate narrower read with its own
+decision, not this one widening.
+
+Two scopes, deliberately different:
+
+- **actors** are organization-wide and unfiltered by the envelope's
+  operation — an actor with no participation in the operation the
+  administrator happens to be signed in at is still on the roster, and is
+  exactly who the administrator may need to place. Each entry carries the
+  actor id, the display name when one is set, and the enabled state.
+- **teams** are the teams the organization fields **in the envelope's
+  operation**, each with its display name and lifecycle status (pending,
+  active, retired). Teams are operation data ([teams.md](teams.md)), so the
+  operation the envelope binds to bounds this half.
+
+Both halves are live reads, the same shape `context()` uses. Standing is
+also a fact on `AuthorityContext` — presentation, so a host can hide its
+administration surface — read live at the organization, never an envelope
+claim: a signed bearer standing fact would freeze a live organization fact
+into an operation projection and invite offline standing checks. Commands
+keep checking standing at the handler; the context field and the gate
+agree because both read the same fact, and they authorize nothing. A
+retired administrator's still-live envelope therefore reads `administrator:
+false` and is refused the roster, and a disabled actor's envelope reads
+until expiry — the bounded envelope is the authority `disable` deliberately
+leaves in place.
+
+Operation-administrator standing is deliberately absent from the context:
+it is hat-derived (the worn hat carries a configure action or its role is
+declared in `adminRoles`) and the envelope already projects it as
+configuration reach. The one residue — an `adminRoles` role that carries no
+configure action is envelope-invisible — is a deployment rule, not a seam
+fact: every declared admin role carries a configure action.
+
 ## Failures
 
 No new failure kind is added.

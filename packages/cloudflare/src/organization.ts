@@ -871,13 +871,32 @@ export class OrganizationAuthority extends DurableObject<Env> {
     readonly displayName?: string;
     readonly disabled: boolean;
     readonly linked: boolean;
+    /** Administrator standing, live: presentation for hiding a surface,
+     * never an authorization — commands check it at the handler. */
+    readonly administrator: boolean;
   } | undefined {
     const actor = this.actor(actorId);
     if (actor === undefined) return undefined;
     return {
       ...actor,
       linked: this.one("SELECT 1 AS present FROM principal_links WHERE actor_id = ? LIMIT 1", actorId) !== undefined,
+      administrator: this.isAdmin(actorId),
     };
+  }
+
+  /** The organization's own actor directory, names included: this is the
+   * organization's state read by its administrator through the runtime's
+   * roster gate, not the nameless projection image the operation pulls. */
+  private actorDirectory(): readonly {
+    readonly actorId: string;
+    readonly displayName?: string;
+    readonly disabled: boolean;
+  }[] {
+    return this.rows("SELECT actor_id, display_name, disabled FROM actors ORDER BY actor_id").map((row) => ({
+      actorId: row.actor_id as string,
+      ...(row.display_name === null || row.display_name === undefined ? {} : { displayName: row.display_name as string }),
+      disabled: row.disabled === 1,
+    }));
   }
 
   private rosterView(): {
@@ -1070,6 +1089,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
   override async fetch(request: Request): Promise<Response> {
     return handleOrganizationRequest(request, {
       bootstrap: (input) => this.bootstrap(input),
+      actorDirectory: () => this.actorDirectory(),
       resolve: (provider, subject) => this.resolve(provider, subject),
       principalLinks: () => this.principalLinks(),
       linkPrincipal: (input) => this.linkPrincipal(input),

@@ -38,6 +38,9 @@ write the story, replace it.*
 | OH-ROSTER-03 | an unclaimed successor does not permit retirement | [roster](roster.md) § The usable successor |
 | OH-ROSTER-04 | a linked successor takes over and the retired caller loses standing | [roster](roster.md) § The usable successor |
 | OH-ROSTER-05 | disable remains the departing administrator's offboarding act | [roster](roster.md) § The usable successor |
+| OH-ROSTER-06 | the roster read lists the organization's actors, claimed or not | [roster](roster.md) § The roster read |
+| OH-ROSTER-07 | the roster read is standing-gated, and the context states standing | [roster](roster.md) § The roster read |
+| OH-ROSTER-08 | a retired administrator's envelope reads standing live and is refused | [roster](roster.md) § The roster read |
 | OH-TEAM-01 | an organization requests and the operation admits a team; grants can target it | [teams](teams.md) § Lifecycle |
 | OH-TEAM-02 | retirement revokes the team's grants and refresh, and keeps the envelope window | [teams](teams.md) § Retirement |
 | OH-TEAM-03 | the team authorization split holds | [teams](teams.md) § Commands |

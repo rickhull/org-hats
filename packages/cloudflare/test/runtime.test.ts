@@ -59,6 +59,56 @@ const conformanceOrganizationIds = (): readonly string[] => [...new Set(
 )];
 
 describe("the Cloudflare runtime's cross-coordinator rules", () => {
+  it("[A9] the roster read spans both coordinators and gates on standing", async () => {
+    const world = await createCloudflareConformanceWorld(env);
+    const dana = CONFORMANCE_PRINCIPALS.dana;
+    const sam = CONFORMANCE_PRINCIPALS.sam;
+    const danaIssued = await world.runtime.accessFromEvidence({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      operationId: MERIDIAN,
+      evidence: dana.evidence,
+    });
+    if (isFailed(danaIssued)) throw new Error(`issuance failed: ${danaIssued.failure.kind}`);
+
+    const read = await world.runtime.roster({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      envelope: danaIssued.envelope,
+    });
+    if (isFailed(read)) throw new Error(`the administrator reads: ${read.failure.kind}`);
+    // actors organization-wide from the organization object…
+    expect(read.actors.map((actor) => [actor.actorId, actor.displayName])).toEqual([
+      ["actor-3a91c4d8", "Sam Whitfield"],
+      ["actor-8d3b77c1", "Dana Okafor"],
+    ]);
+    // …teams scoped to the envelope's operation from the operation object
+    expect(read.teams).toEqual([{ teamId: "team-2e8c64b9", displayName: "Yard crew", status: "active" }]);
+
+    const context = await world.runtime.context({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      envelope: danaIssued.envelope,
+    });
+    if (isFailed(context)) throw new Error(`context failed: ${context.failure.kind}`);
+    expect(context.administrator).toBe(true);
+
+    const samIssued = await world.runtime.accessFromEvidence({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      operationId: MERIDIAN,
+      evidence: sam.evidence,
+    });
+    if (isFailed(samIssued)) throw new Error(`issuance failed: ${samIssued.failure.kind}`);
+    const refused = await world.runtime.roster({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      envelope: samIssued.envelope,
+    });
+    expect(refused).toMatchObject({ failure: { kind: "denied" } });
+    const samContext = await world.runtime.context({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      envelope: samIssued.envelope,
+    });
+    if (isFailed(samContext)) throw new Error(`context failed: ${samContext.failure.kind}`);
+    expect(samContext.administrator).toBe(false);
+  }, 30_000);
+
   it("[E4][E7] context and commands refuse signed claims without expiry", async () => {
     await createCloudflareConformanceWorld(env);
     const signer = await createEphemeralSigner("key-missing-expiry");

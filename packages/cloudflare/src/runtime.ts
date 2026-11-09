@@ -22,6 +22,8 @@ import {
   type HatSummary,
   type Failure,
   type RefreshInput,
+  type RosterRead,
+  type RosterRequest,
   type SignedAccessEnvelope,
 } from "org-hats/authority";
 import {
@@ -446,7 +448,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     const verified = await verify(input.envelope, keys, { now: now() });
     if (isFailed(verified)) return failed(verified.failure);
     const claims = verified.claims;
-    const actor = await call<{ actorId: string; displayName?: string; disabled: boolean }>(
+    const actor = await call<{ actorId: string; displayName?: string; disabled: boolean; administrator: boolean }>(
       organization(claims.actor.organizationId),
       "GET",
       `/actor?actorId=${encodeURIComponent(claims.actor.actorId)}`,
@@ -481,6 +483,9 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
         actorId: claims.actor.actorId,
         ...(actor.value?.displayName === undefined ? {} : { displayName: actor.value.displayName }),
       },
+      // standing read live at the organization: presentation for hiding a
+      // surface, never an authorization — commands check at the handler
+      administrator: actor.value?.administrator === true,
       ...(org.value?.displayName === null || org.value?.displayName === undefined
         ? {}
         : { organizationDisplayName: org.value.displayName }),
@@ -505,6 +510,49 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
       sites: claims.sites,
       ...(claims.amr === undefined ? {} : { amr: [...claims.amr] }),
       ...(claims.auth_time === undefined ? {} : { authTime: claims.auth_time }),
+    };
+  };
+
+  // The organization roster read: the envelope proves the caller, standing
+  // — live at the organization — decides who reads, and the two halves read
+  // the two objects that own them (actors at the organization, teams at the
+  // operation the envelope binds to). No fresh evidence: a read is not a
+  // mutation.
+  const roster = async (input: RosterRequest): Promise<RosterRead | Failed> => {
+    if (input.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) return failed({ kind: "wrong-interface-version" });
+    const verified = await verify(input.envelope, keys, { now: now() });
+    if (isFailed(verified)) return failed(verified.failure);
+    const claims = verified.claims;
+    const organizationId = claims.actor.organizationId;
+    if (!(await adminOfOrganization(organizationId, claims.actor.actorId))) {
+      return failed({ kind: "denied", detail: "the caller does not administer this organization" });
+    }
+    const directory = await call<{
+      readonly actors: readonly { readonly actorId: string; displayName?: string; readonly disabled: boolean }[];
+    }>(organization(organizationId), "GET", "/actor-directory");
+    if (!directory.ok || directory.value === undefined) {
+      return failed(directory.failure ?? { kind: "unavailable" });
+    }
+    const teams = await call<{
+      readonly teams: readonly { readonly teamId: string; displayName?: string; readonly status: "pending" | "active" | "retired" }[];
+    }>(operation(claims.operationId), "POST", "/teams-of", { organizationId });
+    if (!teams.ok || teams.value === undefined) {
+      // the same pass-through context() uses: an operation object that was
+      // never bootstrapped answers unavailable
+      return failed(teams.failure ?? { kind: "unavailable" });
+    }
+    return {
+      organizationId,
+      actors: directory.value.actors.map((actor) => ({
+        actorId: actor.actorId,
+        ...(actor.displayName === undefined ? {} : { displayName: actor.displayName }),
+        disabled: actor.disabled,
+      })),
+      teams: teams.value.teams.map((team) => ({
+        teamId: team.teamId,
+        ...(team.displayName === undefined ? {} : { displayName: team.displayName }),
+        status: team.status,
+      })),
     };
   };
 
@@ -816,5 +864,5 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     return result;
   };
 
-  return { accessFromEvidence, refresh, context, command, activationRequest, activationInspect, activationAccept };
+  return { accessFromEvidence, refresh, context, roster, command, activationRequest, activationInspect, activationAccept };
 };

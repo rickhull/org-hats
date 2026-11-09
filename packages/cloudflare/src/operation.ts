@@ -980,6 +980,24 @@ export class OperationAuthority extends DurableObject<Env> {
     });
   }
 
+  /** The teams one organization fields in this operation, with lifecycle
+   * status — the teams half of the runtime's roster read. The runtime gates
+   * that read on administrator standing before this is called. */
+  teamsOf(organizationId: string): readonly {
+    readonly teamId: string;
+    readonly displayName?: string;
+    readonly status: "pending" | "active" | "retired";
+  }[] {
+    return this.rows(
+      "SELECT team_id, display_name, status FROM teams WHERE organization_id = ? ORDER BY team_id",
+      organizationId,
+    ).map((row) => ({
+      teamId: row.team_id as string,
+      ...(row.display_name === null || row.display_name === undefined ? {} : { displayName: row.display_name as string }),
+      status: row.status as "pending" | "active" | "retired",
+    }));
+  }
+
   private retireTeam(input: TeamRetireInput): Result<{ applied: boolean }> {
     const at = now();
     const payload = payloadOf({
@@ -1719,6 +1737,7 @@ export class OperationAuthority extends DurableObject<Env> {
       admitTeam: (input) => this.admitTeam(input),
       updateTeam: (input) => this.updateTeam(input),
       retireTeam: (input) => this.retireTeam(input),
+      teamsOf: (organizationId) => this.teamsOf(organizationId),
       recordRefresh: (handleHash, organizationId, actorId) =>
         this.recordRefresh(handleHash, organizationId, actorId),
       issue: (organizationId, actorId, auth) => this.issue(organizationId, actorId, auth),

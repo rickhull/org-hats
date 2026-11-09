@@ -118,6 +118,37 @@ export interface ContextRequest extends Versioned {
   readonly envelope: SignedAccessEnvelope;
 }
 
+/** The organization roster for the envelope's actor, proven by a valid
+ * envelope and gated on organization-administrator standing: the actors
+ * the organization owns, organization-wide, and the teams it fields in
+ * the envelope's operation. A read, not a mutation — no fresh evidence. */
+export interface RosterRequest extends Versioned {
+  readonly envelope: SignedAccessEnvelope;
+}
+
+/** One organization actor. `displayName` is presentation only, the same
+ * rule `update-actor` writes; `disabled` is the offboarding state. */
+export interface RosterActorEntry {
+  readonly actorId: string;
+  readonly displayName?: string;
+  readonly disabled: boolean;
+}
+
+/** One team the organization fields in the envelope's operation, with its
+ * lifecycle status: a pending team awaits admission, a retired one is
+ * tombstoned, and only an active team carries grants. */
+export interface RosterTeamEntry {
+  readonly teamId: string;
+  readonly displayName?: string;
+  readonly status: "pending" | "active" | "retired";
+}
+
+export interface RosterRead {
+  readonly organizationId: string;
+  readonly actors: readonly RosterActorEntry[];
+  readonly teams: readonly RosterTeamEntry[];
+}
+
 export interface HatSummary {
   readonly role: string;
   readonly actions: readonly string[];
@@ -145,6 +176,12 @@ export interface AuthorityContext {
   readonly wearableHats: readonly HatSummary[];
   readonly selectedHat?: HatSummary;
   readonly sites: readonly SiteBinding[];
+  /** Organization-administrator standing, live at the organization: a
+   * presentation fact so a host can hide its administration surface.
+   * It authorizes nothing — commands check standing at the handler — and
+   * the envelope carries no standing claim (docs/authority_redesign.md
+   * § Access). */
+  readonly administrator: boolean;
   /** How the session's principal authenticated, as the issuing evidence
    * stated: the same opaque `amr` values and authentication timestamp the
    * envelope claims carry, absent when that evidence carried none. */
@@ -314,6 +351,9 @@ export interface AuthorityRuntime {
   refresh(input: RefreshInput): Promise<AccessIssue | Failed>;
   /** Presentation context for the envelope's actor. */
   context(input: ContextRequest): Promise<AuthorityContext | Failed>;
+  /** The organization roster for the envelope's administrator: actors
+   * organization-wide, teams in the envelope's operation. */
+  roster(input: RosterRequest): Promise<RosterRead | Failed>;
   /** A typed, idempotent authority command. */
   command(input: AuthorityCommand): Promise<CommandResult>;
   /** Administrator-authorized return-once activation issuance. */

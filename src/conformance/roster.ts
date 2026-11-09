@@ -1,7 +1,7 @@
 // The roster conformance family.
 
 import { CONFORMANCE_PRINCIPALS, DANA_OKAFOR, HARBOR_LOGISTICS, HOME_OP, IDP, INVITEE_ACTOR, INVITEE_ORG, MERIDIAN } from "./world.ts";
-import { assert, command, equal, expectFailure, freshAuth, issue } from "./helpers.ts";
+import { assert, command, deepEqual, equal, expectFailure, freshAuth, issue } from "./helpers.ts";
 import { runtimeCase, type ConformanceCase } from "./case.ts";
 import { AUTHORITY_INTERFACE_VERSION, actorId, isFailed, operationId, organizationId } from "../contract.ts";
 
@@ -139,5 +139,94 @@ export const ROSTER_CASES: readonly ConformanceCase[] = [
       evidence: dana.evidence,
     });
     expectFailure(blocked, "not-admitted", "a disabled actor issues nothing");
+  }),
+
+  runtimeCase("OH-ROSTER-06", "the roster read lists the organization's actors, claimed or not", async (world) => {
+    const dana = CONFORMANCE_PRINCIPALS.dana;
+    const created = await command(
+      world,
+      { kind: "create-actor", organizationId: HARBOR_LOGISTICS, actorId: "actor-roster-wide", displayName: "No Grant At All" },
+      freshAuth(dana, MERIDIAN),
+      "roster-06-create",
+    );
+    assert(created.ok, "the actor is created");
+    const issued = await issue(world, dana, MERIDIAN);
+    const read = await world.runtime.roster({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      envelope: issued.envelope,
+    });
+    if (isFailed(read)) throw new Error(`the administrator reads: ${read.failure.kind}`);
+    equal(read.organizationId, HARBOR_LOGISTICS, "the read is scoped to the envelope's organization");
+    deepEqual(
+      read.actors.map((actor) => [actor.actorId, actor.displayName, actor.disabled]),
+      [
+        ["actor-3a91c4d8", "Sam Whitfield", false],
+        ["actor-8d3b77c1", "Dana Okafor", false],
+        ["actor-roster-wide", "No Grant At All", false],
+      ],
+      "the roster is organization-wide: the linked member, the administrator, and an actor with no grant and no participation",
+    );
+    deepEqual(
+      read.teams.map((team) => [team.teamId, team.displayName, team.status]),
+      [["team-2e8c64b9", "Yard crew", "active"]],
+      "the teams are the organization's own in the envelope's operation — not another organization's",
+    );
+  }),
+
+  runtimeCase("OH-ROSTER-07", "the roster read is standing-gated, and the context states standing", async (world) => {
+    const sam = CONFORMANCE_PRINCIPALS.sam;
+    const samIssued = await issue(world, sam, MERIDIAN);
+    const refused = await world.runtime.roster({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      envelope: samIssued.envelope,
+    });
+    expectFailure(refused, "denied", "a member without standing cannot read the roster");
+
+    const samShown = await world.runtime.context({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      envelope: samIssued.envelope,
+    });
+    if (isFailed(samShown)) throw new Error(`context for the member: ${samShown.failure.kind}`);
+    equal(samShown.administrator, false, "the member's context states no standing");
+
+    const dana = CONFORMANCE_PRINCIPALS.dana;
+    const danaShown = await world.runtime.context({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      envelope: (await issue(world, dana, MERIDIAN)).envelope,
+    });
+    if (isFailed(danaShown)) throw new Error(`context for the administrator: ${danaShown.failure.kind}`);
+    equal(danaShown.administrator, true, "the administrator's context states standing");
+  }),
+
+  runtimeCase("OH-ROSTER-08", "a retired administrator's envelope reads standing live and is refused", async (world) => {
+    const dana = CONFORMANCE_PRINCIPALS.dana;
+    const sam = CONFORMANCE_PRINCIPALS.sam;
+    const danaIssued = await issue(world, dana, MERIDIAN);
+    const appointed = await command(
+      world,
+      { kind: "appoint-administrator", organizationId: HARBOR_LOGISTICS, actorId: "actor-3a91c4d8" },
+      freshAuth(dana, MERIDIAN),
+      "roster-08-appoint",
+    );
+    assert(appointed.ok, "a linked member is appointed the usable successor");
+    const retired = await command(
+      world,
+      { kind: "retire-administrator", organizationId: HARBOR_LOGISTICS, actorId: DANA_OKAFOR },
+      freshAuth(sam, MERIDIAN),
+      "roster-08-retire",
+    );
+    assert(retired.ok, "the successor retires the administrator");
+
+    const after = await world.runtime.context({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      envelope: danaIssued.envelope,
+    });
+    if (isFailed(after)) throw new Error(`context after retirement: ${after.failure.kind}`);
+    equal(after.administrator, false, "the same envelope reads standing live, not as issued");
+    const refused = await world.runtime.roster({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      envelope: danaIssued.envelope,
+    });
+    expectFailure(refused, "denied", "the retired administrator cannot read the roster");
   }),
 ];

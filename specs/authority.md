@@ -33,8 +33,8 @@ per-fact owner to appeal to.
 ### A3 — The seam serves use cases, not storage
 
 Callers receive complete use cases — issue from evidence, refresh, context,
-command, and the three activation lifecycle calls — and never a grant query,
-a row, or a repository.
+the roster read, command, and the three activation lifecycle calls — and
+never a grant query, a row, or a repository.
 
 *Held by:* `AuthorityRuntime` is the only public surface; the conformance
 inventory runs through the public surface exclusively.
@@ -146,9 +146,12 @@ appoints and retires its own administrators through typed commands.
 *Held by:* `adminRoles` for operation titles; administrator standing in
 organization state, seeded by the bootstrap that creates the organization and
 written afterwards only by `appoint-administrator` and
-`retire-administrator` under fresh administrator evidence; the authorization
-cases assert denials for non-administrators, including a retired
-administrator after a replayed bootstrap.
+`retire-administrator` under fresh administrator evidence; standing is
+disclosed only as the live `administrator` fact on `AuthorityContext` and
+gates the `roster` read at the handler — never an envelope claim, never
+inferred from a hat; the authorization cases assert denials for
+non-administrators, including a retired administrator after a replayed
+bootstrap, and `OH-ROSTER-06..08` pin the read's scope and gate.
 *If it breaks:* administration becomes a hardcoded title, or an organization
 cannot appoint or retire its own administrator without a deployment.
 

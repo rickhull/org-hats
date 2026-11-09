@@ -170,7 +170,11 @@ it. The properties that matter:
   the same commit as a grant change; rotation consumes its handle and
   installs the replacement in one transaction, so one handle cannot rotate
   twice under concurrent requests;
-- `context` yields presentation facts for the envelope's actor;
+- `context` yields presentation facts for the envelope's actor, including
+  organization-administrator standing as a live presentation fact;
+- `roster` reads the organization's roster for the envelope's administrator:
+  actors organization-wide, the teams it fields in the envelope's operation —
+  envelope-authorized, standing-gated, no fresh evidence;
 - `command` executes a typed, idempotent command — "access request" keeps
   its organizational meaning and is never an issuance input's name.
 - `activationRequest`, `activationInspect`, and `activationAccept` own the
@@ -253,9 +257,11 @@ The hat is not the authority for an authority command. It is the local check
 for a host's own product mutations; the runtime's commands declare their own
 authorization — fresh evidence for organizational acts, standing for operation
 administration — and none reads the selected hat. Administrator standing is
-not a claim in the envelope or the context, so a host discovers it by calling
-the runtime and handling `denied`, never by inferring it from a hat or its
-actions.
+never an envelope claim, so a host never infers it from a hat, its actions, or
+a signed projection, and never checks it offline: the context exposes it as a
+live presentation fact for hiding a surface, the roster read gates on it at
+the handler, and commands keep deciding it there — the refusal stays the
+control, the disclosure only changes what a host shows.
 
 The module uses portable cryptographic interfaces or Web Platform primitives.
 It does not know how sessions are transported and does not import Cloudflare

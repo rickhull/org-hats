@@ -66,6 +66,9 @@ const fixture: TwinFixture = {
 interface SetupOptions {
   readonly secondLinked?: boolean;
   readonly secondDisabled?: boolean;
+  /** TARGET holds a wearable grant, so a linked non-administrator can issue
+   * an envelope and ask for the roster read. */
+  readonly targetGranted?: boolean;
 }
 
 const setup = async (options: SetupOptions = {}) => {
@@ -77,8 +80,28 @@ const setup = async (options: SetupOptions = {}) => {
       ? [{ provider: "idp", subject: "roster-second", organizationId: ORG, actorId: SECOND }]
       : []),
   ];
+  const { targetGranted } = options;
+  const grantedFixture: TwinFixture = targetGranted === true
+    ? {
+      ...fixture,
+      snapshot: fixtureSnapshot({
+        ...fixture.snapshot,
+        grants: [
+          ...fixture.snapshot.grants,
+          {
+            grantId: "grant-roster-target",
+            operationId: OP,
+            organizationId: ORG,
+            actorId: TARGET,
+            role: "member",
+            target: { kind: "team", teamId: TEAM },
+          },
+        ],
+      }),
+    }
+    : fixture;
   const engine = await createTestEngine({
-    fixtures: [fixture],
+    fixtures: [grantedFixture],
     principalLinks: links,
     orgAdmins: { [ORG]: options.secondLinked === true ? [ADMIN, SECOND] : [ADMIN] },
   });
@@ -317,4 +340,77 @@ test("an organization command refuses a forged envelope before reading its claim
     "create-forged",
   ));
   assert.equal(failureOf(result).kind, "invalid-signature");
+});
+
+// --- the roster read ------------------------------------------------------------------
+
+test("an administrator reads the organization-wide roster by envelope", async () => {
+  const { engine } = await setup();
+  okOf(await engine.runtime.command(cmd(
+    { kind: "create-actor", organizationId: ORG, actorId: "actor-roster-created", displayName: "Created Person" },
+    fresh(ADMIN_EVIDENCE),
+    "read-create",
+  )));
+  const issued = successOf(await engine.runtime.accessFromEvidence({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    operationId: OP,
+    evidence: ADMIN_EVIDENCE,
+  }));
+  const read = await engine.runtime.roster({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    envelope: issued.envelope,
+  });
+  if (isFailed(read)) throw new Error(`the administrator reads: ${read.failure.kind}`);
+  assert.equal(read.organizationId, ORG);
+  // organization-wide, not filtered by the envelope's operation: the linked
+  // TARGET, the unlinked SECOND, the disabled DISABLED, and the just-created
+  // actor are all on it — and OTHER_ORG's actor is not
+  assert.deepEqual(
+    read.actors.map((actor) => [actor.actorId, actor.displayName ?? null, actor.disabled]),
+    [
+      ["actor-roster-admin", null, false],
+      ["actor-roster-created", "Created Person", false],
+      ["actor-roster-disabled", null, true],
+      ["actor-roster-second", null, false],
+      ["actor-roster-target", null, false],
+    ],
+  );
+  // the organization's teams in the envelope's operation, with status
+  assert.deepEqual(
+    read.teams.map((team) => [team.teamId, team.displayName ?? null, team.status]),
+    [["team-roster", null, "active"]],
+  );
+});
+
+test("the roster read refuses a member without standing, and her context says so", async () => {
+  const { engine } = await setup({ targetGranted: true });
+  const issued = successOf(await engine.runtime.accessFromEvidence({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    operationId: OP,
+    evidence: TARGET_EVIDENCE,
+  }));
+  const refused = await engine.runtime.roster({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    envelope: issued.envelope,
+  });
+  assert.equal(failureOf(refused).kind, "denied");
+  assert.match(failureOf(refused).detail ?? "", /does not administer/);
+
+  const shown = await engine.runtime.context({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    envelope: issued.envelope,
+  });
+  if (isFailed(shown)) throw new Error(`context for the member: ${shown.failure.kind}`);
+  assert.equal(shown.administrator, false, "the member's context states no standing");
+
+  const adminShown = await engine.runtime.context({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    envelope: successOf(await engine.runtime.accessFromEvidence({
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+      operationId: OP,
+      evidence: ADMIN_EVIDENCE,
+    })).envelope,
+  });
+  if (isFailed(adminShown)) throw new Error(`context for the administrator: ${adminShown.failure.kind}`);
+  assert.equal(adminShown.administrator, true, "the administrator's context states standing");
 });

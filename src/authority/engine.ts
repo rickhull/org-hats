@@ -54,6 +54,8 @@ import type {
   AuthorityRuntime,
   CommandResult,
   ContextRequest,
+  RosterRead,
+  RosterRequest,
   Failed,
   RefreshInput,
 } from "./types.ts";
@@ -336,6 +338,13 @@ export const createInMemoryAuthority = async (
       if (versionFail !== undefined) return failed(versionFail);
       await deliver();
       return operations.context(input);
+    },
+
+    async roster(input: RosterRequest): Promise<RosterRead | Failed> {
+      const versionFail = checkVersion(input.interfaceVersion);
+      if (versionFail !== undefined) return failed(versionFail);
+      await deliver();
+      return organizations.roster(input);
     },
 
     async command(inputCommand: AuthorityCommand): Promise<CommandResult> {

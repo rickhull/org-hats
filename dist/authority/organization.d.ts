@@ -1,6 +1,6 @@
 import { type Failure, type OperationId, type OrganizationId } from "../contract.js";
 import type { Clock, Signer } from "./internal.js";
-import type { ActivationAcceptInput, ActivationAcceptance, ActivationInspectInput, ActivationInspection, ActivationRequestInput, ActivationRequestResult, AuthorityCommand, Failed } from "./types.js";
+import type { ActivationAcceptInput, ActivationAcceptance, ActivationInspectInput, ActivationInspection, ActivationRequestInput, ActivationRequestResult, AuthorityCommand, Failed, RosterRead, RosterRequest } from "./types.js";
 import { type OpState, type OrgState, type OutboxMessage, type CommandHandler, type Principal, type PrincipalLink } from "./state.js";
 export interface OrganizationDeps {
     readonly orgs: Map<OrganizationId, OrgState>;
@@ -21,5 +21,9 @@ export interface OrganizationCoordinator {
     activationRequest(input: ActivationRequestInput): Promise<ActivationRequestResult | Failed>;
     activationInspect(input: ActivationInspectInput): Promise<ActivationInspection | Failed>;
     activationAccept(input: ActivationAcceptInput): Promise<ActivationAcceptance | Failed>;
+    /** The organization roster read: the gate and the actors are this
+     * coordinator's; the teams half reads the operation map, the reference
+     * world's local read of a fact the deployed shape projects. */
+    roster(input: RosterRequest): Promise<RosterRead | Failed>;
 }
 export declare const createOrganizationCoordinator: (deps: OrganizationDeps) => OrganizationCoordinator;

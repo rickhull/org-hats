@@ -30,6 +30,25 @@ export const createOrganizationCoordinator = (deps) => {
                 request.revokedAt = at;
         }
     };
+    // The one envelope gate. Every envelope-authorized path — command
+    // authorization and the roster read — verifies signature and expiry in
+    // this one place: a control shared is a control that cannot drift between
+    // callers (the reverse defect — a read sitting above the gate — is the one
+    // this file already recorded above).
+    const envelopeGate = async (envelope, boundTo) => {
+        const parsed = parseAccessEnvelope(envelope);
+        if ("kind" in parsed)
+            return parsed;
+        const { signature, claims } = parsed;
+        if (!(await signer.verify(canonicalJson(asJson(claims)), signature))) {
+            return { kind: "invalid-signature" };
+        }
+        if (clock.now() >= claims.exp)
+            return { kind: "expired" };
+        if (boundTo !== undefined && claims.operationId !== boundTo)
+            return { kind: "wrong-binding" };
+        return { claims };
+    };
     const resolvePrincipal = async (authorization, boundTo) => {
         if (authorization.kind === "fresh-evidence") {
             const link = principalLinks.get(principalKey(authorization.evidence.provider, authorization.evidence.subject));
@@ -51,17 +70,10 @@ export const createOrganizationCoordinator = (deps) => {
         // The claims come from the gate, not from the input beside it. This read
         // used to sit one statement above the gate, which is how a shared control
         // became a defect in one caller and not the others.
-        const parsed = parseAccessEnvelope(authorization.envelope);
-        if ("kind" in parsed)
-            return parsed;
-        const { signature, claims } = parsed;
-        if (!(await signer.verify(canonicalJson(asJson(claims)), signature))) {
-            return { kind: "invalid-signature" };
-        }
-        if (clock.now() >= claims.exp)
-            return { kind: "expired" };
-        if (boundTo !== undefined && claims.operationId !== boundTo)
-            return { kind: "wrong-binding" };
+        const gated = await envelopeGate(authorization.envelope, boundTo);
+        if ("kind" in gated)
+            return gated;
+        const { claims } = gated;
         // No declared admin role means no role administers this operation —
         // a visible denial. Falling back to a hardcoded `["admin"]` applied a
         // title this file's own charter says is configuration, and silently
@@ -469,11 +481,51 @@ export const createOrganizationCoordinator = (deps) => {
         org.audit.push({ at: request.consumedAt, by: "activation", fact: `activation for actor ${target.actorId} accepted` });
         return { applied: true, actor: { organizationId: org.organizationId, actorId: target.actorId } };
     };
+    // The roster read. An envelope proves the caller; standing — not the
+    // envelope, which carries no standing claim — decides who reads. The
+    // actor list is organization-wide: an actor with no participation in the
+    // envelope's operation is still on the roster the administrator
+    // administers. The teams half is scoped the other way: only the teams
+    // the organization fields in the operation the envelope binds to.
+    const roster = async (input) => {
+        const gated = await envelopeGate(input.envelope);
+        if ("kind" in gated)
+            return { failure: gated };
+        const { claims } = gated;
+        const organization = organizationId(claims.actor.organizationId);
+        const org = orgs.get(organization);
+        if (org === undefined)
+            return { failure: { kind: "wrong-binding", detail: "unknown organization" } };
+        const reader = actorId(claims.actor.actorId);
+        if (!org.admins.includes(reader)) {
+            return { failure: { kind: "denied", detail: "the caller does not administer this organization" } };
+        }
+        const operation = ops.get(operationId(claims.operationId));
+        if (operation === undefined)
+            return { failure: { kind: "wrong-binding", detail: "unknown operation" } };
+        const actors = [...org.actors]
+            .sort((left, right) => (left.actorId < right.actorId ? -1 : left.actorId > right.actorId ? 1 : 0))
+            .map((actor) => ({
+            actorId: actor.actorId,
+            ...(actor.displayName !== undefined ? { displayName: actor.displayName } : {}),
+            disabled: actor.disabled === true,
+        }));
+        const teams = operation.teams
+            .filter((team) => team.organizationId === organization)
+            .sort((left, right) => (left.teamId < right.teamId ? -1 : left.teamId > right.teamId ? 1 : 0))
+            .map((team) => ({
+            teamId: team.teamId,
+            ...(team.displayName !== undefined ? { displayName: team.displayName } : {}),
+            status: team.status,
+        }));
+        return { organizationId: organization, actors, teams };
+    };
     return {
         resolvePrincipal,
         activationRequest,
         activationInspect,
         activationAccept,
+        roster,
         command(input, principal) {
             switch (input.kind) {
                 case "participation-accept": return acceptParticipation(input, principal);
