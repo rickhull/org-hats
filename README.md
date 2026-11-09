@@ -104,16 +104,17 @@ The full verification gate checks the portable suites, type and import boundarie
 There is no package-registry publication. Pin a release tag (or, for stronger reproducibility, an exact commit). For example:
 
 ```sh
-pnpm add "git+https://codeberg.org/rickhull/org-hats.git#v3.5.0"
+pnpm add "git+https://codeberg.org/rickhull/org-hats.git#v3.8.0"
 ```
 
-The authority side exposes four session and command calls, plus the three activation lifecycle calls:
+The authority side exposes five session, read, and command calls, plus the three activation lifecycle calls:
 
 | Call | Purpose |
 | --- | --- |
 | `accessFromEvidence` | Resolve externally verified evidence and issue an envelope and refresh handle |
 | `refresh` | Continue a session and report whether the handle was kept, rotated, or revoked |
 | `context` | Read presentation facts, not an authorization decision |
+| `roster` | Read the organization's roster for its administrator: actors organization-wide, the organization's teams in the envelope's operation |
 | `command` | Execute typed, idempotent authority mutations |
 | `activationRequest` | Mint a one-time activation code (return-once) for an existing actor who has no login bound yet |
 | `activationInspect` | Disclose only whether an activation secret is usable |

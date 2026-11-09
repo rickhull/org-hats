@@ -9,12 +9,17 @@ pre-bootstrapped operation without resetting it.*
 
 ## Latest reported deployment and acceptance
 
-Consumer receipts reconciled on 2026-11-08 report the authority deployed at
-`cloudflare-v0.13.1`, with portable consumer pin `v3.7.1`. The published
-runtime tag resolves to `7ef5ec69227d27b49ce1ccec470fa247a42fa5e1`; upstream
-publication evidence is in [the release review](release_review_v3.7.1.md).
-Publication, consumer pin adoption, deployment, and live acceptance are
-separate evidence, not consequences inferred from one another.
+The consumer's relay receipt reports pin adoption at `cloudflare-v0.14.0`
+(resolving to `c1f3d32`, portable pin still `v3.7.1`), with consumer
+conformance passed at the pin — typecheck clean, 743 tests, all browser
+journeys — and the standing repair and preview adopted into its operator
+review. Deployment at the pin is not separately reported; publication,
+consumer pin adoption, deployment, and live acceptance are separate
+evidence, not consequences inferred from one another.
+
+`v3.8.0` and `cloudflare-v0.15.0` (the organization roster read and
+administrator standing on the context) are published; the consumer reports
+adoption under way, and no receipt exists for them yet.
 
 The consumer's later receipt, **six-group binding smoke passes on v0.13.1**,
 reports a fresh dedicated organization/operation fixture and all six groups

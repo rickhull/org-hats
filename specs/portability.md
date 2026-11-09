@@ -89,7 +89,8 @@ every consumer at once.
 ### P7 — Brands stay behind the public surface
 
 The five domain ids are branded internally, but every consumer-facing
-command, claim, neutral-access result, and context takes or returns plain
+command, claim, neutral-access result, context, and roster read takes or
+returns plain
 strings for those ids. Evidence names a provider and subject, not a domain
 id. A host passes ids it read from its own records without importing a
 constructor.
