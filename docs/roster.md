@@ -102,7 +102,11 @@ organization's roster — a read, not a mutation, so no fresh evidence; the
 step-up contract reserves fresh evidence for the acts that change the
 roster. The gate is standing itself, checked live at the organization:
 the envelope proves the caller, standing decides who reads, and a member
-without standing is `denied`. The roster is not member-visible; a member
+without standing is `denied` — a different kind from a broken session,
+which the closed taxonomy already separates (`invalid-signature`,
+`expired`, `unauthenticated` all fail before the gate runs), so a host can
+tell a surface offered to the wrong actor from a session problem. The
+roster is not member-visible; a member
 directory, if one is ever wanted, is a separate narrower read with its own
 decision, not this one widening.
 
@@ -122,7 +126,11 @@ Both halves are live reads, the same shape `context()` uses. Standing is
 also a fact on `AuthorityContext` — presentation, so a host can hide its
 administration surface — read live at the organization, never an envelope
 claim: a signed bearer standing fact would freeze a live organization fact
-into an operation projection and invite offline standing checks. Commands
+into an operation projection and invite offline standing checks. The two
+freshnesses are a property, not an accident: standing read through
+`context()` — and the roster's gate — is as fresh as the call, while every
+hat-derived reach in the envelope is as fresh as the lease. A consumer
+that mixes them should hide on the first and authorize on neither. Commands
 keep checking standing at the handler; the context field and the gate
 agree because both read the same fact, and they authorize nothing. A
 retired administrator's still-live envelope therefore reads `administrator:
