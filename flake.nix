@@ -18,7 +18,7 @@
         default = pkgs.mkShell {
           packages = with pkgs; [
             nodejs_24
-            pnpm_11
+            pnpm_12
             git
             # rg with the short -r pitfall closed: -r is --replace, not
             # recursion (rg recurses by default), and the silent output

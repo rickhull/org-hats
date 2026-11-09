@@ -80,7 +80,7 @@ In order of preference:
    on GitHub's runners and absent on Codeberg's act image; `rg` is absent
    on both.)
 2. **Setup actions**, mirrored at `code.forgejo.org/actions/*` — already
-   used for `pnpm` (11.21.0) and `node` (24). Prefer these when an official
+   used for `pnpm` (12.9.0) and `node` (24). Prefer these when an official
    action exists; pin the version.
 3. **A pinned static binary**, fetched and checksum-verified in a step —
    the adopted path for `rg`, live in both workflows. The fleet is amd64;
@@ -151,7 +151,7 @@ short `-r` pitfall (see `AGENTS.md`) the moment they exist.
 
 - Keep the job whole and short: one `CI=1 ci/run portable` invocation,
   ~90 s, well inside the `codeberg-small` five-minute cap.
-- Pin what the workflow installs: action versions, `pnpm` 11.21.0,
+- Pin what the workflow installs: action versions, `pnpm` 12.9.0,
   `node` 24, and any fetched binary's version **and** digest.
 - `fetch-depth: 0` is required: the release-metadata and tag gates read
   history and tag objects, and CI mode refuses a shallow or dirty checkout.

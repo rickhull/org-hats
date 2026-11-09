@@ -123,7 +123,7 @@ run ends with a short self-evaluation of whether the skill earned its keep.
 
 ## Tooling
 
-- The project flake (`flake.nix`) provides Node 24, pnpm 11, `git`, `rg`,
+- The project flake (`flake.nix`) provides Node 24, pnpm 12, `git`, `rg`,
   `jq`, Python 3, and `fj` 0.7+; `.envrc` enters it with `use flake`.  Run
   `direnv allow` once per clone.  Never install pnpm through corepack or npm.
 - `rg` searches recursively by default.  Never pass its short `-r` flag:

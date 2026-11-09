@@ -129,7 +129,7 @@ Codeberg hosted Forgejo Actions runs
 [`.forgejo/workflows/check.yml`](../.forgejo/workflows/check.yml) only on
 `workflow_dispatch`, on `codeberg-small`:
 
-- checkout with tags (`fetch-depth: 0`), pnpm 11.21.0, Node 24;
+- checkout with tags (`fetch-depth: 0`), pnpm 12.9.0, Node 24;
 - `CI=1 ci/run portable` — the repository-owned contract performs the
   root-only frozen install, build-freshness check, portable gate, and static
   Cloudflare artifact check. Workerd and vitest stay off the light runner.
