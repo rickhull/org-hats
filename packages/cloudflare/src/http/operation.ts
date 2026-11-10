@@ -89,6 +89,7 @@ const parseOperationBootstrap = (input: unknown): BootstrapInput => {
     operationId: asString(body["operationId"], "operationId"),
     slug: asString(body["slug"], "slug"),
     ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
+    ...(body["shortName"] === undefined ? {} : { shortName: asString(body["shortName"], "shortName") }),
     ...(body["bounded"] === true ? { bounded: true } : {}),
     policy,
     ...(body["adminRoles"] === undefined ? {} : { adminRoles: asArray(body["adminRoles"], "adminRoles").map((entry) => asString(entry, "adminRoles entry")) }),
@@ -100,6 +101,7 @@ const parseOperationBootstrap = (input: unknown): BootstrapInput => {
         siteId: asString(site["siteId"], "siteId"),
         path: asString(site["path"], "path"),
         ...(site["displayName"] === undefined ? {} : { displayName: asString(site["displayName"], "displayName") }),
+        ...(site["shortName"] === undefined ? {} : { shortName: asString(site["shortName"], "shortName") }),
         aliases: asArray(site["aliases"] ?? [], "aliases").map((alias) => asString(alias, "alias")),
       };
     }),

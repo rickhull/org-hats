@@ -1,8 +1,8 @@
 // The organization coordinator's schema and additive migration chain.
 
-import { initializeSchema, type SchemaMigration } from "./sql";
+import { ensureColumn, initializeSchema, type SchemaMigration } from "./sql";
 
-export const ORGANIZATION_SCHEMA_VERSION = "2";
+export const ORGANIZATION_SCHEMA_VERSION = "3";
 
 const ACTIVATION_REQUESTS = `CREATE TABLE IF NOT EXISTS activation_requests (
   request_id TEXT PRIMARY KEY,
@@ -18,6 +18,7 @@ const TABLES: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS organization (
     organization_id TEXT PRIMARY KEY,
     display_name TEXT,
+    short_name TEXT,
     sealed_idp_config TEXT,
     sealed_idp_config_updated_at INTEGER,
     created_at INTEGER NOT NULL,
@@ -71,6 +72,11 @@ export const organizationMigrations: readonly SchemaMigration[] = [
     version: "2",
     name: "activation-requests",
     apply: (sql) => sql.exec(ACTIVATION_REQUESTS),
+  },
+  {
+    version: "3",
+    name: "display-short-name",
+    apply: (sql) => ensureColumn(sql, "organization", "short_name", "TEXT"),
   },
 ];
 

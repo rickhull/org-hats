@@ -14,6 +14,7 @@ export interface Claim {
 export interface OrgState {
     readonly organizationId: OrganizationId;
     readonly displayName?: string;
+    readonly shortName?: string;
     actors: {
         organizationId: OrganizationId;
         actorId: ActorId;
@@ -57,6 +58,7 @@ export interface RefreshRecord {
 export interface OpState {
     readonly operationId: OperationId;
     readonly displayName?: string;
+    readonly shortName?: string;
     readonly slug?: string;
     readonly bounded?: boolean;
     policy: PolicyBundle;
@@ -64,6 +66,7 @@ export interface OpState {
         siteId: SiteId;
         operationId: OperationId;
         displayName?: string;
+        shortName?: string;
         path?: string;
         aliases: readonly string[];
     }[];

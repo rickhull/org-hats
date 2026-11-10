@@ -15,7 +15,7 @@ import {
   type ExportSnapshot,
   type StateRow,
 } from "./state";
-import { initializeOrganizationSchema } from "./schema/organization";
+import { initializeOrganizationSchema, ORGANIZATION_SCHEMA_VERSION } from "./schema/organization";
 import { displayNameFailure, identifierFailure } from "./validation";
 import { handleOrganizationRequest } from "./http/organization";
 
@@ -45,6 +45,8 @@ const payloadOf = (input: Record<string, unknown>): string =>
 export interface BootstrapInput {
   readonly organizationId: string;
   readonly displayName?: string;
+  /** The short display label, presentation only and never an address. */
+  readonly shortName?: string;
   readonly actors: readonly {
     readonly actorId: string;
     readonly displayName?: string;
@@ -276,15 +278,17 @@ export class OrganizationAuthority extends DurableObject<Env> {
       );
       this.ctx.storage.sql.exec(
         `INSERT INTO organization
-          (organization_id, display_name, sealed_idp_config, sealed_idp_config_updated_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)
+          (organization_id, display_name, short_name, sealed_idp_config, sealed_idp_config_updated_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(organization_id) DO UPDATE SET
            display_name = excluded.display_name,
+           short_name = excluded.short_name,
            sealed_idp_config = COALESCE(excluded.sealed_idp_config, organization.sealed_idp_config),
            sealed_idp_config_updated_at = COALESCE(excluded.sealed_idp_config_updated_at, organization.sealed_idp_config_updated_at),
            updated_at = excluded.updated_at`,
         input.organizationId,
         input.displayName ?? null,
+        input.shortName ?? null,
         input.sealedIdpConfig ?? null,
         input.sealedIdpConfig === undefined ? null : at,
         at,
@@ -942,12 +946,13 @@ export class OrganizationAuthority extends DurableObject<Env> {
     const organizationId = this.organizationId();
     const organization = organizationId === undefined
       ? undefined
-      : this.one("SELECT display_name, sealed_idp_config FROM organization WHERE organization_id = ?", organizationId);
+      : this.one("SELECT display_name, short_name, sealed_idp_config FROM organization WHERE organization_id = ?", organizationId);
     const count = (table: string): number => Number(this.one(`SELECT COUNT(*) AS n FROM ${table}`)?.["n"] ?? 0);
     return {
       schemaVersion: String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0"),
       organizationId: organizationId ?? null,
       displayName: organization?.["display_name"] ?? null,
+      shortName: organization?.["short_name"] ?? null,
       hasSealedIdpConfig: organization?.["sealed_idp_config"] !== null && organization?.["sealed_idp_config"] !== undefined,
       actors: count("actors"),
       invitations: count("invitations"),
@@ -1061,8 +1066,14 @@ export class OrganizationAuthority extends DurableObject<Env> {
     if (typeof input !== "object" || input === null) return failure("invalid-command", "snapshot must be an object");
     const snapshot = input as Partial<ExportSnapshot>;
     if (snapshot.coordinator !== "organization") return failure("invalid-command", "snapshot is not organization state");
+    // Every schema this coordinator has shipped is restorable, the operation
+    // side's rule: `restoreTables` writes the current columns and fills the
+    // ones an older export did not carry with null, so an older snapshot is a
+    // restore rather than a second bootstrap. An unknown or future version is
+    // still refused — a schema bump must not strand an export taken before it.
     const version = String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0");
-    if (snapshot.schemaVersion !== version && snapshot.schemaVersion !== "1") {
+    const supported = new Set(["1", "2", ORGANIZATION_SCHEMA_VERSION, version]);
+    if (!supported.has(String(snapshot.schemaVersion))) {
       return failure("invalid-command", "snapshot schema version does not match");
     }
     if (typeof snapshot.tables !== "object" || snapshot.tables === null) return failure("invalid-command", "snapshot has no tables");

@@ -86,7 +86,7 @@ export const restoreTables = (
 };
 
 export const organizationTables: readonly TableSpec[] = [
-  { name: "organization", columns: ["organization_id", "display_name", "sealed_idp_config", "sealed_idp_config_updated_at", "created_at", "updated_at"], orderBy: "organization_id" },
+  { name: "organization", columns: ["organization_id", "display_name", "short_name", "sealed_idp_config", "sealed_idp_config_updated_at", "created_at", "updated_at"], orderBy: "organization_id" },
   { name: "actors", columns: ["actor_id", "display_name", "disabled", "created_at", "updated_at"], orderBy: "actor_id" },
   { name: "principal_links", columns: ["provider", "subject", "actor_id", "created_at"], orderBy: "provider, subject" },
   { name: "activation_requests", columns: ["request_id", "actor_id", "secret_hash", "issued_at", "expires_at", "consumed_at", "revoked_at"], orderBy: "request_id" },
@@ -103,8 +103,8 @@ export const organizationTables: readonly TableSpec[] = [
  * pulling, which fails closed in the meantime — an actor missing from the
  * projection is `not-admitted`, never wrongly admitted. */
 export const operationTables: readonly TableSpec[] = [
-  { name: "operation", columns: ["operation_id", "display_name", "slug", "bounded", "policy_json", "admin_roles_json", "configure_actions_json", "envelope_lifetime_seconds", "created_at", "updated_at"], orderBy: "operation_id" },
-  { name: "sites", columns: ["site_id", "display_name", "path", "aliases_json", "created_at", "updated_at"], orderBy: "site_id" },
+  { name: "operation", columns: ["operation_id", "display_name", "short_name", "slug", "bounded", "policy_json", "admin_roles_json", "configure_actions_json", "envelope_lifetime_seconds", "created_at", "updated_at"], orderBy: "operation_id" },
+  { name: "sites", columns: ["site_id", "display_name", "short_name", "path", "aliases_json", "created_at", "updated_at"], orderBy: "site_id" },
   { name: "teams", columns: ["team_id", "site_id", "organization_id", "display_name", "status", "created_at", "updated_at"], orderBy: "team_id" },
   { name: "participations", columns: ["organization_id", "status", "created_at", "updated_at"], orderBy: "organization_id" },
   { name: "invitations", columns: ["invitation_id", "organization_id", "status", "created_at", "updated_at"], orderBy: "invitation_id" },

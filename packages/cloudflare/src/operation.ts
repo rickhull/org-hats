@@ -100,6 +100,9 @@ const targetColumns = (target: Unbranded<GrantTarget>): readonly [string, string
 export interface SiteInput {
   readonly siteId: string;
   readonly displayName?: string;
+  /** The short display label, presentation only and distinct from `path`:
+   * a site may be `PEC-ATL` to the people there and `atlanta` in a URL. */
+  readonly shortName?: string;
   /** The canonical one-segment path beneath the operation hostname. */
   readonly path: string;
   readonly aliases: readonly string[];
@@ -162,6 +165,8 @@ export interface ParticipationInput {
 export interface BootstrapInput {
   readonly operationId: string;
   readonly displayName?: string;
+  /** The short display label, presentation only and never an address. */
+  readonly shortName?: string;
   /** The one DNS label naming the operation hostname. */
   readonly slug: string;
   readonly bounded?: boolean;
@@ -503,10 +508,11 @@ export class OperationAuthority extends DurableObject<Env> {
       const existing = this.one("SELECT 1 AS present FROM operation WHERE operation_id = ?", input.operationId);
       this.ctx.storage.sql.exec(
         `INSERT INTO operation
-          (operation_id, display_name, slug, bounded, policy_json, admin_roles_json, configure_actions_json, envelope_lifetime_seconds, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (operation_id, display_name, short_name, slug, bounded, policy_json, admin_roles_json, configure_actions_json, envelope_lifetime_seconds, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(operation_id) DO UPDATE SET
            display_name = excluded.display_name,
+           short_name = excluded.short_name,
            slug = excluded.slug,
            bounded = excluded.bounded,
            policy_json = excluded.policy_json,
@@ -516,6 +522,7 @@ export class OperationAuthority extends DurableObject<Env> {
            updated_at = excluded.updated_at`,
         input.operationId,
         input.displayName ?? null,
+        input.shortName ?? null,
         input.slug,
         input.bounded === true ? 1 : 0,
         canonicalJson(input.policy as unknown as JsonValue),
@@ -527,15 +534,17 @@ export class OperationAuthority extends DurableObject<Env> {
       );
       for (const site of input.sites) {
         this.ctx.storage.sql.exec(
-          `INSERT INTO sites (site_id, display_name, path, aliases_json, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)
+          `INSERT INTO sites (site_id, display_name, short_name, path, aliases_json, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(site_id) DO UPDATE SET
              display_name = excluded.display_name,
+             short_name = excluded.short_name,
              path = excluded.path,
              aliases_json = excluded.aliases_json,
              updated_at = excluded.updated_at`,
           site.siteId,
           site.displayName ?? null,
+          site.shortName ?? null,
           site.path,
           canonicalJson(site.aliases as unknown as JsonValue),
           at,
@@ -1256,10 +1265,12 @@ export class OperationAuthority extends DurableObject<Env> {
     return {
       operationId: this.operationId() ?? null,
       operationSlug: this.one("SELECT slug FROM operation LIMIT 1")?.["slug"] ?? null,
+      operationShortName: this.one("SELECT short_name FROM operation LIMIT 1")?.["short_name"] ?? null,
       policy: this.policy() ?? null,
-      sites: this.rows("SELECT site_id, display_name, path, aliases_json FROM sites ORDER BY site_id").map((row) => ({
+      sites: this.rows("SELECT site_id, display_name, short_name, path, aliases_json FROM sites ORDER BY site_id").map((row) => ({
         siteId: String(row["site_id"]),
         displayName: row["display_name"],
+        shortName: row["short_name"],
         path: row["path"],
         aliases: JSON.parse(String(row["aliases_json"])) as unknown,
       })),
@@ -1621,7 +1632,7 @@ export class OperationAuthority extends DurableObject<Env> {
     // current columns and fills columns the older snapshot did not carry with
     // null, so the schema-2 → accepted-schema drill is a restore, not a
     // second bootstrap. An unknown or future version is still refused.
-    const supported = new Set(["2", "3", "4", "5"]);
+    const supported = new Set(["2", "3", "4", "5", "6"]);
     if (!supported.has(String(snapshot.schemaVersion))) {
       return failure("invalid-command", "snapshot schema version is not supported");
     }

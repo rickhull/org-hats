@@ -57,6 +57,19 @@ _Avoid_: venue, location, scope, path
 **Alias** — A routing name for a site. Aliases decorate; ids resolve.
 _Avoid_: slug (as the identity), scope path
 
+**Display label** — A name an entity carries for presentation, in two
+fields: `displayName` is the long form and `shortName` the short form people
+say — "Porsche Experience Centers" and `PEC`. Both are volunteered,
+bootstrap-set, never unique, and read by no decision; the short form is
+stored rather than derived because abbreviation takes knowledge and
+truncation is not abbreviation. The long form holds no parenthetical: a host
+composes "Long (SHORT)" from the two, so one name has one place to edit it.
+An organization, operation, and site carry both; an actor and a team carry
+`displayName` alone. A short name is not an identity, a key, a slug, or a
+path — `Operation.slug` and `Site.path` are the addresses, and a display
+label never determines one.
+_Avoid_: handle, title, label (unqualified)
+
 ## Policy and reach
 
 **Action** — An opaque verb named by the policy bundle, for example
@@ -285,3 +298,7 @@ assumption the model rejects.
 - **Role as an entity** — a role is policy data; the grant is the entity.
 - **Access (unqualified)** — name the access envelope, the access module, or
   the access issue.
+- **Handle** — in this repository a handle is the opaque rotating refresh
+  credential, and nothing else. For the short form of a display label use
+  *short name*; a consumer whose own product vocabulary says "handle" maps it
+  to `shortName` at its boundary.

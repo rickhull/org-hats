@@ -174,3 +174,36 @@ keys, or restoring state.
 Unknown top-level and per-key fields in a verification-key set remain
 accepted. The new E5 witness verifies the committed signed envelope through
 both shapes; this is evidence for the existing compatibility promise.
+
+## 3.x additive: the short display label
+
+An organization, operation, and site carry an optional `shortName` beside
+`displayName` — the short form people say, `PEC` to the long form's "Porsche
+Experience Centers". It changes no command, claim, or envelope meaning.
+Interface version 3 and envelope version 1 stay put, and an existing caller
+needs no change.
+
+- `Organization`, `Operation`, and `Site` gain `shortName?: string`. A team
+  and an actor keep `displayName` alone. Both labels are presentation only:
+  no uniqueness, no authorization, and no decision reads either. `shortName`
+  is not an address — `Operation.slug` and `Site.path` remain the only
+  routing facts, and the only writer of each is unchanged.
+- Store the long form without a parenthetical. The host composes
+  "Porsche Experience Centers (PEC)" from the two fields; storing the
+  composed string in `displayName` as well puts one name in two places.
+- The field is bootstrap-set. There is no `update-organization`,
+  `update-operation`, or `update-site` command — there was none for
+  `displayName` either — so a deployment sets it where it sets the long form.
+  Editing it needs new commands, which this change deliberately does not add.
+- A short name is absent when unset, never an empty string and never a
+  fallback to the id or the long form. A host decides what to show.
+
+### Cloudflare schema
+
+The operation coordinator moves to schema 6 and the organization coordinator
+to schema 3, each by one additive `short_name` column; the migrations run on
+object start like every earlier step. Both coordinators restore every schema
+they have shipped, so an export taken before this lands still restores — the
+missing column comes back null. The organization coordinator previously
+accepted only its current schema or schema 1 on restore; it now accepts the
+whole shipped range, which is what keeps a pre-bump export restorable.

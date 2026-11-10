@@ -14,6 +14,11 @@ scaled bench's state; the measured verdict, the consumer-agreed design
 (model-scoped epoch, trigger-backed), and the done-when are in
 [`snapshot_cache.md`](snapshot_cache.md).
 
+An entity carries two display labels.  The additive `shortName` has landed
+within interface 3; renaming `displayName` to `longName` is interface 4 and
+waits for the next deliberate break — the trigger, and what the landed step
+deliberately left out, are in [`display_labels.md`](display_labels.md).
+
 The assurance frictions are closed: all four decisions are recorded as
 postures with their triggers and shelf conditions in
 [`../docs/assurance.md`](../docs/assurance.md), which is the durable

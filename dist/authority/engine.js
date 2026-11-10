@@ -58,6 +58,7 @@ export const createInMemoryAuthority = async (config = {}) => {
         ops.set(op.operationId, {
             operationId: op.operationId,
             ...(op.displayName !== undefined ? { displayName: op.displayName } : {}),
+            ...(op.shortName !== undefined ? { shortName: op.shortName } : {}),
             ...(op.slug !== undefined ? { slug: op.slug } : {}),
             ...(op.bounded !== undefined ? { bounded: op.bounded } : {}),
             policy: fixture.policy,
@@ -76,6 +77,7 @@ export const createInMemoryAuthority = async (config = {}) => {
                 orgs.set(organization.organizationId, {
                     organizationId: organization.organizationId,
                     ...(organization.displayName !== undefined ? { displayName: organization.displayName } : {}),
+                    ...(organization.shortName !== undefined ? { shortName: organization.shortName } : {}),
                     actors: [],
                     admins: [],
                     invitations: new Map(),

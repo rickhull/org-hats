@@ -855,3 +855,50 @@ test("boot refuses a principal link to an actor the fixtures do not declare", as
     /principal link names an unknown actor/,
   );
 });
+
+test("the short name is a second display label, carried to the exported snapshot", async () => {
+  // A short form is not computable from a long one, so it is stored, not
+  // derived. It is presentation only — the same footing as `displayName`,
+  // bootstrap-set, never read by a decision — and the operator's long form
+  // carries no parenthetical: a host composes "Long (SHORT)" from the two
+  // fields, so one name has one place to edit it.
+  const labelled: TwinFixture = {
+    name: "professional",
+    policy: PROFESSIONAL_OPERATION.policy,
+    snapshot: fixtureSnapshot({
+      operations: [{ operationId: "op-labelled", displayName: "Porsche Experience Centers", shortName: "PEC" }],
+      organizations: [{ organizationId: "org-labelled", displayName: "AMCI Global", shortName: "AMCI" }],
+      actors: [{ organizationId: "org-labelled", actorId: "actor-labelled" }],
+      sites: [
+        { siteId: "site-atl", operationId: "op-labelled", displayName: "Atlanta, GA", shortName: "PEC-ATL", aliases: [] },
+        { siteId: "site-bare", operationId: "op-labelled", aliases: [] },
+      ],
+      teams: [{ teamId: "team-labelled", siteId: "site-atl", organizationId: "org-labelled" }],
+      grants: [],
+      participations: [{ organizationId: "org-labelled", operationId: "op-labelled", status: "active" }],
+    }),
+  };
+  const engine = await createInMemoryAuthority({
+    clock: fixedClock(1_700_000_000),
+    signer: await webCryptoSigner("key-short-name"),
+    fixtures: [labelled],
+  });
+  const snapshot = engine.snapshotOf(operationId("op-labelled"));
+  assert.ok(snapshot !== undefined);
+
+  const operation = snapshot.operations.find((o) => o.operationId === "op-labelled");
+  assert.equal(operation?.displayName, "Porsche Experience Centers", "the long form stores without the parenthetical");
+  assert.equal(operation?.shortName, "PEC");
+  const organization = snapshot.organizations.find((o) => o.organizationId === "org-labelled");
+  assert.equal(organization?.displayName, "AMCI Global");
+  assert.equal(organization?.shortName, "AMCI");
+  const site = snapshot.sites.find((s) => s.siteId === "site-atl");
+  assert.equal(site?.displayName, "Atlanta, GA");
+  assert.equal(site?.shortName, "PEC-ATL");
+
+  // Absent is absent: an unset short name is not an empty string and not a
+  // fallback to the id or the long form, so a host decides what to show.
+  const bare = snapshot.sites.find((s) => s.siteId === "site-bare");
+  assert.equal(bare?.shortName, undefined);
+  assert.ok(!("shortName" in (bare ?? {})), "an unset short name is absent, not undefined-valued");
+});

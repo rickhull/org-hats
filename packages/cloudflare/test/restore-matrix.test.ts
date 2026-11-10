@@ -52,13 +52,14 @@ const restore = async (coordinator: "operation" | "organization", id: string, sn
 const ABSENT: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
   "2": {
     refresh_records: ["amr_json", "auth_time"],
-    operation: ["slug"],
-    sites: ["path"],
+    operation: ["slug", "short_name"],
+    sites: ["path", "short_name"],
     teams: ["status"],
   },
-  "3": { operation: ["slug"], sites: ["path"], teams: ["status"] },
-  "4": { teams: ["status"] },
-  "5": {},
+  "3": { operation: ["slug", "short_name"], sites: ["path", "short_name"], teams: ["status"] },
+  "4": { operation: ["short_name"], sites: ["short_name"], teams: ["status"] },
+  "5": { operation: ["short_name"], sites: ["short_name"] },
+  "6": {},
 };
 
 const atSchema = (snapshot: Snapshot, version: string): Snapshot => {
@@ -74,14 +75,15 @@ const atSchema = (snapshot: Snapshot, version: string): Snapshot => {
 
 const asRestored = (snapshot: Snapshot, version: string): Record<string, StateRow[]> => {
   // What the restore must produce from a version-v snapshot: every column
-  // that version lacked comes back null; teams default active below 5.
+  // that version lacked comes back null; teams default active below 5, the
+  // schema that added the status column.
   const tables: Record<string, StateRow[]> = {};
   for (const [table, rows] of Object.entries(snapshot.tables)) {
     const absent = ABSENT[version]?.[table] ?? [];
     tables[table] = rows.map((row) => {
       const filled: Record<string, string | number | null> = { ...row };
       for (const column of absent) filled[column] = null;
-      if (table === "teams" && version !== "5") filled.status = "active";
+      if (table === "teams" && Number(version) < 5) filled.status = "active";
       return filled as StateRow;
     });
   }
@@ -126,7 +128,7 @@ describe("the restore matrix", () => {
     if (isFailed(issued)) throw new Error(`sam issuance failed: ${issued.failure.kind}`);
 
     const source = await exportCoordinator("operation", OP);
-    expect(source.schemaVersion).toBe("5");
+    expect(source.schemaVersion).toBe("6");
     expect(source.tables["refresh_records"]?.length ?? 0).toBeGreaterThan(0);
     expect(source.tables["teams"]?.some((team) => team.status === "retired")).toBe(true);
     // The refresh table carries records without authentication facts too
@@ -135,22 +137,30 @@ describe("the restore matrix", () => {
     expect(withAuth).toBeDefined();
     expect(withAuth?.auth_time).not.toBeNull();
 
-    for (const version of ["2", "3", "4", "5"]) {
+    for (const version of ["2", "3", "4", "5", "6"]) {
       const target = `op-restore-matrix-${version}`;
       const restored = await restore("operation", target, atSchema(source, version));
       expect(restored.status).toBe(200);
       expect(restored.body.ok).toBe(true);
 
       const after = await exportCoordinator("operation", target);
-      expect(after.schemaVersion).toBe("5");
+      expect(after.schemaVersion).toBe("6");
       expect(withoutRestoreAudit(after).tables).toEqual(asRestored(source, version));
 
-      // The named claims, stated once for the record:
-      if (version !== "5") {
+      // The named claims, stated once for the record. Schema 5 added the
+      // team status column, so only an export older than 5 loses a retired
+      // team to the active default.
+      if (Number(version) < 5) {
         const teams = after.tables["teams"] ?? [];
         expect(teams.every((team) => team.status === "active")).toBe(true);
       } else {
         expect(after.tables["teams"]?.some((team) => team.status === "retired")).toBe(true);
+      }
+      // Schema 6 added the short display label; an older export restores it
+      // as null rather than inventing one.
+      if (Number(version) < 6) {
+        expect(after.tables["operation"]?.[0]?.short_name).toBeNull();
+        expect(after.tables["sites"]?.every((site) => site.short_name === null)).toBe(true);
       }
       if (version === "2") {
         expect(after.tables["refresh_records"]?.every((row) => row.amr_json === null && row.auth_time === null))
@@ -256,7 +266,7 @@ describe("the restore matrix", () => {
     const futureOperation = await restore(
       "operation",
       "op-restore-matrix-future",
-      { ...operationSnapshot, schemaVersion: "6" },
+      { ...operationSnapshot, schemaVersion: "7" },
     );
     expect(futureOperation.body.failure?.kind).toBe("invalid-command");
 
@@ -270,7 +280,7 @@ describe("the restore matrix", () => {
     const futureOrganization = await restore(
       "organization",
       "org-restore-matrix-future",
-      { ...organizationSnapshot, schemaVersion: "3" },
+      { ...organizationSnapshot, schemaVersion: "4" },
     );
     expect(futureOrganization.body.failure?.kind).toBe("invalid-command");
   }, 60_000);

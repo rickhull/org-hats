@@ -31,11 +31,13 @@ describe("the schema migration chain", () => {
   it("names every additive step in version order", () => {
     expect(organizationMigrations.map(({ version, name }) => [version, name])).toEqual([
       ["2", "activation-requests"],
+      ["3", "display-short-name"],
     ]);
     expect(operationMigrations.map(({ version, name }) => [version, name])).toEqual([
       ["3", "refresh-authentication-facts"],
       ["4", "operation-routing-facts"],
       ["5", "team-status"],
+      ["6", "display-short-name"],
     ]);
     expect(organizationMigrations.at(-1)?.version).toBe(ORGANIZATION_SCHEMA_VERSION);
     expect(operationMigrations.at(-1)?.version).toBe(OPERATION_SCHEMA_VERSION);

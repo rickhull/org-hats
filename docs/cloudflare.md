@@ -384,9 +384,12 @@ Restore is typed and atomic; a failed restore leaves the previous state
 intact. Refresh handles issued before a wipe survive the export → wipe →
 restore round trip: recovery does not strand a session.
 
-The operation schema is 5. Older operation exports (schema 2, 3, or 4)
-restore into it: columns the older snapshot did not carry read as null,
-teams from an export without a status restore as `active`, and
+The operation schema is 6 and the organization schema is 3. Older exports
+restore into them — every schema either coordinator has shipped is accepted,
+so a schema bump never strands an export taken before it: columns the older
+snapshot did not carry read as null, teams from an export without a status
+restore as `active`, an operation or site from an export before schema 6
+restores with no short name, and
 `POST /ops/operation/routing-facts` backfills the complete routing set. The
 schema-2 → accepted-schema drill is a restore plus a typed backfill, not a
 second bootstrap. Until the backfill, `routingFactsComplete` is false, so a

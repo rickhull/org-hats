@@ -125,7 +125,7 @@ describe("OperationAuthority", () => {
       schemaVersion: string;
       tables: { operation: Record<string, unknown>[]; sites: Record<string, unknown>[] };
     }>(current.op, "GET", "/export");
-    expect(exported.body.value?.schemaVersion).toBe("5");
+    expect(exported.body.value?.schemaVersion).toBe("6");
     expect(exported.body.value?.tables.operation[0]?.["slug"]).toBe("routing-op");
     expect(exported.body.value?.tables.sites[0]?.["path"]).toBe("site");
     const status = await call<{ routingFactsComplete: boolean }>(current.op, "GET", "/status");
@@ -679,5 +679,61 @@ describe("OperationAuthority", () => {
       "/snapshot",
     );
     expect(restored.body.value?.teams.find((team) => team.team_id === TEAM)?.status).toBe("active");
+  });
+
+  it("carries the short display label through bootstrap, export, and restore", async () => {
+    // A short form is not computable from a long one, so the coordinator
+    // stores it beside the long form. Presentation only: it reaches no
+    // decision, and `modelSnapshot` — the claims path — deliberately does not
+    // carry it. The long form holds no parenthetical; a host composes
+    // "Long (SHORT)" from the two fields.
+    const current = world("short-name");
+    expect((await bootstrapOrganization(current)).body.ok).toBe(true);
+    expect((await call(current.op, "POST", "/bootstrap", {
+      operationId: current.opId,
+      slug: "test-op",
+      displayName: "Porsche Experience Centers",
+      shortName: "PEC",
+      policy: {
+        format: 1,
+        id: "policy-test",
+        version: "1",
+        actions: ["observe"],
+        roles: [{ title: "field", actions: ["observe"] }],
+        readPolicy: { organizations: "granted-teams" },
+      },
+      sites: [
+        { siteId: SITE, path: "site", aliases: ["site"], displayName: "Atlanta, GA", shortName: "PEC-ATL" },
+        { siteId: "site-bare", path: "bare", aliases: [], displayName: "No Short Form" },
+      ],
+      teams: [],
+      grants: [],
+    })).body.ok).toBe(true);
+
+    const seen = await call<{
+      readonly operationShortName: string | null;
+      readonly sites: readonly { readonly siteId: string; readonly shortName: unknown }[];
+    }>(current.op, "GET", "/snapshot");
+    expect(seen.body.value?.operationShortName).toBe("PEC");
+    expect(seen.body.value?.sites.find((site) => site.siteId === SITE)?.shortName).toBe("PEC-ATL");
+    expect(seen.body.value?.sites.find((site) => site.siteId === "site-bare")?.shortName).toBe(null);
+
+    // The field survives the export/restore round trip, which rewrites every
+    // column: a column absent from the table spec would be silently dropped.
+    const exported = await call<{
+      readonly schemaVersion: string;
+      readonly tables: Readonly<Record<string, readonly Record<string, unknown>[]>>;
+    }>(current.op, "GET", "/export");
+    const snapshot = exported.body.value;
+    expect(snapshot).toBeDefined();
+    if (snapshot === undefined) return;
+    expect((await call(current.op, "POST", "/reset")).body.ok).toBe(true);
+    expect((await call(current.op, "POST", "/restore", snapshot)).body.ok).toBe(true);
+    const restored = await call<{
+      readonly operationShortName: string | null;
+      readonly sites: readonly { readonly siteId: string; readonly shortName: unknown }[];
+    }>(current.op, "GET", "/snapshot");
+    expect(restored.body.value?.operationShortName).toBe("PEC");
+    expect(restored.body.value?.sites.find((site) => site.siteId === SITE)?.shortName).toBe("PEC-ATL");
   });
 });

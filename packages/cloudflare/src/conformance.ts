@@ -62,6 +62,7 @@ export const createCloudflareConformanceWorld = async (env: Env): Promise<Confor
     await post(organization(id), "/bootstrap", {
       organizationId: id,
       ...(organizationRecord?.displayName === undefined ? {} : { displayName: organizationRecord.displayName }),
+      ...(organizationRecord?.shortName === undefined ? {} : { shortName: organizationRecord.shortName }),
       actors,
       principalLinks,
       orgAdmins: CONFORMANCE_WORLD.orgAdmins[id] ?? [],
@@ -79,6 +80,7 @@ export const createCloudflareConformanceWorld = async (env: Env): Promise<Confor
       operationId: operationRecord.operationId,
       slug,
       ...(operationRecord.displayName === undefined ? {} : { displayName: operationRecord.displayName }),
+      ...(operationRecord.shortName === undefined ? {} : { shortName: operationRecord.shortName }),
       ...(operationRecord.bounded === true ? { bounded: true } : {}),
       policy: fixture.policy,
       configureActions: ["configure"],
@@ -89,6 +91,7 @@ export const createCloudflareConformanceWorld = async (env: Env): Promise<Confor
           siteId: site.siteId,
           path,
           ...(site.displayName === undefined ? {} : { displayName: site.displayName }),
+          ...(site.shortName === undefined ? {} : { shortName: site.shortName }),
           aliases: [...site.aliases],
         };
       }),

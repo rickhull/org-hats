@@ -1,8 +1,18 @@
 import type { ActorId, GrantTarget, OperationId, OrganizationId, SiteId, TargetRef, TeamId } from "./contract.js";
 import type { PolicyBundle } from "./policy.js";
+/** A display label an entity carries for presentation. `displayName` is the
+ * long form and `shortName` the short form people say — "Porsche Experience
+ * Centers" and `PEC`. Both are volunteered, bootstrap-set, never unique, and
+ * never read by a decision; neither is derivable from the other, which is why
+ * the short form is stored rather than computed. The long form carries no
+ * parenthetical: a host composes "Long (SHORT)" from the two, so one name has
+ * one place to edit it. A short name is not an identity, a key, a slug, or a
+ * path — `Operation.slug` and `Site.path` are the routing facts, and this
+ * never determines an address. */
 export interface Organization {
     readonly organizationId: OrganizationId;
     readonly displayName?: string;
+    readonly shortName?: string;
 }
 /** An actor is a person known to one organization. The pair with
  * `organizationId` is the actor's stable identity across every operation
@@ -18,6 +28,8 @@ export interface Actor {
 export interface Operation {
     readonly operationId: OperationId;
     readonly displayName?: string;
+    /** The short display label, the same rule as `Organization.shortName`. */
+    readonly shortName?: string;
     /** The one DNS label naming this operation's hostname. The registry
      * projects it; operation authority is the only writer. Optional only for
      * snapshots that predate routing facts; a snapshot with site paths must
@@ -34,6 +46,10 @@ export interface Site {
     readonly siteId: SiteId;
     readonly operationId: OperationId;
     readonly displayName?: string;
+    /** The short display label, the same rule as `Organization.shortName`.
+     * Distinct from `path`, which is the address: a site may be `PEC-ATL` to
+     * the people there and `atlanta` in a URL. */
+    readonly shortName?: string;
     /** The canonical one-segment path beneath the operation's hostname. The
      * registry projects it; operation authority is the only writer. Optional
      * only for snapshots that predate routing facts. */

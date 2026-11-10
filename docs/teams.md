@@ -85,7 +85,7 @@ No new failure kind is added.
 
 ## Cloudflare
 
-The operation schema is 5. `teams.status` is `pending`, `active`, or
+The operation schema is 6; `status` arrived in schema 5. `teams.status` is `pending`, `active`, or
 `retired`, `modelSnapshot` reads active teams only, and grants refuse a team
 that is not active. Export carries the status; restore accepts older exports
 (schema 2–4) and restores teams that predate the column as `active`.

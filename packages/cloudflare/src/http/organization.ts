@@ -88,6 +88,7 @@ export const handleOrganizationRequest = async (
       return json(host.bootstrap({
         organizationId: asString(body["organizationId"], "organizationId"),
         ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
+        ...(body["shortName"] === undefined ? {} : { shortName: asString(body["shortName"], "shortName") }),
         actors: asArray(body["actors"], "actors").map((entry) => {
           const actor = asRecord(entry);
           return {

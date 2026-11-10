@@ -47,6 +47,7 @@ export interface Claim {
 export interface OrgState {
   readonly organizationId: OrganizationId;
   readonly displayName?: string;
+  readonly shortName?: string;
   actors: { organizationId: OrganizationId; actorId: ActorId; displayName?: string; disabled?: boolean }[];
   /** Administrator standing, seeded at bootstrap and changed only by the
    * organization's own appoint/retire commands. */
@@ -85,10 +86,18 @@ export interface RefreshRecord {
 export interface OpState {
   readonly operationId: OperationId;
   readonly displayName?: string;
+  readonly shortName?: string;
   readonly slug?: string;
   readonly bounded?: boolean;
   policy: PolicyBundle;
-  sites: { siteId: SiteId; operationId: OperationId; displayName?: string; path?: string; aliases: readonly string[] }[];
+  sites: {
+    siteId: SiteId;
+    operationId: OperationId;
+    displayName?: string;
+    shortName?: string;
+    path?: string;
+    aliases: readonly string[];
+  }[];
   teams: {
     teamId: TeamId;
     siteId: SiteId;
@@ -158,11 +167,13 @@ export const snapshotOf = (
     organizations: [...orgs.values()].map((org) => ({
       organizationId: org.organizationId,
       ...(org.displayName !== undefined ? { displayName: org.displayName } : {}),
+      ...(org.shortName !== undefined ? { shortName: org.shortName } : {}),
     })),
     actors: [...orgs.values()].flatMap((org) => org.actors.map((actor) => ({ ...actor }))),
     operations: [...ops.values()].map((o) => ({
       operationId: o.operationId,
       ...(o.displayName !== undefined ? { displayName: o.displayName } : {}),
+      ...(o.shortName !== undefined ? { shortName: o.shortName } : {}),
       ...(o.slug !== undefined ? { slug: o.slug } : {}),
       ...(o.bounded !== undefined ? { bounded: o.bounded } : {}),
     })),
