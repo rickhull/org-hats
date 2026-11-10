@@ -15,8 +15,11 @@ a tag; pushing a tag is a push, and stays Rick's.
 working tree, so they proceed only with Rick's approval — ask for specific
 paths and say what each file is.  Never `git add -A` or `git add .`.
 
-The bare repository at `ssh://forge@nas/home/forge/repos/org-hats.git` is
-canonical (remote `origin`); `main` tracks `origin/main`.  Codeberg (remote
+The bare repository at `ssh://forge@nas-ts/home/forge/repos/org-hats.git` is
+canonical (remote `origin`); `main` tracks `origin/main`.  `nas-ts` is the
+tailnet alias for the same host — `nas` resolves only on the LAN, and
+`bin/release` knows the remote by name, so `origin` carries the alias that
+works from anywhere.  Codeberg (remote
 `codeberg`) and GitHub (remote `github`) are best-effort public release
 mirrors, updated by `bin/release`, which publishes by default (`--no-push`
 keeps a release local).  A mirror failure does not invalidate a NAS-published

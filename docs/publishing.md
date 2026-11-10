@@ -5,7 +5,7 @@
 ## Canonical forge and public mirrors
 
 - **The NAS forge is canonical** — remote `origin` at
-  `ssh://forge@nas/home/forge/repos/org-hats.git`. Its bare repository is
+  `ssh://forge@nas-ts/home/forge/repos/org-hats.git`. Its bare repository is
   the release authority, and `main` tracks `origin/main`.
 - **Codeberg is a public release mirror** —
   <https://codeberg.org/rickhull/org-hats>, remote `codeberg`. Public project
@@ -21,7 +21,14 @@ configured mirror. A missing or unavailable mirror warns but does not
 invalidate the canonical release. The next successful release push advances
 the mirror branch and sends every reachable annotated tag it missed.
 
-`nas` is the LAN name; the Tailscale alias `nas-ts` reaches the same host.
+`nas` is the LAN name and `nas-ts` the Tailscale alias; both reach the same
+host. `origin` carries `nas-ts` because it resolves on and off the LAN, while
+`nas` points at `nas.lan` and fails everywhere else — and `bin/release`
+addresses the canonical forge by remote name, so a second remote would not
+publish a release taken from outside the LAN. On the LAN the tailnet name
+still makes a direct connection. The twin aliases themselves are deliberate
+and live in the thinkpad flake (`home/rick.nix`); this chooses between them,
+it does not redefine them.
 
 ### Provisioning the NAS authority (one-time; NAS owner)
 
@@ -51,7 +58,7 @@ A clone that predates the migration has `origin` pointing at Codeberg:
 
 ```sh
 git remote rename origin codeberg
-git remote add origin ssh://forge@nas/home/forge/repos/org-hats.git
+git remote add origin ssh://forge@nas-ts/home/forge/repos/org-hats.git
 git remote add github git@github.com:rickhull/org-hats.git   # if absent
 git config push.followTags true
 ```
