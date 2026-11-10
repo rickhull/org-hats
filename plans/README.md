@@ -14,12 +14,10 @@ scaled bench's state; the measured verdict, the consumer-agreed design
 (model-scoped epoch, trigger-backed), and the done-when are in
 [`snapshot_cache.md`](snapshot_cache.md).
 
-Four decisions stand between this library and an operator's SOC 2 or TISAX
-assessment going smoothly, and the first is upstream of the rest: whether an
-operator action has an owner in the model at all, before retention, erasure,
-and release signing.  The durable posture is
-[`../docs/assurance.md`](../docs/assurance.md); the decisions and their
-done-whens are in [`assurance.md`](assurance.md).
+The assurance frictions are closed: all four decisions are recorded as
+postures with their triggers and shelf conditions in
+[`../docs/assurance.md`](../docs/assurance.md), which is the durable
+statement and needs no plan beside it.
 
 Durable decisions and completed work live in [`docs/`](../docs/README.md),
 [`specs/`](../specs/README.md), and commit history. Retired plans are removed;

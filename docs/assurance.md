@@ -92,15 +92,27 @@ these development dependencies.
 Recorded as facts, not promises. Each is a friction an operator will meet, and
 the owner of the fix.
 
-**Operator attribution is a claim, not proof.** An ops caller may send
+**Operator attribution is a claim, not proof — and that is the decided
+posture, not a gap.** An ops caller may send
 `x-ops-operator: <id>`, and the audit row records it in place of the bare
 literal `operator`. That is worth having — an assessor asking "which
 administrator ran this restore?" now gets a name — but the ops token remains
 all-or-nothing, so anyone holding it can claim any identity. The trail is
 therefore exactly as trustworthy as the operator's control over who holds the
-token, and no further. There is still no separation of duties inside the
-surface. An operator who needs attribution that resists its own holders needs
-per-operator tokens, which this library does not provide.
+token, and no further.
+
+This is deliberate and permanent unless its named trigger fires: operator
+identity is **transport-owned**, and the model will not grow an operator
+actor. An identity worth recording is one worth authenticating, and an
+authenticated operator principal would bring issuance, rotation, revocation,
+and a permission model onto the highest-privilege surface — a larger
+assurance surface than the one it answers, for an audience of one operator
+today. What an operator does instead, at their own edge: per-operator tokens
+at a proxy in front of the ops surface, mTLS client identity, a bastion with
+its own authentication, or address allowlists — controls assessors already
+know how to examine. The revisit triggers are concrete: a second operator
+appears, or a consumer needs separation of duties inside the ops surface.
+Either turns this paragraph into a plan; neither has happened.
 
 **The audit log is not tamper-evident.** This is an explicit non-goal, and it
 is the right call for a library that does not own storage — but it is a stated
@@ -109,28 +121,67 @@ restore or direct storage access can rewrite them, and nothing detects it.
 Operators needing log integrity must ship rows to an append-only store they
 control, and should expect an assessor to test that path rather than this one.
 
-**Audit rows and idempotency claims are retained indefinitely.** There is no
-pruning, no retention policy, and no documented growth expectation. A
-long-lived operation accumulates one claim row per successful command and one
-audit row per privileged act, forever. Retention is a question both regimes
-ask directly, and the honest current answer is "unbounded, and the operator
-owns the policy."
+**Audit rows and idempotency claims grow linearly, by formula, and the
+retention policy is the operator's.** This is the decided answer: the
+library offers no pruning mechanism, states the growth exactly, and the
+growth is linear in privileged activity with no amplification:
 
-**Name clearing exists; a complete erasure workflow does not.**
-`update-actor` with `displayName: null` clears an actor's display name through
-the ordinary authority command. It does not delete the actor, principal
-links, grant references, audit history, or previously exported snapshots.
-Actors can be disabled and administrator standing can be retired; neither
-deletes the actor. The broader erasure scope and the deployment's treatment
-of retained identifiers, backups, and downstream data remain an explicit
-decision in [the assurance plan](../plans/assurance.md#decision-3--erasure-of-personal-data).
+- **one idempotency-claim row per admitted command** — applied, replayed,
+  or idempotent no-op alike; a command refused before its handler commits
+  no claim (`A8`: a denied command cannot poison its key), and a replay
+  adds nothing, since its row already exists;
+- **one audit row per mutating act**, and none for no-ops, replays, the
+  session surface (issue, refresh, context, the roster read), or ops
+  reads; a restore writes exactly one, after it replaces the tables.
 
-**Release integrity rests on policy, not cryptography.** Tags are immutable by
-repository rule and `bin/check-version` checks agreement, but a git tag is a
-name. There is no signed tag, no provenance attestation, and no reproducible
-build claim. A consumer who needs an immutable commitment pins a commit; an
-assessor asking how upstream artifacts are authenticated gets "we pin a
-commit", which is sound but weaker than a signature.
+Rows are O(1) writes inside the mutation's own transaction — no command
+writes a row per grant, per team, or per participant. Where the operator
+reads the ledger: both coordinators' `/status` report live `audit` counts
+(the operation's also reports `refreshRecords`, the other table sessions
+grow), and claims are carried by export for offline counting. An operator
+who must bound storage prunes at their own storage layer with one
+contract in view: **a claim is what makes a retry safe**, so a pruning
+window shorter than a caller's retry horizon reopens double-application
+for keys still in flight. Retention is therefore the operator's to own
+and to state, with this formula as the growth expectation.
+
+**Name clearing exists; a complete erasure workflow does not — and the
+boundary is now stated.** This is the decided boundary, not an open
+decision:
+
+- `update-actor` with `displayName: null` clears an actor's display name
+  through the ordinary authority command, and no second name-clearing
+  command will be added;
+- `unlink-principal` removes the person-to-actor binding — the
+  identity-bearing rows (provider, subject) — after which refresh fails
+  closed and no new session issues for that binding;
+- the library never deletes an actor, a grant, an audit row, or a team:
+  actor ids are addresses rather than personal data by rule (a host must
+  not encode a name or mail fact into one), audit history is
+  authority-relevant, and retention follows the formula above.
+
+What stays with the deployment, and is the operator's to answer in an
+erasure request: backups and exports already taken (an export carries
+links and names as they stood), downstream consumer data, and the
+identity provider's own records of the subject. The library's erasure
+reach ends at the live tables, and an assessor should be told exactly
+that.
+
+**Release integrity rests on policy, not cryptography — and that is the
+recorded choice.** Tags are immutable by repository rule and
+`bin/check-version` checks agreement, but a git tag is a name. There is no
+signed tag, no provenance attestation, and no reproducible-build claim. The
+recorded answer to "how is an upstream artifact authenticated" is:
+**pin the commit hash, not the tag** — the NAS forge is the release
+authority, the mirrors are best-effort convenience, and the consumer's own
+pin check (resolved hash against manifest, as the current consumer's
+`pin_state` does) is the control that exists in practice. Signed tags are
+declined for now: they would aim squarely at the weakest leg — the
+best-effort mirrors — at the standing cost of a signing key's custody,
+rotation, and compromise response. The shelf condition is concrete: an
+assessor who rejects commit-pinning, or a consumer who wants to verify
+signatures, turns this paragraph into a small slice (`bin/check-version`
+verification plus a documented key); neither has happened.
 
 **Nothing in a release records that it passed its gate.** `bin/verify` writes
 a marker, but deliberately as local convenience — its own comment says "never
@@ -141,8 +192,10 @@ repository's policy plus the branch's CI run, not a property of the artifact.
 Codeberg's CI witness is manual-dispatch only; GitHub's release-mirror CI
 runs on push and provides separate portable, workerd, and tag-artifact
 evidence as described in [publishing.md](publishing.md#ci). Those run logs
-are not an attestation carried by the release artifact. This is the same
-gap as the unsigned tag and sits under the release-signing decision.
+are not an attestation carried by the release artifact. This is decided with
+the release-signing question above: the witnesses are the branch's CI runs
+and the release discipline, an attestation field would ride the same signed
+tag that paragraph declines, and the same shelf condition covers both.
 
 ## How to read this
 
