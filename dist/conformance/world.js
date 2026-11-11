@@ -56,8 +56,8 @@ export const CONFORMANCE_INVITEE = {
     name: "invitee",
     policy: PROFESSIONAL_OPERATION.policy,
     snapshot: {
-        operations: [{ operationId: HOME_OP, displayName: "Conformance Home", slug: "conformance-home" }],
-        organizations: [{ organizationId: INVITEE_ORG, displayName: "Cedar Works" }],
+        operations: [{ operationId: HOME_OP, longName: "Conformance Home", slug: "conformance-home" }],
+        organizations: [{ organizationId: INVITEE_ORG, longName: "Cedar Works" }],
         actors: [
             { organizationId: INVITEE_ORG, actorId: INVITEE_ACTOR, displayName: "Nia Fields" },
             { organizationId: INVITEE_ORG, actorId: INVITEE_UNCLAIMED, displayName: "Unclaimed Invitee" },

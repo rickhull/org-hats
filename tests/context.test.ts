@@ -28,10 +28,10 @@ const twoHatsWorld = (): WorldDefinition => ({
     readPolicy: { organizations: "granted-teams" },
   },
   snapshot: {
-    operations: [{ operationId: "op-two", displayName: "Two Hats", slug: "two-hats" }],
-    organizations: [{ organizationId: "org-two", displayName: "Two Works" }],
+    operations: [{ operationId: "op-two", longName: "Two Hats", slug: "two-hats" }],
+    organizations: [{ organizationId: "org-two", longName: "Two Works" }],
     actors: [{ organizationId: "org-two", actorId: "actor-two", displayName: "Two Hands" }],
-    sites: [{ siteId: "site-two", operationId: "op-two", displayName: "Yard", path: "yard", aliases: ["yard"] }],
+    sites: [{ siteId: "site-two", operationId: "op-two", longName: "Yard", path: "yard", aliases: ["yard"] }],
     teams: [
       { teamId: "team-first", siteId: "site-two", organizationId: "org-two", displayName: "First Crew" },
       { teamId: "team-second", siteId: "site-two", organizationId: "org-two", displayName: "Second Crew" },
@@ -176,10 +176,10 @@ const namedTargetsWorld = (): WorldDefinition => ({
     readPolicy: { organizations: "granted-teams" },
   },
   snapshot: {
-    operations: [{ operationId: "op-named", displayName: "Named", slug: "named" }],
+    operations: [{ operationId: "op-named", longName: "Named", slug: "named" }],
     organizations: [{ organizationId: "org-named" }],
     actors: [{ organizationId: "org-named", actorId: "actor-named" }],
-    sites: [{ siteId: "site-north", operationId: "op-named", displayName: "North Yard", path: "north", aliases: ["north"] }],
+    sites: [{ siteId: "site-north", operationId: "op-named", longName: "North Yard", path: "north", aliases: ["north"] }],
     teams: [
       { teamId: "team-named", siteId: "site-north", organizationId: "org-named", displayName: "Harbor Field" },
       { teamId: "team-plain", siteId: "site-north", organizationId: "org-named" },

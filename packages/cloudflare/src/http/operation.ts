@@ -88,7 +88,7 @@ const parseOperationBootstrap = (input: unknown): BootstrapInput => {
   return {
     operationId: asString(body["operationId"], "operationId"),
     slug: asString(body["slug"], "slug"),
-    ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
+    ...(body["longName"] === undefined ? {} : { longName: asString(body["longName"], "longName") }),
     ...(body["shortName"] === undefined ? {} : { shortName: asString(body["shortName"], "shortName") }),
     ...(body["bounded"] === true ? { bounded: true } : {}),
     policy,
@@ -100,7 +100,7 @@ const parseOperationBootstrap = (input: unknown): BootstrapInput => {
       return {
         siteId: asString(site["siteId"], "siteId"),
         path: asString(site["path"], "path"),
-        ...(site["displayName"] === undefined ? {} : { displayName: asString(site["displayName"], "displayName") }),
+        ...(site["longName"] === undefined ? {} : { longName: asString(site["longName"], "longName") }),
         ...(site["shortName"] === undefined ? {} : { shortName: asString(site["shortName"], "shortName") }),
         aliases: asArray(site["aliases"] ?? [], "aliases").map((alias) => asString(alias, "alias")),
       };

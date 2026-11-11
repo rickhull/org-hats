@@ -18,10 +18,10 @@ const ownWorld = (): WorldDefinition => ({
     readPolicy: { organizations: "granted-teams" },
   },
   snapshot: {
-    operations: [{ operationId: "op-own", displayName: "Own Operation", slug: "own" }],
-    organizations: [{ organizationId: "org-own", displayName: "Own Works" }],
+    operations: [{ operationId: "op-own", longName: "Own Operation", slug: "own" }],
+    organizations: [{ organizationId: "org-own", longName: "Own Works" }],
     actors: [{ organizationId: "org-own", actorId: "actor-own", displayName: "Own Hand" }],
-    sites: [{ siteId: "site-own", operationId: "op-own", displayName: "Yard", path: "yard", aliases: ["yard"] }],
+    sites: [{ siteId: "site-own", operationId: "op-own", longName: "Yard", path: "yard", aliases: ["yard"] }],
     teams: [{ teamId: "team-own", siteId: "site-own", organizationId: "org-own", displayName: "Crew" }],
     grants: [
       {
@@ -140,7 +140,7 @@ test("defineWorld refuses more than one operation in a fixture", () => {
           ...definition.snapshot,
           operations: [
             ...definition.snapshot.operations,
-            { operationId: "op-second", displayName: "Second Operation" },
+            { operationId: "op-second", longName: "Second Operation" },
           ],
         },
       }),

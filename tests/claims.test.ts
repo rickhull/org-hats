@@ -59,7 +59,8 @@ test("[A5][A14][E6] claims: the actor, wearable hat, reach, and lifetime in one 
   const claims = claimsFor(DANA_OKAFOR, HARBOR_LOGISTICS);
   assert.ok(!("kind" in claims));
   assert.equal(claims.v, 1);
-  assert.equal(claims.interfaceVersion, 3);
+  // provenance moves with the call surface; the envelope's own `v` does not
+  assert.equal(claims.interfaceVersion, 4);
   assert.equal(claims.operationId, OP);
   assert.deepEqual(claims.actor, { organizationId: HARBOR_LOGISTICS, actorId: DANA_OKAFOR });
   assert.deepEqual(claims.hat, {

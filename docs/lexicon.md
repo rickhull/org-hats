@@ -57,18 +57,28 @@ _Avoid_: venue, location, scope, path
 **Alias** — A routing name for a site. Aliases decorate; ids resolve.
 _Avoid_: slug (as the identity), scope path
 
-**Display label** — A name an entity carries for presentation, in two
-fields: `displayName` is the long form and `shortName` the short form people
-say — "Porsche Experience Centers" and `PEC`. Both are volunteered,
+**Display label** — A name an entity carries for presentation. An
+organization, operation, and site carry a **pair**: `longName` is the full
+form and `shortName` the short form people say. Both are volunteered,
 bootstrap-set, never unique, and read by no decision; the short form is
 stored rather than derived because abbreviation takes knowledge and
 truncation is not abbreviation. The long form holds no parenthetical: a host
 composes "Long (SHORT)" from the two, so one name has one place to edit it.
-An organization, operation, and site carry both; an actor and a team carry
-`displayName` alone. A short name is not an identity, a key, a slug, or a
-path — `Operation.slug` and `Site.path` are the addresses, and a display
-label never determines one.
-_Avoid_: handle, title, label (unqualified)
+
+An actor and a team carry a **single** label, `displayName`, with no
+counterpart — an actor's is the OIDC `name` claim and a team's is already the
+short form, so neither is the long half of anything. The two words are not
+synonyms: `longName` names a half, `displayName` names a whole. A team's
+becomes `longName` if teams ever acquire a short name.
+
+A short name is not an identity, a key, a slug, or a path —
+`Operation.slug` and `Site.path` are the addresses, and a display label never
+determines one. The field was `displayName` on all five entities through
+interface 3; `docs/migration-v4.md` records the rename.
+_Avoid_: handle — it already names the opaque rotating refresh credential,
+and a short label like `PEC-ATL` beside `Operation.slug` invites someone to
+treat the editable name as the address; title; label (unqualified);
+displayName (for the three paired entities)
 
 ## Policy and reach
 

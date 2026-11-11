@@ -65,7 +65,7 @@ import {
   type PrincipalLink,
 } from "./state.ts";
 import { fail, ok } from "./result.ts";
-import { displayNameFailure, identifierFailure } from "./validation.ts";
+import { displayLabelFailure, identifierFailure } from "./validation.ts";
 
 export interface OperationDeps {
   readonly orgs: Map<OrganizationId, OrgState>;
@@ -204,7 +204,7 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     const actorId_ = actorId(claims.actor.actorId);
     const wearable = wearableGrants(snapshot, organizationId_, actorId_, op.operationId);
     const actor = orgs.get(organizationId_)?.actors.find((a) => a.actorId === actorId_);
-    const orgName = orgs.get(organizationId_)?.displayName;
+    const orgName = orgs.get(organizationId_)?.longName;
     const participation = snapshot.participations.find((p) => p.organizationId === organizationId_);
     // the hat in force: the same ranking issuance used (primary, then
     // role, target, grant id). The envelope cannot name the worn grant, so
@@ -213,11 +213,14 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     // role.
     const selected = firstByRank(wearable);
     // The target's display name is operation state a host would otherwise
-    // need a round trip to read; absent when unset, never the id.
+    // need a round trip to read; absent when unset, never the id. A target is
+    // a team or a site, so this reads a team's `displayName` or a site's
+    // `longName` — the field stays `targetDisplayName` because it names the
+    // genus over both, not the long half of a site's pair.
     const nameOf = (target: HatSummary["target"]): string | undefined =>
       target.kind === "team"
         ? snapshot.teams.find((t) => t.teamId === target.teamId)?.displayName
-        : snapshot.sites.find((s) => s.siteId === target.siteId)?.displayName;
+        : snapshot.sites.find((s) => s.siteId === target.siteId)?.longName;
     // Presentation still may not invent an action list. A grant naming a
     // role the bundle dropped makes the context unanswerable, not empty.
     const hats: HatSummary[] = [];
@@ -243,9 +246,9 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
         actorId: actorId_,
         ...(actor?.displayName !== undefined ? { displayName: actor.displayName } : {}),
       },
-      ...(orgName !== undefined ? { organizationDisplayName: orgName } : {}),
+      ...(orgName !== undefined ? { organizationLongName: orgName } : {}),
       operationId: op.operationId,
-      ...(op.displayName !== undefined ? { operationDisplayName: op.displayName } : {}),
+      ...(op.longName !== undefined ? { operationLongName: op.longName } : {}),
       participation: participation?.status ?? "revoked",
       // standing read live at the organization: presentation for hiding a
       // surface, never an authorization — the commands check at the handler
@@ -508,7 +511,7 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     const idFailure = identifierFailure(input.teamId, "team id");
     if (idFailure !== undefined) return { ok: false, failure: idFailure };
     if (input.displayName !== undefined) {
-      const nameFailure = displayNameFailure(input.displayName, "team display name");
+      const nameFailure = displayLabelFailure(input.displayName, "team display name");
       if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
     }
     const organization = organizationId(input.organizationId);
@@ -575,7 +578,7 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     }
     const replay = checkClaim(op.claims, input);
     if (replay !== undefined) return replay;
-    const nameFailure = displayNameFailure(input.displayName, "team display name");
+    const nameFailure = displayLabelFailure(input.displayName, "team display name");
     if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
     if (team.status === "retired") return fail("invalid-command", "team is retired");
     const changed = (team.displayName ?? null) !== input.displayName;

@@ -104,6 +104,6 @@ test("the airlift twin stands alone: no organization leaks in from the consumer-
     const known = [PROFESSIONAL_OPERATION, FESTIVAL].some((twin) =>
       twin.snapshot.organizations.some((o) => o.organizationId === organization.organizationId),
     );
-    assert.equal(known, false, `${organization.displayName} is an airlift-only organization`);
+    assert.equal(known, false, `${organization.longName} is an airlift-only organization`);
   }
 });

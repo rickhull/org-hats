@@ -27,12 +27,12 @@ const jsonPost = async (path: string, body: unknown): Promise<Response> =>
 // the ops surface seeds the same Cedar Works actors, links, admins, and
 // sealed-config shape, under its own display name and sealed marker
 const orgBootstrap = (organizationId: string) =>
-  organizationBootstrap(organizationId, { displayName: "Ops Works", sealedIdpConfig: "sealed:ops-test" });
+  organizationBootstrap(organizationId, { longName: "Ops Works", sealedIdpConfig: "sealed:ops-test" });
 
 const opBootstrap = (operationId: string, organizationId: string) => ({
   operationId,
   slug: "ops-op",
-  displayName: "Ops Operation",
+  longName: "Ops Operation",
   policy: {
     format: 1,
     id: "policy-ops",

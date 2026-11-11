@@ -52,7 +52,7 @@ import {
   type PrincipalLink,
 } from "./state.ts";
 import { fail, ok } from "./result.ts";
-import { displayNameFailure, identifierFailure } from "./validation.ts";
+import { displayLabelFailure, identifierFailure } from "./validation.ts";
 
 export interface OrganizationDeps {
   readonly orgs: Map<OrganizationId, OrgState>;
@@ -366,7 +366,7 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
     const idFailure = identifierFailure(input.actorId, "actor id");
     if (idFailure !== undefined) return { ok: false, failure: idFailure };
     if (input.displayName !== undefined) {
-      const nameFailure = displayNameFailure(input.displayName, "display name");
+      const nameFailure = displayLabelFailure(input.displayName, "display name");
       if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
     }
     if (org.actors.some((actor) => actor.actorId === input.actorId)) {
@@ -392,7 +392,7 @@ export const createOrganizationCoordinator = (deps: OrganizationDeps): Organizat
     if ("failure" in org) return { ok: false, failure: org.failure };
     const replay = checkClaim(org.claims, input);
     if (replay !== undefined) return replay;
-    const nameFailure = displayNameFailure(input.displayName, "display name");
+    const nameFailure = displayLabelFailure(input.displayName, "display name");
     if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
     const target = org.actors.find((candidate) => candidate.actorId === input.actorId);
     if (target === undefined) return fail("invalid-command", "unknown actor");

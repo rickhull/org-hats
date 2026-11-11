@@ -453,14 +453,14 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
       "GET",
       `/actor?actorId=${encodeURIComponent(claims.actor.actorId)}`,
     );
-    const org = await call<{ organizationId: string; displayName: string | null }>(
+    const org = await call<{ organizationId: string; longName: string | null }>(
       organization(claims.actor.organizationId),
       "GET",
       "/organization",
     );
     const op = await call<{
       operationId: string;
-      operationDisplayName?: string;
+      operationLongName?: string;
       participation: "invited" | "accepted" | "active" | "revoked";
       wearableHats: readonly HatSummary[];
     }>(operation(claims.operationId), "POST", "/context", {
@@ -486,11 +486,11 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
       // standing read live at the organization: presentation for hiding a
       // surface, never an authorization — commands check at the handler
       administrator: actor.value?.administrator === true,
-      ...(org.value?.displayName === null || org.value?.displayName === undefined
+      ...(org.value?.longName === null || org.value?.longName === undefined
         ? {}
-        : { organizationDisplayName: org.value.displayName }),
+        : { organizationLongName: org.value.longName }),
       operationId: claims.operationId,
-      ...(op.value.operationDisplayName === undefined ? {} : { operationDisplayName: op.value.operationDisplayName }),
+      ...(op.value.operationLongName === undefined ? {} : { operationLongName: op.value.operationLongName }),
       participation: op.value.participation,
       wearableHats: op.value.wearableHats,
       ...(selected === undefined

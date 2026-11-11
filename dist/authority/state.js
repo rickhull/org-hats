@@ -29,13 +29,13 @@ export const snapshotOf = (ops, orgs, operationId) => {
     return {
         organizations: [...orgs.values()].map((org) => ({
             organizationId: org.organizationId,
-            ...(org.displayName !== undefined ? { displayName: org.displayName } : {}),
+            ...(org.longName !== undefined ? { longName: org.longName } : {}),
             ...(org.shortName !== undefined ? { shortName: org.shortName } : {}),
         })),
         actors: [...orgs.values()].flatMap((org) => org.actors.map((actor) => ({ ...actor }))),
         operations: [...ops.values()].map((o) => ({
             operationId: o.operationId,
-            ...(o.displayName !== undefined ? { displayName: o.displayName } : {}),
+            ...(o.longName !== undefined ? { longName: o.longName } : {}),
             ...(o.shortName !== undefined ? { shortName: o.shortName } : {}),
             ...(o.slug !== undefined ? { slug: o.slug } : {}),
             ...(o.bounded !== undefined ? { bounded: o.bounded } : {}),

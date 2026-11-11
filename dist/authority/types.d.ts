@@ -116,7 +116,10 @@ export interface HatSummary {
      * offer the switch the summary shows. */
     readonly grantId: string;
     /** The target's display name when the operation set one; absent when it
-     * did not, never a fallback to the id, so a host decides what to show. */
+     * did not, never a fallback to the id, so a host decides what to show.
+     * A target is a team or a site, so this carries a team's `displayName` or
+     * a site's `longName`: the name is the genus over both, not the long half
+     * of a site's pair, which is why it did not become `targetLongName`. */
     readonly targetDisplayName?: string;
 }
 export interface AuthorityContext {
@@ -125,9 +128,9 @@ export interface AuthorityContext {
         readonly actorId: Unbranded<ActorId>;
         readonly displayName?: string;
     };
-    readonly organizationDisplayName?: string;
+    readonly organizationLongName?: string;
     readonly operationId: Unbranded<OperationId>;
-    readonly operationDisplayName?: string;
+    readonly operationLongName?: string;
     readonly participation: "invited" | "accepted" | "active" | "revoked";
     readonly wearableHats: readonly HatSummary[];
     readonly selectedHat?: HatSummary;

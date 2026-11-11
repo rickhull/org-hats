@@ -42,8 +42,8 @@ const invitee: TwinFixture = {
   name: "invitee",
   policy: PROFESSIONAL_OPERATION.policy,
   snapshot: fixtureSnapshot({
-    operations: [{ operationId: "op-dummy", displayName: "Dummy Home Op" }],
-    organizations: [{ organizationId: "org-invitee", displayName: "Cedar Works" }],
+    operations: [{ operationId: "op-dummy", longName: "Dummy Home Op" }],
+    organizations: [{ organizationId: "org-invitee", longName: "Cedar Works" }],
     actors: [
       { organizationId: "org-invitee", actorId: "actor-inv-lead", displayName: "Nia Fields" },
     ],
@@ -866,11 +866,11 @@ test("the short name is a second display label, carried to the exported snapshot
     name: "professional",
     policy: PROFESSIONAL_OPERATION.policy,
     snapshot: fixtureSnapshot({
-      operations: [{ operationId: "op-labelled", displayName: "Porsche Experience Centers", shortName: "PEC" }],
-      organizations: [{ organizationId: "org-labelled", displayName: "AMCI Global", shortName: "AMCI" }],
+      operations: [{ operationId: "op-labelled", longName: "Porsche Experience Centers", shortName: "PEC" }],
+      organizations: [{ organizationId: "org-labelled", longName: "AMCI Global", shortName: "AMCI" }],
       actors: [{ organizationId: "org-labelled", actorId: "actor-labelled" }],
       sites: [
-        { siteId: "site-atl", operationId: "op-labelled", displayName: "Atlanta, GA", shortName: "PEC-ATL", aliases: [] },
+        { siteId: "site-atl", operationId: "op-labelled", longName: "Atlanta, GA", shortName: "PEC-ATL", aliases: [] },
         { siteId: "site-bare", operationId: "op-labelled", aliases: [] },
       ],
       teams: [{ teamId: "team-labelled", siteId: "site-atl", organizationId: "org-labelled" }],
@@ -887,13 +887,13 @@ test("the short name is a second display label, carried to the exported snapshot
   assert.ok(snapshot !== undefined);
 
   const operation = snapshot.operations.find((o) => o.operationId === "op-labelled");
-  assert.equal(operation?.displayName, "Porsche Experience Centers", "the long form stores without the parenthetical");
+  assert.equal(operation?.longName, "Porsche Experience Centers", "the long form stores without the parenthetical");
   assert.equal(operation?.shortName, "PEC");
   const organization = snapshot.organizations.find((o) => o.organizationId === "org-labelled");
-  assert.equal(organization?.displayName, "AMCI Global");
+  assert.equal(organization?.longName, "AMCI Global");
   assert.equal(organization?.shortName, "AMCI");
   const site = snapshot.sites.find((s) => s.siteId === "site-atl");
-  assert.equal(site?.displayName, "Atlanta, GA");
+  assert.equal(site?.longName, "Atlanta, GA");
   assert.equal(site?.shortName, "PEC-ATL");
 
   // Absent is absent: an unset short name is not an empty string and not a

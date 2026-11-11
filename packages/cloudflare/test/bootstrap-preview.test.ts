@@ -13,7 +13,7 @@ interface Change {
 interface Preview { readonly coordinator: "operation"; readonly changes: readonly Change[] }
 
 const input = (operationId: string) => ({
-  operationId, slug: "preview", displayName: "Preview operation",
+  operationId, slug: "preview", longName: "Preview operation",
   policy: {
     format: 1, id: "preview", version: "1", actions: ["observe"],
     roles: [{ title: "field", actions: ["observe"] }],
@@ -71,10 +71,10 @@ describe("operation bootstrap preview", () => {
     const original = input(id);
     expect((await call(stub(id), "POST", "/bootstrap", original)).body.ok).toBe(true);
     const changed = {
-      ...original, displayName: "Updated operation",
+      ...original, longName: "Updated operation",
       teams: original.teams.map((team) => ({ ...team, displayName: "Ignored rename" })),
       grants: original.grants.map((grant) => ({ ...grant, primary: false, revoked: true })),
-      sites: original.sites.map((site) => ({ ...site, displayName: "Updated site" })),
+      sites: original.sites.map((site) => ({ ...site, longName: "Updated site" })),
     };
     const before = await exported(id);
     const result = await (await preview(changed)).json() as Envelope<Preview>;

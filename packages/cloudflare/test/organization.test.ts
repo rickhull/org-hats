@@ -521,7 +521,7 @@ describe("the outbox drain is bounded per invocation", () => {
     expect(empty.body.failure?.kind).toBe("invalid-command");
 
     const longDisplay = await call(stub, "POST", "/bootstrap", {
-      ...organizationBootstrap("org/label-rule", { displayName: long }),
+      ...organizationBootstrap("org/label-rule", { longName: long }),
     });
     expect(longDisplay.body.failure?.kind).toBe("invalid-command");
 

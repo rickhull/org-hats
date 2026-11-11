@@ -16,7 +16,7 @@ import {
   type StateRow,
 } from "./state";
 import { initializeOrganizationSchema, ORGANIZATION_SCHEMA_VERSION } from "./schema/organization";
-import { displayNameFailure, identifierFailure } from "./validation";
+import { displayLabelFailure, identifierFailure } from "./validation";
 import { handleOrganizationRequest } from "./http/organization";
 
 /** One organization authority. The object owns the facts that stay stable
@@ -44,7 +44,7 @@ const payloadOf = (input: Record<string, unknown>): string =>
 
 export interface BootstrapInput {
   readonly organizationId: string;
-  readonly displayName?: string;
+  readonly longName?: string;
   /** The short display label, presentation only and never an address. */
   readonly shortName?: string;
   readonly actors: readonly {
@@ -248,14 +248,14 @@ export class OrganizationAuthority extends DurableObject<Env> {
     // use: a refused label never persists and leaves the organization
     // unbootstrapped rather than half-named.
     for (const [value, label] of [
-      [input.displayName, "organization display name"],
+      [input.longName, "organization long name"],
       [input.shortName, "organization short name"],
     ] as const) {
-      const nameFailure = displayNameFailure(value, label);
+      const nameFailure = displayLabelFailure(value, label);
       if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
     }
     for (const actor of input.actors) {
-      const nameFailure = displayNameFailure(actor.displayName, `actor ${actor.actorId} display name`);
+      const nameFailure = displayLabelFailure(actor.displayName, `actor ${actor.actorId} display name`);
       if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
     }
     const at = now();
@@ -301,7 +301,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
            sealed_idp_config_updated_at = COALESCE(excluded.sealed_idp_config_updated_at, organization.sealed_idp_config_updated_at),
            updated_at = excluded.updated_at`,
         input.organizationId,
-        input.displayName ?? null,
+        input.longName ?? null,
         input.shortName ?? null,
         input.sealedIdpConfig ?? null,
         input.sealedIdpConfig === undefined ? null : at,
@@ -760,7 +760,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
       if (!this.isAdmin(input.byActorId)) return failure("denied", "the caller does not administer this organization");
       const idFailure = identifierFailure(input.actorId, "actor id");
       if (idFailure !== undefined) return { ok: false, failure: idFailure };
-      const nameFailure = displayNameFailure(input.displayName);
+      const nameFailure = displayLabelFailure(input.displayName);
       if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
       if (this.actor(input.actorId) !== undefined) return failure("invalid-command", "actor already exists");
       this.ctx.storage.sql.exec(
@@ -791,7 +791,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
       const replay = this.replay(input.idempotencyKey, payload);
       if (replay !== undefined) return replay;
       if (!this.isAdmin(input.byActorId)) return failure("denied", "the caller does not administer this organization");
-      const nameFailure = displayNameFailure(input.displayName);
+      const nameFailure = displayLabelFailure(input.displayName);
       if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
       const target = this.actor(input.actorId);
       if (target === undefined) return failure("invalid-command", "unknown actor");
@@ -937,15 +937,15 @@ export class OrganizationAuthority extends DurableObject<Env> {
     };
   }
 
-  private organizationSummary(): { readonly organizationId: string | null; readonly displayName: string | null } {
+  private organizationSummary(): { readonly organizationId: string | null; readonly longName: string | null } {
     const organizationId = this.organizationId();
     const organization = organizationId === undefined
       ? undefined
       : this.one("SELECT display_name FROM organization WHERE organization_id = ?", organizationId);
-    const displayName = organization?.["display_name"];
+    const longName = organization?.["display_name"];
     return {
       organizationId: organizationId ?? null,
-      displayName: displayName === undefined || displayName === null ? null : String(displayName),
+      longName: longName === undefined || longName === null ? null : String(longName),
     };
   }
 
@@ -965,7 +965,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
     return {
       schemaVersion: String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0"),
       organizationId: organizationId ?? null,
-      displayName: organization?.["display_name"] ?? null,
+      longName: organization?.["display_name"] ?? null,
       shortName: organization?.["short_name"] ?? null,
       hasSealedIdpConfig: organization?.["sealed_idp_config"] !== null && organization?.["sealed_idp_config"] !== undefined,
       actors: count("actors"),

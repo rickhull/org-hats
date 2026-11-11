@@ -34,10 +34,10 @@ export const call = async <T>(
 
 export const organizationBootstrap = (
   organizationId: string,
-  overrides: { readonly displayName?: string; readonly sealedIdpConfig?: string } = {},
+  overrides: { readonly longName?: string; readonly sealedIdpConfig?: string } = {},
 ) => ({
   organizationId,
-  displayName: overrides.displayName ?? "Cedar Works",
+  longName: overrides.longName ?? "Cedar Works",
   actors: [
     { actorId: "actor-lead", displayName: "Nia Fields" },
     { actorId: "actor-crew", displayName: "Sam Whitfield" },

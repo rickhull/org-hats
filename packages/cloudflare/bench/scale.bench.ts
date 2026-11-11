@@ -133,7 +133,7 @@ it("scaled-world hot paths", async () => {
   for (const [org, letter] of [[ORG_A, "a"], [ORG_B, "b"]] as const) {
     await post(organization(org), "/bootstrap", {
       organizationId: org,
-      displayName: `Scale ${letter.toUpperCase()}`,
+      longName: `Scale ${letter.toUpperCase()}`,
       actors: Array.from({ length: ACTORS_PER_ORG }, (_, i) => ({
         actorId: `actor-${letter}${pad(i)}`,
         displayName: `Scale ${letter}${pad(i)}`,
@@ -151,7 +151,7 @@ it("scaled-world hot paths", async () => {
   await post(operation(OP), "/bootstrap", {
     operationId: OP,
     slug: "scale",
-    displayName: "Scale Operation",
+    longName: "Scale Operation",
     policy: {
       format: 1,
       id: "policy-scale",

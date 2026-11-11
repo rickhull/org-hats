@@ -40,7 +40,7 @@ const bootstrapOperation = async (current: World, participating = false) =>
     operationId: current.opId,
     slug: "test-op",
     ...(participating ? { participations: [{ organizationId: current.orgId, status: "active" }] } : {}),
-    displayName: "Test Operation",
+    longName: "Test Operation",
     policy: {
       format: 1,
       id: "policy-test",
@@ -516,7 +516,7 @@ describe("OperationAuthority", () => {
     await call(current.op, "POST", "/bootstrap", {
       operationId: current.opId,
       slug: "test-op",
-      displayName: "Test Operation",
+      longName: "Test Operation",
       policy: {
         format: 1,
         id: "policy-test",
@@ -692,7 +692,7 @@ describe("OperationAuthority", () => {
     expect((await call(current.op, "POST", "/bootstrap", {
       operationId: current.opId,
       slug: "test-op",
-      displayName: "Porsche Experience Centers",
+      longName: "Porsche Experience Centers",
       shortName: "PEC",
       policy: {
         format: 1,
@@ -703,8 +703,8 @@ describe("OperationAuthority", () => {
         readPolicy: { organizations: "granted-teams" },
       },
       sites: [
-        { siteId: SITE, path: "site", aliases: ["site"], displayName: "Atlanta, GA", shortName: "PEC-ATL" },
-        { siteId: "site-bare", path: "bare", aliases: [], displayName: "No Short Form" },
+        { siteId: SITE, path: "site", aliases: ["site"], longName: "Atlanta, GA", shortName: "PEC-ATL" },
+        { siteId: "site-bare", path: "bare", aliases: [], longName: "No Short Form" },
       ],
       teams: [],
       grants: [],
@@ -737,10 +737,53 @@ describe("OperationAuthority", () => {
     expect(restored.body.value?.sites.find((site) => site.siteId === SITE)?.shortName).toBe("PEC-ATL");
   });
 
+  it("a bootstrap body sending the interface-3 `displayName` stores no long name, silently", async () => {
+    // This pins the deploy-order rule in docs/migration-v4.md. The rename
+    // moved an optional field, so an interface-3 body is not refused — the
+    // parser reads `longName` and never looks at `displayName`, and the
+    // operation bootstraps nameless. A 4.x authority deployed in front of a
+    // consumer that still sends the old name loses every long name without
+    // an error, which is why the consumer release goes first.
+    //
+    // If this test ever fails because the body was accepted or refused, the
+    // boundary gained dual-accept or a legacy-key refusal: update the
+    // migration note's deploy-order section with it.
+    const current = world("legacy-label");
+    expect((await bootstrapOrganization(current)).body.ok).toBe(true);
+    const sent = await call(current.op, "POST", "/bootstrap", {
+      operationId: current.opId,
+      slug: "legacy",
+      displayName: "Interface Three Name",
+      policy: {
+        format: 1,
+        id: "policy-legacy",
+        version: "1",
+        actions: ["observe"],
+        roles: [{ title: "field", actions: ["observe"] }],
+        readPolicy: { organizations: "granted-teams" },
+      },
+      sites: [{ siteId: SITE, path: "site", aliases: ["site"], displayName: "Interface Three Site" }],
+      teams: [],
+      grants: [],
+    });
+    expect(sent.body.ok).toBe(true);
+    // Read the stored column, not a projection: this is the fact that was
+    // lost, and the export is the only read that shows the operation's own
+    // long name without a signed-in envelope.
+    const exported = await call<{
+      readonly tables: Readonly<Record<string, readonly Record<string, unknown>[]>>;
+    }>(current.op, "GET", "/export");
+    const tables = exported.body.value?.tables;
+    expect(tables).toBeDefined();
+    if (tables === undefined) return;
+    expect(tables["operation"]?.[0]?.["display_name"]).toBe(null);
+    expect(tables["sites"]?.find((row) => row["site_id"] === SITE)?.["display_name"]).toBe(null);
+  });
+
   it("refuses a display label the display-name rule rejects, at bootstrap", async () => {
     // The consumer asked for this boundary: rejecting a bad short name before
     // it persists beats remembering not to send one. Bootstrap validated no
-    // name at all before this, so `displayName` is checked by the same rule —
+    // name at all before this, so `longName` is checked by the same rule —
     // one unvalidated label beside a validated one at the same boundary is
     // the asymmetry that becomes a bug later.
     const current = world("label-rule");
@@ -766,7 +809,7 @@ describe("OperationAuthority", () => {
     expect(tooLong.body.failure?.kind).toBe("invalid-command");
     const empty = await call(current.op, "POST", "/bootstrap", { ...base, shortName: "   ", sites: [site] });
     expect(empty.body.failure?.kind).toBe("invalid-command");
-    const longDisplay = await call(current.op, "POST", "/bootstrap", { ...base, displayName: long, sites: [site] });
+    const longDisplay = await call(current.op, "POST", "/bootstrap", { ...base, longName: long, sites: [site] });
     expect(longDisplay.body.failure?.kind).toBe("invalid-command");
     const badSite = await call(current.op, "POST", "/bootstrap", {
       ...base,

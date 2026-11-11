@@ -25,18 +25,24 @@ import { actionsOf } from "./policy.ts";
 
 // --- entities ------------------------------------------------------------------
 
-/** A display label an entity carries for presentation. `displayName` is the
- * long form and `shortName` the short form people say — "Porsche Experience
- * Centers" and `PEC`. Both are volunteered, bootstrap-set, never unique, and
+/** A display label an entity carries for presentation. `longName` and
+ * `shortName` are the two halves of one pair — the full form and the short
+ * form people say. Both are volunteered, bootstrap-set, never unique, and
  * never read by a decision; neither is derivable from the other, which is why
  * the short form is stored rather than computed. The long form carries no
  * parenthetical: a host composes "Long (SHORT)" from the two, so one name has
  * one place to edit it. A short name is not an identity, a key, a slug, or a
  * path — `Operation.slug` and `Site.path` are the routing facts, and this
- * never determines an address. */
+ * never determines an address.
+ *
+ * Only the three entities that carry a pair use `longName`. An `Actor` and a
+ * `Team` keep `displayName`, a single label with no counterpart: an actor's
+ * comes from the OIDC `name` claim, and a team's is already the short form.
+ * `longName` means the long half of a pair, so it would be a false name on
+ * either. */
 export interface Organization {
   readonly organizationId: OrganizationId;
-  readonly displayName?: string;
+  readonly longName?: string;
   readonly shortName?: string;
 }
 
@@ -46,6 +52,8 @@ export interface Organization {
 export interface Actor {
   readonly organizationId: OrganizationId;
   readonly actorId: ActorId;
+  /** A single display label with no short counterpart — this is the OIDC
+   * `name` claim, not the long half of a pair, so it is not `longName`. */
   readonly displayName?: string;
   /** A disabled actor holds no wearable hat and issues no new access; the
    * flag is organization-owned and binds every operation. */
@@ -54,7 +62,7 @@ export interface Actor {
 
 export interface Operation {
   readonly operationId: OperationId;
-  readonly displayName?: string;
+  readonly longName?: string;
   /** The short display label, the same rule as `Organization.shortName`. */
   readonly shortName?: string;
   /** The one DNS label naming this operation's hostname. The registry
@@ -73,7 +81,7 @@ export interface Operation {
 export interface Site {
   readonly siteId: SiteId;
   readonly operationId: OperationId;
-  readonly displayName?: string;
+  readonly longName?: string;
   /** The short display label, the same rule as `Organization.shortName`.
    * Distinct from `path`, which is the address: a site may be `PEC-ATL` to
    * the people there and `atlanta` in a URL. */
@@ -91,6 +99,9 @@ export interface Team {
   readonly teamId: TeamId;
   readonly siteId: SiteId;
   readonly organizationId: OrganizationId;
+  /** A single display label with no short counterpart — a team's label is
+   * already the short form, so it is not the long half of a pair. When teams
+   * acquire a `shortName`, this becomes `longName` with them. */
   readonly displayName?: string;
 }
 

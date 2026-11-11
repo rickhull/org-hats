@@ -113,7 +113,7 @@ export type AssertPlainId<T extends true> = T;
  * outlives the call signatures that produced it, so a command-surface break
  * must not strand live sessions. The envelope's own version pair is what
  * gates. */
-export declare const AUTHORITY_INTERFACE_VERSION: 3;
+export declare const AUTHORITY_INTERFACE_VERSION: 4;
 export type AuthorityInterfaceVersion = typeof AUTHORITY_INTERFACE_VERSION;
 /** The interface version as envelope claims record it: which runtime
  * interface issued them. Provenance, not a gate — `verify` never refuses a

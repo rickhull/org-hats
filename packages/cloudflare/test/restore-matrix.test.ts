@@ -314,7 +314,7 @@ describe("a crafted snapshot's undelivered outbox rows", () => {
     expect((await call(op, "POST", "/bootstrap", {
       operationId: opId,
       slug: "replay-op",
-      displayName: "Replay Operation",
+      longName: "Replay Operation",
       policy: {
         format: 1,
         id: "policy-replay",

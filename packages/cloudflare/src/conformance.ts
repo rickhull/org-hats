@@ -61,7 +61,7 @@ export const createCloudflareConformanceWorld = async (env: Env): Promise<Confor
       .map((link) => ({ provider: link.provider, subject: link.subject, actorId: link.actorId }));
     await post(organization(id), "/bootstrap", {
       organizationId: id,
-      ...(organizationRecord?.displayName === undefined ? {} : { displayName: organizationRecord.displayName }),
+      ...(organizationRecord?.longName === undefined ? {} : { longName: organizationRecord.longName }),
       ...(organizationRecord?.shortName === undefined ? {} : { shortName: organizationRecord.shortName }),
       actors,
       principalLinks,
@@ -79,7 +79,7 @@ export const createCloudflareConformanceWorld = async (env: Env): Promise<Confor
     await post(operation(operationRecord.operationId), "/bootstrap", {
       operationId: operationRecord.operationId,
       slug,
-      ...(operationRecord.displayName === undefined ? {} : { displayName: operationRecord.displayName }),
+      ...(operationRecord.longName === undefined ? {} : { longName: operationRecord.longName }),
       ...(operationRecord.shortName === undefined ? {} : { shortName: operationRecord.shortName }),
       ...(operationRecord.bounded === true ? { bounded: true } : {}),
       policy: fixture.policy,
@@ -90,7 +90,7 @@ export const createCloudflareConformanceWorld = async (env: Env): Promise<Confor
         return {
           siteId: site.siteId,
           path,
-          ...(site.displayName === undefined ? {} : { displayName: site.displayName }),
+          ...(site.longName === undefined ? {} : { longName: site.longName }),
           ...(site.shortName === undefined ? {} : { shortName: site.shortName }),
           aliases: [...site.aliases],
         };

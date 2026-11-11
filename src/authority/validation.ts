@@ -14,9 +14,11 @@ export const identifierFailure = (value: string, label: string): Failure | undef
   return undefined;
 };
 
-/** A display name: `null` clears it; a string must be non-empty and at most
- * 200 characters. */
-export const displayNameFailure = (value: string | null, label = "display name"): Failure | undefined => {
+/** Any display label — a `longName`, a `shortName`, or the single
+ * `displayName` an actor or team carries. One rule governs all of them:
+ * `null` clears it; a string must be non-empty and at most 200 characters.
+ * The name says label, not name, because a short name is one of these too. */
+export const displayLabelFailure = (value: string | null, label = "display name"): Failure | undefined => {
   if (value === null) return undefined;
   if (value.trim().length === 0) return { kind: "invalid-command", detail: `${label} is empty` };
   if (value.length > 200) return { kind: "invalid-command", detail: `${label} is too long` };

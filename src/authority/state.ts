@@ -46,7 +46,7 @@ export interface Claim {
 
 export interface OrgState {
   readonly organizationId: OrganizationId;
-  readonly displayName?: string;
+  readonly longName?: string;
   readonly shortName?: string;
   actors: { organizationId: OrganizationId; actorId: ActorId; displayName?: string; disabled?: boolean }[];
   /** Administrator standing, seeded at bootstrap and changed only by the
@@ -85,7 +85,7 @@ export interface RefreshRecord {
 
 export interface OpState {
   readonly operationId: OperationId;
-  readonly displayName?: string;
+  readonly longName?: string;
   readonly shortName?: string;
   readonly slug?: string;
   readonly bounded?: boolean;
@@ -93,7 +93,7 @@ export interface OpState {
   sites: {
     siteId: SiteId;
     operationId: OperationId;
-    displayName?: string;
+    longName?: string;
     shortName?: string;
     path?: string;
     aliases: readonly string[];
@@ -166,13 +166,13 @@ export const snapshotOf = (
   return {
     organizations: [...orgs.values()].map((org) => ({
       organizationId: org.organizationId,
-      ...(org.displayName !== undefined ? { displayName: org.displayName } : {}),
+      ...(org.longName !== undefined ? { longName: org.longName } : {}),
       ...(org.shortName !== undefined ? { shortName: org.shortName } : {}),
     })),
     actors: [...orgs.values()].flatMap((org) => org.actors.map((actor) => ({ ...actor }))),
     operations: [...ops.values()].map((o) => ({
       operationId: o.operationId,
-      ...(o.displayName !== undefined ? { displayName: o.displayName } : {}),
+      ...(o.longName !== undefined ? { longName: o.longName } : {}),
       ...(o.shortName !== undefined ? { shortName: o.shortName } : {}),
       ...(o.slug !== undefined ? { slug: o.slug } : {}),
       ...(o.bounded !== undefined ? { bounded: o.bounded } : {}),

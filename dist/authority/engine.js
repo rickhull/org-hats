@@ -57,7 +57,7 @@ export const createInMemoryAuthority = async (config = {}) => {
             throw new Error("a fixture needs an operation");
         ops.set(op.operationId, {
             operationId: op.operationId,
-            ...(op.displayName !== undefined ? { displayName: op.displayName } : {}),
+            ...(op.longName !== undefined ? { longName: op.longName } : {}),
             ...(op.shortName !== undefined ? { shortName: op.shortName } : {}),
             ...(op.slug !== undefined ? { slug: op.slug } : {}),
             ...(op.bounded !== undefined ? { bounded: op.bounded } : {}),
@@ -76,7 +76,7 @@ export const createInMemoryAuthority = async (config = {}) => {
             if (!orgs.has(organization.organizationId)) {
                 orgs.set(organization.organizationId, {
                     organizationId: organization.organizationId,
-                    ...(organization.displayName !== undefined ? { displayName: organization.displayName } : {}),
+                    ...(organization.longName !== undefined ? { longName: organization.longName } : {}),
                     ...(organization.shortName !== undefined ? { shortName: organization.shortName } : {}),
                     actors: [],
                     admins: [],

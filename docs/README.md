@@ -72,6 +72,11 @@ public `org-hats` docs are normative for the seam.
   version 3, the `action-not-carried` reason, and `teamReach()`; envelope
   format 1 keeps reading; plus the 3.7.1 patch hardening and its host
   acceptance checks.
+- [`migration-v4.md`](migration-v4.md) — the 3.x → 4.0 break: interface
+  version 4 and `displayName` → `longName` on the three entities carrying a
+  short counterpart, with an actor and a team keeping `displayName`; no
+  schema version moves, no export is stranded, envelope format 1 keeps
+  reading, and the consumer release deploys before the authority.
 - [`release_review_v3.7.1.md`](release_review_v3.7.1.md) — the bounded
   standards/spec review and source-level consumer acceptance for the
   access-integrity patch pair.

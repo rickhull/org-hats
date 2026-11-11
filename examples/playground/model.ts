@@ -6,7 +6,7 @@ import {
 import { ed25519VerifyKey, verify } from "../../dist/access/index.js";
 
 const fixtures = [PROFESSIONAL_OPERATION, FESTIVAL];
-const west = PROFESSIONAL_OPERATION.snapshot.sites.find((site) => site.displayName === "West Yard")!;
+const west = PROFESSIONAL_OPERATION.snapshot.sites.find((site) => site.longName === "West Yard")!;
 const len = PROFESSIONAL_OPERATION.snapshot.actors.find((actor) => actor.displayName === "Len Chu")!;
 const provider = "playground";
 const evidence = (organizationId: string, actorId: string) => ({ provider, subject: JSON.stringify([organizationId, actorId]) });
@@ -86,22 +86,22 @@ export async function createPlayground() {
     const access = verified && !isFailed(verified) ? verified.access : null;
     const verification = !verified ? "unauthenticated" : isFailed(verified) ? verified.failure.kind : "valid";
     const targetLabel = (target: typeof state.grants[number]["target"]) => target.kind === "site"
-      ? state.sites.find((site) => site.siteId === target.siteId)?.displayName ?? target.siteId
+      ? state.sites.find((site) => site.siteId === target.siteId)?.longName ?? target.siteId
       : state.teams.find((team) => team.teamId === target.teamId)?.displayName ?? target.teamId;
     const hat = (grant: typeof state.grants[number]) => ({ grantId: grant.grantId, role: grant.role, targetLabel: targetLabel(grant.target) });
     const worn = state.grants.find((grant) => grant.grantId === session?.grantId);
     return {
-      operations: fixtures.map((world) => ({ id: world.snapshot.operations[0]!.operationId, name: world.snapshot.operations[0]!.displayName ?? world.snapshot.operations[0]!.operationId })),
-      operation: { id: operation.operationId, name: operation.displayName ?? operation.operationId, readPolicy: fixture.policy.readPolicy.organizations },
-      actors: state.actors.filter((actor) => fixture.snapshot.actors.some((candidate) => candidate.actorId === actor.actorId && candidate.organizationId === actor.organizationId)).map((actor) => ({ id: actor.actorId, label: actor.displayName ?? actor.actorId, organization: state.organizations.find((org) => org.organizationId === actor.organizationId)?.displayName ?? actor.organizationId })),
+      operations: fixtures.map((world) => ({ id: world.snapshot.operations[0]!.operationId, name: world.snapshot.operations[0]!.longName ?? world.snapshot.operations[0]!.operationId })),
+      operation: { id: operation.operationId, name: operation.longName ?? operation.operationId, readPolicy: fixture.policy.readPolicy.organizations },
+      actors: state.actors.filter((actor) => fixture.snapshot.actors.some((candidate) => candidate.actorId === actor.actorId && candidate.organizationId === actor.organizationId)).map((actor) => ({ id: actor.actorId, label: actor.displayName ?? actor.actorId, organization: state.organizations.find((org) => org.organizationId === actor.organizationId)?.longName ?? actor.organizationId })),
       selectedActorId, now, issuedAt: session?.envelope.claims.iat ?? null, expiresAt: session?.envelope.claims.exp ?? null,
       verification, refreshOutcome: session?.refreshOutcome ?? missingRefreshOutcome, bindingProbe, selectedHat: worn ? hat(worn) : null,
       hats: state.grants.filter((grant) => grant.actorId === selectedActorId && !grant.revoked).map(hat),
-      sites: state.sites.map((site) => ({ id: site.siteId, label: site.displayName ?? site.siteId, configurable: access?.mayConfigure(site.siteId) ?? false })),
+      sites: state.sites.map((site) => ({ id: site.siteId, label: site.longName ?? site.siteId, configurable: access?.mayConfigure(site.siteId) ?? false })),
       teams: state.teams.map((team) => ({
         id: team.teamId, siteId: team.siteId, label: team.displayName ?? team.teamId,
-        siteLabel: state.sites.find((site) => site.siteId === team.siteId)?.displayName ?? team.siteId,
-        organizationLabel: state.organizations.find((org) => org.organizationId === team.organizationId)?.displayName ?? team.organizationId,
+        siteLabel: state.sites.find((site) => site.siteId === team.siteId)?.longName ?? team.siteId,
+        organizationLabel: state.organizations.find((org) => org.organizationId === team.organizationId)?.longName ?? team.organizationId,
         actions: fixture.policy.actions.filter((action) => access?.mayAct(action, { kind: "team", teamId: team.teamId }) ?? false),
         readable: access ? access.readableOrganizationIds().includes(team.organizationId) || access.readableTeamIds().includes(team.teamId) : false,
         reachable: access?.teamReach().includes(team.teamId) ?? false,

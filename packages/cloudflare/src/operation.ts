@@ -47,7 +47,7 @@ import {
   OUTBOX_DRAIN_LIMIT,
 } from "./state";
 import { initializeOperationSchema } from "./schema/operation";
-import { displayNameFailure, identifierFailure } from "./validation";
+import { displayLabelFailure, identifierFailure } from "./validation";
 import { handleOperationRequest } from "./http/operation";
 import {
   rowActorId,
@@ -99,7 +99,7 @@ const targetColumns = (target: Unbranded<GrantTarget>): readonly [string, string
 
 export interface SiteInput {
   readonly siteId: string;
-  readonly displayName?: string;
+  readonly longName?: string;
   /** The short display label, presentation only and distinct from `path`:
    * a site may be `PEC-ATL` to the people there and `atlanta` in a URL. */
   readonly shortName?: string;
@@ -164,7 +164,7 @@ export interface ParticipationInput {
 
 export interface BootstrapInput {
   readonly operationId: string;
-  readonly displayName?: string;
+  readonly longName?: string;
   /** The short display label, presentation only and never an address. */
   readonly shortName?: string;
   /** The one DNS label naming the operation hostname. */
@@ -480,23 +480,23 @@ export class OperationAuthority extends DurableObject<Env> {
     // Both labels, not just the short one — an unvalidated field beside a
     // validated one at one boundary is an asymmetry nothing justifies.
     for (const [value, label] of [
-      [input.displayName, "operation display name"],
+      [input.longName, "operation long name"],
       [input.shortName, "operation short name"],
     ] as const) {
-      const nameFailure = displayNameFailure(value, label);
+      const nameFailure = displayLabelFailure(value, label);
       if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
     }
     for (const site of input.sites) {
       for (const [value, label] of [
-        [site.displayName, `site ${site.siteId} display name`],
+        [site.longName, `site ${site.siteId} long name`],
         [site.shortName, `site ${site.siteId} short name`],
       ] as const) {
-        const nameFailure = displayNameFailure(value, label);
+        const nameFailure = displayLabelFailure(value, label);
         if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
       }
     }
     for (const team of input.teams) {
-      const nameFailure = displayNameFailure(team.displayName, `team ${team.teamId} display name`);
+      const nameFailure = displayLabelFailure(team.displayName, `team ${team.teamId} display name`);
       if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
     }
     // Routing facts are operation-authority facts. Validate the whole set
@@ -546,7 +546,7 @@ export class OperationAuthority extends DurableObject<Env> {
            envelope_lifetime_seconds = excluded.envelope_lifetime_seconds,
            updated_at = excluded.updated_at`,
         input.operationId,
-        input.displayName ?? null,
+        input.longName ?? null,
         input.shortName ?? null,
         input.slug,
         input.bounded === true ? 1 : 0,
@@ -568,7 +568,7 @@ export class OperationAuthority extends DurableObject<Env> {
              aliases_json = excluded.aliases_json,
              updated_at = excluded.updated_at`,
           site.siteId,
-          site.displayName ?? null,
+          site.longName ?? null,
           site.shortName ?? null,
           site.path,
           canonicalJson(site.aliases as unknown as JsonValue),
@@ -927,7 +927,7 @@ export class OperationAuthority extends DurableObject<Env> {
       if (replay !== undefined) return replay;
       const idFailure = identifierFailure(input.teamId, "team id");
       if (idFailure !== undefined) return { ok: false, failure: idFailure };
-      const nameFailure = displayNameFailure(input.displayName, "team display name");
+      const nameFailure = displayLabelFailure(input.displayName, "team display name");
       if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
       const standing = this.one("SELECT status FROM participations WHERE organization_id = ?", input.organizationId);
       if (standing === undefined || String(standing["status"]) !== "active") {
@@ -996,7 +996,7 @@ export class OperationAuthority extends DurableObject<Env> {
       if (String(team["organization_id"]) !== input.byOrganizationId) {
         return failure("denied", "the caller does not administer this team's organization");
       }
-      const nameFailure = displayNameFailure(input.displayName, "team display name");
+      const nameFailure = displayLabelFailure(input.displayName, "team display name");
       if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
       if (String(team["status"]) === "retired") return failure("invalid-command", "team is retired");
       const current = team["display_name"] === null ? null : String(team["display_name"]);
@@ -1292,9 +1292,14 @@ export class OperationAuthority extends DurableObject<Env> {
       operationSlug: this.one("SELECT slug FROM operation LIMIT 1")?.["slug"] ?? null,
       operationShortName: this.one("SELECT short_name FROM operation LIMIT 1")?.["short_name"] ?? null,
       policy: this.policy() ?? null,
+      // The column is `display_name` and the field is `longName`: the wire
+      // name moved at interface 4 and the column deliberately did not.
+      // Renaming the column would make every export taken before the rename
+      // restore with the long name silently null, because `restoreTables`
+      // inserts by current column name (plans/display_labels.md § Step 2).
       sites: this.rows("SELECT site_id, display_name, short_name, path, aliases_json FROM sites ORDER BY site_id").map((row) => ({
         siteId: String(row["site_id"]),
-        displayName: row["display_name"],
+        longName: row["display_name"],
         shortName: row["short_name"],
         path: row["path"],
         aliases: JSON.parse(String(row["aliases_json"])) as unknown,
@@ -1344,7 +1349,7 @@ export class OperationAuthority extends DurableObject<Env> {
     const sites = this.rows("SELECT site_id, display_name, path, aliases_json FROM sites").map((row) => ({
       siteId: rowSiteId(row),
       operationId,
-      ...(row["display_name"] === null ? {} : { displayName: rowText(row, "display_name") }),
+      ...(row["display_name"] === null ? {} : { longName: rowText(row, "display_name") }),
       ...(row["path"] === null ? {} : { path: rowText(row, "path") }),
       aliases: JSON.parse(rowText(row, "aliases_json")) as string[],
     }));
@@ -1630,7 +1635,7 @@ export class OperationAuthority extends DurableObject<Env> {
     }
     return value({
       operationId: rowOperationId(operation),
-      ...(operation["display_name"] === null ? {} : { operationDisplayName: rowText(operation, "display_name") }),
+      ...(operation["display_name"] === null ? {} : { operationLongName: rowText(operation, "display_name") }),
       participation: status as "invited" | "accepted" | "active" | "revoked",
       wearableHats: wearable,
     });

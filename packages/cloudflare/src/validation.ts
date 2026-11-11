@@ -19,7 +19,7 @@ export const identifierFailure = (value: string, label: string): Failure | undef
 
 /** A display name: `null` clears it; a string must be non-empty after
  * trimming and at most 200 characters. */
-export const displayNameFailure = (
+export const displayLabelFailure = (
   value: string | null | undefined,
   label = "display name",
 ): Failure | undefined => {

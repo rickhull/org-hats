@@ -83,8 +83,8 @@ export async function createActivationLesson() {
     const verified = envelope ? await verify(envelope, keys, { now, expectedOperationId: operation.operationId }) : null;
     const access = verified && !isFailed(verified) ? verified.access : null;
     return {
-      operationName: operation.displayName ?? operation.operationId,
-      actor: { id: newcomerId, label: actor?.displayName ?? "New teammate", organization: state.organizations.find((org) => org.organizationId === HARBOR_LOGISTICS)?.displayName ?? HARBOR_LOGISTICS, exists: !!actor },
+      operationName: operation.longName ?? operation.operationId,
+      actor: { id: newcomerId, label: actor?.displayName ?? "New teammate", organization: state.organizations.find((org) => org.organizationId === HARBOR_LOGISTICS)?.longName ?? HARBOR_LOGISTICS, exists: !!actor },
       linked,
       activation: { requested: secret !== null, usable, acceptance },
       grant: { present: !!grant, role: grant?.role ?? "field", targetLabel: yard.displayName ?? yard.teamId },

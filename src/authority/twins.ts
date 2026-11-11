@@ -87,11 +87,11 @@ export const PROFESSIONAL_OPERATION: TwinFixture = twin({
   name: "professional",
   policy: professionalPolicy,
   snapshot: {
-    operations: [{ operationId: OP, displayName: "Meridian Field Services", slug: "meridian" }],
+    operations: [{ operationId: OP, longName: "Meridian Field Services", slug: "meridian" }],
     organizations: [
-      { organizationId: "org-2b7c41de", displayName: "Northline Electrical" },
-      { organizationId: HARBOR_LOGISTICS, displayName: "Harbor Logistics" },
-      { organizationId: "org-a53e90f7", displayName: "Atlas Facilities" },
+      { organizationId: "org-2b7c41de", longName: "Northline Electrical" },
+      { organizationId: HARBOR_LOGISTICS, longName: "Harbor Logistics" },
+      { organizationId: "org-a53e90f7", longName: "Atlas Facilities" },
     ],
     actors: [
       { organizationId: "org-2b7c41de", actorId: "actor-11c2f8ab", displayName: "Priya Nandi" },
@@ -101,8 +101,8 @@ export const PROFESSIONAL_OPERATION: TwinFixture = twin({
       { organizationId: "org-a53e90f7", actorId: "actor-77f2b0e5", displayName: "Len Chu" },
     ],
     sites: [
-      { siteId: EAST, operationId: OP, displayName: "East Hall", path: "east", aliases: ["east"] },
-      { siteId: WEST, operationId: OP, displayName: "West Yard", path: "west", aliases: ["west"] },
+      { siteId: EAST, operationId: OP, longName: "East Hall", path: "east", aliases: ["east"] },
+      { siteId: WEST, operationId: OP, longName: "West Yard", path: "west", aliases: ["west"] },
     ],
     teams: [
       { teamId: "team-c7d9e2a1", siteId: EAST, organizationId: "org-2b7c41de", displayName: "Hall build crew" },
@@ -197,11 +197,11 @@ export const FESTIVAL: TwinFixture = twin({
   name: "festival",
   policy: festivalPolicy,
   snapshot: {
-    operations: [{ operationId: FOP, displayName: "Riverbend Fest", slug: "festival", bounded: true }],
+    operations: [{ operationId: FOP, longName: "Riverbend Fest", slug: "festival", bounded: true }],
     organizations: [
-      { organizationId: "org-d94b1c6e", displayName: "Ciders Guild" },
-      { organizationId: "org-08f7a2b5", displayName: "Park Stewards" },
-      { organizationId: HARBOR_LOGISTICS, displayName: "Harbor Logistics" },
+      { organizationId: "org-d94b1c6e", longName: "Ciders Guild" },
+      { organizationId: "org-08f7a2b5", longName: "Park Stewards" },
+      { organizationId: HARBOR_LOGISTICS, longName: "Harbor Logistics" },
     ],
     actors: [
       { organizationId: "org-d94b1c6e", actorId: "actor-40e9d1a7", displayName: "Iris Bell" },
@@ -210,8 +210,8 @@ export const FESTIVAL: TwinFixture = twin({
       { organizationId: HARBOR_LOGISTICS, actorId: DANA_OKAFOR, displayName: "Dana Okafor" },
     ],
     sites: [
-      { siteId: ROW, operationId: FOP, displayName: "Tasting Row", path: "row", aliases: ["tasting", "row"] },
-      { siteId: GATE, operationId: FOP, displayName: "Park Gate", path: "gate", aliases: ["gate"] },
+      { siteId: ROW, operationId: FOP, longName: "Tasting Row", path: "row", aliases: ["tasting", "row"] },
+      { siteId: GATE, operationId: FOP, longName: "Park Gate", path: "gate", aliases: ["gate"] },
     ],
     teams: [
       { teamId: "team-3f8b52d6", siteId: GATE, organizationId: "org-08f7a2b5", displayName: "Gate crew" },
@@ -286,12 +286,12 @@ export const AIRLIFT: TwinFixture = twin({
   name: "airlift",
   policy: airliftPolicy,
   snapshot: {
-    operations: [{ operationId: AOP, displayName: "Berlin Airlift", slug: "berlin-airlift", bounded: true }],
+    operations: [{ operationId: AOP, longName: "Berlin Airlift", slug: "berlin-airlift", bounded: true }],
     organizations: [
-      { organizationId: "org-6f1a93c4", displayName: "Vittles Airlift Wing" },
-      { organizationId: "org-2d7eb58a", displayName: "Plane Fare Air Group" },
-      { organizationId: "org-9c4b17f3", displayName: "Rhein Contract Carriers" },
-      { organizationId: "org-58e3a2d1", displayName: "Ground Handling Services Berlin" },
+      { organizationId: "org-6f1a93c4", longName: "Vittles Airlift Wing" },
+      { organizationId: "org-2d7eb58a", longName: "Plane Fare Air Group" },
+      { organizationId: "org-9c4b17f3", longName: "Rhein Contract Carriers" },
+      { organizationId: "org-58e3a2d1", longName: "Ground Handling Services Berlin" },
     ],
     actors: [
       { organizationId: "org-6f1a93c4", actorId: "actor-4f7c2a19", displayName: "Charles Whitfield" },
@@ -308,11 +308,11 @@ export const AIRLIFT: TwinFixture = twin({
       { organizationId: "org-58e3a2d1", actorId: "actor-a93c8e50", displayName: "Clara Weiss" },
     ],
     sites: [
-      { siteId: RHEIN_MAIN, operationId: AOP, displayName: "Rhein-Main Airfield", path: "rhein-main", aliases: ["rhein-main"] },
-      { siteId: FASSBERG, operationId: AOP, displayName: "Fassberg Station", path: "fassberg", aliases: ["fassberg"] },
-      { siteId: TEMPELHOF, operationId: AOP, displayName: "Tempelhof Airfield", path: "tempelhof", aliases: ["tempelhof"] },
-      { siteId: GATOW, operationId: AOP, displayName: "Gatow Airfield", path: "gatow", aliases: ["gatow"] },
-      { siteId: TEGEL, operationId: AOP, displayName: "Tegel Strip", path: "tegel", aliases: ["tegel"] },
+      { siteId: RHEIN_MAIN, operationId: AOP, longName: "Rhein-Main Airfield", path: "rhein-main", aliases: ["rhein-main"] },
+      { siteId: FASSBERG, operationId: AOP, longName: "Fassberg Station", path: "fassberg", aliases: ["fassberg"] },
+      { siteId: TEMPELHOF, operationId: AOP, longName: "Tempelhof Airfield", path: "tempelhof", aliases: ["tempelhof"] },
+      { siteId: GATOW, operationId: AOP, longName: "Gatow Airfield", path: "gatow", aliases: ["gatow"] },
+      { siteId: TEGEL, operationId: AOP, longName: "Tegel Strip", path: "tegel", aliases: ["tegel"] },
     ],
     teams: [
       { teamId: "team-a41f8c73", siteId: RHEIN_MAIN, organizationId: "org-6f1a93c4", displayName: "Loading rack one" },

@@ -157,7 +157,7 @@ type _TargetRefIsPlain = AssertPlainId<
  * outlives the call signatures that produced it, so a command-surface break
  * must not strand live sessions. The envelope's own version pair is what
  * gates. */
-export const AUTHORITY_INTERFACE_VERSION = 3 as const;
+export const AUTHORITY_INTERFACE_VERSION = 4 as const;
 export type AuthorityInterfaceVersion = typeof AUTHORITY_INTERFACE_VERSION;
 
 /** The interface version as envelope claims record it: which runtime

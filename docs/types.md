@@ -114,7 +114,7 @@ annotation would only hide it. Copy at the boundary; do not treat
 Version literals are part of the contract:
 
 ```ts
-export const AUTHORITY_INTERFACE_VERSION = 3 as const;
+export const AUTHORITY_INTERFACE_VERSION = 4 as const;
 export const ACCESS_ENVELOPE_VERSION = 1 as const;
 ```
 

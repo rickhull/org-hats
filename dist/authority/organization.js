@@ -13,7 +13,7 @@ import { actorId, asJson, canonicalJson, parseAccessEnvelope, operationId, organ
 import { sha256Hex } from "./internal.js";
 import { principalKey, revokeParticipation, checkClaim, commitClaim, } from "./state.js";
 import { fail, ok } from "./result.js";
-import { displayNameFailure, identifierFailure } from "./validation.js";
+import { displayLabelFailure, identifierFailure } from "./validation.js";
 export const createOrganizationCoordinator = (deps) => {
     const { orgs, ops, principalLinks, outbox, clock, signer, nextId, adminRoles, configureActions, activationLifetime, activationSecret, } = deps;
     const unusableActivation = () => ({
@@ -293,7 +293,7 @@ export const createOrganizationCoordinator = (deps) => {
         if (idFailure !== undefined)
             return { ok: false, failure: idFailure };
         if (input.displayName !== undefined) {
-            const nameFailure = displayNameFailure(input.displayName, "display name");
+            const nameFailure = displayLabelFailure(input.displayName, "display name");
             if (nameFailure !== undefined)
                 return { ok: false, failure: nameFailure };
         }
@@ -322,7 +322,7 @@ export const createOrganizationCoordinator = (deps) => {
         const replay = checkClaim(org.claims, input);
         if (replay !== undefined)
             return replay;
-        const nameFailure = displayNameFailure(input.displayName, "display name");
+        const nameFailure = displayLabelFailure(input.displayName, "display name");
         if (nameFailure !== undefined)
             return { ok: false, failure: nameFailure };
         const target = org.actors.find((candidate) => candidate.actorId === input.actorId);

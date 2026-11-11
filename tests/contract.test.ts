@@ -65,10 +65,13 @@ test("canonicalJson escapes controls and orders non-ASCII by code unit", () => {
 });
 
 test("[E8] the interface version names the call surface, not the wire format", () => {
-  // 1.x callers used the two-optional grant shape; 2 carries GrantTarget.
-  // Envelope readability does not move with it — claims record the issuing
-  // interface as provenance, and the format pair above gates.
-  assert.equal(AUTHORITY_INTERFACE_VERSION, 3);
+  // 1.x callers used the two-optional grant shape; 2 carries GrantTarget; 4
+  // renames `displayName` to `longName` on the three entities that carry a
+  // short counterpart. Envelope readability does not move with any of it —
+  // claims record the issuing interface as provenance, and the format pair
+  // above gates. `ACCESS_ENVELOPE_VERSION` stayed 1 across this rename
+  // because no claim carries a display label.
+  assert.equal(AUTHORITY_INTERFACE_VERSION, 4);
 });
 
 test("signature transport is unpadded base64url and round-trips", () => {

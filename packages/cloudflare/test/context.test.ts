@@ -84,8 +84,8 @@ describe("context presentation", () => {
     if (isFailed(context)) throw new Error(`context failed: ${context.failure.kind}`);
 
     expect(context.actor.displayName).toBe("Dana Okafor");
-    expect(context.organizationDisplayName).toBe("Harbor Logistics");
-    expect(context.operationDisplayName).toBe("Meridian Field Services");
+    expect(context.organizationLongName).toBe("Harbor Logistics");
+    expect(context.operationLongName).toBe("Meridian Field Services");
     expect(context.participation).toBe("active");
     expect(context.wearableHats).toHaveLength(1);
     expect(context.wearableHats[0]?.role).toBe("coordinator");

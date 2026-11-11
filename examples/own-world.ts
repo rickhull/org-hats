@@ -52,18 +52,18 @@ const world = defineWorld({
     readPolicy: { organizations: "granted-teams" },
   },
   snapshot: {
-    operations: [{ operationId: OPERATION, displayName: "Lantern Bay Boatyard", slug: "lantern-bay" }],
+    operations: [{ operationId: OPERATION, longName: "Lantern Bay Boatyard", slug: "lantern-bay" }],
     organizations: [
-      { organizationId: TIDEWATER, displayName: "Tidewater Marine" },
-      { organizationId: YARD, displayName: "Lantern Bay Works" },
+      { organizationId: TIDEWATER, longName: "Tidewater Marine" },
+      { organizationId: YARD, longName: "Lantern Bay Works" },
     ],
     actors: [
       { organizationId: TIDEWATER, actorId: ROBIN, displayName: "Robin Vale" },
       { organizationId: YARD, actorId: WREN, displayName: "Wren Ash" },
     ],
     sites: [
-      { siteId: PIER, operationId: OPERATION, displayName: "Pier", path: "pier", aliases: ["pier"] },
-      { siteId: SHED, operationId: OPERATION, displayName: "Boat Shed", path: "shed", aliases: ["shed"] },
+      { siteId: PIER, operationId: OPERATION, longName: "Pier", path: "pier", aliases: ["pier"] },
+      { siteId: SHED, operationId: OPERATION, longName: "Boat Shed", path: "shed", aliases: ["shed"] },
     ],
     teams: [
       { teamId: "team-hull", siteId: PIER, organizationId: TIDEWATER, displayName: "Hull crew" },

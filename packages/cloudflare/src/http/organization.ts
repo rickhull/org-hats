@@ -66,7 +66,7 @@ export interface OrganizationRouteHost {
     readonly actors: readonly { readonly actorId: string; readonly disabled: boolean }[];
   };
   idpConfig(): { readonly present: boolean; readonly config?: string };
-  organizationSummary(): { readonly organizationId: string | null; readonly displayName: string | null };
+  organizationSummary(): { readonly organizationId: string | null; readonly longName: string | null };
   reset(): Result<unknown>;
   status(): Record<string, unknown>;
   exportSnapshot(): unknown;
@@ -87,7 +87,7 @@ export const handleOrganizationRequest = async (
       const body = await readBody(request);
       return json(host.bootstrap({
         organizationId: asString(body["organizationId"], "organizationId"),
-        ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
+        ...(body["longName"] === undefined ? {} : { longName: asString(body["longName"], "longName") }),
         ...(body["shortName"] === undefined ? {} : { shortName: asString(body["shortName"], "shortName") }),
         actors: asArray(body["actors"], "actors").map((entry) => {
           const actor = asRecord(entry);
