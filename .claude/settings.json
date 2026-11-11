@@ -1,5 +1,8 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(git tag*)"
+    ],
     "ask": [
       "Bash(git add*)",
       "Bash(git rm*)",
@@ -17,7 +20,11 @@
       "Bash(git stash*)",
       "Bash(git cherry-pick*)",
       "Bash(git revert*)",
-      "Bash(git clean*)"
+      "Bash(git clean*)",
+      "Bash(git add -A*)",
+      "Bash(git add .*)",
+      "Bash(git add -f*)",
+      "Bash(git add --force*)"
     ]
   }
 }

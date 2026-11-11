@@ -25,6 +25,13 @@ export const DENY: readonly string[] = [
 
 export const ASK: readonly string[] = ["add", "rm", "mv", "restore"] as const;
 
+/** Tagging is the agent's outright, with no approval in any harness: a tag is
+ * named by its release family and re-checked by `bin/check-version`, so there
+ * is no judgment left to gate. Stated as an allowance rather than left out of
+ * both lists — "not denied" resolves to each harness's own default, which is
+ * how the three drifted apart on this verb. */
+export const ALLOW: readonly string[] = ["tag"] as const;
+
 const VALUE_OPTIONS = new Set([
   "-C",
   "-c",

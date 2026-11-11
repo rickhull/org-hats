@@ -2,25 +2,56 @@
 
 ## Git policy
 
-Rick makes every commit and every push.  `git commit`, `push`, `reset`,
-`checkout`, `switch`, `merge`, `rebase`, `stash`, `cherry-pick`, `revert`,
-and `clean` are off limits; a denial is an answer, not an obstacle to route
-around.  Tags are the exception: agents may and should create them with
-`git tag` — annotated, named by a release family (`vX.Y.Z` from
-`package.json`, `cloudflare-vX.Y.Z` from `packages/cloudflare/package.json`),
-then verified with `bin/check-version <tag>`.  Do not move, force, or delete
-a tag; pushing a tag is a push, and stays Rick's.
+The line is history versus the tree: **recorded history is Rick's, and the
+index and working tree are the agent's.**  Three tiers, and the guards in
+`.claude/settings.json`, `.codex/git-guard.sh`, and
+`.pi/extensions/lib/git-command-classifier.ts` carry the same lists, with
+`tests/git-guards.test.ts` holding them in lockstep.
 
-`git add`, `git rm`, `git mv`, and `git restore` change the index or the
-working tree, so they proceed only with Rick's approval — ask for specific
-paths and say what each file is.  Never `git add -A` or `git add .`.
+**Denied.**  Rick makes every commit and every push.  `git commit`, `push`,
+`reset`, `checkout`, `switch`, `merge`, `rebase`, `stash`, `cherry-pick`,
+`revert`, and `clean` are off limits; a denial is an answer, not an obstacle
+to route around — including by way of a script that runs one of them.
+`bin/release` is the exception, and the only one: it commits, tags, and
+publishes, and an agent may run it.  It earns that by leaving no judgment to
+the agent — the version comes from the manifest, the tag from the release
+family, the message is the tag, the gates fail closed, and
+`bin/check-version` re-checks the tag after the commit.
+
+**The agent's outright, no approval.**  `git tag` — annotated, named by a
+release family (`vX.Y.Z` from `package.json`, `cloudflare-vX.Y.Z` from
+`packages/cloudflare/package.json`), then verified with
+`bin/check-version <tag>`.  Do not move, force, or delete a tag; pushing a
+bare tag outside `bin/release` is a push, and stays Rick's.
+
+**The agent's, gated for now.**  `git add`, `git rm`, `git mv`, and
+`git restore` change the index and the working tree, and both are the
+agent's to manage.  They prompt today and the prompt is scheduled to go away, so do
+not narrate a request for them — invoke the command and let the gate decide.
+Name specific paths and say what each file is: when the prompt goes, Rick's
+reading of `git diff --staged` is the only review left, so a turn that stages
+reports what it staged, file by file.
+
+Three limits survive the gate going away.  Never `git add -A` or `git add .`:
+they sweep untracked files nobody has looked at into Rick's next commit.
+Never `git add -f`, and never stage anything under `notes/`: the relay is
+gitignored, and a gitignore is one forced add from not applying.  And
+`git restore` is the one irreversible verb in this tier — it discards
+uncommitted work with no reflog, including Rick's — so read the target with
+`git diff` before restoring it, and prefer `--staged`, which only unstages.
+
+Staging is a commit-shaped act, not a scratch habit: `bin/release`,
+`bin/verify`, `bin/gate-cache`, `bin/check-dist`, and the pre-push hook all
+read `git status --porcelain`, which counts staged changes, so a half-staged
+tree blocks a release — and `git stash` is denied, so Rick is the one who
+clears it.
 
 The bare repository at `ssh://forge@nas-ts/home/forge/repos/org-hats.git` is
 canonical (remote `origin`); `main` tracks `origin/main`.  `nas-ts` is the
 tailnet alias for the same host — `nas` resolves only on the LAN, and
 `bin/release` knows the remote by name, so `origin` carries the alias that
-works from anywhere.  Codeberg (remote
-`codeberg`) and GitHub (remote `github`) are best-effort public release
+works from anywhere.  Codeberg (remote `codeberg`) and GitHub (remote
+`github`) are best-effort public release
 mirrors, updated by `bin/release`, which publishes by default (`--no-push`
 keeps a release local).  A mirror failure does not invalidate a NAS-published
 release; the next release catches up its branch and reachable annotated tags.
@@ -243,6 +274,17 @@ forward-looking plans in `plans/`.
 `AGENTS.md` carries directives only.
 
 Each agent enforces the Git policy with its own guard, because no shared
-mechanism exists: `.claude/settings.json` (deny + ask), `.codex/config.toml`
-with `.codex/git-guard.sh`, and `.pi/extensions/git-guard.ts`.  Their lists
-mirror this file's "Git policy" and must stay in lockstep with it.
+mechanism exists: `.claude/settings.json` (allow + ask + deny),
+`.codex/config.toml` with `.codex/git-guard.sh`, and
+`.pi/extensions/git-guard.ts` with its classifier lib.  Their lists mirror
+this file's "Git policy", and `tests/git-guards.test.ts` fails when one
+drifts — it parses all three and asserts the tiers agree and stay disjoint.
+
+The harnesses are not equally expressive, and the policy is written to the
+weakest: a Codex hook cannot return "ask", only deny or allow.  So the gated
+tier is, under Codex, whatever Codex's own approval setting does — which is
+why `git tag` is stated as an explicit allowance in all three rather than
+left out of every list.  "Not denied" resolves to each harness's default,
+and that is how the three drifted apart on tagging.  A guard matches the
+command an agent types, so none of them sees a git call inside a script;
+this file is the control, and the guards are a speed bump.
