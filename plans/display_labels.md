@@ -74,16 +74,44 @@ also a display name.  The pair `shortName`/`longName` is self-describing, and
 it removes the genus/species confusion between "display label" and "display
 name".
 
-This is a breaking interface change — 442 occurrences across 45 files, the
-command surface, the result shapes, and the coordinator's columns — so it
-rides the next deliberate break with a migration note and a paired consumer
-rollout.  `AGENTS.md` permits it as a change re-reviewed with the consumer,
-not as an additive one.  The envelope does not move: `displayName` appears
-nowhere in the claims, so no live session drops.
+This is a breaking interface change — 482 occurrences across 49 files, the
+command surface, and the result shapes — so it rides the next deliberate
+break with a migration note and a paired consumer rollout.  `AGENTS.md`
+permits it as a change re-reviewed with the consumer, not as an additive one.
+The envelope does not move: `displayName` appears nowhere in the claims, so no
+live session drops.
+
+**The SQL column does not move, and this is the decision, not an omission.**
+The rename is two independent changes: the wire field, which the consumer
+sees, and the column `display_name`, which it does not — `coordinatorPresent`
+reads only `coordinator`, `tables`, and `<coordinator>_id` from `/ops/export`,
+so column names never cross the boundary.  Renaming the column buys nothing
+and carries the one real hazard here: `restoreTables` inserts by current
+column name and fills what is absent with null, so every export at schema 6
+or earlier would restore with the long name silently NULL — no error, on the
+most destructive privileged act in the system.  The column stays
+`display_name`; the row-mapping sites carry the mismatch and a comment saying
+the column name is historical.  An earlier revision of this plan prescribed an
+add/backfill/drop migration; it is withdrawn.
+
+**An alias is not the cheaper path.**  Accepting both field names on bootstrap
+writes is easy, but emitting both on reads makes an alias indistinguishable
+from a second fact, which is the long/short confusion this rename exists to
+remove.  The break is deferred, not avoided: retiring `displayName` later is
+still interface 4.  Writes can be additive here; reads cannot.
+
+**Open with the consumer: three entities or five.**  Only organization,
+operation, and site carry a short counterpart.  `longName` means the long half
+of a pair, so on an actor it is wrong — that label is the OIDC `name` claim —
+and on a team it is worse, because a team's label is already the short form.
+The proposal on the table is to rename only where the pair exists and leave
+`Actor.displayName` and `Team.displayName` alone, with a team's crossing over
+when it acquires its own short name.  Settle this before the sweep; it decides
+the scope.
 
 **Done when:** `AUTHORITY_INTERFACE_VERSION` is 4, `docs/migration-v4.md`
-records the rename, the coordinator's add/backfill/drop migration has landed,
-and the consumer has crossed it.
+records the rename, the three-or-five scope is settled, and the consumer has
+crossed it.
 
 **Trigger:** the next break that moves the interface version for another
 reason.  The consumer declined taking it early and has recorded the same
