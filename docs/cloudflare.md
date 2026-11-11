@@ -44,7 +44,10 @@ modules.
 
 The coordinators keep the actor/team identifier and display-name checks in
 `src/validation.ts` rather than importing the portable authority module's
-internal helpers. They are deliberately adapter-boundary rules: the limits
+internal helpers.  Both coordinators apply the display-name rule to every
+label a bootstrap carries — organization, operation, site, team, and actor,
+long form and short — before opening the transaction, so a refused label
+never persists. They are deliberately adapter-boundary rules: the limits
 are part of the storage command contract, and the roster and team suites pin
 them on both the portable and Cloudflare sides. Sharing the portable
 implementation would publish an internal helper for a handful of length

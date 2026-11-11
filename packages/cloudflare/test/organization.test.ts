@@ -501,4 +501,38 @@ describe("the outbox drain is bounded per invocation", () => {
     }
     expect(invocations).toBe(Math.ceil(total / OUTBOX_DRAIN_LIMIT));
   }, 30_000);
+
+  it("refuses a display label the display-name rule rejects, at bootstrap", async () => {
+    // Same boundary and same rule as the operation coordinator: a bad label
+    // is refused before it persists, rather than stored and rendered later.
+    const stub = organization("org/label-rule");
+    const long = "x".repeat(201);
+
+    const tooLong = await call(stub, "POST", "/bootstrap", {
+      ...organizationBootstrap("org/label-rule"),
+      shortName: long,
+    });
+    expect(tooLong.body.failure?.kind).toBe("invalid-command");
+
+    const empty = await call(stub, "POST", "/bootstrap", {
+      ...organizationBootstrap("org/label-rule"),
+      shortName: "   ",
+    });
+    expect(empty.body.failure?.kind).toBe("invalid-command");
+
+    const longDisplay = await call(stub, "POST", "/bootstrap", {
+      ...organizationBootstrap("org/label-rule", { displayName: long }),
+    });
+    expect(longDisplay.body.failure?.kind).toBe("invalid-command");
+
+    // Nothing persisted: the organization is still unbootstrapped.
+    const status = await call<Record<string, unknown>>(stub, "GET", "/status");
+    expect(status.body.value?.["organizationId"]).toBe(null);
+
+    const ok = await call(stub, "POST", "/bootstrap", {
+      ...organizationBootstrap("org/label-rule"),
+      shortName: "y".repeat(200),
+    });
+    expect(ok.body.ok).toBe(true);
+  });
 });

@@ -736,4 +736,55 @@ describe("OperationAuthority", () => {
     expect(restored.body.value?.operationShortName).toBe("PEC");
     expect(restored.body.value?.sites.find((site) => site.siteId === SITE)?.shortName).toBe("PEC-ATL");
   });
+
+  it("refuses a display label the display-name rule rejects, at bootstrap", async () => {
+    // The consumer asked for this boundary: rejecting a bad short name before
+    // it persists beats remembering not to send one. Bootstrap validated no
+    // name at all before this, so `displayName` is checked by the same rule —
+    // one unvalidated label beside a validated one at the same boundary is
+    // the asymmetry that becomes a bug later.
+    const current = world("label-rule");
+    const long = "x".repeat(201);
+    const atLimit = "y".repeat(200);
+    const base = {
+      operationId: current.opId,
+      slug: "test-op",
+      policy: {
+        format: 1,
+        id: "policy-test",
+        version: "1",
+        actions: ["observe"],
+        roles: [{ title: "field", actions: ["observe"] }],
+        readPolicy: { organizations: "granted-teams" },
+      },
+      teams: [],
+      grants: [],
+    };
+    const site = { siteId: SITE, path: "site", aliases: ["site"] };
+
+    const tooLong = await call(current.op, "POST", "/bootstrap", { ...base, shortName: long, sites: [site] });
+    expect(tooLong.body.failure?.kind).toBe("invalid-command");
+    const empty = await call(current.op, "POST", "/bootstrap", { ...base, shortName: "   ", sites: [site] });
+    expect(empty.body.failure?.kind).toBe("invalid-command");
+    const longDisplay = await call(current.op, "POST", "/bootstrap", { ...base, displayName: long, sites: [site] });
+    expect(longDisplay.body.failure?.kind).toBe("invalid-command");
+    const badSite = await call(current.op, "POST", "/bootstrap", {
+      ...base,
+      sites: [{ ...site, shortName: long }],
+    });
+    expect(badSite.body.failure?.kind).toBe("invalid-command");
+
+    // Refused before anything persisted: the operation is still unbootstrapped.
+    const seen = await call<{ readonly operationId: string | null }>(current.op, "GET", "/snapshot");
+    expect(seen.body.value?.operationId).toBe(null);
+
+    // The limit itself is inclusive, and the consumer bounds its handles well
+    // inside it.
+    const ok = await call(current.op, "POST", "/bootstrap", {
+      ...base,
+      shortName: atLimit,
+      sites: [{ ...site, shortName: atLimit }],
+    });
+    expect(ok.body.ok).toBe(true);
+  });
 });

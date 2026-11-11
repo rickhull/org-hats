@@ -197,6 +197,13 @@ needs no change.
   Editing it needs new commands, which this change deliberately does not add.
 - A short name is absent when unset, never an empty string and never a
   fallback to the id or the long form. A host decides what to show.
+- Both labels are now validated at Cloudflare bootstrap by the same rule the
+  command paths use: non-empty after trimming, at most 200 characters. This
+  is new for `displayName` too — bootstrap validated no label before — so a
+  deployment that sent an empty or over-long display name and succeeded now
+  gets `invalid-command`. The refusal happens before the transaction opens,
+  so nothing persists and the coordinator stays unbootstrapped rather than
+  half-named.
 
 ### Cloudflare schema
 

@@ -244,6 +244,20 @@ export class OrganizationAuthority extends DurableObject<Env> {
   }
 
   private bootstrap(input: BootstrapInput): Result<{ organizationId: string }> {
+    // Checked before the transaction, by the same rule the command paths
+    // use: a refused label never persists and leaves the organization
+    // unbootstrapped rather than half-named.
+    for (const [value, label] of [
+      [input.displayName, "organization display name"],
+      [input.shortName, "organization short name"],
+    ] as const) {
+      const nameFailure = displayNameFailure(value, label);
+      if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
+    }
+    for (const actor of input.actors) {
+      const nameFailure = displayNameFailure(actor.displayName, `actor ${actor.actorId} display name`);
+      if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
+    }
     const at = now();
     return this.ctx.storage.transactionSync(() => {
       // one identity is never two actors: a (provider, subject) may re-link

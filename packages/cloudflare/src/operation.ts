@@ -474,6 +474,31 @@ export class OperationAuthority extends DurableObject<Env> {
   private bootstrap(input: BootstrapInput): Result<{ operationId: string }> {
     const problems = validatePolicyBundle(input.policy);
     if (problems.length > 0) return failure("invalid-command", problems.join("; "));
+    // Display labels are checked before anything is written, by the same rule
+    // the command paths use: a label refused here never persists, and a
+    // refusal leaves the operation unbootstrapped rather than half-named.
+    // Both labels, not just the short one — an unvalidated field beside a
+    // validated one at one boundary is an asymmetry nothing justifies.
+    for (const [value, label] of [
+      [input.displayName, "operation display name"],
+      [input.shortName, "operation short name"],
+    ] as const) {
+      const nameFailure = displayNameFailure(value, label);
+      if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
+    }
+    for (const site of input.sites) {
+      for (const [value, label] of [
+        [site.displayName, `site ${site.siteId} display name`],
+        [site.shortName, `site ${site.siteId} short name`],
+      ] as const) {
+        const nameFailure = displayNameFailure(value, label);
+        if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
+      }
+    }
+    for (const team of input.teams) {
+      const nameFailure = displayNameFailure(team.displayName, `team ${team.teamId} display name`);
+      if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
+    }
     // Routing facts are operation-authority facts. Validate the whole set
     // before opening the transaction: a bootstrap that writes half a
     // hostname namespace is a projection with no source.
