@@ -534,7 +534,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
       return failed(directory.failure ?? { kind: "unavailable" });
     }
     const teams = await call<{
-      readonly teams: readonly { readonly teamId: string; displayName?: string; readonly status: "pending" | "active" | "retired" }[];
+      readonly teams: readonly { readonly teamId: string; longName?: string; shortName?: string; readonly status: "pending" | "active" | "retired" }[];
     }>(operation(claims.operationId), "POST", "/teams-of", { organizationId });
     if (!teams.ok || teams.value === undefined) {
       // the same pass-through context() uses: an operation object that was
@@ -550,7 +550,8 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
       })),
       teams: teams.value.teams.map((team) => ({
         teamId: team.teamId,
-        ...(team.displayName === undefined ? {} : { displayName: team.displayName }),
+        ...(team.longName === undefined ? {} : { longName: team.longName }),
+        ...(team.shortName === undefined ? {} : { shortName: team.shortName }),
         status: team.status,
       })),
     };
@@ -784,7 +785,8 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
           teamId: input.teamId,
           siteId: input.siteId,
           organizationId: input.organizationId,
-          ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
+          ...(input.longName === undefined ? {} : { longName: input.longName }),
+          ...(input.shortName === undefined ? {} : { shortName: input.shortName }),
           byActorId: authorized.actorId,
           byOrganizationId: authorized.organizationId,
           idempotencyKey: input.idempotencyKey,
@@ -801,7 +803,8 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
       case "update-team":
         result = await route(operation(input.operationId), "/update-team", {
           teamId: input.teamId,
-          displayName: input.displayName,
+          longName: input.longName,
+          shortName: input.shortName,
           byActorId: authorized.actorId,
           byOrganizationId: authorized.organizationId,
           idempotencyKey: input.idempotencyKey,

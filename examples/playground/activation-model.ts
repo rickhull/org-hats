@@ -7,7 +7,7 @@ import { ed25519VerifyKey, verify } from "../../dist/access/index.js";
 
 const fixture = PROFESSIONAL_OPERATION;
 const operation = fixture.snapshot.operations[0]!;
-const yard = fixture.snapshot.teams.find((team) => team.displayName === "Yard crew")!;
+const yard = fixture.snapshot.teams.find((team) => team.longName === "Yard crew")!;
 const len = fixture.snapshot.actors.find((actor) => actor.displayName === "Len Chu")!;
 const newcomerId = "actor-lesson-newcomer";
 const provider = "lesson-idp";
@@ -87,7 +87,7 @@ export async function createActivationLesson() {
       actor: { id: newcomerId, label: actor?.displayName ?? "New teammate", organization: state.organizations.find((org) => org.organizationId === HARBOR_LOGISTICS)?.longName ?? HARBOR_LOGISTICS, exists: !!actor },
       linked,
       activation: { requested: secret !== null, usable, acceptance },
-      grant: { present: !!grant, role: grant?.role ?? "field", targetLabel: yard.displayName ?? yard.teamId },
+      grant: { present: !!grant, role: grant?.role ?? "field", targetLabel: yard.longName ?? yard.teamId },
       access: {
         issuance, refresh: refreshResult, verification: !verified ? "none" : isFailed(verified) ? verified.failure.kind : "valid",
         mayObserve: access?.mayAct("observe", { kind: "team", teamId: yard.teamId }) ?? false,

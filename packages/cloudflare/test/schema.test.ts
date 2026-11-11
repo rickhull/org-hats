@@ -38,6 +38,7 @@ describe("the schema migration chain", () => {
       ["4", "operation-routing-facts"],
       ["5", "team-status"],
       ["6", "display-short-name"],
+      ["7", "team-short-name"],
     ]);
     expect(organizationMigrations.at(-1)?.version).toBe(ORGANIZATION_SCHEMA_VERSION);
     expect(operationMigrations.at(-1)?.version).toBe(OPERATION_SCHEMA_VERSION);

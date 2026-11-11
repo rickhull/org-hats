@@ -102,7 +102,8 @@ export interface OpState {
     teamId: TeamId;
     siteId: SiteId;
     organizationId: OrganizationId;
-    displayName?: string;
+    longName?: string;
+    shortName?: string;
     /** Only `active` teams enter a snapshot; pending and retired stay in
      * operation state for audit, idempotency, and id-reuse refusal. */
     status: "pending" | "active" | "retired";
@@ -184,7 +185,8 @@ export const snapshotOf = (
         teamId: team.teamId,
         siteId: team.siteId,
         organizationId: team.organizationId,
-        ...(team.displayName !== undefined ? { displayName: team.displayName } : {}),
+        ...(team.longName !== undefined ? { longName: team.longName } : {}),
+        ...(team.shortName !== undefined ? { shortName: team.shortName } : {}),
       })),
     grants: [...op.grants],
     participations: [...op.participations],

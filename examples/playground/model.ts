@@ -87,7 +87,7 @@ export async function createPlayground() {
     const verification = !verified ? "unauthenticated" : isFailed(verified) ? verified.failure.kind : "valid";
     const targetLabel = (target: typeof state.grants[number]["target"]) => target.kind === "site"
       ? state.sites.find((site) => site.siteId === target.siteId)?.longName ?? target.siteId
-      : state.teams.find((team) => team.teamId === target.teamId)?.displayName ?? target.teamId;
+      : state.teams.find((team) => team.teamId === target.teamId)?.longName ?? target.teamId;
     const hat = (grant: typeof state.grants[number]) => ({ grantId: grant.grantId, role: grant.role, targetLabel: targetLabel(grant.target) });
     const worn = state.grants.find((grant) => grant.grantId === session?.grantId);
     return {
@@ -99,7 +99,7 @@ export async function createPlayground() {
       hats: state.grants.filter((grant) => grant.actorId === selectedActorId && !grant.revoked).map(hat),
       sites: state.sites.map((site) => ({ id: site.siteId, label: site.longName ?? site.siteId, configurable: access?.mayConfigure(site.siteId) ?? false })),
       teams: state.teams.map((team) => ({
-        id: team.teamId, siteId: team.siteId, label: team.displayName ?? team.teamId,
+        id: team.teamId, siteId: team.siteId, label: team.longName ?? team.teamId,
         siteLabel: state.sites.find((site) => site.siteId === team.siteId)?.longName ?? team.siteId,
         organizationLabel: state.organizations.find((org) => org.organizationId === team.organizationId)?.longName ?? team.organizationId,
         actions: fixture.policy.actions.filter((action) => access?.mayAct(action, { kind: "team", teamId: team.teamId }) ?? false),

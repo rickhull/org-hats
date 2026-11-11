@@ -54,12 +54,13 @@ const ABSENT: Readonly<Record<string, Readonly<Record<string, readonly string[]>
     refresh_records: ["amr_json", "auth_time"],
     operation: ["slug", "short_name"],
     sites: ["path", "short_name"],
-    teams: ["status"],
+    teams: ["status", "short_name"],
   },
-  "3": { operation: ["slug", "short_name"], sites: ["path", "short_name"], teams: ["status"] },
-  "4": { operation: ["short_name"], sites: ["short_name"], teams: ["status"] },
-  "5": { operation: ["short_name"], sites: ["short_name"] },
-  "6": {},
+  "3": { operation: ["slug", "short_name"], sites: ["path", "short_name"], teams: ["status", "short_name"] },
+  "4": { operation: ["short_name"], sites: ["short_name"], teams: ["status", "short_name"] },
+  "5": { operation: ["short_name"], sites: ["short_name"], teams: ["short_name"] },
+  "6": { teams: ["short_name"] },
+  "7": {},
 };
 
 const atSchema = (snapshot: Snapshot, version: string): Snapshot => {
@@ -128,7 +129,7 @@ describe("the restore matrix", () => {
     if (isFailed(issued)) throw new Error(`sam issuance failed: ${issued.failure.kind}`);
 
     const source = await exportCoordinator("operation", OP);
-    expect(source.schemaVersion).toBe("6");
+    expect(source.schemaVersion).toBe("7");
     expect(source.tables["refresh_records"]?.length ?? 0).toBeGreaterThan(0);
     expect(source.tables["teams"]?.some((team) => team.status === "retired")).toBe(true);
     // The refresh table carries records without authentication facts too
@@ -137,14 +138,14 @@ describe("the restore matrix", () => {
     expect(withAuth).toBeDefined();
     expect(withAuth?.auth_time).not.toBeNull();
 
-    for (const version of ["2", "3", "4", "5", "6"]) {
+    for (const version of ["2", "3", "4", "5", "6", "7"]) {
       const target = `op-restore-matrix-${version}`;
       const restored = await restore("operation", target, atSchema(source, version));
       expect(restored.status).toBe(200);
       expect(restored.body.ok).toBe(true);
 
       const after = await exportCoordinator("operation", target);
-      expect(after.schemaVersion).toBe("6");
+      expect(after.schemaVersion).toBe("7");
       expect(withoutRestoreAudit(after).tables).toEqual(asRestored(source, version));
 
       // The named claims, stated once for the record. Schema 5 added the
@@ -231,7 +232,13 @@ describe("the restore matrix", () => {
       "roundtrip-admit-team",
     );
     await run(
-      { kind: "update-team", operationId: OP, teamId: "team-restore-roundtrip", displayName: "Restored Crew" },
+      {
+        kind: "update-team",
+        operationId: OP,
+        teamId: "team-restore-roundtrip",
+        longName: "Restored Crew",
+        shortName: "RC",
+      },
       FRESH,
       "roundtrip-update-team",
     );
@@ -242,6 +249,7 @@ describe("the restore matrix", () => {
     expect(sourceOperation.tables["teams"]?.some((row) =>
       row["team_id"] === "team-restore-roundtrip" &&
       row["display_name"] === "Restored Crew" &&
+      row["short_name"] === "RC" &&
       row["status"] === "active",
     )).toBe(true);
 
@@ -266,7 +274,7 @@ describe("the restore matrix", () => {
     const futureOperation = await restore(
       "operation",
       "op-restore-matrix-future",
-      { ...operationSnapshot, schemaVersion: "7" },
+      { ...operationSnapshot, schemaVersion: "8" },
     );
     expect(futureOperation.body.failure?.kind).toBe("invalid-command");
 

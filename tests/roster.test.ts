@@ -377,7 +377,7 @@ test("an administrator reads the organization-wide roster by envelope", async ()
   );
   // the organization's teams in the envelope's operation, with status
   assert.deepEqual(
-    read.teams.map((team) => [team.teamId, team.displayName ?? null, team.status]),
+    read.teams.map((team) => [team.teamId, team.longName ?? null, team.status]),
     [["team-roster", null, "active"]],
   );
 });

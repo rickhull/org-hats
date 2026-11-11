@@ -2,7 +2,7 @@
 
 import { ensureColumn, initializeSchema, type SchemaMigration } from "./sql";
 
-export const OPERATION_SCHEMA_VERSION = "6";
+export const OPERATION_SCHEMA_VERSION = "7";
 
 const TABLES: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS operation (
@@ -32,6 +32,7 @@ const TABLES: readonly string[] = [
     site_id TEXT NOT NULL,
     organization_id TEXT NOT NULL,
     display_name TEXT,
+    short_name TEXT,
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('pending', 'active', 'retired')),
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
@@ -141,6 +142,11 @@ export const operationMigrations: readonly SchemaMigration[] = [
       ensureColumn(sql, "operation", "short_name", "TEXT");
       ensureColumn(sql, "sites", "short_name", "TEXT");
     },
+  },
+  {
+    version: "7",
+    name: "team-short-name",
+    apply: (sql) => ensureColumn(sql, "teams", "short_name", "TEXT"),
   },
 ];
 

@@ -125,7 +125,7 @@ describe("OperationAuthority", () => {
       schemaVersion: string;
       tables: { operation: Record<string, unknown>[]; sites: Record<string, unknown>[] };
     }>(current.op, "GET", "/export");
-    expect(exported.body.value?.schemaVersion).toBe("6");
+    expect(exported.body.value?.schemaVersion).toBe("7");
     expect(exported.body.value?.tables.operation[0]?.["slug"]).toBe("routing-op");
     expect(exported.body.value?.tables.sites[0]?.["path"]).toBe("site");
     const status = await call<{ routingFactsComplete: boolean }>(current.op, "GET", "/status");
@@ -572,7 +572,8 @@ describe("OperationAuthority", () => {
       teamId: "team-new",
       siteId: SITE,
       organizationId: current.orgId,
-      displayName: "New Crew",
+      longName: "New Crew",
+      shortName: "NC",
       byActorId: LEAD,
       byOrganizationId: current.orgId,
       idempotencyKey: "team-request",
@@ -580,11 +581,21 @@ describe("OperationAuthority", () => {
     expect(requested.body.ok).toBe(true);
 
     interface SnapshotRows {
-      readonly teams: readonly { readonly team_id: string; readonly status: string; readonly display_name: string | null }[];
+      readonly teams: readonly {
+        readonly team_id: string;
+        readonly status: string;
+        readonly display_name: string | null;
+        readonly short_name: string | null;
+      }[];
       readonly grants: readonly { readonly grantId: string; readonly revoked: boolean }[];
     }
     const pending = await call<SnapshotRows>(current.op, "GET", "/snapshot");
-    expect(pending.body.value?.teams.find((team) => team.team_id === "team-new")?.status).toBe("pending");
+    const pendingTeam = pending.body.value?.teams.find((team) => team.team_id === "team-new");
+    expect(pendingTeam?.status).toBe("pending");
+    // The labels are set at request, before admission: a pending team already
+    // has the names its organization asked for.
+    expect(pendingTeam?.display_name).toBe("New Crew");
+    expect(pendingTeam?.short_name).toBe("NC");
 
     const early = await call(current.op, "POST", "/grant", {
       organizationId: current.orgId,
@@ -606,11 +617,16 @@ describe("OperationAuthority", () => {
 
     expect((await call(current.op, "POST", "/update-team", {
       teamId: "team-new",
-      displayName: "Renamed Crew",
+      longName: "Renamed Crew",
+      shortName: "RC",
       byActorId: LEAD,
       byOrganizationId: current.orgId,
       idempotencyKey: "team-rename",
     })).body.ok).toBe(true);
+    const renamed = await call<SnapshotRows>(current.op, "GET", "/snapshot");
+    const renamedTeam = renamed.body.value?.teams.find((team) => team.team_id === "team-new");
+    expect(renamedTeam?.display_name).toBe("Renamed Crew");
+    expect(renamedTeam?.short_name).toBe("RC");
 
     expect((await call(current.op, "POST", "/grant", {
       organizationId: current.orgId,
@@ -735,6 +751,77 @@ describe("OperationAuthority", () => {
     }>(current.op, "GET", "/snapshot");
     expect(restored.body.value?.operationShortName).toBe("PEC");
     expect(restored.body.value?.sites.find((site) => site.siteId === SITE)?.shortName).toBe("PEC-ATL");
+  });
+
+  it("`update-team` writes both labels in one act, so an omitted field clears it", async () => {
+    // The consumer chose both-required over absent-means-unchanged: its
+    // editing surface is a full-form page that submits every field, so a
+    // field-scoped shape would buy nothing, and the remedy it would actually
+    // want for concurrent editing is optimistic concurrency, which no command
+    // shape provides.
+    //
+    // The cost of that choice is this: a client that omits a label it did not
+    // mean to touch clears it. The consumer accepted it knowingly — their
+    // short-name input ships with the field for exactly this reason — and it
+    // is in docs/migration-v4.md. This test is the behavior, stated once.
+    const current = world("team-pair-clear");
+    await bootstrapOrganization(current);
+    await bootstrapOperation(current, true);
+
+    interface TeamRows {
+      readonly teams: readonly {
+        readonly team_id: string;
+        readonly display_name: string | null;
+        readonly short_name: string | null;
+      }[];
+    }
+    const teamRow = async () => {
+      const seen = await call<TeamRows>(current.op, "GET", "/snapshot");
+      return seen.body.value?.teams.find((team) => team.team_id === TEAM);
+    };
+
+    expect((await call(current.op, "POST", "/update-team", {
+      teamId: TEAM,
+      longName: "Atlanta Floor Operations",
+      shortName: "ATL-FLOOR",
+      byActorId: LEAD,
+      byOrganizationId: current.orgId,
+      idempotencyKey: "pair-set",
+    })).body.ok).toBe(true);
+    expect((await teamRow())?.display_name).toBe("Atlanta Floor Operations");
+    expect((await teamRow())?.short_name).toBe("ATL-FLOOR");
+
+    // The whole point: the short name is absent from this body, so it is
+    // cleared rather than kept.
+    expect((await call(current.op, "POST", "/update-team", {
+      teamId: TEAM,
+      longName: "Atlanta Floor Operations",
+      byActorId: LEAD,
+      byOrganizationId: current.orgId,
+      idempotencyKey: "pair-omit-short",
+    })).body.ok).toBe(true);
+    expect((await teamRow())?.display_name).toBe("Atlanta Floor Operations");
+    expect((await teamRow())?.short_name).toBe(null);
+
+    // Each label is validated on its own, and a refusal writes neither.
+    const refused = await call(current.op, "POST", "/update-team", {
+      teamId: TEAM,
+      longName: "Still Fine",
+      shortName: "   ",
+      byActorId: LEAD,
+      byOrganizationId: current.orgId,
+      idempotencyKey: "pair-bad-short",
+    });
+    expect(refused.body.failure?.kind).toBe("invalid-command");
+    expect((await teamRow())?.display_name).toBe("Atlanta Floor Operations");
+
+    // The audit names which halves moved: "labels updated" over a two-field
+    // write does not tell a reader which name changed.
+    const audit = await call<readonly { fact: string }[]>(current.op, "GET", "/audit");
+    expect(audit.body.value?.some((entry) =>
+      entry.fact === `team ${TEAM} long name and short name updated`,
+    )).toBe(true);
+    expect(audit.body.value?.some((entry) => entry.fact === `team ${TEAM} short name updated`)).toBe(true);
   });
 
   it("a bootstrap body sending the interface-3 `displayName` stores no long name, silently", async () => {

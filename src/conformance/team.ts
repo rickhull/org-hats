@@ -15,7 +15,7 @@ export const TEAM_CASES: readonly ConformanceCase[] = [
       organizationId: HARBOR_LOGISTICS,
       teamId: "team-conformance-lifecycle",
       siteId: EAST,
-      displayName: "Conformance Crew",
+      longName: "Conformance Crew",
     };
     const requested = await command(world, body, freshAuth(dana, MERIDIAN), "team-01-request");
     assert(requested.ok, "the organization requests the team");

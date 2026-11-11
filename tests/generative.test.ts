@@ -523,7 +523,7 @@ test("[A8] duplicate commands: every mutating command claims its key", async () 
     );
     await applyTwice(
       engine,
-      { kind: "update-team", operationId: OP, teamId, displayName: "Generated Crew" },
+      { kind: "update-team", operationId: OP, teamId, longName: "Generated Crew", shortName: "GC" },
       dana,
       "dup-update-team",
     );
@@ -571,12 +571,12 @@ test("generated command sequences: roster and team commands preserve invariants"
     await run({ kind: "appoint-administrator", organizationId: "org-4c1f9a2e", actorId: actor }, dana, `gen-${seed}-appoint`);
     await run({ kind: "retire-administrator", organizationId: "org-4c1f9a2e", actorId: actor }, dana, `gen-${seed}-retire-admin`);
     await run(
-      { kind: "request-team", operationId: OP, organizationId: "org-4c1f9a2e", teamId: team, siteId: site, displayName: `Crew ${seed}` },
+      { kind: "request-team", operationId: OP, organizationId: "org-4c1f9a2e", teamId: team, siteId: site, longName: `Crew ${seed}` },
       dana,
       `gen-${seed}-request-team`,
     );
     await run({ kind: "admit-team", operationId: OP, teamId: team }, admin, `gen-${seed}-admit-team`);
-    await run({ kind: "update-team", operationId: OP, teamId: team, displayName: `Renamed Crew ${seed}` }, dana, `gen-${seed}-update-team`);
+    await run({ kind: "update-team", operationId: OP, teamId: team, longName: `Renamed Crew ${seed}`, shortName: null }, dana, `gen-${seed}-update-team`);
     await run({ kind: "retire-team", operationId: OP, teamId: team }, dana, `gen-${seed}-retire-team`);
 
     const snapshot = engine.snapshotOf(OP);

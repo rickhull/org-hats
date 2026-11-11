@@ -27,7 +27,7 @@ survives a re-bootstrap.
 | --- | --- | --- |
 | `request-team` | fresh evidence from an `adminOfOrganization` of the named organization | Creates a `pending` team at an existing site. Requires active participation and a new `teamId`. |
 | `admit-team` | `adminOfOperation` (access envelope or fresh evidence) | `pending` → `active`. An active team replays as success; a retired one is refused. |
-| `update-team` | fresh evidence from an administrator of the team's organization | Sets or clears `displayName`. Presentation only: no decision, reach, or grant changes. |
+| `update-team` | fresh evidence from an administrator of the team's organization | Writes both display labels, `longName` and `shortName`, in one act. Presentation only: no decision, reach, or grant changes. |
 | `retire-team` | the team organization's administrator with fresh evidence, or an `adminOfOperation` | `pending`/`active` → `retired`; revokes the grants and refresh records that stood on the team. |
 
 An organization administrator acts only on its own team: the operation
@@ -47,10 +47,20 @@ non-empty, at most 128 characters, unique within the operation including
 retired ids, and no personal data encoded. A retired id is never reused, so
 a team cannot be resurrected by re-requesting it.
 
-`displayName` is optional at request, required in `update-team`
-(`string | null`; `null` clears, an empty string is refused), and never
-identity or authorization. A team is never moved between sites: retire it and
-request a new one.
+A team carries the display-label pair, `longName` and `shortName`
+(`docs/lexicon.md`, "Display label"). Both are optional at `request-team` and
+**both are required in `update-team`** (`string | null` each; `null` clears,
+an empty string is refused). Neither is ever identity or authorization.
+
+`update-team` writes the pair in one act, so **a body that omits a label
+clears it** — there is no absent-means-unchanged. A team form must render
+both inputs, or it silently drops the one it does not show on every submit.
+The shape is the consumer's choice and the reasoning is in
+`docs/migration-v4.md`; the short version is that a full-form client gains
+nothing from a field-scoped command, and the remedy for concurrent editing it
+would actually want is optimistic concurrency, which no command shape gives.
+
+A team is never moved between sites: retire it and request a new one.
 
 ## Retirement
 

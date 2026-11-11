@@ -1,8 +1,8 @@
 # Migrating from org-hats v3 to v4
 
 **Status:** `4.0.0` crosses this break; `3.9.0` is the last 3.x release. The
-envelope format does not move. This note records the one delta a consumer
-crosses and how to cross it. The architecture itself is unchanged — see
+envelope format does not move. This note records the deltas a consumer
+crosses and how to cross them. The architecture itself is unchanged — see
 [authority_redesign.md](authority_redesign.md).
 
 ## 3.x → 4.0
@@ -12,44 +12,72 @@ crosses and how to cross it. The architecture itself is unchanged — see
 `AUTHORITY_INTERFACE_VERSION` moves from 3 to 4, so a 3.x caller gets
 `wrong-interface-version` before its command body is interpreted. Send 4.
 
-### `displayName` becomes `longName` on the three paired entities
+### `displayName` becomes `longName` on the four paired entities
 
-An `Organization`, an `Operation`, and a `Site` rename `displayName` to
-`longName`. These are the three entities that carry a `shortName`, added in
-3.x: once both halves exist, `displayName` beside `shortName` is lopsided,
-because a short name is also a display name. The pair is now `longName` and
-`shortName`, and each names a half.
+An `Organization`, an `Operation`, a `Site`, and a `Team` rename
+`displayName` to `longName`, and a `Team` gains `shortName`. These are the
+four entities that carry a pair: once both halves exist, `displayName` beside
+`shortName` is lopsided, because a short name is also a display name. The pair
+is `longName` and `shortName`, and each names a half.
 
-**An `Actor` and a `Team` keep `displayName`, and this is deliberate.** They
-carry a single label with no counterpart: an actor's comes from the OIDC
-`name` claim, and a team's is already the short form. `longName` means the
-long half of a pair, so on either of them it would be a false name. Two
-words, two meanings — `longName` is a half, `displayName` is a whole. If
-teams later acquire a `shortName`, a team's label becomes `longName` with it.
+A team earned the pair because its label is rendered more times per page, and
+in denser slots, than any other — the short form is what a tight slot can
+fit, and it is not derivable from the long one.
+
+**An `Actor` keeps `displayName`, and this is deliberate.** That label is the
+OIDC `name` claim: authority relays it and never authors it, so a short form
+would have no upstream source and would make authority the author of a
+nickname for a person — a policy question, not a label. `longName` means the
+long half of a pair, so there it would be a false name. Two words, two
+meanings: `longName` is a half, `displayName` is a whole.
 
 What moves:
 
 | Surface | 3.x | 4.0 |
 | --- | --- | --- |
-| `Organization`, `Operation`, `Site` | `displayName` | `longName` |
+| `Organization`, `Operation`, `Site`, `Team` | `displayName` | `longName` |
+| `Team` | — | `shortName` added |
 | Organization bootstrap body | `displayName` | `longName` |
-| Operation bootstrap body, and each `sites[]` entry | `displayName` | `longName` |
+| Operation bootstrap body, and each `sites[]` and `teams[]` entry | `displayName` | `longName` (+ optional `shortName`) |
+| `request-team` | `displayName?` | `longName?`, `shortName?` |
+| `update-team` | `displayName: string \| null` | `longName` **and** `shortName`, both required |
+| Roster read's `RosterTeamEntry` | `displayName?` | `longName?`, `shortName?` |
 | Context read | `organizationDisplayName`, `operationDisplayName` | `organizationLongName`, `operationLongName` |
-| `Actor`, `Team`, `PrincipalEvidence` | `displayName` | unchanged |
-| Team commands (`request-team`, `update-team`) | `displayName` | unchanged |
+| `Actor`, `PrincipalEvidence` | `displayName` | unchanged |
 | Actor commands (`create-actor`, `update-actor`) | `displayName` | unchanged |
 | `HatSummary.targetDisplayName` | `targetDisplayName` | unchanged |
 
 `targetDisplayName` keeps its name on purpose. A grant target is a team or a
-site, so the field carries a team's `displayName` or a site's `longName`: it
-names the genus over both, not the long half of a site's pair.
+site, so the field carries either one's `longName`: it names the genus over
+both, not the long half of either pair. It never composes the short form — a
+host picks the half its slot can fit.
 
-### No schema version moves, and no export is stranded
+### `update-team` writes both labels, and an omitted field clears one
 
-The coordinators' SQL column stays `display_name` in all five tables. The
-wire name moved; the column deliberately did not, so the operation
-coordinator stays at schema 6 and the organization coordinator at schema 3,
-and **every export taken before this release restores unchanged.**
+`update-team` takes `longName` and `shortName`, **both required**, and `null`
+clears one. There is no absent-means-unchanged: a body that omits a label
+clears it.
+
+This is the consumer's choice, taken knowingly. Its editing surface is a
+full-form page that submits every field, so a field-scoped shape would buy
+nothing; and the remedy it would actually want if concurrent administration
+became real is optimistic concurrency — a roster version, refuse-if-stale —
+which no command shape provides. Buying half that fix in the wire was the
+worse trade.
+
+**The consequence for any other client:** a form that renders only the long
+name silently clears the short one on every submit. Ship the input with the
+field.
+
+### One additive column, and no export is stranded
+
+The coordinators' long-name column stays `display_name` in all five tables.
+The wire name moved; the column deliberately did not. The organization
+coordinator stays at **schema 3**; the operation coordinator moves to
+**schema 7** for one additive `short_name` column on `teams`, the same shape
+as schema 6 added for the operation and its sites. **Every export taken
+before this release restores unchanged** — a pre-7 snapshot has no team short
+name and restores with it null, which is what it was.
 
 This is load-bearing rather than lazy. `restoreTables` inserts by current
 column name and fills what a snapshot lacks with null, so renaming the column
@@ -72,8 +100,10 @@ verifying on a 4.x runtime.
 **Do not deploy a 4.x authority in front of a consumer that still sends
 `displayName` in its bootstrap bodies.** The field is optional and the
 boundary parser reads `longName`, so a body carrying the old name is not
-refused — it bootstraps an organization, operation, or site with **no long
-name at all**, silently. A rename of an optional field fails quiet, not loud.
+refused — it bootstraps an organization, operation, site, or team with **no
+long name at all**, silently. A rename of an optional field fails quiet, not
+loud. `packages/cloudflare/test/operation.test.ts` pins that behavior, so
+this warning cannot drift from the code.
 
 The order is: the consumer ships the release that sends `longName` and reads
 `organizationLongName`/`operationLongName`, pinned to 4.x, and the authority
@@ -86,8 +116,13 @@ One mechanical pass, guarded by the compiler for a typed consumer:
 
 1. Send `4` as the interface version.
 2. Rename `displayName` to `longName` where the entity is an organization,
-   operation, or site — in bootstrap bodies and in anything reading a
-   snapshot's `organizations`, `operations`, or `sites`.
+   operation, site, or team — in bootstrap bodies and in anything reading a
+   snapshot's `organizations`, `operations`, `sites`, or `teams`, including
+   the roster read's team entries.
 3. Rename the two context-read fields.
-4. Leave every actor and team `displayName` alone. A blanket
-   find-and-replace is the one way to get this wrong.
+4. Send both labels in `update-team`, and add the short-name input to any
+   team form before shipping it: with both-required, a form that omits the
+   field clears it on every submit.
+5. Leave every actor `displayName` alone — `Actor`, `PrincipalEvidence`,
+   `create-actor`, `update-actor`, and the context read's `actor.displayName`.
+   A blanket find-and-replace is the one way to get this wrong.

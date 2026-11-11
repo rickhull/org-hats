@@ -22,7 +22,7 @@ const ownWorld = (): WorldDefinition => ({
     organizations: [{ organizationId: "org-own", longName: "Own Works" }],
     actors: [{ organizationId: "org-own", actorId: "actor-own", displayName: "Own Hand" }],
     sites: [{ siteId: "site-own", operationId: "op-own", longName: "Yard", path: "yard", aliases: ["yard"] }],
-    teams: [{ teamId: "team-own", siteId: "site-own", organizationId: "org-own", displayName: "Crew" }],
+    teams: [{ teamId: "team-own", siteId: "site-own", organizationId: "org-own", longName: "Crew" }],
     grants: [
       {
         grantId: "g-own", operationId: "op-own", organizationId: "org-own",

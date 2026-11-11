@@ -515,7 +515,8 @@ export const createOrganizationCoordinator = (deps) => {
             .sort((left, right) => (left.teamId < right.teamId ? -1 : left.teamId > right.teamId ? 1 : 0))
             .map((team) => ({
             teamId: team.teamId,
-            ...(team.displayName !== undefined ? { displayName: team.displayName } : {}),
+            ...(team.longName !== undefined ? { longName: team.longName } : {}),
+            ...(team.shortName !== undefined ? { shortName: team.shortName } : {}),
             status: team.status,
         }));
         return { organizationId: organization, actors, teams };

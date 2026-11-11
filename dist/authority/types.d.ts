@@ -98,7 +98,8 @@ export interface RosterActorEntry {
  * tombstoned, and only an active team carries grants. */
 export interface RosterTeamEntry {
     readonly teamId: string;
-    readonly displayName?: string;
+    readonly longName?: string;
+    readonly shortName?: string;
     readonly status: "pending" | "active" | "retired";
 }
 export interface RosterRead {
@@ -215,16 +216,25 @@ export type TeamCommand = {
     readonly organizationId: Unbranded<OrganizationId>;
     readonly teamId: Unbranded<TeamId>;
     readonly siteId: Unbranded<SiteId>;
-    readonly displayName?: string;
+    readonly longName?: string;
+    readonly shortName?: string;
 } | {
     readonly kind: "admit-team";
     readonly operationId: Unbranded<OperationId>;
     readonly teamId: Unbranded<TeamId>;
-} | {
+}
+/** Both labels are required, and `null` clears one. The pair is written in
+ * one act because the consumer's editing surface is a full-form page that
+ * submits every field: absent-meaning-unchanged would buy a field-scoped
+ * client nobody has, and the remedy for concurrent editing it would want
+ * is optimistic concurrency, which no command shape provides. A caller
+ * that omits a field it did not mean to touch clears it. */
+ | {
     readonly kind: "update-team";
     readonly operationId: Unbranded<OperationId>;
     readonly teamId: Unbranded<TeamId>;
-    readonly displayName: string | null;
+    readonly longName: string | null;
+    readonly shortName: string | null;
 } | {
     readonly kind: "retire-team";
     readonly operationId: Unbranded<OperationId>;

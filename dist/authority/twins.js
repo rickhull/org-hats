@@ -83,10 +83,10 @@ export const PROFESSIONAL_OPERATION = twin({
             { siteId: WEST, operationId: OP, longName: "West Yard", path: "west", aliases: ["west"] },
         ],
         teams: [
-            { teamId: "team-c7d9e2a1", siteId: EAST, organizationId: "org-2b7c41de", displayName: "Hall build crew" },
-            { teamId: "team-f5b3a08d", siteId: EAST, organizationId: "org-2b7c41de", displayName: "Floor operations" },
-            { teamId: "team-2e8c64b9", siteId: WEST, organizationId: HARBOR_LOGISTICS, displayName: "Yard crew" },
-            { teamId: "team-9a1f73e0", siteId: WEST, organizationId: "org-a53e90f7", displayName: "Facilities desk" },
+            { teamId: "team-c7d9e2a1", siteId: EAST, organizationId: "org-2b7c41de", longName: "Hall build crew" },
+            { teamId: "team-f5b3a08d", siteId: EAST, organizationId: "org-2b7c41de", longName: "Floor operations" },
+            { teamId: "team-2e8c64b9", siteId: WEST, organizationId: HARBOR_LOGISTICS, longName: "Yard crew" },
+            { teamId: "team-9a1f73e0", siteId: WEST, organizationId: "org-a53e90f7", longName: "Facilities desk" },
         ],
         grants: [
             {
@@ -155,7 +155,7 @@ const boothTeams = () => {
             teamId: `team-booth-${n}`,
             siteId: ROW,
             organizationId: "org-d94b1c6e",
-            displayName: `Tasting booth ${n}`,
+            longName: `Tasting booth ${n}`,
         });
     }
     return teams;
@@ -181,8 +181,8 @@ export const FESTIVAL = twin({
             { siteId: GATE, operationId: FOP, longName: "Park Gate", path: "gate", aliases: ["gate"] },
         ],
         teams: [
-            { teamId: "team-3f8b52d6", siteId: GATE, organizationId: "org-08f7a2b5", displayName: "Gate crew" },
-            { teamId: "team-7c2e91a4", siteId: GATE, organizationId: "org-08f7a2b5", displayName: "Safety" },
+            { teamId: "team-3f8b52d6", siteId: GATE, organizationId: "org-08f7a2b5", longName: "Gate crew" },
+            { teamId: "team-7c2e91a4", siteId: GATE, organizationId: "org-08f7a2b5", longName: "Safety" },
             ...boothTeams(),
         ],
         grants: [
@@ -278,18 +278,18 @@ export const AIRLIFT = twin({
             { siteId: TEGEL, operationId: AOP, longName: "Tegel Strip", path: "tegel", aliases: ["tegel"] },
         ],
         teams: [
-            { teamId: "team-a41f8c73", siteId: RHEIN_MAIN, organizationId: "org-6f1a93c4", displayName: "Loading rack one" },
-            { teamId: "team-b79e2d50", siteId: RHEIN_MAIN, organizationId: "org-6f1a93c4", displayName: "Line maintenance" },
-            { teamId: "team-d62c9f14", siteId: RHEIN_MAIN, organizationId: "org-9c4b17f3", displayName: "Charter cell" },
-            { teamId: "team-f83a5b61", siteId: RHEIN_MAIN, organizationId: "org-6f1a93c4", displayName: "Raisin bomber crew" },
-            { teamId: "team-1e94c7a8", siteId: FASSBERG, organizationId: "org-2d7eb58a", displayName: "Fassberg dispatch" },
-            { teamId: "team-3c6f0d92", siteId: FASSBERG, organizationId: "org-2d7eb58a", displayName: "Havel boat crew" },
-            { teamId: "team-5a2b8e37", siteId: TEMPELHOF, organizationId: "org-58e3a2d1", displayName: "Ground shift one" },
-            { teamId: "team-7f9d4c15", siteId: TEMPELHOF, organizationId: "org-58e3a2d1", displayName: "Ground shift two" },
-            { teamId: "team-9b3e6a82", siteId: TEMPELHOF, organizationId: "org-6f1a93c4", displayName: "Tempelhof ops desk" },
-            { teamId: "team-c84b1f69", siteId: GATOW, organizationId: "org-58e3a2d1", displayName: "Gatow handling shift" },
-            { teamId: "team-e27a5c03", siteId: GATOW, organizationId: "org-2d7eb58a", displayName: "Gatow tower watch" },
-            { teamId: "team-6d1f9b74", siteId: TEGEL, organizationId: "org-58e3a2d1", displayName: "Tegel strip detail" },
+            { teamId: "team-a41f8c73", siteId: RHEIN_MAIN, organizationId: "org-6f1a93c4", longName: "Loading rack one" },
+            { teamId: "team-b79e2d50", siteId: RHEIN_MAIN, organizationId: "org-6f1a93c4", longName: "Line maintenance" },
+            { teamId: "team-d62c9f14", siteId: RHEIN_MAIN, organizationId: "org-9c4b17f3", longName: "Charter cell" },
+            { teamId: "team-f83a5b61", siteId: RHEIN_MAIN, organizationId: "org-6f1a93c4", longName: "Raisin bomber crew" },
+            { teamId: "team-1e94c7a8", siteId: FASSBERG, organizationId: "org-2d7eb58a", longName: "Fassberg dispatch" },
+            { teamId: "team-3c6f0d92", siteId: FASSBERG, organizationId: "org-2d7eb58a", longName: "Havel boat crew" },
+            { teamId: "team-5a2b8e37", siteId: TEMPELHOF, organizationId: "org-58e3a2d1", longName: "Ground shift one" },
+            { teamId: "team-7f9d4c15", siteId: TEMPELHOF, organizationId: "org-58e3a2d1", longName: "Ground shift two" },
+            { teamId: "team-9b3e6a82", siteId: TEMPELHOF, organizationId: "org-6f1a93c4", longName: "Tempelhof ops desk" },
+            { teamId: "team-c84b1f69", siteId: GATOW, organizationId: "org-58e3a2d1", longName: "Gatow handling shift" },
+            { teamId: "team-e27a5c03", siteId: GATOW, organizationId: "org-2d7eb58a", longName: "Gatow tower watch" },
+            { teamId: "team-6d1f9b74", siteId: TEGEL, organizationId: "org-58e3a2d1", longName: "Tegel strip detail" },
         ],
         grants: [
             {

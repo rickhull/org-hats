@@ -214,12 +214,13 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     const selected = firstByRank(wearable);
     // The target's display name is operation state a host would otherwise
     // need a round trip to read; absent when unset, never the id. A target is
-    // a team or a site, so this reads a team's `displayName` or a site's
-    // `longName` — the field stays `targetDisplayName` because it names the
-    // genus over both, not the long half of a site's pair.
+    // a team or a site, so this reads either one's `longName` — the field
+    // stays `targetDisplayName` because it names the genus over both, not the
+    // long half of either pair. The short form is deliberately not composed
+    // here: a host picks the half its slot can fit.
     const nameOf = (target: HatSummary["target"]): string | undefined =>
       target.kind === "team"
-        ? snapshot.teams.find((t) => t.teamId === target.teamId)?.displayName
+        ? snapshot.teams.find((t) => t.teamId === target.teamId)?.longName
         : snapshot.sites.find((s) => s.siteId === target.siteId)?.longName;
     // Presentation still may not invent an action list. A grant naming a
     // role the bundle dropped makes the context unanswerable, not empty.
@@ -510,8 +511,12 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     if (replay !== undefined) return replay;
     const idFailure = identifierFailure(input.teamId, "team id");
     if (idFailure !== undefined) return { ok: false, failure: idFailure };
-    if (input.displayName !== undefined) {
-      const nameFailure = displayLabelFailure(input.displayName, "team display name");
+    if (input.longName !== undefined) {
+      const nameFailure = displayLabelFailure(input.longName, "team long name");
+      if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
+    }
+    if (input.shortName !== undefined) {
+      const nameFailure = displayLabelFailure(input.shortName, "team short name");
       if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
     }
     const organization = organizationId(input.organizationId);
@@ -528,7 +533,8 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
       teamId: teamId(input.teamId),
       siteId: siteId(input.siteId),
       organizationId: organization,
-      ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+      ...(input.longName !== undefined ? { longName: input.longName } : {}),
+      ...(input.shortName !== undefined ? { shortName: input.shortName } : {}),
       status: "pending",
     });
     commitClaim(op.claims, input);
@@ -578,17 +584,30 @@ export const createOperationCoordinator = (deps: OperationDeps): OperationCoordi
     }
     const replay = checkClaim(op.claims, input);
     if (replay !== undefined) return replay;
-    const nameFailure = displayLabelFailure(input.displayName, "team display name");
-    if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
+    const longFailure = displayLabelFailure(input.longName, "team long name");
+    if (longFailure !== undefined) return { ok: false, failure: longFailure };
+    const shortFailure = displayLabelFailure(input.shortName, "team short name");
+    if (shortFailure !== undefined) return { ok: false, failure: shortFailure };
     if (team.status === "retired") return fail("invalid-command", "team is retired");
-    const changed = (team.displayName ?? null) !== input.displayName;
-    if (changed) {
-      if (input.displayName === null) delete team.displayName;
-      else team.displayName = input.displayName;
+    // Both labels are written in one act, so a caller that omits one clears
+    // it. The audit records which halves moved, because "labels updated" over
+    // a two-field write does not say what a reader needs to know.
+    const moved: string[] = [];
+    if ((team.longName ?? null) !== input.longName) {
+      if (input.longName === null) delete team.longName;
+      else team.longName = input.longName;
+      moved.push("long name");
+    }
+    if ((team.shortName ?? null) !== input.shortName) {
+      if (input.shortName === null) delete team.shortName;
+      else team.shortName = input.shortName;
+      moved.push("short name");
+    }
+    if (moved.length > 0) {
       op.audit.push({
         at: clock.now(),
         by: `${principal.organizationId}/${principal.actorId}`,
-        fact: `team ${team.teamId} display name updated`,
+        fact: `team ${team.teamId} ${moved.join(" and ")} updated`,
       });
     }
     commitClaim(op.claims, input);

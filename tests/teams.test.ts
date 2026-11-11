@@ -119,13 +119,14 @@ const envelope = async (
   return { kind: "access-envelope" as const, envelope: issued.envelope };
 };
 
-const request = (teamId: string, siteIdValue = SITE_ONE, displayName?: string) => ({
+const request = (teamId: string, siteIdValue = SITE_ONE, longName?: string, shortName?: string) => ({
   kind: "request-team" as const,
   operationId: OP,
   organizationId: ORG,
   teamId,
   siteId: siteIdValue,
-  ...(displayName === undefined ? {} : { displayName }),
+  ...(longName === undefined ? {} : { longName }),
+  ...(shortName === undefined ? {} : { shortName }),
 });
 
 const requestFor = (organizationIdValue: typeof ORG, teamId: string) => ({
@@ -152,7 +153,7 @@ test("[A17] a team is pending until the operation admits it, then grants can tar
   assert.equal(failureOf(early).kind, "invalid-command", "a pending team is not a grant target");
 
   okOf(await engine.runtime.command(cmd({ kind: "admit-team", operationId: OP, teamId: "team-one" }, await envelope(engine.runtime, ADMIN_EVIDENCE), "admit-1")));
-  assert.equal(snapshotTeam(engine, "team-one")?.displayName, "Crew One");
+  assert.equal(snapshotTeam(engine, "team-one")?.longName, "Crew One");
 
   okOf(await engine.runtime.command(cmd(
     { kind: "grant-hat", operationId: OP, organizationId: ORG, actorId: MEMBER, role: "member", target: { kind: "team", teamId: "team-one" } },
@@ -213,19 +214,19 @@ test("the owning organization renames its team; another organization cannot", as
   okOf(await engine.runtime.command(cmd(request("team-one"), fresh(ADMIN_EVIDENCE), "req-1")));
   okOf(await engine.runtime.command(cmd({ kind: "admit-team", operationId: OP, teamId: "team-one" }, await envelope(engine.runtime, ADMIN_EVIDENCE), "admit-1")));
   okOf(await engine.runtime.command(cmd(
-    { kind: "update-team", operationId: OP, teamId: "team-one", displayName: "Renamed Crew" },
+    { kind: "update-team", operationId: OP, teamId: "team-one", longName: "Renamed Crew", shortName: "RC" },
     fresh(ADMIN_EVIDENCE),
     "rename-1",
   )));
-  assert.equal(snapshotTeam(engine, "team-one")?.displayName, "Renamed Crew");
+  assert.equal(snapshotTeam(engine, "team-one")?.longName, "Renamed Crew");
   okOf(await engine.runtime.command(cmd(
-    { kind: "update-team", operationId: OP, teamId: "team-one", displayName: null },
+    { kind: "update-team", operationId: OP, teamId: "team-one", longName: null, shortName: null },
     fresh(ADMIN_EVIDENCE),
     "rename-clear",
   )));
-  assert.equal(snapshotTeam(engine, "team-one")?.displayName, undefined);
+  assert.equal(snapshotTeam(engine, "team-one")?.longName, undefined);
   const empty = await engine.runtime.command(cmd(
-    { kind: "update-team", operationId: OP, teamId: "team-one", displayName: "" },
+    { kind: "update-team", operationId: OP, teamId: "team-one", longName: "", shortName: null },
     fresh(ADMIN_EVIDENCE),
     "rename-empty",
   ));
@@ -234,7 +235,7 @@ test("the owning organization renames its team; another organization cannot", as
   okOf(await engine.runtime.command(cmd(requestFor(OTHER, "team-other"), fresh(OUTSIDER_EVIDENCE), "req-other")));
   okOf(await engine.runtime.command(cmd({ kind: "admit-team", operationId: OP, teamId: "team-other" }, await envelope(engine.runtime, ADMIN_EVIDENCE), "admit-other")));
   const foreign = await engine.runtime.command(cmd(
-    { kind: "update-team", operationId: OP, teamId: "team-other", displayName: "Hijacked" },
+    { kind: "update-team", operationId: OP, teamId: "team-other", longName: "Hijacked", shortName: null },
     fresh(ADMIN_EVIDENCE),
     "rename-foreign",
   ));

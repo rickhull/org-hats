@@ -58,27 +58,31 @@ _Avoid_: venue, location, scope, path
 _Avoid_: slug (as the identity), scope path
 
 **Display label** — A name an entity carries for presentation. An
-organization, operation, and site carry a **pair**: `longName` is the full
-form and `shortName` the short form people say. Both are volunteered,
+organization, operation, site, and team carry a **pair**: `longName` is the
+full form and `shortName` the short form people say. Both are volunteered,
 bootstrap-set, never unique, and read by no decision; the short form is
 stored rather than derived because abbreviation takes knowledge and
 truncation is not abbreviation. The long form holds no parenthetical: a host
 composes "Long (SHORT)" from the two, so one name has one place to edit it.
 
-An actor and a team carry a **single** label, `displayName`, with no
-counterpart — an actor's is the OIDC `name` claim and a team's is already the
-short form, so neither is the long half of anything. The two words are not
-synonyms: `longName` names a half, `displayName` names a whole. A team's
-becomes `longName` if teams ever acquire a short name.
+An actor carries a **single** label, `displayName`, with no counterpart: it
+is the OIDC `name` claim, which authority relays and never authors, so a short
+form would have no upstream source and would make authority the author of a
+nickname for a person. The two words are not synonyms: `longName` names a
+half, `displayName` names a whole.
+
+A team's pair is the only one with a write path — set at `request-team`,
+edited by `update-team`, which writes both labels in one act. The other three
+are bootstrap-set.
 
 A short name is not an identity, a key, a slug, or a path —
 `Operation.slug` and `Site.path` are the addresses, and a display label never
 determines one. The field was `displayName` on all five entities through
-interface 3; `docs/migration-v4.md` records the rename.
+interface 3; `docs/migration-v4.md` records the rename and the team pair.
 _Avoid_: handle — it already names the opaque rotating refresh credential,
 and a short label like `PEC-ATL` beside `Operation.slug` invites someone to
 treat the editable name as the address; title; label (unqualified);
-displayName (for the three paired entities)
+displayName (for the four paired entities)
 
 ## Policy and reach
 

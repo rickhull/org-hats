@@ -167,7 +167,7 @@ export const ROSTER_CASES: readonly ConformanceCase[] = [
       "the roster is organization-wide: the linked member, the administrator, and an actor with no grant and no participation",
     );
     deepEqual(
-      read.teams.map((team) => [team.teamId, team.displayName, team.status]),
+      read.teams.map((team) => [team.teamId, team.longName, team.status]),
       [["team-2e8c64b9", "Yard crew", "active"]],
       "the teams are the organization's own in the envelope's operation — not another organization's",
     );

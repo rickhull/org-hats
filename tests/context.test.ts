@@ -33,8 +33,8 @@ const twoHatsWorld = (): WorldDefinition => ({
     actors: [{ organizationId: "org-two", actorId: "actor-two", displayName: "Two Hands" }],
     sites: [{ siteId: "site-two", operationId: "op-two", longName: "Yard", path: "yard", aliases: ["yard"] }],
     teams: [
-      { teamId: "team-first", siteId: "site-two", organizationId: "org-two", displayName: "First Crew" },
-      { teamId: "team-second", siteId: "site-two", organizationId: "org-two", displayName: "Second Crew" },
+      { teamId: "team-first", siteId: "site-two", organizationId: "org-two", longName: "First Crew" },
+      { teamId: "team-second", siteId: "site-two", organizationId: "org-two", longName: "Second Crew" },
     ],
     grants: [
       {
@@ -181,7 +181,7 @@ const namedTargetsWorld = (): WorldDefinition => ({
     actors: [{ organizationId: "org-named", actorId: "actor-named" }],
     sites: [{ siteId: "site-north", operationId: "op-named", longName: "North Yard", path: "north", aliases: ["north"] }],
     teams: [
-      { teamId: "team-named", siteId: "site-north", organizationId: "org-named", displayName: "Harbor Field" },
+      { teamId: "team-named", siteId: "site-north", organizationId: "org-named", longName: "Harbor Field" },
       { teamId: "team-plain", siteId: "site-north", organizationId: "org-named" },
     ],
     grants: [

@@ -66,9 +66,9 @@ const world = defineWorld({
       { siteId: SHED, operationId: OPERATION, longName: "Boat Shed", path: "shed", aliases: ["shed"] },
     ],
     teams: [
-      { teamId: "team-hull", siteId: PIER, organizationId: TIDEWATER, displayName: "Hull crew" },
-      { teamId: "team-rig", siteId: PIER, organizationId: YARD, displayName: "Rigging" },
-      { teamId: "team-shed", siteId: SHED, organizationId: YARD, displayName: "Shed hands" },
+      { teamId: "team-hull", siteId: PIER, organizationId: TIDEWATER, longName: "Hull crew" },
+      { teamId: "team-rig", siteId: PIER, organizationId: YARD, longName: "Rigging" },
+      { teamId: "team-shed", siteId: SHED, organizationId: YARD, longName: "Shed hands" },
     ],
     grants: [
       {

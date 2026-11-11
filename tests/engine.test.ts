@@ -902,3 +902,55 @@ test("the short name is a second display label, carried to the exported snapshot
   assert.equal(bare?.shortName, undefined);
   assert.ok(!("shortName" in (bare ?? {})), "an unset short name is absent, not undefined-valued");
 });
+
+test("a team carries the pair, and `update-team` writes both labels in one act", async () => {
+  // A team label is the one rendered most times per page and in the densest
+  // slots, so a host needs the short form it cannot derive. The pair arrives
+  // on a team's terms, not the other three's: a team is the only one of these
+  // with a write path, so the labels are set at request and edited after.
+  //
+  // Both fields are required in `update-team`, the consumer's choice: its
+  // client is a full-form page that submits every field, so absent-means-
+  // unchanged would buy nothing, and the remedy for concurrent editing it
+  // would actually want is optimistic concurrency, which no command shape
+  // provides.
+  const paired: TwinFixture = {
+    name: "professional",
+    policy: PROFESSIONAL_OPERATION.policy,
+    snapshot: fixtureSnapshot({
+      operations: [{ operationId: "op-team-pair", longName: "Team Pair", shortName: "TP" }],
+      organizations: [{ organizationId: "org-team-pair", longName: "Pair Works" }],
+      actors: [{ organizationId: "org-team-pair", actorId: "actor-pair" }],
+      sites: [{ siteId: "site-pair", operationId: "op-team-pair", aliases: [] }],
+      teams: [
+        {
+          teamId: "team-paired",
+          siteId: "site-pair",
+          organizationId: "org-team-pair",
+          longName: "Atlanta Floor Operations",
+          shortName: "ATL-FLOOR",
+        },
+        { teamId: "team-bare", siteId: "site-pair", organizationId: "org-team-pair", longName: "No Short Form" },
+      ],
+      grants: [],
+      participations: [{ organizationId: "org-team-pair", operationId: "op-team-pair", status: "active" }],
+    }),
+  };
+  const engine = await createInMemoryAuthority({
+    clock: fixedClock(1_700_000_000),
+    signer: await webCryptoSigner("key-team-pair"),
+    fixtures: [paired],
+  });
+  const snapshot = engine.snapshotOf(operationId("op-team-pair"));
+  assert.ok(snapshot !== undefined);
+
+  const team = snapshot.teams.find((t) => t.teamId === "team-paired");
+  assert.equal(team?.longName, "Atlanta Floor Operations");
+  assert.equal(team?.shortName, "ATL-FLOOR");
+
+  // The same absence rule as the other three: unset is absent, never the id
+  // and never a truncation of the long form.
+  const bare = snapshot.teams.find((t) => t.teamId === "team-bare");
+  assert.equal(bare?.longName, "No Short Form");
+  assert.ok(!("shortName" in (bare ?? {})), "an unset team short name is absent");
+});

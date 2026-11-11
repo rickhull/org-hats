@@ -112,7 +112,8 @@ export interface TeamInput {
   readonly teamId: string;
   readonly siteId: string;
   readonly organizationId: string;
-  readonly displayName?: string;
+  readonly longName?: string;
+  readonly shortName?: string;
 }
 
 export interface GrantInput {
@@ -129,7 +130,8 @@ export interface TeamRequestInput {
   readonly teamId: string;
   readonly siteId: string;
   readonly organizationId: string;
-  readonly displayName?: string;
+  readonly longName?: string;
+  readonly shortName?: string;
   readonly byActorId: string;
   readonly byOrganizationId: string;
   readonly idempotencyKey: string;
@@ -143,7 +145,10 @@ export interface TeamAdmitInput {
 
 export interface TeamUpdateInput {
   readonly teamId: string;
-  readonly displayName: string | null;
+  /** Both labels are written in one act; `null` clears one. A caller that
+   * omits a field it did not mean to touch clears it. */
+  readonly longName: string | null;
+  readonly shortName: string | null;
   readonly byActorId: string;
   readonly byOrganizationId: string;
   readonly idempotencyKey: string;
@@ -496,8 +501,13 @@ export class OperationAuthority extends DurableObject<Env> {
       }
     }
     for (const team of input.teams) {
-      const nameFailure = displayLabelFailure(team.displayName, `team ${team.teamId} display name`);
-      if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
+      for (const [value, label] of [
+        [team.longName, `team ${team.teamId} long name`],
+        [team.shortName, `team ${team.teamId} short name`],
+      ] as const) {
+        const nameFailure = displayLabelFailure(value ?? null, label);
+        if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
+      }
     }
     // Routing facts are operation-authority facts. Validate the whole set
     // before opening the transaction: a bootstrap that writes half a
@@ -581,13 +591,14 @@ export class OperationAuthority extends DurableObject<Env> {
       // re-bootstrap.
       for (const team of input.teams) {
         this.ctx.storage.sql.exec(
-          `INSERT INTO teams (team_id, site_id, organization_id, display_name, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, 'active', ?, ?)
+          `INSERT INTO teams (team_id, site_id, organization_id, display_name, short_name, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
            ON CONFLICT(team_id) DO NOTHING`,
           team.teamId,
           team.siteId,
           team.organizationId,
-          team.displayName ?? null,
+          team.longName ?? null,
+          team.shortName ?? null,
           at,
           at,
         );
@@ -919,7 +930,8 @@ export class OperationAuthority extends DurableObject<Env> {
       teamId: input.teamId,
       siteId: input.siteId,
       organizationId: input.organizationId,
-      ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
+      ...(input.longName === undefined ? {} : { longName: input.longName }),
+      ...(input.shortName === undefined ? {} : { shortName: input.shortName }),
       byActorId: input.byActorId,
     });
     return this.ctx.storage.transactionSync(() => {
@@ -927,8 +939,10 @@ export class OperationAuthority extends DurableObject<Env> {
       if (replay !== undefined) return replay;
       const idFailure = identifierFailure(input.teamId, "team id");
       if (idFailure !== undefined) return { ok: false, failure: idFailure };
-      const nameFailure = displayLabelFailure(input.displayName, "team display name");
-      if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
+      const longFailure = displayLabelFailure(input.longName ?? null, "team long name");
+      if (longFailure !== undefined) return { ok: false, failure: longFailure };
+      const shortFailure = displayLabelFailure(input.shortName ?? null, "team short name");
+      if (shortFailure !== undefined) return { ok: false, failure: shortFailure };
       const standing = this.one("SELECT status FROM participations WHERE organization_id = ?", input.organizationId);
       if (standing === undefined || String(standing["status"]) !== "active") {
         return failure("denied", "the organization does not actively participate in this operation");
@@ -940,12 +954,13 @@ export class OperationAuthority extends DurableObject<Env> {
         return failure("invalid-command", "team id already exists");
       }
       this.ctx.storage.sql.exec(
-        `INSERT INTO teams (team_id, site_id, organization_id, display_name, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'pending', ?, ?)`,
+        `INSERT INTO teams (team_id, site_id, organization_id, display_name, short_name, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`,
         input.teamId,
         input.siteId,
         input.organizationId,
-        input.displayName ?? null,
+        input.longName ?? null,
+        input.shortName ?? null,
         at,
         at,
       );
@@ -982,32 +997,45 @@ export class OperationAuthority extends DurableObject<Env> {
     const payload = payloadOf({
       kind: "update-team",
       teamId: input.teamId,
-      displayName: input.displayName,
+      longName: input.longName,
+      shortName: input.shortName,
       byActorId: input.byActorId,
     });
     return this.ctx.storage.transactionSync(() => {
       const replay = this.replay(input.idempotencyKey, payload);
       if (replay !== undefined) return replay;
       const team = this.one(
-        "SELECT organization_id, status, display_name FROM teams WHERE team_id = ?",
+        "SELECT organization_id, status, display_name, short_name FROM teams WHERE team_id = ?",
         input.teamId,
       );
       if (team === undefined) return failure("invalid-command", "unknown team");
       if (String(team["organization_id"]) !== input.byOrganizationId) {
         return failure("denied", "the caller does not administer this team's organization");
       }
-      const nameFailure = displayLabelFailure(input.displayName, "team display name");
-      if (nameFailure !== undefined) return { ok: false, failure: nameFailure };
+      const longFailure = displayLabelFailure(input.longName, "team long name");
+      if (longFailure !== undefined) return { ok: false, failure: longFailure };
+      const shortFailure = displayLabelFailure(input.shortName, "team short name");
+      if (shortFailure !== undefined) return { ok: false, failure: shortFailure };
       if (String(team["status"]) === "retired") return failure("invalid-command", "team is retired");
-      const current = team["display_name"] === null ? null : String(team["display_name"]);
-      if (current !== input.displayName) {
+      // Both labels move in one statement, so a caller that omits one clears
+      // it. The audit names the halves that moved: "labels updated" over a
+      // two-field write does not tell a reader which name changed.
+      const currentLong = team["display_name"] === null ? null : String(team["display_name"]);
+      const currentShort = team["short_name"] === null || team["short_name"] === undefined
+        ? null
+        : String(team["short_name"]);
+      const moved: string[] = [];
+      if (currentLong !== input.longName) moved.push("long name");
+      if (currentShort !== input.shortName) moved.push("short name");
+      if (moved.length > 0) {
         this.ctx.storage.sql.exec(
-          "UPDATE teams SET display_name = ?, updated_at = ? WHERE team_id = ?",
-          input.displayName,
+          "UPDATE teams SET display_name = ?, short_name = ?, updated_at = ? WHERE team_id = ?",
+          input.longName,
+          input.shortName,
           at,
           input.teamId,
         );
-        this.audit(input.byActorId, `team ${input.teamId} display name updated`, at);
+        this.audit(input.byActorId, `team ${input.teamId} ${moved.join(" and ")} updated`, at);
       }
       this.claim(input.idempotencyKey, payload, at);
       return value({ applied: true });
@@ -1019,15 +1047,17 @@ export class OperationAuthority extends DurableObject<Env> {
    * that read on administrator standing before this is called. */
   teamsOf(organizationId: string): readonly {
     readonly teamId: string;
-    readonly displayName?: string;
+    readonly longName?: string;
+    readonly shortName?: string;
     readonly status: "pending" | "active" | "retired";
   }[] {
     return this.rows(
-      "SELECT team_id, display_name, status FROM teams WHERE organization_id = ? ORDER BY team_id",
+      "SELECT team_id, display_name, short_name, status FROM teams WHERE organization_id = ? ORDER BY team_id",
       organizationId,
     ).map((row) => ({
       teamId: row.team_id as string,
-      ...(row.display_name === null || row.display_name === undefined ? {} : { displayName: row.display_name as string }),
+      ...(row.display_name === null || row.display_name === undefined ? {} : { longName: row.display_name as string }),
+      ...(row.short_name === null || row.short_name === undefined ? {} : { shortName: row.short_name as string }),
       status: row.status as "pending" | "active" | "retired",
     }));
   }
@@ -1304,7 +1334,7 @@ export class OperationAuthority extends DurableObject<Env> {
         path: row["path"],
         aliases: JSON.parse(String(row["aliases_json"])) as unknown,
       })),
-      teams: this.rows("SELECT team_id, site_id, organization_id, display_name, status FROM teams ORDER BY team_id"),
+      teams: this.rows("SELECT team_id, site_id, organization_id, display_name, short_name, status FROM teams ORDER BY team_id"),
       grants: this.rows("SELECT * FROM grants ORDER BY grant_id").map((row) => ({
         grantId: String(row["grant_id"]),
         organizationId: String(row["organization_id"]),
@@ -1353,11 +1383,14 @@ export class OperationAuthority extends DurableObject<Env> {
       ...(row["path"] === null ? {} : { path: rowText(row, "path") }),
       aliases: JSON.parse(rowText(row, "aliases_json")) as string[],
     }));
-    const teams = this.rows("SELECT team_id, site_id, organization_id, display_name FROM teams WHERE status = 'active'").map((row) => ({
+    const teams = this.rows("SELECT team_id, site_id, organization_id, display_name, short_name FROM teams WHERE status = 'active'").map((row) => ({
       teamId: rowTeamId(row),
       siteId: rowSiteId(row),
       organizationId: rowOrganizationId(row),
-      ...(row["display_name"] === null ? {} : { displayName: rowText(row, "display_name") }),
+      ...(row["display_name"] === null ? {} : { longName: rowText(row, "display_name") }),
+      ...(row["short_name"] === null || row["short_name"] === undefined
+        ? {}
+        : { shortName: rowText(row, "short_name") }),
     }));
     const grants: Grant[] = this.rows("SELECT * FROM grants").map((row) => ({
       grantId: rowText(row, "grant_id"),
@@ -1662,7 +1695,7 @@ export class OperationAuthority extends DurableObject<Env> {
     // current columns and fills columns the older snapshot did not carry with
     // null, so the schema-2 → accepted-schema drill is a restore, not a
     // second bootstrap. An unknown or future version is still refused.
-    const supported = new Set(["2", "3", "4", "5", "6"]);
+    const supported = new Set(["2", "3", "4", "5", "6", "7"]);
     if (!supported.has(String(snapshot.schemaVersion))) {
       return failure("invalid-command", "snapshot schema version is not supported");
     }

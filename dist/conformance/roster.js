@@ -91,7 +91,7 @@ export const ROSTER_CASES = [
             ["actor-8d3b77c1", "Dana Okafor", false],
             ["actor-roster-wide", "No Grant At All", false],
         ], "the roster is organization-wide: the linked member, the administrator, and an actor with no grant and no participation");
-        deepEqual(read.teams.map((team) => [team.teamId, team.displayName, team.status]), [["team-2e8c64b9", "Yard crew", "active"]], "the teams are the organization's own in the envelope's operation — not another organization's");
+        deepEqual(read.teams.map((team) => [team.teamId, team.longName, team.status]), [["team-2e8c64b9", "Yard crew", "active"]], "the teams are the organization's own in the envelope's operation — not another organization's");
     }),
     runtimeCase("OH-ROSTER-07", "the roster read is standing-gated, and the context states standing", async (world) => {
         const sam = CONFORMANCE_PRINCIPALS.sam;

@@ -84,8 +84,8 @@ test("the festival is bounded and materializes the booth burst deterministically
   assert.equal(FESTIVAL.snapshot.operations[0]?.bounded, true);
   const booths = FESTIVAL.snapshot.teams.filter((t) => t.teamId.startsWith("team-booth-"));
   assert.equal(booths.length, 150);
-  assert.equal(booths[0]?.displayName, "Tasting booth 001");
-  assert.equal(booths[booths.length - 1]?.displayName, "Tasting booth 150");
+  assert.equal(booths[0]?.longName, "Tasting booth 001");
+  assert.equal(booths[booths.length - 1]?.longName, "Tasting booth 150");
 });
 
 test("Harbor Logistics and Dana Okafor join both consumer-design operations with different hats", () => {

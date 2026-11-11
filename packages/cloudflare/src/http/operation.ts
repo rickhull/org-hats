@@ -61,7 +61,8 @@ export interface OperationRouteHost {
    * status — the teams half of the runtime's roster read. */
   teamsOf(organizationId: string): readonly {
     readonly teamId: string;
-    readonly displayName?: string;
+    readonly longName?: string;
+    readonly shortName?: string;
     readonly status: "pending" | "active" | "retired";
   }[];
   recordRefresh(handleHash: string, organizationId: string, actorId: string): Result<unknown>;
@@ -111,7 +112,8 @@ const parseOperationBootstrap = (input: unknown): BootstrapInput => {
         teamId: asString(team["teamId"], "teamId"),
         siteId: asString(team["siteId"], "siteId"),
         organizationId: asString(team["organizationId"], "organizationId"),
-        ...(team["displayName"] === undefined ? {} : { displayName: asString(team["displayName"], "displayName") }),
+        ...(team["longName"] === undefined ? {} : { longName: asString(team["longName"], "longName") }),
+        ...(team["shortName"] === undefined ? {} : { shortName: asString(team["shortName"], "shortName") }),
       };
     }),
     grants: asArray(body["grants"] ?? [], "grants").map((entry) => {
@@ -272,7 +274,8 @@ export const handleOperationRequest = async (
         teamId: asString(body["teamId"], "teamId"),
         siteId: asString(body["siteId"], "siteId"),
         organizationId: asString(body["organizationId"], "organizationId"),
-        ...(body["displayName"] === undefined ? {} : { displayName: asString(body["displayName"], "displayName") }),
+        ...(body["longName"] === undefined ? {} : { longName: asString(body["longName"], "longName") }),
+        ...(body["shortName"] === undefined ? {} : { shortName: asString(body["shortName"], "shortName") }),
         byActorId: asString(body["byActorId"], "byActorId"),
         byOrganizationId: asString(body["byOrganizationId"], "byOrganizationId"),
         idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
@@ -292,7 +295,14 @@ export const handleOperationRequest = async (
       const body = await readBody(request);
       return json(host.updateTeam({
         teamId: asString(body["teamId"], "teamId"),
-        displayName: body["displayName"] === null ? null : asString(body["displayName"], "displayName"),
+        // Both labels are required: an omitted field is `null`, which clears
+        // the label rather than leaving it alone (docs/migration-v4.md).
+        longName: body["longName"] === null || body["longName"] === undefined
+          ? null
+          : asString(body["longName"], "longName"),
+        shortName: body["shortName"] === null || body["shortName"] === undefined
+          ? null
+          : asString(body["shortName"], "shortName"),
         byActorId: asString(body["byActorId"], "byActorId"),
         byOrganizationId: asString(body["byOrganizationId"], "byOrganizationId"),
         idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),

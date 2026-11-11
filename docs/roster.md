@@ -118,9 +118,10 @@ Two scopes, deliberately different:
   exactly who the administrator may need to place. Each entry carries the
   actor id, the display name when one is set, and the enabled state.
 - **teams** are the teams the organization fields **in the envelope's
-  operation**, each with its display name and lifecycle status (pending,
-  active, retired). Teams are operation data ([teams.md](teams.md)), so the
-  operation the envelope binds to bounds this half.
+  operation**, each with its display-label pair — `longName` and `shortName`,
+  either absent when unset — and its lifecycle status (pending, active,
+  retired). Teams are operation data ([teams.md](teams.md)), so the operation
+  the envelope binds to bounds this half.
 
 Both halves are live reads, the same shape `context()` uses. Standing is
 also a fact on `AuthorityContext` — presentation, so a host can hide its

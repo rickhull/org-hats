@@ -10,11 +10,12 @@ import type { PolicyBundle } from "./policy.js";
  * path — `Operation.slug` and `Site.path` are the routing facts, and this
  * never determines an address.
  *
- * Only the three entities that carry a pair use `longName`. An `Actor` and a
- * `Team` keep `displayName`, a single label with no counterpart: an actor's
- * comes from the OIDC `name` claim, and a team's is already the short form.
- * `longName` means the long half of a pair, so it would be a false name on
- * either. */
+ * An `Organization`, `Operation`, `Site`, and `Team` carry the pair. An
+ * `Actor` does not, and keeps `displayName`: that label is the OIDC `name`
+ * claim, which authority relays and never authors, so a short form would have
+ * no upstream source and would make authority the author of a nickname for a
+ * person. `longName` means the long half of a pair, so it would be a false
+ * name there. */
 export interface Organization {
     readonly organizationId: OrganizationId;
     readonly longName?: string;
@@ -70,10 +71,13 @@ export interface Team {
     readonly teamId: TeamId;
     readonly siteId: SiteId;
     readonly organizationId: OrganizationId;
-    /** A single display label with no short counterpart — a team's label is
-     * already the short form, so it is not the long half of a pair. When teams
-     * acquire a `shortName`, this becomes `longName` with them. */
-    readonly displayName?: string;
+    readonly longName?: string;
+    /** The short display label, the same rule as `Organization.shortName`. A
+     * team label is rendered more times per page, and in denser slots, than any
+     * other — which is what earned the pair here. Unlike the other three, a
+     * team's labels have a write path: set at `request-team`, edited by
+     * `update-team`. */
+    readonly shortName?: string;
 }
 export type { GrantTarget } from "./contract.js";
 /** A hat is an operation-local grant: this organization's actor may act in

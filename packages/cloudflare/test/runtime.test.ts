@@ -81,7 +81,7 @@ describe("the Cloudflare runtime's cross-coordinator rules", () => {
       ["actor-8d3b77c1", "Dana Okafor"],
     ]);
     // …teams scoped to the envelope's operation from the operation object
-    expect(read.teams).toEqual([{ teamId: "team-2e8c64b9", displayName: "Yard crew", status: "active" }]);
+    expect(read.teams).toEqual([{ teamId: "team-2e8c64b9", longName: "Yard crew", status: "active" }]);
 
     const context = await world.runtime.context({
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,

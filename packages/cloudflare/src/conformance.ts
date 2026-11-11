@@ -99,7 +99,8 @@ export const createCloudflareConformanceWorld = async (env: Env): Promise<Confor
         teamId: team.teamId,
         siteId: team.siteId,
         organizationId: team.organizationId,
-        ...(team.displayName === undefined ? {} : { displayName: team.displayName }),
+        ...(team.longName === undefined ? {} : { longName: team.longName }),
+        ...(team.shortName === undefined ? {} : { shortName: team.shortName }),
       })),
       grants: snapshot.grants.map((grant) => ({
         grantId: grant.grantId,
