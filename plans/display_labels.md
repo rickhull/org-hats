@@ -100,19 +100,35 @@ from a second fact, which is the long/short confusion this rename exists to
 remove.  The break is deferred, not avoided: retiring `displayName` later is
 still interface 4.  Writes can be additive here; reads cannot.
 
-**Open with the consumer: three entities or five.**  Only organization,
-operation, and site carry a short counterpart.  `longName` means the long half
-of a pair, so on an actor it is wrong — that label is the OIDC `name` claim —
-and on a team it is worse, because a team's label is already the short form.
-The proposal on the table is to rename only where the pair exists and leave
-`Actor.displayName` and `Team.displayName` alone, with a team's crossing over
-when it acquires its own short name.  Settle this before the sweep; it decides
-the scope.
+**The scope is the three paired entities — settled with the consumer.**
+Organization, operation, and site gain `longName` beside `shortName`; `Actor`
+and `Team` keep `displayName`.  `longName` means the long half of a pair, and
+on an actor there is no pair — that label is the OIDC `name` claim, a single
+fact.  On a team it is worse than wrong: the label already *is* the short
+form.  Uniformity across all five would put a tidy type listing above a true
+one.  A team crosses over when teams acquire a short name, and that is the
+named trigger, not a reopened decision.
+
+**No deployed reader consumes the three renamed fields.**  The consumer's
+readers take `displayName` from the context read (`context.actor.displayName`)
+and from the roster surface — actors and teams, the two types this rename does
+not touch.  Organization, operation, and site display names reach the consumer
+on the write side only, in the bootstrap bodies its deploy path composes.  So
+the break is write-side, and the sweep is smaller than a result-shape break
+implies.  Re-verify this against the consumer at execution time rather than
+trusting this line: it records an exposure as of the `cloudflare-v0.16.0`
+deploy, and a reader added later would change it.
+
+The result shape still changes for those three, so the interface version still
+moves.  "No one reads it today" is a fact about the current consumer, not
+about the contract.
 
 **Done when:** `AUTHORITY_INTERFACE_VERSION` is 4, `docs/migration-v4.md`
-records the rename, the three-or-five scope is settled, and the consumer has
-crossed it.
+records the rename, and the consumer has crossed it.
 
 **Trigger:** the next break that moves the interface version for another
-reason.  The consumer declined taking it early and has recorded the same
-target on its side; do not move the version for this alone.
+reason.  The consumer was offered the rename early a second time, after the
+scope narrowed, and chose to wait: cutting now would supersede the pin it
+deployed and put another authority deploy in front of the consumer release
+carrying `shortName`, which gates other work there.  Nothing on either side
+gates on the rename.  Do not move the version for this alone.
