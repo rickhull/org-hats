@@ -9,6 +9,11 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
+The local-credentials (passkey) work is phased and ready to start: the
+decisions, guardrails, five phases, and the dependency-revisit gate are in
+[`local_credentials.md`](local_credentials.md). Phase 1 (the CBOR/WebAuthn
+decoding layer, vectors first) is the concrete next action.
+
 The type-safety plan is retired: all four slices landed with red-first
 regressions (claims shape gate, world/snapshot ownership, outbox union,
 route flag parsing); the durable findings live in
