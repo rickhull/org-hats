@@ -6,7 +6,16 @@ and [E4](../specs/envelope.md#e4--verification-fails-closed-in-a-fixed-order)
 remain obligations; the current violations do not lower them. Each slice
 leaves the applicable tests green before the next begins.
 
-## 1. Validate the complete access claims shape
+## 1. Validate the complete access claims shape — DONE
+
+Landed: the gate checks the required v1 claims shape after the expiry
+stage (`accessClaimsShapeFailure` in `src/contract.ts`), the E4 table
+carries the new stage, and the red-first regressions live in
+`tests/access.test.ts` (verified malformed result, accessor reachability,
+expected-site throw, combined fault with a forged signature, and wrapper
+version still winning). The depth test's at-the-bound assertion moved
+with the new precedence: shapeless claims at the bound are the gate's
+refusal, not the signature's.
 
 Validate all required claims from `unknown` before exposing a verified result
 or reading fields that depend on that shape. Preserve E4's format, version,

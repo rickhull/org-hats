@@ -286,10 +286,13 @@ test("[E4] claims deeper than the format's bound are refused before canonicaliza
     signature: vectors.signature,
   });
 
-  // at the bound the gate passes and the signature decides
+  // at the bound the depth check passes — but these claims are also
+  // shapeless, and the shape refusal (like every parser stage) precedes the
+  // signature, so the gate still answers: `unauthenticated`, not
+  // `invalid-signature`
   assert.equal(
     failureOf(await verify(envelopeAt(ACCESS_CLAIMS_MAX_DEPTH) as never, keys, { now })).kind,
-    "invalid-signature",
+    "unauthenticated",
   );
   // one level past it, the claims are never read
   assert.equal(
@@ -512,4 +515,78 @@ test("neutral access: absent authentication facts flatten honestly", async () =>
   assert.deepEqual(access.authenticatedWith(), []);
   assert.equal(access.authenticatedAt(), undefined);
   assert.deepEqual(access.teamReach(), ["team-2e8c64b9"]);
+});
+
+// --- E4 slice: the complete claims shape ----------------------------------
+//
+// A trusted issuer that signs structurally incomplete claims is not an
+// attacker — the signature is real — but the result was never a readable
+// v1 claims object. These regressions were proven red first: the incomplete
+// claims verified at an earlier time, the actor accessor threw on the
+// missing `actor` object, and an expected site made verification itself
+// throw on the missing `sites` array.
+
+/** A real signature over whatever claims the issuer actually supplied —
+ * the "trusted issuer, malformed claims" case, distinct from forgery. */
+const signedByTrustedIssuer = async (
+  claims: unknown,
+): Promise<{ envelope: SignedAccessEnvelope; keys: ReadonlyMap<string, VerifyKey> }> => {
+  const signer = await webCryptoSigner("issuer-shape");
+  const signature = await signer.sign(canonicalJson(asJson(claims)));
+  const verifyKeys = new Map<string, VerifyKey>([
+    [signer.keyId, await ed25519VerifyKey(signer.keyId, await signer.publicKey())],
+  ]);
+  return {
+    envelope: {
+      format: ACCESS_ENVELOPE_FORMAT,
+      v: 1,
+      keyId: signer.keyId,
+      claims: claims as AccessEnvelopeClaimsV1,
+      signature,
+    },
+    keys: verifyKeys,
+  };
+};
+
+test("[E4] correctly signed but incomplete claims are refused as a value", async () => {
+  const { envelope, keys: issuerKeys } = await signedByTrustedIssuer({ v: 1, exp: 200 });
+  const result = await verify(envelope, issuerKeys, { now: 100 });
+  assert.ok(isFailed(result), "incomplete claims must not verify");
+  assert.equal(failureOf(result).kind, "unauthenticated");
+});
+
+test("[E4] incomplete claims never reach an accessor that throws", async () => {
+  const { envelope, keys: issuerKeys } = await signedByTrustedIssuer({ v: 1, exp: 200 });
+  const result = await verify(envelope, issuerKeys, { now: 100 });
+  // before the fix this was a Verified value whose access.actor() threw;
+  // now the refusal precedes any accessor, and the accessor never sees
+  // claims that lack the fields it reads
+  assert.ok(isFailed(result));
+  assert.equal(result.failure.kind, "unauthenticated");
+});
+
+test("[E4] an expected site no longer throws on the missing sites array", async () => {
+  const { envelope, keys: issuerKeys } = await signedByTrustedIssuer({ v: 1, exp: 200 });
+  const result = await verify(envelope, issuerKeys, { now: 100, expectedSiteId: "site-b8d620fa" });
+  assert.ok(isFailed(result), "the shape refusal precedes binding checks");
+  assert.equal(failureOf(result).kind, "unauthenticated");
+});
+
+test("[E4] the shape refusal precedes the signature check", async () => {
+  const { envelope, keys: issuerKeys } = await signedByTrustedIssuer({ v: 1, exp: 200 });
+  const badlySigned: SignedAccessEnvelope = { ...envelope, signature: envelope.signature.slice(0, -4) + "AAAA" };
+  // combined fault: malformed claims and a forged signature — the unreadable
+  // claims are refused before the signature is consulted, so the answer is
+  // the parser's own refusal, not `invalid-signature`
+  const result = await verify(badlySigned, issuerKeys, { now: 100 });
+  assert.ok(isFailed(result));
+  assert.equal(failureOf(result).kind, "unauthenticated");
+});
+
+test("[E4] a wrong wrapper version still wins over malformed claims", async () => {
+  const { envelope, keys: issuerKeys } = await signedByTrustedIssuer({ v: 1, exp: 200 });
+  const misversioned = { ...envelope, v: 99 } as unknown as SignedAccessEnvelope;
+  const result = await verify(misversioned, issuerKeys, { now: 100 });
+  assert.ok(isFailed(result));
+  assert.equal(failureOf(result).kind, "wrong-interface-version");
 });

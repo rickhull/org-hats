@@ -92,6 +92,7 @@ checks follow the declarations they interpret.
 | Claims depth | Exceeds E2's depth bound | `unauthenticated` |
 | Carriage fields | Missing, empty, or non-string key id or signature | `unauthenticated` |
 | Expiry shape | Missing, nonnumeric, non-finite, or fractional `exp` | `unauthenticated` |
+| Required claims shape | Any required v1 claim missing or of the wrong type, after the depth bound (optional `amr`/`auth_time` and unknown additive claims excepted) | `unauthenticated` |
 
 Only after parsing succeeds does verification check the signature against a
 known key id (`invalid-signature`), elapsed expiry (`expired`), and then the
@@ -102,8 +103,11 @@ This order also governs combined faults. An object without a format marker
 is a format mismatch, even if it also lacks claims. An unsupported wrapper
 version wins over an absent claims payload; an unsupported wrapper or claims
 version wins over excessive claims depth. With supported versions, absent
-claims, excessive depth, and invalid expiry are `unauthenticated`. No
-signature check can repair any of these parser refusals.
+claims, excessive depth, invalid expiry, and incomplete required claims are
+`unauthenticated`. No signature check can repair any of these parser
+refusals — a correctly signed envelope whose issuer supplied `{v: 1,
+exp: 200}` is not forged, but it was never a readable claims object, and the
+gate owns that refusal before the signature is consulted.
 
 Declaration checks precede payload scans so an unsupported format or version
 is refused without interpreting its payload. The distinction between

@@ -42,18 +42,17 @@ exercise refusal before persistence and valid stored values.
   `disabled`, grant-command `primary`, organization `operator`, and team
   retirement's `asOperationAdmin`. Their malformed values become false or
   absent; bootstrap's parsing fix does not cover those routes.
-- [parseAccessEnvelope](../src/contract.ts) checks containers, versions,
+- ~~[parseAccessEnvelope](../src/contract.ts) checks containers, versions,
   depth, carriage fields, and expiry but asserts the complete claims type
-  without checking all fields. A correctly signed claims object
-  `{v: 1, exp: 200}` can verify at
-  an earlier time and return a `Verified` value whose actor accessor throws.
-  Supplying an expected site makes verification itself throw on the missing
-  sites array. This requires a trusted issuer to sign malformed claims;
-  it is not signature forgery.
-  [E4](../specs/envelope.md#e4--verification-fails-closed-in-a-fixed-order)
-  describes the verification boundary, and [E2](../specs/envelope.md#e2--one-canonical-implementation)
-  the canonical JSON contract. Verified claims are nevertheless copied and
-  deeply frozen; immutability does not establish their shape.
+  without checking all fields.~~ **Closed:** the gate now checks the complete
+  required v1 claims shape after the expiry stage and before any caller can
+  read a claim — a correctly signed `{v: 1, exp: 200}` is `unauthenticated`
+  at the gate, never a `Verified` value whose accessors throw. E3's optional
+  and unknown additive claims and E8's issuer-version provenance are
+  unaffected; the spec's E4 table carries the new stage. Proven red first:
+  the verified malformed result, the `invalid-signature` combined fault, and
+  the `verify` throw on the missing `sites` array all reproduced before the
+  fix.
 - The in-memory engine keeps fixture policy references and shallow-copies
   nested fixture data at ingress ([engine.ts](../src/authority/engine.ts)).
   Its [snapshot](../src/authority/state.ts) copies arrays but shares grant,

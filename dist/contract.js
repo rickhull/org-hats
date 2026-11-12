@@ -85,6 +85,55 @@ export const accessClaimsDepth = (value) => {
  * results keep their `ok` discriminant and do not use this. Narrowing a
  * typed union is all this does — it parses nothing. */
 export const isFailed = (result) => "failure" in result;
+const isRecordLike = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+const isStringArray = (value) => Array.isArray(value) && value.every((entry) => typeof entry === "string");
+/** The complete required shape of v1 claims, checked before the claims can
+ * wear the type. A correctly signed envelope whose issuer supplied
+ * `{v: 1, exp: 200}` is not an attack — the signature is real — but it was
+ * never a readable claims object, and handing it to `verify` as one moved
+ * the failure from this gate to an accessor that threw. Optional claims
+ * (`amr`, `auth_time`) and unknown additive claims (E3) are exempt: only the
+ * fields every v1 reader depends on are required. Types are checked, not
+ * values: id spellings and roster membership stay the issuer's to mean. */
+const accessClaimsShapeFailure = (claims) => {
+    const record = claims;
+    if (typeof record.interfaceVersion !== "number" || !Number.isInteger(record.interfaceVersion)) {
+        return { kind: "unauthenticated", detail: "the claims carry no interface version" };
+    }
+    if (typeof record.operationId !== "string") {
+        return { kind: "unauthenticated", detail: "the claims carry no operation id" };
+    }
+    const actor = record.actor;
+    if (!isRecordLike(actor) ||
+        typeof actor.organizationId !== "string" ||
+        typeof actor.actorId !== "string") {
+        return { kind: "unauthenticated", detail: "the claims carry no actor binding" };
+    }
+    const hat = record.hat;
+    if (!isRecordLike(hat) ||
+        typeof hat.role !== "string" ||
+        !isStringArray(hat.actions) ||
+        !isStringArray(hat.teamIds) ||
+        !isStringArray(hat.siteIds)) {
+        return { kind: "unauthenticated", detail: "the claims carry no worn hat" };
+    }
+    if (!isStringArray(record.memberTeamIds) ||
+        !isStringArray(record.readableOrganizationIds) ||
+        !isStringArray(record.readableTeamIds) ||
+        !isStringArray(record.configurableSiteIds)) {
+        return { kind: "unauthenticated", detail: "the claims carry incomplete reach facts" };
+    }
+    if (!Array.isArray(record.sites) ||
+        !record.sites.every((site) => isRecordLike(site) &&
+            typeof site.siteId === "string" &&
+            isStringArray(site.aliases))) {
+        return { kind: "unauthenticated", detail: "the claims carry no site bindings" };
+    }
+    if (typeof record.iat !== "number" || !Number.isFinite(record.iat)) {
+        return { kind: "unauthenticated", detail: "the claims carry no finite issued-at" };
+    }
+    return undefined;
+};
 /** The envelope gate shared by the verifier and the runtime's command and
  * context authorization. The format marker, the envelope's own version, and
  * the claims' version must agree before a signature is trusted or claims are
@@ -154,6 +203,9 @@ export const parseAccessEnvelope = (envelope) => {
     if (typeof exp !== "number" || !Number.isInteger(exp)) {
         return { kind: "unauthenticated", detail: "the claims carry no finite whole-number expiry" };
     }
+    const shape = accessClaimsShapeFailure(claims);
+    if (shape !== undefined)
+        return shape;
     return {
         keyId: carriage.keyId,
         signature: carriage.signature,
