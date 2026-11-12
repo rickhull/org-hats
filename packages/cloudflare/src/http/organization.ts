@@ -46,6 +46,7 @@ export interface OrganizationRouteHost {
   revokeActivation(input: RecoveryInput): Result<unknown>;
   unlinkPrincipal(input: RecoveryInput): Result<unknown>;
   invite(invitationId: string, operationId: string): Result<unknown>;
+  forgetOperation(operationId: string): Result<unknown>;
   intakeParticipationRevoked(operationId: string): Result<unknown>;
   drain(): Promise<{ readonly delivered: number; readonly pending: number }>;
   accept(input: AcceptInput): Result<unknown>;
@@ -180,6 +181,11 @@ export const handleOrganizationRequest = async (
         asString(body["invitationId"], "invitationId"),
         asString(body["operationId"], "operationId"),
       ));
+    }
+
+    if (request.method === "POST" && url.pathname === "/forget-operation") {
+      const body = await readBody(request);
+      return json(host.forgetOperation(asString(body["operationId"], "operationId")));
     }
 
     if (request.method === "POST" && url.pathname === "/intake") {

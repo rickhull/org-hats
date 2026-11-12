@@ -383,10 +383,20 @@ export default {
           return relay(env.OPERATION.get(env.OPERATION.idFromName(operationId)),
             url.pathname.endsWith("/bootstrap-preview") ? "/bootstrap-preview" : "/bootstrap", body);
         }
-        if (request.method === "POST" && url.pathname === "/ops/operation/routing-facts") {
-          const body = await request.json() as { operationId?: string };
+        if (request.method === "POST" && url.pathname === "/ops/operation/routing-facts") {          const body = await request.json() as { operationId?: string };
           if (typeof body.operationId !== "string") throw new Error("operationId is required");
           return relay(env.OPERATION.get(env.OPERATION.idFromName(body.operationId)), "/routing-facts", body);
+        }
+        if (request.method === "POST" && url.pathname === "/ops/operation/delete") {
+          const body = await request.json() as { operationId?: string };
+          if (typeof body.operationId !== "string") throw new Error("operationId is required");
+          return relay(env.OPERATION.get(env.OPERATION.idFromName(body.operationId)), "/delete", body);
+        }
+        if (request.method === "POST" && url.pathname === "/ops/organization/forget-operation") {
+          const body = await request.json() as { organizationId?: string; operationId?: string };
+          if (typeof body.organizationId !== "string") throw new Error("organizationId is required");
+          if (typeof body.operationId !== "string") throw new Error("operationId is required");
+          return relay(organizationStub(env, body.organizationId), "/forget-operation", { operationId: body.operationId });
         }
         // The audit trail on its own. `/ops/export` also carries these rows,
         // but it carries `sealed_idp_config` with them, so producing an audit
@@ -404,12 +414,25 @@ export default {
           return relay(stub, "/status");
         }
         if (request.method === "GET" && url.pathname === "/ops/export") {
-          const stub = coordinator(env, url.searchParams.get("coordinator"), url.searchParams.get("id") ?? "");
+          const coordinatorName = url.searchParams.get("coordinator");
+          const coordinatorId = url.searchParams.get("id") ?? "";
+          const stub = coordinator(env, coordinatorName, coordinatorId);
           if (stub === undefined) throw new Error("coordinator must be organization or operation, with an id");
           const response = await relay(stub, "/export");
           const body = await response.json() as { ok: boolean; value?: unknown; failure?: unknown };
           if (!body.ok) return Response.json(body, { status: response.status });
-          return new Response(canonicalJson(body.value as JsonValue), {
+          // an absent coordinator names itself, so one coordinator's absence
+          // cannot be mistaken for another's
+          const snapshot = body.value as Record<string, unknown>;
+          const named = snapshot.absent === true
+            ? {
+                ...snapshot,
+                ...(coordinatorName === "operation" ? { operationId: coordinatorId }
+                  : coordinatorName === "organization" ? { organizationId: coordinatorId }
+                  : {}),
+              }
+            : snapshot;
+          return new Response(canonicalJson(named as JsonValue), {
             headers: { "content-type": "application/json; charset=utf-8" },
           });
         }

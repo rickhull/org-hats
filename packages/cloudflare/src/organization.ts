@@ -1068,6 +1068,59 @@ export class OrganizationAuthority extends DurableObject<Env> {
     return Number(this.one("SELECT COUNT(*) AS pending FROM outbox WHERE delivered_at IS NULL")?.["pending"] ?? 0);
   }
 
+  /** Scoped cleanup for one deleted operation: its invitation records,
+   * the outbox rows addressed to it, the replay claims whose payloads name
+   * it, and the audit facts that reference it. Everything else — actors,
+   * principal links, administrator standing, every other operation's
+   * history — survives; this is not an organization wipe. Like the
+   * operation-side delete it writes no audit row: the retained-nothing
+   * contract covers the organization's facts about this operation too, and
+   * the operator who ordered the deletion holds the trace. Idempotent. */
+  private forgetOperation(operationId: string): Result<{ forgotten: boolean }> {
+    return this.ctx.storage.transactionSync(() => {
+      // collected before the invitations rows go, so audit facts naming an
+      // invitation of this operation are scoped by identity, not by
+      // substring that could catch another operation's invitation
+      const invitationIds = this.rows(
+        "SELECT invitation_id FROM invitations WHERE operation_id = ?",
+        operationId,
+      ).map((row) => String(row["invitation_id"]));
+      this.ctx.storage.sql.exec("DELETE FROM invitations WHERE operation_id = ?", operationId);
+      this.ctx.storage.sql.exec("DELETE FROM outbox WHERE target = ?", operationId);
+      for (const row of this.rows("SELECT idempotency_key, payload FROM claims")) {
+        let payload: unknown;
+        try {
+          payload = JSON.parse(String(row["payload"]));
+        } catch {
+          continue;
+        }
+        if (
+          typeof payload === "object" && payload !== null &&
+          (payload as { operationId?: unknown }).operationId === operationId
+        ) {
+          this.ctx.storage.sql.exec(
+            "DELETE FROM claims WHERE idempotency_key = ?",
+            String(row["idempotency_key"]),
+          );
+        }
+      }
+      for (const row of this.rows("SELECT seq, fact FROM audit")) {
+        const fact = String(row["fact"]);
+        // Suffix-anchored so one operation id cannot match inside another
+        // (`op-1` must not catch `op-10`): the trailing word after the id in
+        // every fact template is `revoked`, or the id ends the fact.
+        const referencesOperation =
+          fact.endsWith(` for ${operationId}`) ||
+          fact.includes(` in ${operationId} revoked`) ||
+          invitationIds.some((invitationId) => fact.startsWith(`invitation ${invitationId} `));
+        if (referencesOperation) {
+          this.ctx.storage.sql.exec("DELETE FROM audit WHERE seq = ?", Number(row["seq"]));
+        }
+      }
+      return value({ forgotten: true });
+    });
+  }
+
   private exportSnapshot(): ExportSnapshot {
     return {
       schemaVersion: String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0"),
@@ -1142,6 +1195,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
       reset: () => this.reset(),
       status: () => this.status(),
       exportSnapshot: () => this.exportSnapshot(),
+      forgetOperation: (operationId) => this.forgetOperation(operationId),
       restoreSnapshot: (input, operatorId) => this.restoreSnapshot(input, operatorId),
       auditRows: () => this.auditRows(),
       outboxRows: () => this.outboxRows(),

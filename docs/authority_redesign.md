@@ -512,6 +512,21 @@ the evidence it presented; an audit reader alone sees the actor, not the
 authority path. Recording the layer would be a schema and audit-contract
 change, taken only with a concrete consumer need.
 
+### The audit contract holds within a live operation
+
+Restore records itself, because a live coordinator keeps its own history.
+Operation deletion is the deliberate exception: `/ops/operation/delete`
+clears every operation-owned fact — audit, replay claims, and the outbox
+included — and writes no row, because a wiped operation keeps no history at
+all. The trace of the wipe lives with the operator who ordered it; neither
+side retains a tombstone (the consumer's greater-delete decision is
+retains-nothing). Organization-side cleanup (`/ops/organization/forget-
+operation`) follows the same rule for the organization's facts about that
+one operation. Export after a wipe answers explicit absence —
+`{ absent: true, coordinator, requested id }` — never a snapshot of empty
+tables; a late roster or acceptance push is delivered but not applied, so
+absence cannot hide a partly repopulated coordinator.
+
 ## Quartermaster integration
 
 Quartermaster owns reporting behavior and depends only on the authority

@@ -77,6 +77,7 @@ export interface OperationRouteHost {
   drain(): Promise<{ readonly delivered: number; readonly pending: number }>;
   status(): Record<string, unknown>;
   exportSnapshot(): unknown;
+  deleteOperation(operationId: string): Result<unknown>;
   restoreSnapshot(input: unknown, operatorId?: string): Result<unknown>;
   snapshot(): Record<string, unknown>;
   auditRows(): readonly Record<string, unknown>[];
@@ -422,6 +423,12 @@ export const handleOperationRequest = async (
 
     if (request.method === "GET" && url.pathname === "/status") return json(value(host.status()));
     if (request.method === "GET" && url.pathname === "/export") return json(value(host.exportSnapshot()));
+    if (request.method === "POST" && url.pathname === "/delete") {
+      // The body names the target: a delete aimed at another operation
+      // refuses before any mutation, on the first call and on every retry.
+      const body = await readBody(request);
+      return json(host.deleteOperation(asString(body["operationId"], "operationId")));
+    }
     if (request.method === "POST" && url.pathname === "/restore") {
       // The identity rides the header: the body is the snapshot itself.
       const restored = host.restoreSnapshot(await request.json(), operatorIdOf(request).operatorId);

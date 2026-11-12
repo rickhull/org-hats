@@ -50,6 +50,15 @@ export interface ExportSnapshot {
   readonly tables: Record<string, StateRow[]>;
 }
 
+/** What a wiped or never-bootstrapped coordinator exports: absence as a
+ * state result, never a snapshot of empty tables. The ops route adds the
+ * requested id so a caller cannot mistake one coordinator's absence for
+ * another's. */
+export interface AbsentExport {
+  readonly absent: true;
+  readonly coordinator: "organization" | "operation";
+}
+
 export const readTables = (
   sql: SqlStorage,
   specs: readonly TableSpec[],

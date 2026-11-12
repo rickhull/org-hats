@@ -258,13 +258,38 @@ public key distribution:
   [`assurance.md`](assurance.md)
 - `GET /ops/export?coordinator=…&id=…` — canonical JSON. Carries every
   table, `sealed_idp_config` included; prefer `/ops/audit` when the audit
-  trail is what is wanted
+  trail is what is wanted. A wiped or never-bootstrapped operation answers
+  `{ absent: true, coordinator: "operation", operationId: <requested id> }`
+  instead — absence is a state result, never a snapshot of empty tables
 - `POST /ops/restore` — `{ coordinator, id, snapshot }`, typed and atomic;
   a snapshot's undelivered outbox rows are re-delivered by the next drain,
   and the receiving intake recognises the replay by the outbox row id. The
   restore appends one audit row recording itself, written after the tables so
   the snapshot cannot overwrite the trace of the act that applied it — so a
   restored export differs from its snapshot by exactly that row
+- `POST /ops/operation/delete` — `{ operationId }`. True deletion: every
+  operation-owned fact goes, audit, replay claims, and the outbox included;
+  the coordinator is left uninitialized and a deliberate bootstrap is
+  possible again. Writes no audit row — the audit contract holds within a
+  live operation, and the wipe's trace lives with the operator who ordered
+  it (see `authority_redesign.md` § Audit attribution). Refuses a mismatched
+  `operationId` before any mutation, on the first call and on every retry.
+  Idempotent: `deleted: true` whether or not anything existed. The
+  schema-version meta survives (migration state, not operation fact). A
+  late roster or acceptance push delivered after the wipe is accepted as
+  delivered-but-not-applied, so the drain does not wedge and nothing
+  repopulates. Sessions in flight expire by envelope lifetime — deleting
+  refresh state prevents refresh, not already-issued envelopes
+- `POST /ops/organization/forget-operation` — `{ organizationId,
+  operationId }`. Scoped cleanup on the organization side after an operation
+  delete: that operation's invitation records, outbox rows addressed to it,
+  replay claims naming it, and audit facts referencing it are removed, while
+  actors, principal links, administrator standing, every other operation's
+  history, and unrelated audit facts survive. Idempotent, and writes no
+  audit row for the same reason delete does not. Run it for every
+  participant organization enumerated from the pre-delete export, so the
+  organization's outbox fan-out stops addressing a coordinator that no
+  longer decides anything
 
 ### Bootstrap preview
 

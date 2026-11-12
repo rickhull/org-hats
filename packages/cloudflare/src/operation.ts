@@ -42,6 +42,7 @@ import {
   readTables,
   restoreTables,
   type ExportSnapshot,
+  type AbsentExport,
   type StateRow,
   OUTBOX_DELIVERED_RETENTION_SECONDS,
   OUTBOX_DRAIN_LIMIT,
@@ -731,6 +732,16 @@ export class OperationAuthority extends DurableObject<Env> {
   }
 
   private intake(input: IntakeMessage): Result<{ applied: boolean }> {
+    // A wiped or never-bootstrapped coordinator stays fact-free: the
+    // message is delivered — the organization's drain must not wedge on a
+    // target that no longer decides anything — but nothing applies and
+    // nothing is claimed, so a redelivery is as harmless as the first
+    // delivery. Same semantics as an acceptance that arrives after a
+    // revoke: delivered, not applied. Without this, a late roster push
+    // would repopulate the projection behind the export's explicit absence.
+    if (this.one("SELECT 1 AS present FROM operation LIMIT 1") === undefined) {
+      return value({ applied: false });
+    }
     const at = now();
     const payload = payloadOf({ ...input });
     return this.ctx.storage.transactionSync(() => {
@@ -1674,12 +1685,49 @@ export class OperationAuthority extends DurableObject<Env> {
     });
   }
 
-  private exportSnapshot(): ExportSnapshot {
+  private exportSnapshot(): ExportSnapshot | AbsentExport {
+    if (this.one("SELECT 1 AS present FROM operation LIMIT 1") === undefined) {
+      // Absence is a state result, not an empty export: a wiped tree must
+      // not be restorable as if it were live-but-empty, and a caller must
+      // not confuse the two. The requested id rides the ops route.
+      return { absent: true, coordinator: "operation" };
+    }
     return {
       schemaVersion: String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0"),
       coordinator: "operation",
       tables: readTables(this.ctx.storage.sql, operationTables),
     };
+  }
+
+  /** True deletion of the operation: every operation-owned fact goes,
+   * audit, replay claims, and the outbox included, and the coordinator is
+   * left uninitialized so a deliberate bootstrap is possible again.
+   *
+   * This is the one act that writes no audit row — deliberately. Restore
+   * records itself because a live operation keeps its own history; a wiped
+   * operation keeps no history at all, and the trace of the wipe lives with
+   * the operator who ordered it (docs/authority_redesign.md: the audit
+   * contract holds within a live operation). Idempotent by the same
+   * contract: an absent tree is already deleted, and no row may say
+   * otherwise. */
+  private deleteOperation(operationId: string): Result<{ deleted: boolean }> {
+    const operation = this.one("SELECT operation_id FROM operation LIMIT 1");
+    if (operation !== undefined && rowText(operation, "operation_id") !== operationId) {
+      return failure("wrong-binding", `this coordinator holds ${rowText(operation, "operation_id")}, not ${operationId}`);
+    }
+    this.ctx.storage.transactionSync(() => {
+      for (const table of operationTables) {
+        this.ctx.storage.sql.exec(`DELETE FROM ${table.name}`);
+      }
+      // the projection and its stamps go with the facts they were derived
+      // from; the schema version stays, because migration state is not an
+      // operation fact
+      this.ctx.storage.sql.exec("DELETE FROM org_actors");
+      this.ctx.storage.sql.exec(
+        "DELETE FROM meta WHERE key = 'roster_synced_at' OR key LIKE 'roster_at:%'",
+      );
+    });
+    return value({ deleted: true });
   }
 
   /** Restore the operation's own facts. The org-actor projection is not in
@@ -1824,6 +1872,7 @@ export class OperationAuthority extends DurableObject<Env> {
       drain: () => this.drain(),
       status: () => this.status(),
       exportSnapshot: () => this.exportSnapshot(),
+      deleteOperation: (operationId) => this.deleteOperation(operationId),
       restoreSnapshot: (input, operatorId) => this.restoreSnapshot(input, operatorId),
       snapshot: () => this.snapshot(),
       auditRows: () => this.auditRows(),
