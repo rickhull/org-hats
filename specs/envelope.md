@@ -134,6 +134,17 @@ expiry tests in the access, engine, and Cloudflare runtime suites;
 trusted, a valid envelope dies for a reason it cannot name, or a malformed one
 leaves by an exception the closed taxonomy cannot describe.
 
+**Known violation:** the ordered parser checks above do not establish every
+required claims field. A correctly signed claims object containing only
+`v` and a valid `exp` can reach `Verified` whose accessor throws, or make
+verification throw when a site-binding check reads the absent sites array.
+This violates the closed-value requirement; it requires a malformed payload
+signed by a trusted issuer,
+not a forged signature. [Type safety](../docs/type_safety.md) records the
+evidence, and the [plan](../plans/type_safety.md) requires a regression and
+complete required-field validation while preserving this order and E3's
+additive fields.
+
 ### E5 — The key set is the rotation unit
 
 Verification keys travel as one canonical `VerifyKeySet`; rotation is two

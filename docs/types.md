@@ -103,11 +103,13 @@ mistakes: an index that may be absent, an object that sets `slug:
 undefined` where the type requires omission, a fixture that writes a plain
 string where a branded id is expected.
 
-`readonly` prevents mutation through a typed reference, but it does not
-deep-freeze a value or prevent an internal alias. `snapshotOf` returning
-live internal arrays is a runtime isolation problem; a `DeepReadonly`
-annotation would only hide it. Copy at the boundary; do not treat
-`readonly` as immutability.
+`readonly` prevents mutation through that reference, but it does not
+deep-freeze a value or prevent a mutable alias. The in-memory engine's
+`snapshotOf` copies arrays while sharing some nested objects; fixture ingress
+also retains nested aliases. Mutating those aliases can change engine state.
+An additional `DeepReadonly` annotation cannot supply the missing ownership.
+The access verifier separately copies and deeply freezes its verified claims.
+The concrete boundaries are described in [Type safety](type_safety.md).
 
 ## Versions in the type system
 
@@ -166,28 +168,37 @@ and [ES2024 support](https://www.typescriptlang.org/docs/handbook/release-notes/
 
 ## Runtime boundaries
 
-The type layer stops at these seams; each has a named parser or verifier:
+The type layer stops at these seams. The current checks have different scopes:
 
 | Boundary | Shape before conversion | What checks it |
 | --- | --- | --- |
 | Host command ids | plain strings | command validation and the runtime's boundary constructors |
 | SQLite row | `Row` (`string \| number \| null`) | `row.ts` decoders, database constraints |
-| Signed envelope | `SignedAccessEnvelope` | format/version gate, signature, expiry, expected binding |
+| Signed envelope | decoded input, declared as `SignedAccessEnvelope` at the public call | format/version gate, signature, expiry, expected binding; required claims shape is only partially checked |
 | Verification key set | text | `parseVerifyKeySet` |
-| Policy bundle | `PolicyBundle` | `validatePolicyBundle` at the Cloudflare bootstrap and in tests |
-| HTTP command body | `unknown` / JSON | `readBody`, `asString`, `asGrantTarget` |
+| Policy bundle | JSON asserted to be `PolicyBundle` by Cloudflare bootstrap | `validatePolicyBundle` checks semantics while assuming field types; a complete shape parser is missing |
+| HTTP command body | `unknown` / JSON | `readBody`, `asString`, `asGrantTarget`; some optional flags use literal-true tests that silently omit malformed values |
 | Fixture snapshot | `Unbranded<Snapshot>` | `defineWorld` converts and validates a whole world; `fixtureSnapshot` converts a test snapshot; `invariantProblems` checks coherence |
 | Principal evidence | `PrincipalEvidence` | the identity adapter verifies the provider assertion |
 
 `canonicalJson` is a boundary too: its `JsonValue` type is the serializer's
 contract, not a proof that an object is JSON-safe. The `asJson` conversion
-from `src/contract.ts` is that boundary's one name — the sign and verify
-seams call it, tests re-export it, and no other cast to `JsonValue` exists.
+from `src/contract.ts` names the conversion used by the sign and verify
+seams and re-exported by tests. It is an assertion, not a JSON validator;
+other internal serialization paths also assert `JsonValue`.
 
 ## Known limits
 
 These are current facts, not future promises:
 
+- Policy parsing, optional boolean parsing, required claims validation, and
+  in-memory snapshot ownership have confirmed gaps. The current evidence and
+  limits are in [Type safety](type_safety.md); the ordered fixes and their
+  acceptance evidence are in [the plan](../plans/type_safety.md).
+- The internal `OutboxMessage` combines a kind union with optional payload
+  fields, so the type permits messages missing the identifiers their kind
+  needs. Current producers supply them; a discriminated union would make
+  that obligation explicit.
 - Session results (`{failure}`) and command results (`{ok:false,failure}`)
   keep different discriminants, by design; session narrowing is
   centralized in `isFailed`, and the command dispatchers' `default` arms

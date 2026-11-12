@@ -121,6 +121,9 @@ public `org-hats` docs are normative for the seam.
 
 ## Implementation notes
 
+- [`type_safety.md`](type_safety.md) — compiler guarantees, the confirmed
+  parsing and ownership gaps, their evidence, and the boundary between
+  implementation defects and type-design opportunities.
 - [`golang.md`](golang.md) — the Go posture: interesting, not needed yet; a
   wire contract and byte-exact vectors come before any module.
 - [`performance.md`](performance.md) — the opt-in benchmark harness, the
