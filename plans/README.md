@@ -14,20 +14,6 @@ scaled bench's state; the measured verdict, the consumer-agreed design
 (model-scoped epoch, trigger-backed), and the done-when are in
 [`snapshot_cache.md`](snapshot_cache.md).
 
-The display-label work is done and its plan is retired: `shortName` landed
-additively within interface 3, and `displayName` became `longName` on the
-three entities that carry a short counterpart at interface 4.  The durable
-statements are [`../docs/lexicon.md`](../docs/lexicon.md) ("Display label")
-and [`../docs/migration-v4.md`](../docs/migration-v4.md).  A team acquiring
-its own `shortName` — so its `displayName` becomes `longName` — is the one
-reservation both sides hold on record; it needs no plan until a dense view
-makes the case.
-
-The assurance frictions are closed: all four decisions are recorded as
-postures with their triggers and shelf conditions in
-[`../docs/assurance.md`](../docs/assurance.md), which is the durable
-statement and needs no plan beside it.
-
 Durable decisions and completed work live in [`docs/`](../docs/README.md),
 [`specs/`](../specs/README.md), and commit history. Retired plans are removed;
 the index contains current forward work only.

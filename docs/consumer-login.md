@@ -55,8 +55,8 @@ issuer and client id; the secret never reaches the host or the browser.
   that began the redirect.  The verifier is 43–128 unreserved characters;
   the challenge is `S256`.
 
-All three are created host-side.  The authority verifies the nonce and the
-code challenge; it never invents either.
+All three are created host-side. The authority verifies the nonce and sends
+the verifier to the provider, which checks it against the code challenge.
 
 ## The runtime call
 

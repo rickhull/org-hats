@@ -99,11 +99,11 @@ agent accepted it. A stale or unaccepted lease falls back to gate.
 
 ## Header and report
 
-Every new relay entry begins with a timestamped heading; keep a
-`Coordination:` line when coordination matters:
+Every new relay entry begins with a subject heading and carries a
+`Coordination:` line. Entries carry no timestamps:
 
 ```text
-## <ISO-8601> — <subject>
+## <subject>
 Coordination: mode=gate; conch=rick; wake=none
 Coordination: mode=lease; conch=<peer>; rounds=1/3; wake=<section>
 ```

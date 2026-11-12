@@ -125,7 +125,7 @@ reading claims. The claims' `interfaceVersion` is issuer provenance, not a
 readability gate; see [`specs/envelope.md`](../specs/envelope.md) E8.
 
 A parsed envelope may therefore carry a historical interface value even
-though the current call surface speaks `3`. The distinction is named now:
+though the current call surface speaks `4`. The distinction is named now:
 the claims field is `IssuerInterfaceVersion` (`number`), every call keeps
 `AuthorityInterfaceVersion`, and `tests/types.test.ts` pins both exactly —
 widening the provenance field must never widen the call surface with it.

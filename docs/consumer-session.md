@@ -106,20 +106,14 @@ closed and the host maps every kind.  A refused issuance may be audited with
 the provider and subject the evidence carried — never a token, a code, or a
 client secret.
 
-A damaged access cookie is part of that one path.  A cookie truncated at the
-4 KB cap, re-encoded by a proxy, or half-written by an interrupted response
-decodes to something that is not a readable envelope, and verification
-answers `unauthenticated` — the caller presented no usable authority.  It is
-not `wrong-interface-version`: nothing declared a version to disagree about,
-and a deployment mismatch is not what happened.  The host's response is the
-ordinary reauthenticate path and it is already specific enough to act on:
-clear both session cookies — the access cookie is the damaged one, and
-keeping a refresh cookie beside a credential that would not parse only
-repeats the failure — then send the person to login.  Telling someone to
-clear cookies by hand is a bug in the host, not advice: the refusal already
-clears them, and the next request starts a clean login.  A host that instead
-maps this to a 500 leaves a person stuck in a loop with a bad cookie it
-never cleared.
+A damaged access cookie is part of that one path. Truncation, re-encoding,
+or an interrupted response can make the value impossible for the host to
+decode. If decoding yields a value, verification applies the ordered parser
+checks in [E4](../specs/envelope.md#e4--verification-fails-closed-in-a-fixed-order):
+a non-object is `unauthenticated`, while an object with a missing format
+marker is `wrong-interface-version`. The host handles a decoding failure and
+maps parser refusals to its own response. It clears both session cookies and
+starts a clean login rather than leaving a person stuck with a damaged cookie.
 
 ## What upstream does not own
 

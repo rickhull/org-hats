@@ -24,12 +24,11 @@ A team earned the pair because its label is rendered more times per page, and
 in denser slots, than any other — the short form is what a tight slot can
 fit, and it is not derivable from the long one.
 
-**An `Actor` keeps `displayName`, and this is deliberate.** That label is the
-OIDC `name` claim: authority relays it and never authors it, so a short form
-would have no upstream source and would make authority the author of a
-nickname for a person — a policy question, not a label. `longName` means the
-long half of a pair, so there it would be a false name. Two words, two
-meanings: `longName` is a half, `displayName` is a whole.
+**An `Actor` keeps `displayName`, and this is deliberate.** The organization
+owns the actor profile label and can set it through actor commands. Principal
+evidence may also carry a provider-supplied display name. The model does not
+define a separate short form for a person. `longName` means the long half of a
+pair; `displayName` names the whole label.
 
 What moves:
 

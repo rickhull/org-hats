@@ -9,7 +9,18 @@ pre-bootstrapped operation without resetting it.*
 
 ## Latest reported deployment and acceptance
 
-The consumer's relay receipt reports both pins taken together: four
+The consumer reports `v4.0.0` and `cloudflare-v0.17.0` pinned in its
+manifests, with the interface 4 and naming migration complete and green.
+The consumer releases and authority deployment have not yet shipped. The
+consumer plans to ship ops, tenant, and start first, then deploy authority in
+the same sitting. Publication, pin adoption, deployment, and live acceptance
+are separate evidence.
+
+The most recent reported live authority is `cloudflare-v0.14.0`, operation
+schema 5. That report does not supply a new binding-smoke result; the last
+reported live smoke below is for `cloudflare-v0.13.1`.
+
+The earlier consumer relay receipt reported both pins taken together: four
 manifests on `org-hats` `v3.8.0` and the tenant on `org-hats-cloudflare`
 `cloudflare-v0.15.0`, the workspace peer re-keyed, its `pin_state` check
 green, and acceptance recorded in its login spec. Consumer conformance
@@ -19,7 +30,7 @@ as designed. Deployment at the pin is not separately reported;
 publication, consumer pin adoption, deployment, and live acceptance are
 separate evidence, not consequences inferred from one another.
 
-The consumer's later receipt, **six-group binding smoke passes on v0.13.1**,
+The earlier live receipt, **six-group binding smoke passes on v0.13.1**,
 reports a fresh dedicated organization/operation fixture and all six groups
 passing: `issue-and-verify`, `refresh-and-supersede`, `context`,
 `denied-command`, `wrong-binding-and-expired`, and
@@ -29,9 +40,9 @@ exports. This supersedes the earlier spent-fixture smoke limitation; a
 spent actor is still unsuitable for another run.
 
 The consumer reports tagged release identity and matching live drift on its
-surfaces. Its signed-in human acceptance remains outstanding in the latest
-receipt. These are host-reported results, not a new upstream probe or a claim
-that the full inventory ran live. The local browser playground is synthetic
+surfaces. Its signed-in human acceptance remains outstanding in the last
+acceptance report. These are host-reported results, not a new upstream probe
+or a claim that the full inventory ran live. The local browser playground is synthetic
 teaching evidence and does not close that human acceptance.
 
 The deployment receipt names `cloudflare-v0.13.0` as its authority cutback.
@@ -59,8 +70,8 @@ Record another live version only after the host supplies its receipt.
 
 ## Claim
 
-Through the service binding, with interface version `3`, carried by the live
-runtime:
+Through the service binding, using the current interface version `4` with a
+runtime that carries it:
 
 1. `accessFromEvidence` for the linked evidence returns a signed envelope and
    a refresh handle.
@@ -89,6 +100,9 @@ The seven steps above are six groups: steps 1 and 2 are one check.  The
 runner's names are `issue-and-verify`, `refresh-and-supersede`, `context`,
 `denied-command`, `wrong-binding-and-expired`, and
 `stale-projection-refresh`.
+
+The reported v0.13.1 live smoke above exercised interface version `3`; it
+does not establish a live result for interface version `4`.
 
 ## Procedure
 

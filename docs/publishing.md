@@ -224,7 +224,7 @@ status — the first run was `success` in 1m25s. A manual dispatch is
 
 ## The release
 
-Releases are cut with `bin/release` (bump → verify → build → commit → tag; the tag comes from the manifest). It publishes to NAS, then catches up both public mirrors by default; `--no-push` keeps a release local. `v0.4.4` is the last v0.4 release; `v1.0.0` is historical; the current line is v3.x, with v2.x the previous line. The Cloudflare reference runtime is released from the same script with `--package cloudflare`.
+Releases are cut with `bin/release` (bump → verify → build → commit → tag; the tag comes from the manifest). It publishes to NAS, then catches up both public mirrors by default; `--no-push` keeps a release local. `v0.4.4` is the last v0.4 release; `v1.0.0` is historical; the current line is v4.x, with v3.x the previous line. The Cloudflare reference runtime is released from the same script with `--package cloudflare`.
 
 A consumer pins one of:
 
@@ -312,8 +312,9 @@ From a clean `main`:
    git ls-remote --heads codeberg main
    git ls-remote --heads github main
    ```
-   Public-host CI runs when each mirror receives the release; it is
-   release-time evidence, not the publication authority.
+   GitHub CI runs when its mirror receives the release; Codeberg's witness
+   runs only on manual dispatch. Both are evidence, not the publication
+   authority.
 
 ## Discipline
 

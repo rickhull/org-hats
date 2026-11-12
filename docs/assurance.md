@@ -31,7 +31,7 @@ artifact that evidences each.
 | Is a restore recorded? | Yes, and it is the one audit row a snapshot cannot supply: restore writes it after replacing the tables, so the act cannot erase its own trace. |
 | Who performed a privileged action? | The identity the caller claimed on `x-ops-operator`, or the literal `operator` when none was sent. A claim, not proof — see below. |
 | Are retries safe? | Idempotency claims commit with their mutation; a reused key with a different payload is named misuse (`A8`). |
-| Is access revoked promptly? | Disable, unlink, participation, team, and grant changes revoke refresh records; an issued envelope stands only to its expiry ([`consumer-session.md`](consumer-session.md), `A7`, `A13`). |
+| Is access revoked promptly? | Actor disable or unlink, participation or grant revocation, and team retirement revoke affected refresh records; an issued envelope stands only to its expiry ([`consumer-session.md`](consumer-session.md), `A7`, `A13`). |
 | Are secrets stored? | Activation secrets are stored as digests only; refresh handles are hashed at rest ([`activation.md`](activation.md), `A16`). |
 | Who owns which control? | The threat model names the library, host, operator, and consumer per row, and the non-goals are explicit. |
 | How is a key compromise handled? | [`key_compromise.md`](key_compromise.md): detection, containment, the owning authority, and verification per asset. |

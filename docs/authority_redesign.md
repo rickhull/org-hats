@@ -166,10 +166,10 @@ it. The properties that matter:
   operation and returns an `AccessIssue` — the signed envelope plus the
   explicit refresh-handle outcome (kept, rotated, revoked) together, so a
   host never infers session state;
-- `refresh` returns the same pair and revokes affected refresh records in
-  the same commit as a grant change; rotation consumes its handle and
-  installs the replacement in one transaction, so one handle cannot rotate
-  twice under concurrent requests;
+- `refresh` returns the same pair; grant revocation revokes affected refresh
+  records in the same commit. Rotation consumes its handle and installs the
+  replacement in one transaction, so one handle cannot rotate twice under
+  concurrent requests;
 - `context` yields presentation facts for the envelope's actor, including
   organization-administrator standing as a live presentation fact;
 - `roster` reads the organization's roster for the envelope's administrator:
@@ -543,17 +543,12 @@ Durable Object namespaces, or authority database rows. It does not reconstruct
 reach, fallback, participation, or worn-hat rules from envelope claims, and
 its product verbs map onto neutral access facts rather than extending them.
 
-The contract in this line is authority interface `3` and access envelope
-`1`. Quartermaster's `specs/login.md` records the accepted `2.x` contract
-until the consumer moves; the portable v3 line and the Cloudflare reference
-runtime implement `3`, and the consumer's deployment and stand-in retirement
-are tracked in their own plans. Quartermaster's
-`apps/authority-dev` and
-`packages/access` are temporary stand-ins and are deleted together when the
-consumer adopts the runtime binding, so it never grows a second envelope
-implementation. The review items that preceded the release are settled in
-the shipped contract: `supervisedTeamIds` is absent, the read policy is an axis
-structure, `PrincipalEvidence.email` is absent, and the built-in example
+The contract in this line is authority interface `4` and access envelope
+`1`. Quartermaster has adopted the `v4.0.0` and `cloudflare-v0.17.0` tags;
+its rollout puts the consumer releases before the authority deployment. The
+review items that preceded the release are settled in the shipped contract:
+`supervisedTeamIds` is absent, the read policy is an axis structure,
+`PrincipalEvidence.email` is absent, and the built-in example
 worlds use `reviewer` rather than a people-management title.
 
 Ordinary established requests should use a short-lived signed access
@@ -603,10 +598,13 @@ The distinction between platform and deployed configuration is explicit:
 | Secrets and signing keys | deploying operator's secret management or sealed runtime state |
 | Verification-key rollout | deploying operator: distribute verify keys first, activate at the issuer second, retain the old key until its last envelope expires |
 
-Bootstrap is a typed, idempotent command with a manifest identifier, version,
-and content hash. Reapplying platform configuration never silently restores a
-renamed label or revoked grant. Production secrets, customer names,
-and real-person rosters do not enter this public repository; real bootstrap
+Bootstrap accepts typed provisioning input and seeds authority state.
+Reapplying it preserves existing roster facts, team changes, and revoked grants;
+organization administrator standing is seeded only when the organization is
+created. Bootstrap also updates configured facts, including organization and
+operation presentation, site labels and routing, policy, participation, and
+sealed provider configuration. Production secrets, customer names, and
+real-person rosters do not enter this public repository; real bootstrap
 material stays in the deploying consumer's protected, untracked input and
 its authority fields become state owned by the appropriate authority object
 after provisioning. Host-owned operation annotations remain host configuration.

@@ -134,11 +134,12 @@ tenant token and has no per-route scopes.
      as that subject, with no token at all. Contain with
      `/ops/organization/unlink-principal` for the affected actor; compare
      `GET /ops/organization/principal-links` against the roster you expect.
-   - **an administrator appointed.** Bootstrap adds organization
-     administrators and never removes them, so an added administrator stays
-     after rotation. There is no ops route that retires one: use the
-     `retire-administrator` command under a surviving administrator's fresh
-     evidence, or restore.
+   - **administrator standing introduced through creation or restore.**
+     Bootstrap seeds administrators only when it creates an organization; a
+     restore can replace standing in an existing organization. Rotation does
+     not undo either. There is no ops route that retires an administrator:
+     use `retire-administrator` under a surviving administrator's fresh
+     evidence, or restore known-good state.
    - **a replaced sealed provider configuration**, which redirects
      authentication itself — see the sealed-configuration section, and treat
      it as the most urgent of these.
@@ -219,9 +220,12 @@ did not, is the signal.
 - its undelivered outbox rows **are** re-delivered on the next drain, but not
   applied twice: the message id is the outbox row id, which survives the
   restore, so the receiving coordinator recognises the replay;
-- it **cannot** assert an actor's standing. The operation's roster projection
-  is deliberately absent from the export and is rebuilt by pulling, so a
-  disabled actor stays refused however the snapshot's own rows read.
+- an **operation** snapshot cannot assert an actor's enabled state: its roster
+  projection is absent from the export and rebuilt by pulling. If the actor
+  remains disabled at the organization, refresh is refused regardless of the
+  operation snapshot's refresh-record flags. An **organization** snapshot can
+  replace actor disabled flags and administrator standing, so those facts must
+  be checked after an organization restore.
 
 **Containment.**
 

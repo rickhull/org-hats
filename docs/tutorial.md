@@ -532,9 +532,8 @@ const grant = await engine.runtime.command({
 if (!grant.ok) throw new Error(grant.failure.kind);
 ```
 
-A grant change revokes the affected refresh records in the same commit, so
-the session continues by issuing again — and the new envelope's context
-picks up both wearable hats:
+Issue a fresh session to show the new grant in context; its envelope's
+context picks up both wearable hats:
 
 ```ts
 const danaSwitch = await issueFor("dana", "op-61a8e3f2");

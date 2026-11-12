@@ -65,11 +65,11 @@ stored rather than derived because abbreviation takes knowledge and
 truncation is not abbreviation. The long form holds no parenthetical: a host
 composes "Long (SHORT)" from the two, so one name has one place to edit it.
 
-An actor carries a **single** label, `displayName`, with no counterpart: it
-is the OIDC `name` claim, which authority relays and never authors, so a short
-form would have no upstream source and would make authority the author of a
-nickname for a person. The two words are not synonyms: `longName` names a
-half, `displayName` names a whole.
+An actor carries a **single** label, `displayName`, with no counterpart.
+The organization owns this profile label and can set it through actor commands;
+principal evidence may also carry a provider-supplied display name. The model
+does not define a separate short form for a person. The two words are not
+synonyms: `longName` names a half, `displayName` names a whole.
 
 A team's pair is the only one with a write path — set at `request-team`,
 edited by `update-team`, which writes both labels in one act. The other three
@@ -186,8 +186,9 @@ _Avoid_: object, resource
 
 ## Runtime seams
 
-**Authority runtime** — The four-use-case external interface:
-`accessFromEvidence`, `refresh`, `context`, and `command`.
+**Authority runtime** — The external interface: `accessFromEvidence`,
+`refresh`, `context`, `roster`, `command`, `activationRequest`,
+`activationInspect`, and `activationAccept`.
 _Avoid_: service, API (unqualified)
 
 **Command** — A typed, idempotent business act. Its idempotency key claims a
