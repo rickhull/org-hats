@@ -230,7 +230,7 @@ export const handleOperationRequest = async (
             const actor = asRecord(entry);
             return {
               actorId: asString(actor["actorId"], "actorId"),
-              disabled: actor["disabled"] === true,
+              disabled: asBoolean(actor["disabled"] ?? false, "disabled"),
             };
           }),
         }),
@@ -255,7 +255,7 @@ export const handleOperationRequest = async (
         actorId: asString(body["actorId"], "actorId"),
         role: asString(body["role"], "role"),
         target: asGrantTarget(body["target"], "target"),
-        ...(body["primary"] === true ? { primary: true } : {}),
+        ...(body["primary"] === undefined ? {} : { primary: asBoolean(body["primary"], "primary") }),
         byActorId: asString(body["byActorId"], "byActorId"),
         idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
       }));
@@ -348,7 +348,7 @@ export const handleOperationRequest = async (
         teamId: asString(body["teamId"], "teamId"),
         byActorId: asString(body["byActorId"], "byActorId"),
         byOrganizationId: asString(body["byOrganizationId"], "byOrganizationId"),
-        asOperationAdmin: body["asOperationAdmin"] === true,
+        asOperationAdmin: asBoolean(body["asOperationAdmin"] ?? false, "asOperationAdmin"),
         idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
       }));
     }

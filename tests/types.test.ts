@@ -33,6 +33,7 @@ import type {
   CommandResult,
   HatSummary,
 } from "../src/authority/types.ts";
+import type { OutboxMessage } from "../src/authority/state.ts";
 
 // The exactness check: assignability would let `number` pass where the
 // literal is required, and a literal pass where `number` is required.
@@ -149,4 +150,32 @@ test("[A3][P7] public-surface type assertions are compile-time only", () => {
   // The assertions are the type aliases above; they fail `tsc -p
   // tsconfig.tests.json` in bin/check. This test exists so the runtime
   // suite has something green to run in this file.
+});
+
+// --- the outbox message variants are complete ----------------------------------
+//
+// An `OutboxMessage` is a discriminated union: each kind carries exactly the
+// fields its delivery reads, so an incomplete variant — an actor-disabled
+// message with no actor identifiers, which delivery would consume without
+// revoking the intended refresh records — cannot be constructed in checked
+// code. These are compile-time pins: they fail `tsc -p tsconfig.tests.json`
+// in bin/check. They were proven red first against the former optional-field
+// shape, where every incomplete variant below was assignable.
+
+const bareAddress = { id: "ob-x", target: "org-x" } as const;
+type BareAddress = typeof bareAddress;
+type _ActorDisabledWithoutActor = BareAddress & { readonly kind: "actor-disabled" };
+type _ActorUnlinkedWithoutActor = BareAddress & { readonly kind: "actor-unlinked" };
+type _AcceptanceWithoutInvitation = BareAddress & { readonly kind: "acceptance" };
+type _InvitationWithoutOperation = BareAddress & { readonly kind: "invitation" };
+
+type AssignableToOutbox<M> = M extends OutboxMessage ? true : false;
+type _ActorDisabledNeedsItsActor = Expect<Equal<AssignableToOutbox<_ActorDisabledWithoutActor>, false>>;
+type _ActorUnlinkedNeedsItsActor = Expect<Equal<AssignableToOutbox<_ActorUnlinkedWithoutActor>, false>>;
+type _AcceptanceNeedsItsInvitation = Expect<Equal<AssignableToOutbox<_AcceptanceWithoutInvitation>, false>>;
+type _InvitationNeedsItsOperation = Expect<Equal<AssignableToOutbox<_InvitationWithoutOperation>, false>>;
+
+test("[type-safety] the outbox message variants are complete at compile time", () => {
+  // the assertions are the type aliases above; this test gives the runtime
+  // suite something green to run in this file
 });

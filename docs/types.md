@@ -177,7 +177,7 @@ The type layer stops at these seams. The current checks have different scopes:
 | Signed envelope | decoded input, declared as `SignedAccessEnvelope` at the public call | format/version gate, signature, expiry, expected binding; required claims shape is only partially checked |
 | Verification key set | text | `parseVerifyKeySet` |
 | Policy bundle | `unknown` JSON at Cloudflare bootstrap | `parsePolicyBundle` establishes shape before the coordinator's `validatePolicyBundle` semantic checks |
-| HTTP command body | `unknown` / JSON | `readBody`, `asString`, `asGrantTarget`, and `asBoolean` for bootstrap flags; other route flags still use literal-true tests |
+| HTTP command body | `unknown` / JSON | `readBody`, `asString`, `asGrantTarget`, and `asBoolean` for every route flag, bootstrap and otherwise |
 | Fixture snapshot | `Unbranded<Snapshot>` | `defineWorld` converts and validates a whole world; `fixtureSnapshot` converts a test snapshot; `invariantProblems` checks coherence |
 | Principal evidence | `PrincipalEvidence` | the identity adapter verifies the provider assertion |
 
@@ -191,14 +191,10 @@ other internal serialization paths also assert `JsonValue`.
 
 These are current facts, not future promises:
 
-- Required claims validation, non-bootstrap HTTP flag parsing, and in-memory
-  snapshot ownership have confirmed gaps. The current evidence and
-  limits are in [Type safety](type_safety.md); the ordered fixes and their
-  acceptance evidence are in [the plan](../plans/type_safety.md).
-- The internal `OutboxMessage` combines a kind union with optional payload
-  fields, so the type permits messages missing the identifiers their kind
-  needs. Current producers supply them; a discriminated union would make
-  that obligation explicit.
+- The type-safety gaps once listed here — required claims validation,
+  non-bootstrap HTTP flag parsing, in-memory world and snapshot ownership,
+  and the optional-field `OutboxMessage` — are closed with red-first
+  regressions; [Type safety](type_safety.md) records the evidence.
 - Session results (`{failure}`) and command results (`{ok:false,failure}`)
   keep different discriminants, by design; session narrowing is
   centralized in `isFailed`, and the command dispatchers' `default` arms

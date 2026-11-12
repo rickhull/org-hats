@@ -9,10 +9,10 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-The type-safety work has a concrete next action: prove the incomplete signed
-claims defect red, then validate required fields before exposing them. The
-ordered slices and acceptance evidence are in
-[`type_safety.md`](type_safety.md).
+The type-safety plan is retired: all four slices landed with red-first
+regressions (claims shape gate, world/snapshot ownership, outbox union,
+route flag parsing); the durable findings live in
+[`docs/type_safety.md`](../docs/type_safety.md).
 
 The operation snapshot cache is deferred until a consumer approaches the
 scaled bench's state; the measured verdict, the consumer-agreed design

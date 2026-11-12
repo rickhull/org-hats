@@ -4,8 +4,8 @@ TypeScript checks the shape of trusted program values; it does not validate
 JSON, prove a signature's issuer supplied complete claims, or isolate an
 object from mutable aliases. [The type layer](types.md) describes the
 intended boundaries. This document records the present findings against
-those boundaries; the [type-safety plan](../plans/type_safety.md) carries
-the work to close them.
+those boundaries; the retired type-safety plan's slices all landed with
+red-first regressions, and this document records their closures.
 
 ## What the compiler protects
 
@@ -38,10 +38,16 @@ exercise refusal before persistence and valid stored values.
 
 ## Boundary gaps
 
-- Other coordinator HTTP flags still use literal-true tests: intake actor
+- ~~Other coordinator HTTP flags still use literal-true tests: intake actor
   `disabled`, grant-command `primary`, organization `operator`, and team
   retirement's `asOperationAdmin`. Their malformed values become false or
-  absent; bootstrap's parsing fix does not cover those routes.
+  absent; bootstrap's parsing fix does not cover those routes.~~
+  **Closed:** every route flag now parses with `asBoolean` (omitted keeps
+  its existing meaning): intake actor `disabled`, grant-command `primary`,
+  retirement's `asOperationAdmin`, and organization `operator` on activation
+  issuance, activation revocation, and principal unlinking. Proven red first
+  in `packages/cloudflare/test/route-flags.test.ts` — each malformed value
+  was silently flattened before, and an operator `true` still authorizes.
 - ~~[parseAccessEnvelope](../src/contract.ts) checks containers, versions,
   depth, carriage fields, and expiry but asserts the complete claims type
   without checking all fields.~~ **Closed:** the gate now checks the complete
@@ -70,11 +76,14 @@ exercise refusal before persistence and valid stored values.
   the `revoked`/`status` flips through mutable structural types corrupted a
   later snapshot. The regressions live in `tests/engine.test.ts`.
 
-One smaller maintenance exposure is the in-memory `OutboxMessage`: its
-optional fields allow an actor-disabled message with no actor identifiers,
-which delivery can consume without revoking the intended refresh records.
-Current producers supply the fields; this is a representable future mistake,
-not a known malformed message in the current flow.
+One smaller maintenance exposure was the in-memory `OutboxMessage`: its
+optional fields allowed an actor-disabled message with no actor
+identifiers, which delivery could consume without revoking the intended
+refresh records. **Closed:** `OutboxMessage` is now a discriminated union
+carrying the fields each kind requires, proven with compile-time negative
+assertions that were red against the optional-field shape (every incomplete
+variant was assignable) and green after. The delivery guards the union made
+dead are removed; delivery behavior is unchanged.
 
 The analysis is bounded to these seams. The policy and bootstrap-flag
 regressions are proven red against the former behavior and green with the

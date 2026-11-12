@@ -144,10 +144,10 @@ required claims field. A correctly signed claims object containing only
 verification throw when a site-binding check reads the absent sites array.
 This violates the closed-value requirement; it requires a malformed payload
 signed by a trusted issuer,
-not a forged signature. [Type safety](../docs/type_safety.md) records the
-evidence, and the [plan](../plans/type_safety.md) requires a regression and
-complete required-field validation while preserving this order and E3's
-additive fields.
+not a forged signature. **Closed:** the gate now validates the complete
+required v1 claims shape after the expiry stage and before any caller can
+read a claim; [Type safety](../docs/type_safety.md) records the red-first
+evidence, and this order and E3's additive fields are preserved.
 
 ### E5 — The key set is the rotation unit
 

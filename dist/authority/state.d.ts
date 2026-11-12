@@ -97,15 +97,40 @@ export interface OpState {
     audit: AuditEvent[];
     claims: Map<IdempotencyKey, Claim>;
 }
-export interface OutboxMessage {
+/** One message between the coordinators, as a discriminated union: each
+ * kind carries exactly the fields its delivery reads, so an incomplete
+ * variant — an actor-disabled message with no actor identifiers, which
+ * delivery would consume without revoking the intended refresh records —
+ * cannot be constructed in checked code. */
+export type OutboxMessage = {
     readonly id: string;
     readonly target: string;
-    readonly kind: "invitation" | "acceptance" | "actor-disabled" | "actor-unlinked";
-    readonly invitationId?: string;
-    readonly operationId?: OperationId;
-    readonly organizationId?: OrganizationId;
-    readonly actorId?: ActorId;
-}
+    readonly kind: "invitation";
+    readonly invitationId: string;
+    readonly operationId: OperationId;
+    readonly organizationId: OrganizationId;
+} | {
+    readonly id: string;
+    readonly target: string;
+    readonly kind: "acceptance";
+    readonly invitationId: string;
+    readonly operationId: OperationId;
+    readonly organizationId: OrganizationId;
+} | {
+    readonly id: string;
+    readonly target: string;
+    readonly kind: "actor-disabled";
+    readonly operationId: OperationId;
+    readonly organizationId: OrganizationId;
+    readonly actorId: ActorId;
+} | {
+    readonly id: string;
+    readonly target: string;
+    readonly kind: "actor-unlinked";
+    readonly operationId: OperationId;
+    readonly organizationId: OrganizationId;
+    readonly actorId: ActorId;
+};
 /** A resolved caller, after evidence or envelope verification. */
 export interface Principal {
     readonly organizationId: OrganizationId;

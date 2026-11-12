@@ -139,7 +139,7 @@ export const handleOrganizationRequest = async (
         actorId: asString(input["actorId"], "actorId"),
         byActorId: asString(input["byActorId"], "byActorId"),
         secretHash: asString(input["secretHash"], "secretHash"),
-        ...(input["operator"] === true ? { operator: true } : {}),
+        ...(input["operator"] === undefined ? {} : { operator: asBoolean(input["operator"], "operator") }),
         ...operatorIdOf(request),
       }));
     }
@@ -167,7 +167,7 @@ export const handleOrganizationRequest = async (
         actorId: asString(body["actorId"], "actorId"),
         byActorId: asString(body["byActorId"], "byActorId"),
         idempotencyKey: asString(body["idempotencyKey"], "idempotencyKey"),
-        ...(body["operator"] === true ? { operator: true } : {}),
+        ...(body["operator"] === undefined ? {} : { operator: asBoolean(body["operator"], "operator") }),
         ...operatorIdOf(request),
       };
       return json(url.pathname === "/revoke-activation"

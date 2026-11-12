@@ -134,12 +134,10 @@ boundary in `tests/helpers.ts` plus `invariantProblems`; `defineWorld` and
 *If it breaks:* a brand becomes an assertion about data nobody checked, and
 the type layer starts lying about storage, wire, or provider input.
 
-**Known violations:** some non-bootstrap HTTP flags silently omit malformed
-values, and the envelope gate asserts a complete claims type after partial
-shape checks. These violate the requirement above. The existing witnesses cover
-specific refusals and cannot establish complete parsing. Their current
-scope and reproduced failures are in [Type safety](../docs/type_safety.md);
-the [remediation plan](../plans/type_safety.md) supplies the missing cases.
+**Known violations:** none currently. The former gaps — non-bootstrap HTTP
+flags silently omitting malformed values, and the envelope gate asserting a
+complete claims type after partial shape checks — are closed; the red-first
+evidence and closures are recorded in [Type safety](../docs/type_safety.md).
 
 ### P10 — A host's world has a validating entry
 

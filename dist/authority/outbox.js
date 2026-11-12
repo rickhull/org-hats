@@ -17,7 +17,7 @@ export const deliverPending = async (state) => {
             continue;
         if (state.delivered.has(message.id))
             continue;
-        if (message.kind === "invitation" && message.invitationId !== undefined && message.operationId !== undefined) {
+        if (message.kind === "invitation") {
             // the outbox address is a plain string because a message routes to
             // either coordinator; `kind` says which, so the conversion is here
             const org = state.orgs.get(organizationId(message.target));
@@ -25,7 +25,7 @@ export const deliverPending = async (state) => {
                 org.invitations.set(message.invitationId, { operationId: message.operationId, status: "pending" });
             }
         }
-        if (message.kind === "acceptance" && message.invitationId !== undefined) {
+        if (message.kind === "acceptance") {
             const op = state.ops.get(operationId(message.target));
             const invitation = op?.invitations.get(message.invitationId);
             if (op !== undefined && invitation !== undefined && invitation.status === "invited") {
@@ -51,7 +51,7 @@ export const deliverPending = async (state) => {
                 }
             }
         }
-        if ((message.kind === "actor-disabled" || message.kind === "actor-unlinked") && message.operationId !== undefined) {
+        if (message.kind === "actor-disabled" || message.kind === "actor-unlinked") {
             const op = state.ops.get(operationId(message.target));
             if (op !== undefined) {
                 for (const record of op.refreshRecords) {
