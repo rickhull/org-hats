@@ -71,6 +71,13 @@ Cloudflare adapter also exposes OPS_TOKEN-protected equivalents for the first
 administrator and for emergency recovery when the administrator is locked
 out.
 
+The working order for lost-credential recovery is **unlink, re-mint,
+accept**: an actor holding a link cannot claim a new credential, so the
+accept refuses until the unlink has run. `unlink-principal` is actor-wide —
+an identity reset, not a per-credential retire (docs/authority_redesign.md
+§ Local credentials) — so under a mixed actor recovery re-enrolls every
+credential.
+
 ## Concurrent claims
 
 Actors are organization-scoped; provider subjects are external account ids.

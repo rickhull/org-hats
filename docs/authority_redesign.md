@@ -333,6 +333,47 @@ change the portable seam. Browser redirects, provider callbacks, CSRF and
 state handling, and cookies belong to the host. Other hosts may supply
 different adapters without changing the authority model.
 
+### Local credentials (passkeys) — design decisions
+
+The passkey helper reserved above is specified here before it is built.
+A local credential is a principal link like any other —
+`(provider: "webauthn", subject: credential id)` — and the decisions are:
+
+- **Verification lives in the runtime.** WebAuthn assertion verification
+  runs beside the OIDC code exchange in the Cloudflare package; credential
+  public keys are runtime state, sealed and stored like provider
+  configuration. The host owns the browser ceremony (registration prompts,
+  conditional mediation, cookies); the runtime proves the assertion and
+  maps it to principal evidence. No portable seam moves.
+- **Enrollment binds through the activation claim, once.** A passkey may be
+  the actor's first credential: `activationAccept` requires no session and
+  no password, because the return-once secret authenticates the act. The
+  claim-path guard stays strict — an actor holding any link cannot gain a
+  second through a claim — so one credential per actor is claim-bound, and
+  a second credential (passkey beside a federated link, or the reverse) is
+  an operator act through `/ops/organization/principal-link`. This keeps
+  the anti-graft property whole: a leaked activation secret can attach
+  nothing to an already-claimed actor.
+- **The relying-party id is the zone apex.** One credential then works at
+  every operation hostname, including hostnames that did not exist at
+  enrollment. This is preconditioned on zone purity — the deployment
+  controls every subdomain of the zone — which is the consumer's recorded
+  duty (`specs/login.md`, the relying-party constraint) and a stated
+  condition here: a zone the deployment does not fully control must not
+  use apex-scoped credentials.
+- **Unlink stays actor-wide and is an identity reset.**
+  `unlink-principal` removes every link the actor holds; under a mixed
+  actor that includes the surviving credential. Recovery is the working
+  order — unlink, re-mint, accept — and under mixed links it re-enrolls
+  everything. A per-link retire verb is deferred until a consumer's
+  runbook hits that cost with a mixed actor that exists; when it lands, it
+  travels with any revisit of the claim-path guard, not before.
+- **Attestation is handled, never required.** Attestation statements are
+  part of the assertion format and are verified as such, but no trust
+  path, format, or authenticator model is demanded. A device-fleet policy
+  is a deployment concern that returns only with a concrete consumer
+  need.
+
 Authentication facts travel without interpretation. Evidence may state how
 and when the principal authenticated — `amr` method references (RFC 8176)
 and the authentication timestamp, under the OIDC claim spellings — and
