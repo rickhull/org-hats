@@ -55,16 +55,25 @@ export const createInMemoryAuthority = async (config = {}) => {
         const op = fixture.snapshot.operations[0];
         if (op === undefined)
             throw new Error("a fixture needs an operation");
+        // Ingress ownership: the fixture's nested objects are the caller's to
+        // keep mutating, so nothing below retains a reference into it. A
+        // readonly parameter type is erased at runtime; the copies are the
+        // boundary (plans/type_safety.md slice 2).
         ops.set(op.operationId, {
             operationId: op.operationId,
             ...(op.longName !== undefined ? { longName: op.longName } : {}),
             ...(op.shortName !== undefined ? { shortName: op.shortName } : {}),
             ...(op.slug !== undefined ? { slug: op.slug } : {}),
             ...(op.bounded !== undefined ? { bounded: op.bounded } : {}),
-            policy: fixture.policy,
-            sites: fixture.snapshot.sites.map((s) => ({ ...s })),
+            policy: {
+                ...fixture.policy,
+                actions: [...fixture.policy.actions],
+                roles: fixture.policy.roles.map((role) => ({ ...role, actions: [...role.actions] })),
+                readPolicy: { ...fixture.policy.readPolicy },
+            },
+            sites: fixture.snapshot.sites.map((s) => ({ ...s, aliases: [...s.aliases] })),
             teams: fixture.snapshot.teams.map((t) => ({ ...t, status: "active" })),
-            grants: fixture.snapshot.grants.map((g) => ({ ...g })),
+            grants: fixture.snapshot.grants.map((g) => ({ ...g, target: { ...g.target } })),
             participations: fixture.snapshot.participations.map((p) => ({ ...p })),
             invitations: new Map(),
             refreshRecords: [],

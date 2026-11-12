@@ -40,7 +40,13 @@ export const snapshotOf = (ops, orgs, operationId) => {
             ...(o.slug !== undefined ? { slug: o.slug } : {}),
             ...(o.bounded !== undefined ? { bounded: o.bounded } : {}),
         })),
-        sites: [...op.sites],
+        // Egress ownership: every nested object is copied, not shared — a
+        // caller that assigns a readonly grant to a mutable structural type and
+        // flips `revoked` reaches its own copy, never engine state. The arrays
+        // of flat rows (actors, teams) were already fresh objects; the sites,
+        // grants, and participations below were shared until this copy
+        // (plans/type_safety.md slice 2).
+        sites: op.sites.map((s) => ({ ...s, aliases: [...s.aliases] })),
         teams: op.teams
             .filter((team) => team.status === "active")
             .map((team) => ({
@@ -50,8 +56,8 @@ export const snapshotOf = (ops, orgs, operationId) => {
             ...(team.longName !== undefined ? { longName: team.longName } : {}),
             ...(team.shortName !== undefined ? { shortName: team.shortName } : {}),
         })),
-        grants: [...op.grants],
-        participations: [...op.participations],
+        grants: op.grants.map((g) => ({ ...g, target: { ...g.target } })),
+        participations: op.participations.map((p) => ({ ...p })),
     };
 };
 export const payloadHash = (command) => {

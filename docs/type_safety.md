@@ -63,6 +63,12 @@ exercise refusal before persistence and valid stored values.
   This finding concerns the in-memory engine handle, not verified claims or
   an established Cloudflare runtime defect. The existing snapshot test
   checks array mutation, not nested objects.
+  **Closed:** ingress copies the policy bundle, site aliases, and grant
+  targets from fixtures; `snapshotOf` copies every nested site, grant, and
+  participation object on egress. Proven red first: fixture mutation after
+  construction (alias and forged policy action) reached engine state, and
+  the `revoked`/`status` flips through mutable structural types corrupted a
+  later snapshot. The regressions live in `tests/engine.test.ts`.
 
 One smaller maintenance exposure is the in-memory `OutboxMessage`: its
 optional fields allow an actor-disabled message with no actor identifiers,

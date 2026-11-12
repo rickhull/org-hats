@@ -33,7 +33,12 @@ accessor exception, plus the exception during expected-site checking, then pass;
 combined-fault ordering, additive unknown fields, and historical issuer
 versions retain their tests.
 
-## 2. Own the in-memory world and snapshots
+## 2. Own the in-memory world and snapshots — DONE
+
+Landed: ingress copies the policy bundle (actions, roles' actions,
+readPolicy), site aliases, and grant targets from fixtures; `snapshotOf`
+copies every nested site, grant, and participation object on egress.
+Red-first regressions in `tests/engine.test.ts` cover both directions.
 
 Copy nested policy and fixture data on ingress and copy nested snapshot objects
 and arrays on egress. A readonly type alone cannot prevent mutation through a

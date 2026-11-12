@@ -954,3 +954,91 @@ test("a team carries the pair, and `update-team` writes both labels in one act",
   assert.equal(bare?.longName, "No Short Form");
   assert.ok(!("shortName" in (bare ?? {})), "an unset team short name is absent");
 });
+
+// --- Ownership of the in-memory world and snapshots ------------------------
+//
+// A readonly type is not a runtime fact. The engine must own what it keeps:
+// fixture data handed in at construction (the world) and the objects inside
+// a snapshot handed out (nested copies, not shared references). These
+// regressions were proven red first: a site alias pushed into the fixture
+// after construction appeared in later snapshots, a granted action pushed
+// into the fixture's policy widened the issued hat, and a `revoked` flip
+// through a mutable structural type on a returned grant reached engine
+// state.
+
+test("the engine owns the world: fixture mutation after construction cannot change engine state", async () => {
+  const OWN_OP = "op-own-fixture";
+  const OWN_ORG = "org-own-fixture";
+  const OWN_ACTOR = "actor-own-fixture";
+  // a local, deliberately mutable policy and snapshot: the engine must copy
+  // them on ingress, not retain them
+  const policy = {
+    format: 1 as const,
+    id: "policy-own",
+    version: "1",
+    actions: ["observe"],
+    roles: [{ title: "field", actions: ["observe"] }],
+    readPolicy: { organizations: "granted-teams" as const },
+  };
+  const snapshot = fixtureSnapshot({
+    operations: [{ operationId: OWN_OP }],
+    organizations: [{ organizationId: OWN_ORG }],
+    actors: [{ organizationId: OWN_ORG, actorId: OWN_ACTOR }],
+    sites: [{ siteId: "site-own", operationId: OWN_OP, aliases: ["own"] }],
+    teams: [{ teamId: "team-own", siteId: "site-own", organizationId: OWN_ORG }],
+    grants: [{
+      grantId: "g-own", operationId: OWN_OP, organizationId: OWN_ORG,
+      actorId: OWN_ACTOR, role: "field",
+      target: { kind: "team", teamId: "team-own" }, primary: true,
+    }],
+    participations: [{ organizationId: OWN_ORG, operationId: OWN_OP, status: "active" }],
+  });
+  const engine = await createInMemoryAuthority({
+    clock: fixedClock(1_700_000_000),
+    signer: await webCryptoSigner("key-own"),
+    fixtures: [{ name: "own", policy, snapshot }],
+    principalLinks: [{ provider: "idp", subject: "own", organizationId: OWN_ORG as never, actorId: OWN_ACTOR as never }],
+  });
+
+  // the caller keeps its mutable references and changes them afterwards
+  (policy.roles[0] as { actions: string[] }).actions.push("forged-action");
+  (snapshot.sites[0] as unknown as { aliases: string[] }).aliases.push("forged-alias");
+
+  const world = engine.snapshotOf(OWN_OP as never);
+  assert.ok(world !== undefined);
+  assert.deepEqual(world.sites[0]?.aliases, ["own"], "site aliases are copied on ingress");
+
+  const issued = await engine.runtime.accessFromEvidence({
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    operationId: OWN_OP,
+    evidence: { provider: "idp", subject: "own" },
+  });
+  const claims = successOf(issued).envelope.claims;
+  assert.deepEqual(claims.hat.actions, ["observe"], "the policy bundle is copied on ingress");
+});
+
+test("snapshotOf hands out nested copies: grant, site, and participation objects cannot corrupt the engine", async () => {
+  const { engine } = await setup();
+  const before = engine.snapshotOf(OP);
+  assert.ok(before !== undefined);
+  const grant = before.grants.find((g) => g.revoked !== true);
+  assert.ok(grant !== undefined);
+  // the documented hole: a readonly grant assigned to a mutable structural
+  // type flips `revoked` on the object the engine still holds
+  (grant as { revoked?: boolean }).revoked = true;
+  const site = before.sites[0];
+  assert.ok(site !== undefined);
+  (site.aliases as string[]).push("forged-alias");
+  const participation = before.participations.find((p) => p.status === "active");
+  assert.ok(participation !== undefined);
+  (participation as { status: string }).status = "revoked";
+
+  const after = engine.snapshotOf(OP);
+  assert.ok(after !== undefined);
+  assert.equal(after.grants.find((g) => g.grantId === grant.grantId)?.revoked, undefined,
+    "a returned grant is engine-owned");
+  assert.ok(!after.sites[0]?.aliases.includes("forged-alias"),
+    "a returned site's aliases are engine-owned");
+  assert.equal(after.participations.find((p) => p.organizationId === participation.organizationId)?.status, "active",
+    "a returned participation is engine-owned");
+});
