@@ -176,8 +176,8 @@ The type layer stops at these seams. The current checks have different scopes:
 | SQLite row | `Row` (`string \| number \| null`) | `row.ts` decoders, database constraints |
 | Signed envelope | decoded input, declared as `SignedAccessEnvelope` at the public call | format/version gate, signature, expiry, expected binding; required claims shape is only partially checked |
 | Verification key set | text | `parseVerifyKeySet` |
-| Policy bundle | JSON asserted to be `PolicyBundle` by Cloudflare bootstrap | `validatePolicyBundle` checks semantics while assuming field types; a complete shape parser is missing |
-| HTTP command body | `unknown` / JSON | `readBody`, `asString`, `asGrantTarget`; some optional flags use literal-true tests that silently omit malformed values |
+| Policy bundle | `unknown` JSON at Cloudflare bootstrap | `parsePolicyBundle` establishes shape before the coordinator's `validatePolicyBundle` semantic checks |
+| HTTP command body | `unknown` / JSON | `readBody`, `asString`, `asGrantTarget`, and `asBoolean` for bootstrap flags; other route flags still use literal-true tests |
 | Fixture snapshot | `Unbranded<Snapshot>` | `defineWorld` converts and validates a whole world; `fixtureSnapshot` converts a test snapshot; `invariantProblems` checks coherence |
 | Principal evidence | `PrincipalEvidence` | the identity adapter verifies the provider assertion |
 
@@ -191,8 +191,8 @@ other internal serialization paths also assert `JsonValue`.
 
 These are current facts, not future promises:
 
-- Policy parsing, optional boolean parsing, required claims validation, and
-  in-memory snapshot ownership have confirmed gaps. The current evidence and
+- Required claims validation, non-bootstrap HTTP flag parsing, and in-memory
+  snapshot ownership have confirmed gaps. The current evidence and
   limits are in [Type safety](type_safety.md); the ordered fixes and their
   acceptance evidence are in [the plan](../plans/type_safety.md).
 - The internal `OutboxMessage` combines a kind union with optional payload

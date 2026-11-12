@@ -126,17 +126,17 @@ once and checked by the suite and `invariantProblems`; a host's own world
 is validated by `defineWorld` at that boundary.
 
 *Held by:* `verify`'s format/version/signature gate; `parseVerifyKeySet`;
-`validatePolicyBundle`'s semantic checks at the Cloudflare bootstrap and in
-tests; the Cloudflare `row.ts` decoders and ops body decoders; the fixture
+Cloudflare bootstrap's `parsePolicyBundle` followed by `validatePolicyBundle`,
+its policy and bootstrap-flag regression suites, and `asBoolean` for bootstrap
+flags; the Cloudflare `row.ts` decoders and ops body decoders; the fixture
 boundary in `tests/helpers.ts` plus `invariantProblems`; `defineWorld` and
 `tests/world.test.ts` for host worlds.
 *If it breaks:* a brand becomes an assertion about data nobody checked, and
 the type layer starts lying about storage, wire, or provider input.
 
-**Known violations:** Cloudflare bootstrap asserts `PolicyBundle` before
-establishing its JSON shape, some HTTP flags silently omit malformed values,
-and the envelope gate asserts a complete claims type after partial shape
-checks. These violate the requirement above. The existing witnesses cover
+**Known violations:** some non-bootstrap HTTP flags silently omit malformed
+values, and the envelope gate asserts a complete claims type after partial
+shape checks. These violate the requirement above. The existing witnesses cover
 specific refusals and cannot establish complete parsing. Their current
 scope and reproduced failures are in [Type safety](../docs/type_safety.md);
 the [remediation plan](../plans/type_safety.md) supplies the missing cases.

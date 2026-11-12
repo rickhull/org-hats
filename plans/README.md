@@ -9,8 +9,8 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-The type-safety work has a concrete next action: prove the policy parsing
-defect red, then establish its JSON shape before semantic validation. The
+The type-safety work has a concrete next action: prove the incomplete signed
+claims defect red, then validate required fields before exposing them. The
 ordered slices and acceptance evidence are in
 [`type_safety.md`](type_safety.md).
 

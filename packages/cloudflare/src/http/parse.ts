@@ -76,6 +76,11 @@ export const asString = (input: unknown, field: string): string => {
   return input;
 };
 
+export const asBoolean = (input: unknown, field: string): boolean => {
+  if (typeof input !== "boolean") throw new Error(`${field} must be a boolean`);
+  return input;
+};
+
 export const asArray = (input: unknown, field: string): unknown[] => {
   if (!Array.isArray(input)) throw new Error(`${field} must be an array`);
   return input;

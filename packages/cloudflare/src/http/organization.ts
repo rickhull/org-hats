@@ -4,6 +4,7 @@
 
 import {
   asArray,
+  asBoolean,
   asRecord,
   asString,
   failure,
@@ -94,7 +95,7 @@ export const handleOrganizationRequest = async (
           return {
             actorId: asString(actor["actorId"], "actorId"),
             ...(actor["displayName"] === undefined ? {} : { displayName: asString(actor["displayName"], "displayName") }),
-            ...(actor["disabled"] === true ? { disabled: true } : {}),
+            ...(actor["disabled"] === undefined ? {} : { disabled: asBoolean(actor["disabled"], "disabled") }),
           };
         }),
         principalLinks: asArray(body["principalLinks"], "principalLinks").map((entry) => {

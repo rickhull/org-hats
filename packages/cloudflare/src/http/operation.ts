@@ -11,6 +11,7 @@ import type {
 import {
   asActorId,
   asArray,
+  asBoolean,
   asGrantTarget,
   asOrganizationId,
   asRecord,
@@ -82,16 +83,47 @@ export interface OperationRouteHost {
   outboxRows(): readonly Record<string, unknown>[];
 }
 
+/** The coordinator validates policy meaning after this boundary proves its shape. */
+const parsePolicyBundle = (input: unknown): PolicyBundle => {
+  const policy = asRecord(input);
+  if (policy["format"] !== 1) throw new Error("policy.format must be 1");
+  const readPolicy = asRecord(policy["readPolicy"]);
+  const organizations = readPolicy["organizations"];
+  if (organizations !== "granted-teams" && organizations !== "all-participating") {
+    throw new Error("policy.readPolicy.organizations is invalid");
+  }
+  // Empty action strings are part of the existing policy vocabulary; the
+  // coordinator decides whether the vocabulary and role mappings are valid.
+  const action = (entry: unknown): string => {
+    if (typeof entry !== "string") throw new Error("policy action must be a string");
+    return entry;
+  };
+  return {
+    format: 1,
+    id: asString(policy["id"], "policy.id"),
+    version: asString(policy["version"], "policy.version"),
+    actions: asArray(policy["actions"], "policy.actions").map(action),
+    roles: asArray(policy["roles"], "policy.roles").map((entry) => {
+      const role = asRecord(entry);
+      return {
+        title: asString(role["title"], "policy role title"),
+        actions: asArray(role["actions"], "policy role actions").map(action),
+      };
+    }),
+    readPolicy: { ...readPolicy, organizations },
+  };
+};
+
 /** Both bootstrap paths narrow the same untrusted body before use. */
 const parseOperationBootstrap = (input: unknown): BootstrapInput => {
   const body = asRecord(input);
-  const policy = asRecord(body["policy"]) as unknown as PolicyBundle;
+  const policy = parsePolicyBundle(body["policy"]);
   return {
     operationId: asString(body["operationId"], "operationId"),
     slug: asString(body["slug"], "slug"),
     ...(body["longName"] === undefined ? {} : { longName: asString(body["longName"], "longName") }),
     ...(body["shortName"] === undefined ? {} : { shortName: asString(body["shortName"], "shortName") }),
-    ...(body["bounded"] === true ? { bounded: true } : {}),
+    ...(body["bounded"] === undefined ? {} : { bounded: asBoolean(body["bounded"], "bounded") }),
     policy,
     ...(body["adminRoles"] === undefined ? {} : { adminRoles: asArray(body["adminRoles"], "adminRoles").map((entry) => asString(entry, "adminRoles entry")) }),
     ...(body["configureActions"] === undefined ? {} : { configureActions: asArray(body["configureActions"], "configureActions").map((entry) => asString(entry, "configureActions entry")) }),
@@ -124,8 +156,8 @@ const parseOperationBootstrap = (input: unknown): BootstrapInput => {
         actorId: asString(grant["actorId"], "actorId"),
         role: asString(grant["role"], "role"),
         target: asGrantTarget(grant["target"], "target"),
-        ...(grant["primary"] === true ? { primary: true } : {}),
-        ...(grant["revoked"] === true ? { revoked: true } : {}),
+        ...(grant["primary"] === undefined ? {} : { primary: asBoolean(grant["primary"], "primary") }),
+        ...(grant["revoked"] === undefined ? {} : { revoked: asBoolean(grant["revoked"], "revoked") }),
       };
     }),
     participations: asArray(body["participations"] ?? [], "participations").map((entry) => {

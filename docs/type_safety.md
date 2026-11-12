@@ -19,20 +19,29 @@ Strict compiler settings, the portable compiler fence, and typechecked tests
 and examples ([P8](../specs/portability.md#p8--the-suites-and-examples-typecheck))
 make these claims useful, but cannot establish runtime shape or ownership.
 
+## Bootstrap boundary checks
+
+The Cloudflare operation's `parsePolicyBundle` in
+[operation.ts](../packages/cloudflare/src/http/operation.ts) establishes
+the policy's runtime shape before the coordinator applies
+[validatePolicyBundle](../src/policy.ts). Both bootstrap and bootstrap preview
+use it. The [policy regressions](../packages/cloudflare/test/bootstrap-policy.test.ts)
+reject numeric identifiers, versions, role titles, and actions without changing
+exported state. Unknown read-policy axes remain visible to semantic validation.
+
+Bootstrap also parses the actor's `disabled`, operation's `bounded`, and
+grant's `primary` and `revoked` with
+[`asBoolean`](../packages/cloudflare/src/http/parse.ts). Present non-booleans
+are refused; omitted, `false`, and `true` retain their existing stored meaning.
+The [flag regressions](../packages/cloudflare/test/bootstrap-flags.test.ts)
+exercise refusal before persistence and valid stored values.
+
 ## Boundary gaps
 
-- The Cloudflare operation bootstrap casts its policy record to
-  `PolicyBundle` in [operation.ts](../packages/cloudflare/src/http/operation.ts).
-  [validatePolicyBundle](../src/policy.ts) checks policy consistency but
-  does not first establish every field's runtime type: a numeric action can
-  pass its checks. The cast and validator together therefore do not yet
-  establish the parsing contract in [P9](../specs/portability.md#p9--untrusted-data-is-parsed-before-it-wears-a-domain-type).
-- The coordinator HTTP boundaries treat values other than literal `true` as
-  false or absent for flags. For example, `"true"` for a bootstrap grant's
-  `revoked` or a bootstrap actor's `disabled` is omitted.
-  A malformed privileged request can thus produce an active grant or enabled
-  actor instead of being refused. This is a shape problem at the input
-  boundary, not a claim that ordinary unprivileged callers control it.
+- Other coordinator HTTP flags still use literal-true tests: intake actor
+  `disabled`, grant-command `primary`, organization `operator`, and team
+  retirement's `asOperationAdmin`. Their malformed values become false or
+  absent; bootstrap's parsing fix does not cover those routes.
 - [parseAccessEnvelope](../src/contract.ts) checks containers, versions,
   depth, carriage fields, and expiry but asserts the complete claims type
   without checking all fields. A correctly signed claims object
@@ -62,7 +71,7 @@ which delivery can consume without revoking the intended refresh records.
 Current producers supply the fields; this is a representable future mistake,
 not a known malformed message in the current flow.
 
-The analysis was bounded to these seams, not a complete audit. At inspection,
-`pnpm check` passed 256 tests and the Cloudflare TypeScript check passed.
-Ad hoc probes in `/tmp` demonstrated the examples; they are not committed
-regression tests and do not establish a fix.
+The analysis is bounded to these seams. The policy and bootstrap-flag
+regressions are proven red against the former behavior and green with the
+parsers in place. Claims and ownership findings come from ad hoc probes;
+they still require committed regressions and fixes.

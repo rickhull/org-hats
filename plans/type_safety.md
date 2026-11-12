@@ -6,32 +6,7 @@ and [E4](../specs/envelope.md#e4--verification-fails-closed-in-a-fixed-order)
 remain obligations; the current violations do not lower them. Each slice
 leaves the applicable tests green before the next begins.
 
-## 1. Parse bootstrap policy
-
-Parse the operation bootstrap policy from `unknown` into a `PolicyBundle`
-before semantic validation at the Cloudflare HTTP boundary.
-
-**Done when:** malformed policy field types are refused before persistence,
-and valid policy semantics keep their existing acceptance and refusals.
-**Evidence:** a regression with numeric policy identifiers, role titles, and
-actions first fails against the current validator, then passes with shape
-parsing in place. Missing fields also produce a closed refusal.
-
-## 2. Parse optional safety flags
-
-At the HTTP boundary, use a shared boolean parser for optional flags:
-absent and actual `false` retain their existing meaning,
-actual `true` remains true, and present non-booleans are refused. Cover the
-organization actor's `disabled`, operation grant's `revoked` and `primary`,
-and operation `bounded` flags. These bootstrap routes require the ops token.
-
-**Done when:** non-boolean flags are refused before state changes, and valid
-bootstrap behavior is preserved.
-**Evidence:** regression tests first fail against the current
-flag handling, then pass after the fix, including actual false and absent
-cases.
-
-## 3. Validate the complete access claims shape
+## 1. Validate the complete access claims shape
 
 Validate all required claims from `unknown` before exposing a verified result
 or reading fields that depend on that shape. Preserve E4's format, version,
@@ -49,7 +24,7 @@ accessor exception, plus the exception during expected-site checking, then pass;
 combined-fault ordering, additive unknown fields, and historical issuer
 versions retain their tests.
 
-## 4. Own the in-memory world and snapshots
+## 2. Own the in-memory world and snapshots
 
 Copy nested policy and fixture data on ingress and copy nested snapshot objects
 and arrays on egress. A readonly type alone cannot prevent mutation through a
@@ -60,7 +35,7 @@ cannot change a subsequent snapshot or issuance.
 **Evidence:** regressions for both ingress and egress first demonstrate the
 current mutation, then pass with the ownership boundary in place.
 
-## 5. Make outbox message variants complete
+## 3. Make outbox message variants complete
 
 Replace the internal `OutboxMessage` optional-field shape with a discriminated
 union carrying the fields required by each kind, and update its producers and
@@ -73,6 +48,20 @@ and existing delivery behavior remains unchanged.
 current optional-field shape, then rejects missing required fields;
 the relevant delivery tests pass. If adding a test for an existing runtime
 guard, remove the guard, prove the test fails, and restore it before handoff.
+
+## 4. Parse the remaining HTTP flags
+
+Apply the shared boolean parser to non-bootstrap fields: intake actor
+`disabled`, grant-command `primary`, organization `operator` on activation
+issuance, activation revocation, and principal unlinking, and retirement's
+`asOperationAdmin`.
+Preserve omitted and actual boolean values and the existing standing checks.
+
+**Done when:** present non-booleans are refused before each route mutates
+state, while valid requests retain their authorization and effects.
+**Evidence:** HTTP regressions first reproduce each route's acceptance of a
+malformed flag, then pass after parsing; accepted true, false, and omitted
+values retain their existing tests.
 
 ## Completion
 
