@@ -84,7 +84,10 @@ unchanged through refresh while `iat` moves, surfaced on the context, and
 never interpreted by authority. Absence is carried as absence. Refresh
 establishes current authorization eligibility (A13), not a renewed
 authentication event; neither `iat` nor refresh time is evidence about
-`auth_time`.
+`auth_time`. The Cloudflare runtime's passkey evidence states exactly what
+the ceremony proved — `amr: ["webauthn"]` and the verification instant as
+`auth_time` — and does not infer user verification from the authenticator
+flags.
 
 *Held by:* both engines copy the facts without reading their values;
 refresh records carry them through the chain; `OH-AUTH-06`.

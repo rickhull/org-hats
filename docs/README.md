@@ -34,6 +34,10 @@ public `org-hats` docs are normative for the seam.
 - [`consumer-login.md`](consumer-login.md) — the host half of the OIDC
   login: the flow, who holds what, state/nonce/PKCE, the evidence exchange,
   the closed failure set, and a refused first login.
+- [`consumer-passkey.md`](consumer-passkey.md) — the host half of a
+  passkey ceremony: enrollment through the activation claim, usernameless
+  assertion login, the uniform failure set, recovery, the zone-purity and
+  no-attestation preconditions, and what `amr` does not say.
 - [`activation.md`](activation.md) — claiming a pre-provisioned actor,
   return-once secret rotation, global subject serialization, revocation, and
   principal recovery.

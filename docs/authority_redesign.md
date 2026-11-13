@@ -341,19 +341,25 @@ A local credential is a principal link like any other —
 
 - **Verification lives in the runtime.** WebAuthn assertion verification
   runs beside the OIDC code exchange in the Cloudflare package; credential
-  public keys are runtime state, sealed and stored like provider
-  configuration. The host owns the browser ceremony (registration prompts,
-  conditional mediation, cookies); the runtime proves the assertion and
-  maps it to principal evidence. No portable seam moves.
+  public keys are runtime state stored beside the links. They are public
+  material, not sealed secrets, and an organization export carries them
+  like the rest of its snapshot. The host owns the browser ceremony
+  (registration prompts, conditional mediation, cookies); the runtime
+  proves the assertion and maps it to principal evidence. No portable seam
+  moves.
 - **Enrollment binds through the activation claim, once.** A passkey may be
   the actor's first credential: `activationAccept` requires no session and
   no password, because the return-once secret authenticates the act. The
   claim-path guard stays strict — an actor holding any link cannot gain a
-  second through a claim — so one credential per actor is claim-bound, and
-  a second credential (passkey beside a federated link, or the reverse) is
-  an operator act through `/ops/organization/principal-link`. This keeps
-  the anti-graft property whole: a leaked activation secret can attach
-  nothing to an already-claimed actor.
+  second through a claim — so one credential per actor is claim-bound.
+  This keeps the anti-graft property whole: a leaked activation secret can
+  attach nothing to an already-claimed actor. The mixed-actor directions
+  are not symmetric: a passkey actor can gain a federated link through
+  `/ops/organization/principal-link`, but an already-linked actor cannot
+  add a passkey in place. The operator path is the identity reset —
+  unlink, enroll through a fresh claim, re-link — and a direct per-actor
+  passkey enrollment is deferred with the per-link retire, under the same
+  trigger: a consumer's runbook that needs a mixed actor without a reset.
 - **The relying-party id is the zone apex.** One credential then works at
   every operation hostname, including hostnames that did not exist at
   enrollment. This is preconditioned on zone purity — the deployment
@@ -373,6 +379,11 @@ A local credential is a principal link like any other —
   path, format, or authenticator model is demanded. A device-fleet policy
   is a deployment concern that returns only with a concrete consumer
   need.
+- **User verification is preferred, not inferred.** The ceremony asks for
+  `userVerification: "preferred"`; the runtime records `amr: ["webauthn"]`
+  and does not promote the authenticator's user-verification flag into
+  `amr`. A consumer that needs to distinguish step-up is an additive `amr`
+  value, decided with that consumer rather than guessed here.
 - **No runtime dependency, and the library door stays ajar.** The CBOR
   subset, authenticator-data parsing, DER signature conversion, and COSE
   key mapping are written here, with every cryptographic operation left to

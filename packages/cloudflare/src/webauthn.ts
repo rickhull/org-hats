@@ -13,8 +13,9 @@
 // Everything cryptographic stays in crypto.subtle; parsing stays in
 // ./webauthn/cbor, ./webauthn/authenticator, and ./webauthn/verify with the
 // envelope gate's discipline. The activation secret arrives as its SHA-256
-// hex digest — the same shape every other activation route takes, so one
-// hashing rule covers every door.
+// hex digest, unlike the binding's activation methods, which take the
+// plaintext secret and hash it at the boundary. Both ceremonies take the
+// digest so the host hashes once.
 
 import {
   AUTHORITY_INTERFACE_VERSION,

@@ -57,6 +57,14 @@ deploying host owns its product surface, IdP, secrets, and deployment; the
    not, so a host that routes the Worker publicly — and any caller that can
    reach the service binding — gets 404s, not the routes.
 
+8. **Browser authenticator → runtime.** The WebAuthn ceremonies cross a
+   boundary beside the provider exchange. The browser's client data,
+   authenticator data, attestation object, signature, and credential id are
+   untrusted bytes, and the authenticator is the trust root for possession.
+   The runtime mints the challenge and binds it to the host's origin and
+   relying-party id; the host's `organizationId`, `operationId`, `rpId`, and
+   `expectedOrigin` are caller configuration, not proof.
+
 ## Reachable inputs
 
 Every boundary above is crossed by one of these. The list is named so that a
@@ -93,6 +101,12 @@ new input class is a visible addition to the model rather than an assumption.
 - **OIDC documents** — discovery, JWKS, and token responses are hostile input.
   Only `issuer`, `token_endpoint`, and `jwks_uri` are read from discovery; the
   rest is ignored, and the exchange never redirects.
+- **WebAuthn ceremony responses** — `clientDataJSON`, `attestationObject`,
+  `authenticatorData`, `signature`, and credential ids are untrusted bytes
+  from the browser. CBOR is depth- and item-bounded; COSE keys and
+  authenticator data are parsed by named boundaries that refuse unknown
+  constructs rather than skip them; the stored key is re-parsed before it is
+  used to verify.
 - **Release metadata** — tags, manifests, and tracked `dist/`; see the
   supply-chain row.
 
@@ -105,6 +119,10 @@ new input class is a visible addition to the model rather than an assumption.
 | Stolen refresh handle | Handle leaked from host storage or logs | Handles are hashed at rest and rotate on use; actor disable or unlink, participation or grant revocation, and team retirement revoke affected refresh records; refresh re-reads organization state | A stolen, still-live handle can rotate once before the host notices; there is no global bulk revoke |
 | Principal impersonation | Provider subject collision or malicious IdP | One `(provider, subject)` maps to one actor; links are explicit; bootstrap/bind refusals; subject guard serializes cross-organization binds; ambiguity is `unavailable` | The configured IdP is trusted for authentication. A malicious provider can authenticate the wrong human |
 | Provider-callback exchange abused | Intercepted one-time code, nonce reuse, stale or attacker-pinned JWKS | The exchange runs authority-side with the sealed client secret; the nonce is verified against the ID token; signature, issuer, audience, and expiry are checked against a TTL-bounded JWKS cache with forced refetch on unknown kids | The one-time code is the provider's to enforce, and a provider key rotation is only picked up within the cache TTL; a malicious provider authenticates the wrong human (see the impersonation row) |
+| Passkey assertion replay or cross-context use | Captured assertion, held challenge, wrong origin, or a relying-party id the runtime did not bind | The challenge is single-use, minted per ceremony, and bound at mint to the host's origin and RP id; expiry and consumption are checked in the same transaction that advances the counter; the signature covers the authenticator data and the client-data hash; origin and RP-id hash are compared before the signature; every refusal is `unauthenticated` | An assertion captured in transit can be submitted once before the host submits it, after which the challenge refuses the host; TLS, cookie hygiene, and request ordering are the host's |
+| Passkey credential or counter tampering | A stolen or restore-rewritten credential row, a stored credential with no link, a rolled-back counter | Stored key JSON is parsed at the assertion boundary; the credential must have its `(webauthn, credential id)` link to the same actor; a stored nonzero counter must strictly advance and is re-read under the consume transaction; enrollment commits link, credential, and claim consume in one transaction | Database or ops-token access can replace a public key, but the holder still needs the matching private key; synced passkeys report zero forever, so counter replay is not detected; link and credential rows are not tamper-evident |
+| Weak or unattested local credential | A synced or backed-up passkey, an authenticator without user verification, no attestation provenance | The relying-party id is the zone apex under the [zone-purity precondition](cloudflare.md#local-credentials-passkeys); backup-eligibility flags are stored opaquely; attestation is verified when present; `amr` states only `webauthn` | A backup-eligible credential is as strong as the account that syncs it and is not device-bound; there is no attestation or device-fleet policy; `userVerification` is preferred, so PIN or biometric verification is not required and is not surfaced in `amr`; a compromised sync account authenticates as the actor |
+| Passkey challenge flooding | Unauthenticated callers mint assertion options repeatedly | Minting stores one row and performs no cryptography; expired rows are pruned on every mint; challenges are 256 bits and unknown ones answer uniformly | No built-in rate limiting; a flood consumes storage and request budget within the five-minute lifetime, so the Worker platform and host must absorb it |
 | Privilege escalation through commands | A hat, envelope, or fresh evidence used beyond its standing | Command policy table; organization/operation standing; fresh-only writes; selected hat authorizes no command; idempotent claims; audit | An administrator compromised within their own granted authority can exercise it. Separation of duties beyond these roles is host code |
 | Cross-organization or cross-operation reach | Wrong directory id, operation id, or target | Envelope operation binding; coordinator ownership; operation-local grants; per-operation Durable Objects; `wrong-binding` fail closed | A misconfigured organization directory can cause outage or route evidence to the wrong tenant; it is operator configuration |
 | Ops-token compromise | Leaked bearer token | Token is a secret, stored outside the repository; it gates every ops route except the public, secret-free `GET /ops/verification-keys`; use a private ops Worker or tightly held transport | The token is all-or-nothing: bootstrap, links, activation recovery, routing facts, export, and restore. Export returns every table — sealed IdP configuration, refresh-handle hashes, activation digests, and audit rows — and restore can rewrite all of them. Rotating the token contains further use but undoes none of its writes: an administrator it added and a principal link it bound survive rotation and give their holder authenticated access without the token, so containment is a hunt and not only a rotation ([runbook](key_compromise.md)). Key ids and rotation state are visible to anyone who can reach the public verification-keys route |
@@ -125,6 +143,10 @@ new input class is a visible addition to the model rather than an assumption.
   exchange-verified on the Cloudflare runtime — and the configured IdP is
   the trust root for authentication.
 - TLS protects envelopes and refresh handles in transit.
+- A passkey's private key stays in the authenticator, which is the trust
+  root for possession; the runtime receives only public key material and
+  signed assertions, and the browser enforces origin and relying-party
+  scoping.
 - The host protects cookies and other bearer storage, and decides when
   reauthentication or step-up is required.
 - The operator protects `OPS_TOKEN` and the signing secrets, and controls
@@ -139,10 +161,11 @@ new input class is a visible addition to the model rather than an assumption.
 ## Non-goals
 
 `org-hats` is not an identity provider, a general policy engine, a secrets
-manager, a rate limiter, or a tamper-evident audit log. It does not defend
-the host's browser session, product authorization decisions, or deployment
-credentials beyond the boundaries above. The host owns those, and owns the
-product response to every failure kind.
+manager, a rate limiter, a tamper-evident audit log, or an authenticator or
+device-management service. It does not demand or evaluate attestation trust
+paths, defend the host's browser session, product authorization decisions,
+or deployment credentials beyond the boundaries above. The host owns those,
+and owns the product response to every failure kind.
 
 ## Review
 

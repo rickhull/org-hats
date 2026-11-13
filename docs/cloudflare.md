@@ -236,8 +236,10 @@ cookies — and holds no signing key. The design decisions are normative in
 [authority_redesign.md](authority_redesign.md#local-credentials-passkeys--design-decisions).
 
 Four RPC methods on the `AuthorityRuntimeEntrypoint` service binding carry
-the ceremonies. The activation secret is the same SHA-256 hex digest every
-other activation route takes, never the plaintext.
+the ceremonies. The WebAuthn methods take the activation secret as its
+SHA-256 hex digest (`secretHash`), never the plaintext; the binding's
+`activationAccept` and `activationInspect` take the secret and hash it
+internally, so hash once and reuse the digest for both WebAuthn calls.
 
 - `webauthnRegistrationOptions({ interfaceVersion, organizationId,
   secretHash, rpId })` mints the ceremony options against a live activation
@@ -253,8 +255,11 @@ other activation route takes, never the plaintext.
   user presence, attestation when present) and commits the link,
   credential, and activation consume in one transaction. The strict claim
   guard is unchanged: an actor holding any link cannot gain a second
-  credential through a claim; a second credential is an operator act
-  through `/ops/organization/principal-link`.
+  credential through a claim. Adding a federated link to a passkey actor
+  is an ordinary `/ops/organization/principal-link` act; adding a passkey
+  to an already-linked actor requires the identity-reset recovery (unlink,
+  enroll, re-link) — a direct per-actor enrollment ceremony is deferred
+  with the per-link retire.
 - `webauthnAssertionOptions({ interfaceVersion, organizationId, rpId,
   expectedOrigin })` mints a single-use challenge bound to that origin and
   RP id. Feed it to `navigator.credentials.get` with no

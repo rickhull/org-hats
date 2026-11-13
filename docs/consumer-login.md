@@ -134,6 +134,8 @@ the envelope, and the refresh outcome; `specs/authority.md` and
 
 - [`consumer-session.md`](consumer-session.md) — cookies, lifetimes,
   rotation, and the size budget.
+- [`consumer-passkey.md`](consumer-passkey.md) — the same session from a
+  local credential instead of a provider.
 - [`cloudflare.md`](cloudflare.md) — the reference runtime and
   `evidenceFromProviderCode`.
 - [`migration-v3.md`](migration-v3.md) — the interface-version cutover.
