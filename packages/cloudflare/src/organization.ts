@@ -19,6 +19,7 @@ import { initializeOrganizationSchema, ORGANIZATION_SCHEMA_VERSION } from "./sch
 import { base64UrlEncode } from "org-hats/access";
 import { displayLabelFailure, identifierFailure } from "./validation";
 import { handleOrganizationRequest } from "./http/organization";
+import { WEBAUTHN_CEREMONY_LIFETIME_SECONDS } from "./webauthn/constants";
 
 /** One organization authority. The object owns the facts that stay stable
  * while the organization participates in several operations: actors,
@@ -1271,6 +1272,109 @@ export class OrganizationAuthority extends DurableObject<Env> {
     });
   }
 
+  /** Mint a single-use assertion challenge bound to the host's origin and
+   * relying-party id. Binding at mint means the assertion cannot be replayed
+   * at a different origin, and the challenge's consumption is the replay
+   * control. Expired rows are pruned here rather than by an alarm: this is
+   * the only writer. */
+  private webauthnAssertionChallenge(input: {
+    readonly rpId: string;
+    readonly expectedOrigin: string;
+  }): Result<{ readonly challenge: string; readonly rpId: string }> {
+    const at = now();
+    const challenge = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+    return this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec("DELETE FROM webauthn_assertion_challenges WHERE expires_at < ?", at);
+      this.ctx.storage.sql.exec(
+        "INSERT INTO webauthn_assertion_challenges (challenge, rp_id, origin, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+        challenge,
+        input.rpId,
+        input.expectedOrigin,
+        at,
+        at + WEBAUTHN_CEREMONY_LIFETIME_SECONDS,
+      );
+      return value({ challenge, rpId: input.rpId });
+    });
+  }
+
+  /** Read the ceremony's bound context without consuming it. Verification
+   * happens outside the Durable Object; consumption is the atomic act below.
+   * The refusal is uniform: nothing about a challenge's state is enumerable. */
+  private webauthnAssertionChallengeOf(challenge: string): Result<{
+    readonly rpId: string;
+    readonly origin: string;
+  }> {
+    const row = this.one(
+      "SELECT rp_id, origin, consumed_at, expires_at FROM webauthn_assertion_challenges WHERE challenge = ?",
+      challenge,
+    );
+    if (row === undefined || row["consumed_at"] !== null || now() >= Number(row["expires_at"])) {
+      return failure("unauthenticated", "the ceremony is not usable");
+    }
+    return value({ rpId: String(row["rp_id"]), origin: String(row["origin"]) });
+  }
+
+  /** The atomic end of an assertion: consume the challenge and advance the
+   * stored counter together, re-reading the counter under the transaction so
+   * two concurrent assertions cannot both pass the verifier's earlier read.
+   * A credential must still be linked to the actor it was stored for; a row
+   * without its link is unusable, not a second login path. */
+  private webauthnAssertionComplete(input: {
+    readonly challenge: string;
+    readonly credentialId: string;
+    readonly signCount: number;
+    readonly backupEligible: boolean;
+    readonly backedUp: boolean;
+  }): Result<{ readonly actorId: string }> {
+    if (!Number.isInteger(input.signCount) || input.signCount < 0 || input.signCount > 0xffffffff) {
+      return failure("invalid-command", "signCount is not a counter value");
+    }
+    const at = now();
+    return this.ctx.storage.transactionSync(() => {
+      const ceremony = this.one(
+        "SELECT consumed_at, expires_at FROM webauthn_assertion_challenges WHERE challenge = ?",
+        input.challenge,
+      );
+      if (ceremony === undefined || ceremony["consumed_at"] !== null || at >= Number(ceremony["expires_at"])) {
+        return failure("unauthenticated", "the ceremony is not usable");
+      }
+      const credential = this.one(
+        "SELECT actor_id, sign_count FROM credentials WHERE credential_id = ?",
+        input.credentialId,
+      );
+      const link = this.one(
+        "SELECT actor_id FROM principal_links WHERE provider = 'webauthn' AND subject = ?",
+        input.credentialId,
+      );
+      if (
+        credential === undefined || link === undefined ||
+        String(link["actor_id"]) !== String(credential["actor_id"])
+      ) {
+        return failure("unauthenticated", "the credential is not usable");
+      }
+      // a synced passkey reports zero forever; a counter that was ever
+      // nonzero must advance (the recorded tolerance decision)
+      const stored = Number(credential["sign_count"]);
+      if (!(input.signCount > stored || (stored === 0 && input.signCount === 0))) {
+        return failure("unauthenticated", "the ceremony's counter does not advance");
+      }
+      this.ctx.storage.sql.exec(
+        "UPDATE webauthn_assertion_challenges SET consumed_at = ? WHERE challenge = ?",
+        at,
+        input.challenge,
+      );
+      this.ctx.storage.sql.exec(
+        "UPDATE credentials SET sign_count = ?, backup_eligible = ?, backed_up = ?, updated_at = ? WHERE credential_id = ?",
+        input.signCount,
+        input.backupEligible ? 1 : 0,
+        input.backedUp ? 1 : 0,
+        at,
+        input.credentialId,
+      );
+      return value({ actorId: String(credential["actor_id"]) });
+    });
+  }
+
   /** Scoped cleanup for one deleted operation: its invitation records,
    * the outbox rows addressed to it, the replay claims whose payloads name
    * it, and the audit facts that reference it. Everything else — actors,
@@ -1341,9 +1445,9 @@ export class OrganizationAuthority extends DurableObject<Env> {
     // ones an older export did not carry with null, so an older snapshot is a
     // restore rather than a second bootstrap. An unknown or future version is
     // still refused — a schema bump must not strand an export taken before it.
-    const version = String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0");
-    const supported = new Set(["1", "2", "3", ORGANIZATION_SCHEMA_VERSION, version]);
-    if (!supported.has(String(snapshot.schemaVersion))) {
+    const schemaVersion = String(snapshot.schemaVersion);
+    const shipped = /^[0-9]+$/.test(schemaVersion) ? Number(schemaVersion) : Number.NaN;
+    if (!Number.isInteger(shipped) || shipped < 1 || shipped > Number(ORGANIZATION_SCHEMA_VERSION)) {
       return failure("invalid-command", "snapshot schema version does not match");
     }
     if (typeof snapshot.tables !== "object" || snapshot.tables === null) return failure("invalid-command", "snapshot has no tables");
@@ -1405,6 +1509,9 @@ export class OrganizationAuthority extends DurableObject<Env> {
       webauthnChallenge: (secretHash) => this.webauthnChallenge(secretHash),
       webauthnChallengeOf: (secretHash) => this.webauthnChallengeOf(secretHash),
       webauthnRegister: (input) => this.webauthnRegister(input),
+      webauthnAssertionChallenge: (input) => this.webauthnAssertionChallenge(input),
+      webauthnAssertionChallengeOf: (challenge) => this.webauthnAssertionChallengeOf(challenge),
+      webauthnAssertionComplete: (input) => this.webauthnAssertionComplete(input),
       restoreSnapshot: (input, operatorId) => this.restoreSnapshot(input, operatorId),
       auditRows: () => this.auditRows(),
       outboxRows: () => this.outboxRows(),

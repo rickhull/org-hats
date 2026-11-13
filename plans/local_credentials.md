@@ -96,7 +96,11 @@ the provider exchange. One amendment to the approved shape: the inputs
 take `secretHash`, the digest every other activation route takes, not the
 plaintext secret — one hashing rule covers every door. Red-first tests in
 `packages/cloudflare/test/webauthn-registration.test.ts`, including the
-linked-after-minting window the guard must still close.
+linked-after-minting window the guard must still close. Amended again in
+phase 4: the options take `rpId` and mint `rp`, `residentKey: "required"`,
+and `attestation: "none"` — without `rp.id` the browser would default to
+the origin host, not the zone apex — and packed self-attestation
+signatures go through the shared DER-to-raw verification path.
 
 `POST /webauthn/registration` (host-facing, beside the OIDC exchange):
 the host supplies the activation secret and the browser's registration
@@ -116,24 +120,49 @@ be seen as an ordinary principal link; an already-linked actor is
 refused; a replayed ceremony challenge is refused.
 **Evidence:** Cloudflare suite registration tests, red-first.
 
-## Phase 4 — assertion login
+## Phase 4 — assertion login — DONE
 
-`POST /webauthn/assertion`: verify the assertion against the stored key
-(origin and RP id checked against the zone apex, sign counter enforced
-with a tolerance decision recorded when the first real counter behavior
-is observed), then resolve the principal link and issue through the
-existing session path — the same issuance an OIDC login reaches:
+Landed: `webauthnAssertionOptions` and `credentialFromAssertion` in
+`packages/cloudflare/src/webauthn.ts`, backed by internal DO routes
+`/webauthn-assertion-challenge` (mint/read) and
+`/webauthn-assertion-complete` (consume + counter advance in one
+transaction), schema v6 `webauthn_assertion_challenges`, and the shared
+`packages/cloudflare/src/webauthn/verify.ts` (strict DER-to-raw ECDSA,
+RS256 JWK import, one crypto.subtle call). Challenges are bound at mint
+to the host's origin and RP id, so an assertion cannot be replayed in
+another context; the reward for a verified assertion is the ordinary
+`accessFromEvidence` issuance, so disabled actors and revoked
+participation behave exactly as they do for a federated login.
 
-- a disabled actor is refused at issuance exactly as a federated login;
-  a revoked participation behaves as today;
-- the uniform refusal discipline carries over: enumeration-resistant
-  failures for unknown credentials.
+Recorded decisions:
+
+- **Discoverable credentials are required** (`residentKey: "required"`,
+  `requireResidentKey: true`): login is usernameless, so the
+  authenticator holds the user handle and the host never offers an
+  `allowCredentials` list it does not have.
+- **Counter tolerance:** zero counters are accepted forever (the synced
+  passkey signal); a stored nonzero counter must strictly advance. A
+  regression is refused, not logged.
+- The stored key JSON is parsed by name at the assertion boundary; a
+  credential row without its `(webauthn, credential id)` link is
+  unusable, so an operator-stored key is not a second login path.
+
+Also fixed here: the organization restore accepted only schemas 1–3 or
+the current version, so a schema-4 or -5 export would have been refused
+after the v5 bump. The supported set is now every schema the coordinator
+has shipped, pinned by `restore-matrix.test.ts`.
+
+The public surface is the two RPC methods on the service binding, beside
+the registration pair; the host never holds a signing key or a link.
 
 **Done when:** enrollment → logout → assertion login → issued envelope
 works end to end, a wrong-origin assertion is refused, and counter
 regression is refused or logged per the recorded tolerance.
-**Evidence:** Cloudflare suite assertion tests plus one end-to-end test
-driving both routes.
+**Evidence:** `packages/cloudflare/test/webauthn-assertion.test.ts`
+(mint/rotation, end-to-end claim → registration → assertion → verified
+envelope, replay, wrong origin/RP, tamper, unknown credential, counter
+rule, linkless credential). The registration suite also pins the DER
+packed signature and the new options shape.
 
 ## Phase 5 — docs, relay, tag
 

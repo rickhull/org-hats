@@ -105,6 +105,7 @@ export const organizationTables: readonly TableSpec[] = [
   { name: "claims", columns: ["idempotency_key", "payload", "created_at"], orderBy: "idempotency_key" },
   { name: "outbox", columns: ["id", "kind", "target", "payload", "created_at", "delivered_at"], orderBy: "id" },
   { name: "credentials", columns: ["credential_id", "actor_id", "alg", "key_json", "sign_count", "backup_eligible", "backed_up", "created_at", "updated_at"], orderBy: "credential_id" },
+  { name: "webauthn_assertion_challenges", columns: ["challenge", "rp_id", "origin", "created_at", "expires_at", "consumed_at"], orderBy: "challenge" },
 ];
 
 /** The operation's own facts. The `org_actors` projection is deliberately

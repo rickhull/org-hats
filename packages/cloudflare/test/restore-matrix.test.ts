@@ -266,6 +266,28 @@ describe("the restore matrix", () => {
     expect(withoutRestoreAudit(await exportCoordinator("organization", targetOrganization))).toEqual(sourceOrganization);
   }, 60_000);
 
+  it("restores every shipped organization schema", async () => {
+    const world = await createCloudflareConformanceWorld(env);
+    const source = await exportCoordinator("organization", "org-4c1f9a2e");
+
+    // schema 4 added credentials; schema 5 added the registration challenge
+    // column; schema 6 adds the assertion-challenge table. A snapshot taken
+    // between those steps must still restore: the supported set is every
+    // version this coordinator has shipped, not only the current one.
+    for (const version of ["4", "5"]) {
+      const tables = { ...source.tables };
+      delete tables["webauthn_assertion_challenges"];
+      if (version === "4") delete tables["credentials"];
+      const target = `org-restore-shipped-${version}`;
+      const restored = await restore("organization", target, { ...source, schemaVersion: version, tables });
+      expect(restored.status, version).toBe(200);
+      expect(restored.body.ok, version).toBe(true);
+      const after = await exportCoordinator("organization", target);
+      expect(after.schemaVersion, version).toBe("6");
+      expect(after.tables["actors"]).toHaveLength(source.tables["actors"]?.length ?? 0);
+    }
+  }, 60_000);
+
   it("refuses a future schema version for both coordinators", async () => {
     const world = await createCloudflareConformanceWorld(env);
     const operationSnapshot = await exportCoordinator("operation", "op-9f2e6ad4");
@@ -288,7 +310,7 @@ describe("the restore matrix", () => {
     const futureOrganization = await restore(
       "organization",
       "org-restore-matrix-future",
-      { ...organizationSnapshot, schemaVersion: "6" },
+      { ...organizationSnapshot, schemaVersion: "7" },
     );
     expect(futureOrganization.body.failure?.kind).toBe("invalid-command");
   }, 60_000);

@@ -65,6 +65,18 @@ export interface OrganizationRouteHost {
     readonly backupEligible: boolean;
     readonly backedUp: boolean;
   }): Result<unknown>;
+  webauthnAssertionChallenge(input: {
+    readonly rpId: string;
+    readonly expectedOrigin: string;
+  }): Result<unknown>;
+  webauthnAssertionChallengeOf(challenge: string): Result<unknown>;
+  webauthnAssertionComplete(input: {
+    readonly challenge: string;
+    readonly credentialId: string;
+    readonly signCount: number;
+    readonly backupEligible: boolean;
+    readonly backedUp: boolean;
+  }): Result<unknown>;
   credentialFor(credentialId: string): Result<unknown>;
   updateCredentialCounter(credentialId: string, signCount: number): Result<unknown>;
   forgetOperation(operationId: string): Result<unknown>;
@@ -249,6 +261,29 @@ export const handleOrganizationRequest = async (
         signCount: asWholeNumber(body["signCount"] ?? 0, "signCount"),
         backupEligible: body["backupEligible"] === true,
         backedUp: body["backedUp"] === true,
+      }));
+    }
+
+    if (request.method === "POST" && url.pathname === "/webauthn-assertion-challenge") {
+      const body = await readBody(request);
+      return json(host.webauthnAssertionChallenge({
+        rpId: asString(body["rpId"], "rpId"),
+        expectedOrigin: asString(body["expectedOrigin"], "expectedOrigin"),
+      }));
+    }
+    if (request.method === "GET" && url.pathname === "/webauthn-assertion-challenge") {
+      return json(host.webauthnAssertionChallengeOf(asString(url.searchParams.get("challenge"), "challenge")));
+    }
+    if (request.method === "POST" && url.pathname === "/webauthn-assertion-complete") {
+      // the assertion is already verified by the caller; this is the atomic
+      // consume + counter advance inside one transaction
+      const body = await readBody(request);
+      return json(host.webauthnAssertionComplete({
+        challenge: asString(body["challenge"], "challenge"),
+        credentialId: asString(body["credentialId"], "credentialId"),
+        signCount: asWholeNumber(body["signCount"], "signCount"),
+        backupEligible: asBoolean(body["backupEligible"] ?? false, "backupEligible"),
+        backedUp: asBoolean(body["backedUp"] ?? false, "backedUp"),
       }));
     }
 

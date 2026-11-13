@@ -43,7 +43,7 @@ describe("credential storage", () => {
     expect(stored.body.ok).toBe(true);
 
     const snapshot = await exported(source);
-    expect(snapshot.schemaVersion).toBe("5");
+    expect(snapshot.schemaVersion).toBe("6");
     expect(snapshot.tables.credentials?.length).toBe(1);
     expect(snapshot.tables.credentials?.[0]?.["credential_id"]).toBe("cred-1");
 

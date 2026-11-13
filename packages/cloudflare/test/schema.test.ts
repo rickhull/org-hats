@@ -34,6 +34,7 @@ describe("the schema migration chain", () => {
       ["3", "display-short-name"],
       ["4", "credentials"],
       ["5", "webauthn-challenge"],
+      ["6", "webauthn-assertion-challenges"],
     ]);
     expect(operationMigrations.map(({ version, name }) => [version, name])).toEqual([
       ["3", "refresh-authentication-facts"],

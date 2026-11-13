@@ -251,6 +251,26 @@ export const evidenceFromProviderCode = async (
   };
 };
 
+/** The organization directory the runtime may consult for evidence
+ * resolution: the configured list, trimmed, with empty entries dropped. */
+export const organizationDirectory = (env: Env): readonly string[] =>
+  (env.AUTHORITY_ORGANIZATION_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+
+/** The worker's runtime, built from its configuration: the signer, the
+ * verification key set, and the organization directory. */
+export const runtimeFor = async (env: Env): Promise<AuthorityRuntime> => {
+  const signer = await signerFor(env);
+  return createCloudflareRuntime({
+    env,
+    signer,
+    keys: await verificationKeys(env, signer),
+    organizationIds: organizationDirectory(env),
+  });
+};
+
 export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): AuthorityRuntime => {
   const { env, signer, keys, organizationIds } = options;
   const organization = (organizationId: string): DurableObjectStub =>

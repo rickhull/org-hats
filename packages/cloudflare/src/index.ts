@@ -23,23 +23,28 @@ import {
 } from "org-hats/authority";
 import type { Env } from "./env";
 import {
-  createCloudflareRuntime,
   evidenceFromProviderCode,
+  organizationDirectory,
+  runtimeFor,
   serializedVerificationKeys,
   signerFor,
-  verificationKeys,
-  type CloudflareSigner,
 } from "./runtime";
 import type { EvidenceFromProviderCodeInput, EvidenceFromProviderCodeResult } from "./exchange";
 import {
+  credentialFromAssertion,
   credentialFromRegistration,
+  webauthnAssertionOptions,
   webauthnRegistrationOptions,
+  type CredentialFromAssertionInput,
+  type CredentialFromAssertionResult,
   type CredentialFromRegistrationInput,
   type CredentialFromRegistrationResult,
+  type WebauthnAssertionOptionsInput,
+  type WebauthnAssertionOptionsResult,
   type WebauthnRegistrationOptionsInput,
   type WebauthnRegistrationOptionsResult,
 } from "./webauthn";
-import { base64UrlEncode, utf8, verify, type Failed, type VerifyKey } from "org-hats/access";
+import { base64UrlEncode, utf8, verify, type Failed } from "org-hats/access";
 import { CONFORMANCE_PRINCIPALS, type ConformanceWorld } from "org-hats/conformance";
 import { createCloudflareConformanceWorld } from "./conformance";
 import { subjectGuardName } from "./subject-guard";
@@ -50,25 +55,7 @@ export { OrganizationAuthority } from "./organization";
 export { OperationAuthority } from "./operation";
 export { PrincipalSubjectGuard } from "./subject-guard";
 
-const keysFor = async (env: Env, signer: CloudflareSigner): Promise<ReadonlyMap<string, VerifyKey>> =>
-  verificationKeys(env, signer);
-
-const organizationDirectory = (env: Env): readonly string[] =>
-  (env.AUTHORITY_ORGANIZATION_IDS ?? "")
-    .split(",")
-    .map((id) => id.trim())
-    .filter((id) => id.length > 0);
-
-const runtime = async (env: Env): Promise<AuthorityRuntime> => {
-  const organizationIds = organizationDirectory(env);
-  const signer = await signerFor(env);
-  return createCloudflareRuntime({
-    env,
-    signer,
-    keys: await keysFor(env, signer),
-    organizationIds,
-  });
-};
+const runtime = runtimeFor;
 
 const opsAuthorized = (request: Request, env: Env): boolean => {
   const token = env.OPS_TOKEN;
@@ -167,6 +154,17 @@ export class AuthorityRuntimeEntrypoint extends WorkerEntrypoint<Env> implements
    * coordinator, under the strict any-link guard. */
   credentialFromRegistration(input: CredentialFromRegistrationInput): Promise<CredentialFromRegistrationResult> {
     return credentialFromRegistration(this.env, input);
+  }
+  /** Mint a single-use assertion challenge bound to the host's origin and
+   * relying-party id; the same unauthenticated surface with no user handle. */
+  webauthnAssertionOptions(input: WebauthnAssertionOptionsInput): Promise<WebauthnAssertionOptionsResult> {
+    return webauthnAssertionOptions(this.env, input);
+  }
+  /** Verify a passkey assertion against the stored key, consume the
+   * challenge, advance the counter, and issue through the session path a
+   * federated login reaches. */
+  credentialFromAssertion(input: CredentialFromAssertionInput): Promise<CredentialFromAssertionResult> {
+    return credentialFromAssertion(this.env, input);
   }
   refresh(input: RefreshInput): Promise<AccessIssue | Failed> {
     return runtime(this.env).then((value) => value.refresh(input));
