@@ -225,6 +225,75 @@ and the binding smoke are separate acceptance acts, not deploy steps. They
 are documented in [binding-conformance.md](binding-conformance.md) and
 [migration-v2.md](migration-v2.md).
 
+## Local credentials (passkeys)
+
+The runtime's passkey helper is the WebAuthn surface beside the OIDC code
+exchange. It is runtime surface, not the portable seam: a local credential
+is an ordinary principal link, `(provider: "webauthn", subject: credential
+id)`, and assertion evidence enters the same issuance path as any other.
+The host owns the browser ceremony — prompts, conditional mediation,
+cookies — and holds no signing key. The design decisions are normative in
+[authority_redesign.md](authority_redesign.md#local-credentials-passkeys--design-decisions).
+
+Four RPC methods on the `AuthorityRuntimeEntrypoint` service binding carry
+the ceremonies. The activation secret is the same SHA-256 hex digest every
+other activation route takes, never the plaintext.
+
+- `webauthnRegistrationOptions({ interfaceVersion, organizationId,
+  secretHash, rpId })` mints the ceremony options against a live activation
+  request. The challenge rotates on every call, so a stale options page
+  cannot satisfy a later registration. `rp.id` is the relying-party id the
+  host serves and is minted into the options; `residentKey: "required"`
+  makes the credential discoverable, `attestation: "none"` states that no
+  attestation is requested, and the only offered algorithm is ES256.
+- `credentialFromRegistration({ interfaceVersion, organizationId,
+  secretHash, rpId, expectedOrigin, credential: { response:
+  { attestationObject, clientDataJSON } } })` verifies the browser's
+  registration response (ceremony type and challenge, origin, RP-id hash,
+  user presence, attestation when present) and commits the link,
+  credential, and activation consume in one transaction. The strict claim
+  guard is unchanged: an actor holding any link cannot gain a second
+  credential through a claim; a second credential is an operator act
+  through `/ops/organization/principal-link`.
+- `webauthnAssertionOptions({ interfaceVersion, organizationId, rpId,
+  expectedOrigin })` mints a single-use challenge bound to that origin and
+  RP id. Feed it to `navigator.credentials.get` with no
+  `allowCredentials` list: login is usernameless and the credential is
+  discoverable.
+- `credentialFromAssertion({ interfaceVersion, organizationId,
+  operationId, credentialId, response: { authenticatorData,
+  clientDataJSON, signature } })` verifies the assertion against the
+  stored key, consumes the challenge, advances the sign counter, and
+  issues `{ envelope, refresh }` through the ordinary session path.
+  Evidence is `provider: "webauthn"`, `subject: <credential id>`,
+  `amr: ["webauthn"]`, with the verification instant as `auth_time`.
+  Issuance is the same gate a federated login reaches: a disabled actor is
+  `not-admitted`, and a revoked participation behaves as it does today.
+
+Refusals after a well-formed ceremony are uniform: unknown credential,
+unknown or spent challenge, origin or RP mismatch, a signature that does
+not verify, a credential with no principal link, and a counter regression
+are all `unauthenticated`, so the surface does not enumerate credentials.
+Two counter rules are deliberate: a zero counter is accepted forever (the
+synced-passkey signal), and a stored nonzero counter must strictly
+advance — a regression is refused, not logged.
+
+Two preconditions travel with the surface. **The relying-party id is the
+zone apex**, so one credential works at every operation hostname, including
+hostnames that did not exist at enrollment; that requires **zone purity** —
+the deployment must control every subdomain of the zone, because a
+subdomain can request the parent id. A zone the deployment does not fully
+control must not use apex-scoped credentials. And **attestation is handled,
+never required**: `none` and packed self-attestation parse and verify, but
+no trust path, format, or authenticator model is demanded.
+
+Credentials are organization-owned facts (schema version 6 adds the
+credential and assertion-challenge tables). They are carried by
+`/ops/export` and `/ops/restore` — every shipped schema restores — survive
+an operation delete and `forget-operation` untouched, and are removed by
+`unlink-principal` as part of the documented identity reset. Recovery is
+the working order: unlink, re-mint, accept.
+
 ## Operations routes
 
 `/ops/*` is authenticated by `OPS_TOKEN` as a bearer token, except the
@@ -244,7 +313,8 @@ public key distribution:
 - `POST /ops/organization/revoke-activation` — revoke an actor's outstanding
   activation without disabling the actor
 - `POST /ops/organization/unlink-principal` — emergency principal recovery;
-  remove the actor's links and revoke refresh authority without removing grants
+  remove the actor's links and stored passkeys and revoke refresh authority
+  without removing grants
 - `POST /ops/operation/routing-facts` — `{ operationId, slug, sites }`,
   backfilling the operation's complete routing facts; a rename waits for
   history and is not this route's job
