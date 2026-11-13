@@ -2,7 +2,7 @@
 
 import { ensureColumn, initializeSchema, type SchemaMigration } from "./sql";
 
-export const OPERATION_SCHEMA_VERSION = "7";
+export const OPERATION_SCHEMA_VERSION = "8";
 
 const TABLES: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS operation (
@@ -111,6 +111,14 @@ const TABLES: readonly string[] = [
     created_at INTEGER NOT NULL,
     delivered_at INTEGER
   )`,
+  `CREATE TABLE IF NOT EXISTS webauthn_assertion_challenges (
+    challenge TEXT PRIMARY KEY,
+    rp_id TEXT NOT NULL,
+    origin TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    consumed_at INTEGER
+  )`,
 ];
 
 export const operationMigrations: readonly SchemaMigration[] = [
@@ -147,6 +155,20 @@ export const operationMigrations: readonly SchemaMigration[] = [
     version: "7",
     name: "team-short-name",
     apply: (sql) => ensureColumn(sql, "teams", "short_name", "TEXT"),
+  },
+  {
+    version: "8",
+    name: "webauthn-assertion-challenges",
+    apply: (sql) => sql.exec(
+      `CREATE TABLE IF NOT EXISTS webauthn_assertion_challenges (
+        challenge TEXT PRIMARY KEY,
+        rp_id TEXT NOT NULL,
+        origin TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        consumed_at INTEGER
+      )`,
+    ),
   },
 ];
 

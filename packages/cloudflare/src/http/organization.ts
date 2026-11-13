@@ -65,13 +65,8 @@ export interface OrganizationRouteHost {
     readonly backupEligible: boolean;
     readonly backedUp: boolean;
   }): Result<unknown>;
-  webauthnAssertionChallenge(input: {
-    readonly rpId: string;
-    readonly expectedOrigin: string;
-  }): Result<unknown>;
-  webauthnAssertionChallengeOf(challenge: string): Result<unknown>;
-  webauthnAssertionComplete(input: {
-    readonly challenge: string;
+  activationOrganization(secretHash: string): Result<unknown>;
+  webauthnCredentialAdvance(input: {
     readonly credentialId: string;
     readonly signCount: number;
     readonly backupEligible: boolean;
@@ -264,22 +259,14 @@ export const handleOrganizationRequest = async (
       }));
     }
 
-    if (request.method === "POST" && url.pathname === "/webauthn-assertion-challenge") {
-      const body = await readBody(request);
-      return json(host.webauthnAssertionChallenge({
-        rpId: asString(body["rpId"], "rpId"),
-        expectedOrigin: asString(body["expectedOrigin"], "expectedOrigin"),
-      }));
+    if (request.method === "GET" && url.pathname === "/activation-organization") {
+      return json(host.activationOrganization(asString(url.searchParams.get("secretHash"), "secretHash")));
     }
-    if (request.method === "GET" && url.pathname === "/webauthn-assertion-challenge") {
-      return json(host.webauthnAssertionChallengeOf(asString(url.searchParams.get("challenge"), "challenge")));
-    }
-    if (request.method === "POST" && url.pathname === "/webauthn-assertion-complete") {
-      // the assertion is already verified by the caller; this is the atomic
-      // consume + counter advance inside one transaction
+    if (request.method === "POST" && url.pathname === "/webauthn-credential-advance") {
+      // the challenge was consumed in the operation; this is the organization's
+      // half: re-read the counter and advance it under the recorded tolerance
       const body = await readBody(request);
-      return json(host.webauthnAssertionComplete({
-        challenge: asString(body["challenge"], "challenge"),
+      return json(host.webauthnCredentialAdvance({
         credentialId: asString(body["credentialId"], "credentialId"),
         signCount: asWholeNumber(body["signCount"], "signCount"),
         backupEligible: asBoolean(body["backupEligible"] ?? false, "backupEligible"),

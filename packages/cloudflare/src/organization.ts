@@ -19,7 +19,6 @@ import { initializeOrganizationSchema, ORGANIZATION_SCHEMA_VERSION } from "./sch
 import { base64UrlEncode } from "org-hats/access";
 import { displayLabelFailure, identifierFailure } from "./validation";
 import { handleOrganizationRequest } from "./http/organization";
-import { WEBAUTHN_CEREMONY_LIFETIME_SECONDS } from "./webauthn/constants";
 
 /** One organization authority. The object owns the facts that stay stable
  * while the organization participates in several operations: actors,
@@ -1272,55 +1271,34 @@ export class OrganizationAuthority extends DurableObject<Env> {
     });
   }
 
-  /** Mint a single-use assertion challenge bound to the host's origin and
-   * relying-party id. Binding at mint means the assertion cannot be replayed
-   * at a different origin, and the challenge's consumption is the replay
-   * control. Expired rows are pruned here rather than by an alarm: this is
-   * the only writer. */
-  private webauthnAssertionChallenge(input: {
-    readonly rpId: string;
-    readonly expectedOrigin: string;
-  }): Result<{ readonly challenge: string; readonly rpId: string }> {
+  /** Resolve the organization that holds a usable activation request for a
+   * secret digest. The WebAuthn surface no longer takes a host-supplied
+   * organization id; the runtime scans its directory and calls this on each
+   * candidate, exactly as the activation methods already resolve a claim.
+   * Uniform refusal: nothing about the request's state is enumerable. */
+  private activationOrganization(secretHash: string): Result<{ readonly organizationId: string }> {
     const at = now();
-    const challenge = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
-    return this.ctx.storage.transactionSync(() => {
-      this.ctx.storage.sql.exec("DELETE FROM webauthn_assertion_challenges WHERE expires_at < ?", at);
-      this.ctx.storage.sql.exec(
-        "INSERT INTO webauthn_assertion_challenges (challenge, rp_id, origin, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-        challenge,
-        input.rpId,
-        input.expectedOrigin,
-        at,
-        at + WEBAUTHN_CEREMONY_LIFETIME_SECONDS,
-      );
-      return value({ challenge, rpId: input.rpId });
-    });
-  }
-
-  /** Read the ceremony's bound context without consuming it. Verification
-   * happens outside the Durable Object; consumption is the atomic act below.
-   * The refusal is uniform: nothing about a challenge's state is enumerable. */
-  private webauthnAssertionChallengeOf(challenge: string): Result<{
-    readonly rpId: string;
-    readonly origin: string;
-  }> {
-    const row = this.one(
-      "SELECT rp_id, origin, consumed_at, expires_at FROM webauthn_assertion_challenges WHERE challenge = ?",
-      challenge,
+    const request = this.one(
+      "SELECT actor_id, consumed_at, revoked_at, expires_at FROM activation_requests WHERE secret_hash = ?",
+      secretHash,
     );
-    if (row === undefined || row["consumed_at"] !== null || now() >= Number(row["expires_at"])) {
-      return failure("unauthenticated", "the ceremony is not usable");
-    }
-    return value({ rpId: String(row["rp_id"]), origin: String(row["origin"]) });
+    if (
+      request === undefined || request["consumed_at"] !== null ||
+      request["revoked_at"] !== null || at >= Number(request["expires_at"])
+    ) return failure("unauthenticated", "activation is not usable");
+    const actor = this.actor(String(request["actor_id"]));
+    if (actor === undefined || actor.disabled) return failure("unauthenticated", "activation is not usable");
+    const organizationId = this.organizationId();
+    if (organizationId === undefined) return failure("unavailable", "organization is not bootstrapped");
+    return value({ organizationId });
   }
 
-  /** The atomic end of an assertion: consume the challenge and advance the
-   * stored counter together, re-reading the counter under the transaction so
-   * two concurrent assertions cannot both pass the verifier's earlier read.
-   * A credential must still be linked to the actor it was stored for; a row
-   * without its link is unusable, not a second login path. */
-  private webauthnAssertionComplete(input: {
-    readonly challenge: string;
+  /** The organization's half of an assertion: the challenge was consumed in
+   * the operation coordinator, and this advances the stored counter with the
+   * recorded tolerance — zero forever, otherwise strictly increasing. The
+   * read and the update share one transaction so two concurrent assertions
+   * cannot both pass; a credential without its link is unusable. */
+  private webauthnCredentialAdvance(input: {
     readonly credentialId: string;
     readonly signCount: number;
     readonly backupEligible: boolean;
@@ -1331,13 +1309,6 @@ export class OrganizationAuthority extends DurableObject<Env> {
     }
     const at = now();
     return this.ctx.storage.transactionSync(() => {
-      const ceremony = this.one(
-        "SELECT consumed_at, expires_at FROM webauthn_assertion_challenges WHERE challenge = ?",
-        input.challenge,
-      );
-      if (ceremony === undefined || ceremony["consumed_at"] !== null || at >= Number(ceremony["expires_at"])) {
-        return failure("unauthenticated", "the ceremony is not usable");
-      }
       const credential = this.one(
         "SELECT actor_id, sign_count FROM credentials WHERE credential_id = ?",
         input.credentialId,
@@ -1352,17 +1323,10 @@ export class OrganizationAuthority extends DurableObject<Env> {
       ) {
         return failure("unauthenticated", "the credential is not usable");
       }
-      // a synced passkey reports zero forever; a counter that was ever
-      // nonzero must advance (the recorded tolerance decision)
       const stored = Number(credential["sign_count"]);
       if (!(input.signCount > stored || (stored === 0 && input.signCount === 0))) {
         return failure("unauthenticated", "the ceremony's counter does not advance");
       }
-      this.ctx.storage.sql.exec(
-        "UPDATE webauthn_assertion_challenges SET consumed_at = ? WHERE challenge = ?",
-        at,
-        input.challenge,
-      );
       this.ctx.storage.sql.exec(
         "UPDATE credentials SET sign_count = ?, backup_eligible = ?, backed_up = ?, updated_at = ? WHERE credential_id = ?",
         input.signCount,
@@ -1509,9 +1473,8 @@ export class OrganizationAuthority extends DurableObject<Env> {
       webauthnChallenge: (secretHash) => this.webauthnChallenge(secretHash),
       webauthnChallengeOf: (secretHash) => this.webauthnChallengeOf(secretHash),
       webauthnRegister: (input) => this.webauthnRegister(input),
-      webauthnAssertionChallenge: (input) => this.webauthnAssertionChallenge(input),
-      webauthnAssertionChallengeOf: (challenge) => this.webauthnAssertionChallengeOf(challenge),
-      webauthnAssertionComplete: (input) => this.webauthnAssertionComplete(input),
+      activationOrganization: (secretHash) => this.activationOrganization(secretHash),
+      webauthnCredentialAdvance: (input) => this.webauthnCredentialAdvance(input),
       restoreSnapshot: (input, operatorId) => this.restoreSnapshot(input, operatorId),
       auditRows: () => this.auditRows(),
       outboxRows: () => this.outboxRows(),

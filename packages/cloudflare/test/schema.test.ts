@@ -35,6 +35,7 @@ describe("the schema migration chain", () => {
       ["4", "credentials"],
       ["5", "webauthn-challenge"],
       ["6", "webauthn-assertion-challenges"],
+      ["7", "webauthn-assertion-challenge-moves-to-operation"],
     ]);
     expect(operationMigrations.map(({ version, name }) => [version, name])).toEqual([
       ["3", "refresh-authentication-facts"],
@@ -42,6 +43,7 @@ describe("the schema migration chain", () => {
       ["5", "team-status"],
       ["6", "display-short-name"],
       ["7", "team-short-name"],
+      ["8", "webauthn-assertion-challenges"],
     ]);
     expect(organizationMigrations.at(-1)?.version).toBe(ORGANIZATION_SCHEMA_VERSION);
     expect(operationMigrations.at(-1)?.version).toBe(OPERATION_SCHEMA_VERSION);

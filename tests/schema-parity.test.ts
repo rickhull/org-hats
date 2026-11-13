@@ -30,7 +30,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
  * state.ts. */
 const NOT_EXPORTED: Readonly<Record<"organization" | "operation", readonly string[]>> = {
   // `meta` holds the schema version marker, not state; restore re-applies it.
-  organization: ["meta"],
+  // `webauthn_assertion_challenges` is created by the schema-6 migration and
+  // dropped by schema 7 when the challenge moved to the operation; it is not
+  // organization export state at any restorable version.
+  organization: ["meta", "webauthn_assertion_challenges"],
   // `meta` as above; `org_actors` is a projection rebuilt from the
   // organizations — a snapshot that carried it would restore a stale roster
   // as authority (see state.ts).
@@ -161,7 +164,7 @@ test("every coordinator table's schema equals its export spec", () => {
     }
     // Parser sanity: a reformat that hides the DDL from this guard must
     // fail it, not pass vacuously.
-    const minimum = coordinator === "organization" ? 11 : 11;
+    const minimum = coordinator === "organization" ? 10 : 12;
     if (ddl.size < minimum) {
       problems.push(`${files[coordinator]}: expected at least ${minimum} tables, parsed ${ddl.size}`);
     }
@@ -195,7 +198,7 @@ test("every coordinator table's schema equals its export spec", () => {
     }
   }
 
-  const expectedTables = { organization: 11, operation: 11 };
+  const expectedTables = { organization: 10, operation: 12 };
   for (const coordinator of ["organization", "operation"] as const) {
     if (specs[coordinator].size !== expectedTables[coordinator]) {
       problems.push(

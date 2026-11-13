@@ -2,7 +2,7 @@
 
 import { ensureColumn, initializeSchema, type SchemaMigration } from "./sql";
 
-export const ORGANIZATION_SCHEMA_VERSION = "6";
+export const ORGANIZATION_SCHEMA_VERSION = "7";
 
 const ACTIVATION_REQUESTS = `CREATE TABLE IF NOT EXISTS activation_requests (
   request_id TEXT PRIMARY KEY,
@@ -77,14 +77,6 @@ const TABLES: readonly string[] = [
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   )`,
-  `CREATE TABLE IF NOT EXISTS webauthn_assertion_challenges (
-    challenge TEXT PRIMARY KEY,
-    rp_id TEXT NOT NULL,
-    origin TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL,
-    consumed_at INTEGER
-  )`,
 ];
 
 export const organizationMigrations: readonly SchemaMigration[] = [
@@ -133,6 +125,13 @@ export const organizationMigrations: readonly SchemaMigration[] = [
         consumed_at INTEGER
       )`,
     ),
+  },
+  {
+    version: "7",
+    name: "webauthn-assertion-challenge-moves-to-operation",
+    // the challenge became operation-scoped when login turned usernameless;
+    // the organization keeps the credential and the counter, not the ceremony
+    apply: (sql) => sql.exec("DROP TABLE IF EXISTS webauthn_assertion_challenges"),
   },
 ];
 

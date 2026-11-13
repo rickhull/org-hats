@@ -103,7 +103,7 @@ describe("OrganizationAuthority", () => {
     expect(unknown.body.failure?.kind).toBe("unauthenticated");
 
     const status = await call<Record<string, unknown>>(stub, "GET", "/status");
-    expect(status.body.value?.["schemaVersion"]).toBe("6");
+    expect(status.body.value?.["schemaVersion"]).toBe("7");
     expect(status.body.value?.["organizationId"]).toBe("org/bootstrap");
     expect(status.body.value?.["actors"]).toBe(2);
     expect(status.body.value?.["hasSealedIdpConfig"]).toBe(true);

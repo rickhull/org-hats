@@ -125,7 +125,7 @@ describe("OperationAuthority", () => {
       schemaVersion: string;
       tables: { operation: Record<string, unknown>[]; sites: Record<string, unknown>[] };
     }>(current.op, "GET", "/export");
-    expect(exported.body.value?.schemaVersion).toBe("7");
+    expect(exported.body.value?.schemaVersion).toBe("8");
     expect(exported.body.value?.tables.operation[0]?.["slug"]).toBe("routing-op");
     expect(exported.body.value?.tables.sites[0]?.["path"]).toBe("site");
     const status = await call<{ routingFactsComplete: boolean }>(current.op, "GET", "/status");

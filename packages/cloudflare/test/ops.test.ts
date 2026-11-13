@@ -491,7 +491,7 @@ describe("typed ops routes", () => {
       schemaVersion: string;
       tables: Record<string, unknown[]>;
     };
-    expect(after.schemaVersion).toBe("6");
+    expect(after.schemaVersion).toBe("7");
     expect(after.tables["actors"]).toHaveLength(2);
     expect(after.tables["activation_requests"]).toEqual([]);
   });

@@ -236,43 +236,58 @@ cookies — and holds no signing key. The design decisions are normative in
 [authority_redesign.md](authority_redesign.md#local-credentials-passkeys--design-decisions).
 
 Four RPC methods on the `AuthorityRuntimeEntrypoint` service binding carry
-the ceremonies. The WebAuthn methods take the activation secret itself and
-hash it at the boundary with the same SHA-256 rule `activationAccept` and
-`activationInspect` use; the coordinator stores only the digest.
+the ceremonies. The host names the operation for login and the claim secret
+for enrollment; it never supplies an organization id. The WebAuthn methods
+take the activation secret itself and hash it at the boundary with the same
+SHA-256 rule `activationAccept` and `activationInspect` use; the coordinator
+stores only the digest.
 
-- `webauthnRegistrationOptions({ interfaceVersion, organizationId,
-  secret, rpId })` mints the ceremony options against a live activation
-  request. The challenge rotates on every call, so a stale options page
-  cannot satisfy a later registration. `rp.id` is the relying-party id the
-  host serves and is minted into the options; `residentKey: "required"`
+- `webauthnRegistrationOptions({ interfaceVersion, secret, rpId })` mints
+  the ceremony options against a live activation request. The runtime hashes
+  the secret and resolves the single matching organization across its
+  directory, as the activation methods already do; two matches are
+  `unavailable`. The challenge rotates on every call, so a stale options
+  page cannot satisfy a later registration. `rp.id` is the relying-party id
+  the host serves and is minted into the options; `residentKey: "required"`
   makes the credential discoverable, `attestation: "none"` states that no
   attestation is requested, and the only offered algorithm is ES256.
-- `credentialFromRegistration({ interfaceVersion, organizationId,
-  secret, rpId, expectedOrigin, credential: { response:
-  { attestationObject, clientDataJSON } } })` verifies the browser's
-  registration response (ceremony type and challenge, origin, RP-id hash,
-  user presence, attestation when present) and commits the link,
-  credential, and activation consume in one transaction. The strict claim
-  guard is unchanged: an actor holding any link cannot gain a second
-  credential through a claim. Adding a federated link to a passkey actor
-  is an ordinary `/ops/organization/principal-link` act; adding a passkey
-  to an already-linked actor requires the identity-reset recovery (unlink,
+- `credentialFromRegistration({ interfaceVersion, secret, rpId,
+  expectedOrigin, credential: { response: { attestationObject,
+  clientDataJSON } } })` resolves the same organization from the secret,
+  verifies the browser's registration response (ceremony type and
+  challenge, origin, RP-id hash, user presence, attestation when present),
+  and commits the link, credential, and activation consume in one
+  transaction. The strict claim guard is unchanged: an actor holding any
+  link cannot gain a second credential through a claim. Adding a federated
+  link to a passkey actor is an ordinary
+  `/ops/organization/principal-link` act; adding a passkey to an
+  already-linked actor requires the identity-reset recovery (unlink,
   enroll, re-link) — a direct per-actor enrollment ceremony is deferred
   with the per-link retire.
-- `webauthnAssertionOptions({ interfaceVersion, organizationId, rpId,
-  expectedOrigin })` mints a single-use challenge bound to that origin and
-  RP id. Feed it to `navigator.credentials.get` with no
-  `allowCredentials` list: login is usernameless and the credential is
-  discoverable.
-- `credentialFromAssertion({ interfaceVersion, organizationId,
-  operationId, credentialId, response: { authenticatorData,
-  clientDataJSON, signature } })` verifies the assertion against the
-  stored key, consumes the challenge, advances the sign counter, and
-  issues `{ envelope, refresh }` through the ordinary session path.
-  Evidence is `provider: "webauthn"`, `subject: <credential id>`,
-  `amr: ["webauthn"]`, with the verification instant as `auth_time`.
-  Issuance is the same gate a federated login reaches: a disabled actor is
-  `not-admitted`, and a revoked participation behaves as it does today.
+- `webauthnAssertionOptions({ interfaceVersion, operationId, rpId,
+  expectedOrigin })` mints a single-use challenge in the **operation**
+  coordinator, bound to that operation, origin, and RP id. The operation is
+  what a host knows before a session exists; the organization is not
+  resolved until the browser returns a credential. Feed it to
+  `navigator.credentials.get` with no `allowCredentials` list: login is
+  usernameless and the credential is discoverable.
+- `credentialFromAssertion({ interfaceVersion, operationId, credentialId,
+  response: { authenticatorData, clientDataJSON, signature } })` resolves
+  the credential id across the organization directory (two matches are
+  `unavailable`), verifies the assertion against the stored key, consumes
+  the challenge in the operation, advances the sign counter at the owning
+  organization, and issues `{ envelope, refresh }` through the ordinary
+  session path. Evidence is `provider: "webauthn"`,
+  `subject: <credential id>`, `amr: ["webauthn"]`, with the verification
+  instant as `auth_time`. Issuance is the same gate a federated login
+  reaches: a disabled actor is `not-admitted`, and a revoked participation
+  behaves as it does today.
+
+Challenge consumption and counter advancement are separate coordinator
+acts. The operation's consume is the replay control; the organization's
+counter update is a compare-and-set, so two concurrent assertions cannot
+both advance, and a failure between the two is a failed login rather than
+a replay window.
 
 Refusals after a well-formed ceremony are uniform: unknown credential,
 unknown or spent challenge, origin or RP mismatch, a signature that does
@@ -291,12 +306,14 @@ control must not use apex-scoped credentials. And **attestation is handled,
 never required**: `none` and packed self-attestation parse and verify, but
 no trust path, format, or authenticator model is demanded.
 
-Credentials are organization-owned facts (schema version 6 adds the
-credential and assertion-challenge tables). They are carried by
-`/ops/export` and `/ops/restore` — every shipped schema restores — survive
-an operation delete and `forget-operation` untouched, and are removed by
-`unlink-principal` as part of the documented identity reset. Recovery is
-the working order: unlink, re-mint, accept.
+Credentials are organization-owned facts (organization schema 7 keeps the
+credential table; the transient assertion-challenge table of schema 6 was
+dropped when the challenge moved to the operation, whose schema 8 now holds
+it). Both are carried by `/ops/export` and `/ops/restore` — every shipped
+schema restores — credentials survive an operation delete and
+`forget-operation` untouched, and are removed by `unlink-principal` as part
+of the documented identity reset. Recovery is the working order: unlink,
+re-mint, accept.
 
 ## Operations routes
 

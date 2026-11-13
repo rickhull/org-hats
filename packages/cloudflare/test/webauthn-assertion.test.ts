@@ -31,6 +31,7 @@ const ORIGIN = "https://app.example.test";
 const RP_ID = "example.test";
 const OPERATION = "op-9f2e6ad4";
 const DANA_ORG = "org-4c1f9a2e";
+const NORTH_ORG = "org-2b7c41de"; // the conformance world's second organization
 const DANA = CONFORMANCE_PRINCIPALS.dana.actorId;
 
 const org = (id: string) => env.ORGANIZATION.get(env.ORGANIZATION.idFromName(id));
@@ -166,40 +167,41 @@ const assertion = async (
   };
 };
 
-/** A fresh organization with an unlinked crew actor and a live claim. */
-const claimOrg = async (suffix: string): Promise<{ organizationId: string; secret: string }> => {
-  const organizationId = `org-assert-${suffix}`;
-  await call(org(organizationId), "POST", "/bootstrap", {
-    ...organizationBootstrap(organizationId),
-    principalLinks: [{ provider: "idp", subject: "lead", actorId: LEAD }],
+/** Reset the conformance world, unlink Dana (the documented identity
+ * reset), and mint a fresh claim so a passkey can be enrolled for her. */
+const prepare = async (suffix: string): Promise<{ secret: string; operationId: string }> => {
+  await createCloudflareConformanceWorld(env);
+  const danaOrg = env.ORGANIZATION.get(env.ORGANIZATION.idFromName(DANA_ORG));
+  const unlinked = await call(danaOrg, "POST", "/unlink-principal", {
+    actorId: DANA, byActorId: DANA, idempotencyKey: `assert-unlink-${suffix}`,
   });
+  expect(unlinked.body.ok).toBe(true);
   const secret = `secret-${suffix}`;
-  const secretHash = secretHashOf(secret);
-  const minted = await call(org(organizationId), "POST", "/activation-request", {
-    actorId: CREW, byActorId: LEAD, secretHash,
+  const minted = await call(danaOrg, "POST", "/activation-request", {
+    actorId: DANA, byActorId: DANA, secretHash: secretHashOf(secret),
   });
   expect(minted.body.ok).toBe(true);
-  return { organizationId, secret };
+  return { secret, operationId: OPERATION };
 };
 
-/** Enroll `key` for `actorId` through the claim, returning the stored key. */
-const enrolled = async (
-  input: { readonly organizationId: string; readonly secret: string },
-  key: Passkey,
-  signCount = 0,
-): Promise<void> => {
-  const options = await webauthnRegistrationOptions(testEnv, {
+/** The runtime's organization directory, as a deployment configures it. The
+ * WebAuthn surface resolves organizations from this list, never from a
+ * host-supplied id. */
+const directoryFor = (...ids: string[]): Env =>
+  ({ ...env, AUTHORITY_ORGANIZATION_IDS: ids.join(",") }) as Env;
+
+/** Enroll `key` for Dana through the claim. */
+const enrolled = async (secret: string, key: Passkey, signCount = 0): Promise<void> => {
+  const options = await webauthnRegistrationOptions(directoryFor(DANA_ORG), {
     interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-    organizationId: input.organizationId,
-    secret: input.secret,
+    secret,
     rpId: RP_ID,
   });
   if (!options.ok) throw new Error(`registration options failed: ${options.failure.kind}`);
   const ceremony = await registration(options, key, signCount);
-  const registered = await credentialFromRegistration(testEnv, {
+  const registered = await credentialFromRegistration(directoryFor(DANA_ORG), {
     interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-    organizationId: input.organizationId,
-    secret: input.secret,
+    secret,
     rpId: RP_ID,
     expectedOrigin: ORIGIN,
     credential: { response: ceremony },
@@ -207,85 +209,50 @@ const enrolled = async (
   if (!registered.ok) throw new Error(`registration failed: ${registered.failure.kind}`);
 };
 
-/** The runtime's evidence directory must name the organization, as a
- * deployment does; without it issuance cannot resolve the principal link. */
-const directoryFor = (organizationId: string): Env =>
-  ({ ...env, AUTHORITY_ORGANIZATION_IDS: organizationId }) as Env;
+const assertionOptions = async (directory: Env = directoryFor(DANA_ORG)) =>
+  webauthnAssertionOptions(directory, {
+    interfaceVersion: AUTHORITY_INTERFACE_VERSION,
+    operationId: OPERATION,
+    rpId: RP_ID,
+    expectedOrigin: ORIGIN,
+  });
 
 const assertLogin = async (input: {
-  readonly organizationId: string;
-  readonly operationId?: string;
   readonly credentialId: string;
   readonly response: { authenticatorData: string; clientDataJSON: string; signature: string };
-}) => credentialFromAssertion(directoryFor(input.organizationId), {
+  readonly directory?: Env;
+}) => credentialFromAssertion(input.directory ?? directoryFor(DANA_ORG), {
   interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-  organizationId: input.organizationId,
-  operationId: input.operationId ?? "op-not-used-on-refusal",
+  operationId: OPERATION,
   credentialId: input.credentialId,
   response: input.response,
 });
 
 describe("assertion login", () => {
-  it("mints a challenge bound to the origin and RP id, and rotates it", async () => {
-    const { organizationId } = await claimOrg("options");
-    const first = await webauthnAssertionOptions(testEnv, {
-      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-      organizationId,
-      rpId: RP_ID,
-      expectedOrigin: ORIGIN,
-    });
+  it("mints an operation-scoped challenge bound to the origin and RP id, and rotates it", async () => {
+    await prepare("options");
+    const first = await assertionOptions();
     expect(first.ok).toBe(true);
     if (!first.ok) return;
     expect(first.rpId).toBe(RP_ID);
     expect(first.challenge.length).toBeGreaterThan(20);
 
-    const second = await webauthnAssertionOptions(testEnv, {
-      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-      organizationId,
-      rpId: RP_ID,
-      expectedOrigin: ORIGIN,
-    });
+    const second = await assertionOptions();
     expect(second.ok && second.ok && second.challenge).not.toBe(first.challenge);
   });
 
   it("enrolls through the claim, then asserts and issues a verified envelope", async () => {
-    await createCloudflareConformanceWorld(env);
-    const directory = directoryFor(DANA_ORG);
+    const { secret } = await prepare("e2e");
     const signer = await signerFor(env);
     const keys = await verificationKeys(env, signer);
-    const danaOrg = env.ORGANIZATION.get(env.ORGANIZATION.idFromName(DANA_ORG));
-
-    // the recovery order: unlink (identity reset), then re-mint, then accept
-    const unlinked = await call(danaOrg, "POST", "/unlink-principal", {
-      actorId: DANA, byActorId: DANA, idempotencyKey: "assert-unlink-dana",
-    });
-    expect(unlinked.body.ok).toBe(true);
-    const secret = "assert-dana-passkey";
-    const secretHash = secretHashOf(secret);
-    const minted = await call(danaOrg, "POST", "/activation-request", {
-      actorId: DANA, byActorId: DANA, secretHash,
-    });
-    expect(minted.body.ok).toBe(true);
-
     const key = await passkey(0xab);
-    await enrolled({ organizationId: DANA_ORG, secret }, key);
+    await enrolled(secret, key);
 
-    const options = await webauthnAssertionOptions(directory, {
-      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-      organizationId: DANA_ORG,
-      rpId: RP_ID,
-      expectedOrigin: ORIGIN,
-    });
+    const options = await assertionOptions();
     expect(options.ok).toBe(true);
     if (!options.ok) return;
     const signed = await assertion({ challenge: options.challenge, key, signCount: 1 });
-    const issued = await credentialFromAssertion(directory, {
-      interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-      organizationId: DANA_ORG,
-      operationId: OPERATION,
-      credentialId: b64url(key.credentialId),
-      response: signed,
-    });
+    const issued = await assertLogin({ credentialId: b64url(key.credentialId), response: signed });
     expect(issued.ok).toBe(true);
     if (!issued.ok) return;
 
@@ -299,128 +266,127 @@ describe("assertion login", () => {
     expect(verified.claims.auth_time).toBeGreaterThan(0);
   }, 60_000);
 
-  it("refuses a replayed challenge", async () => {
-    const { organizationId, secret } = await claimOrg("replay");
+  it("refuses a replayed challenge after the first login succeeds", async () => {
+    const { secret } = await prepare("replay");
     const key = await passkey(0x01);
-    await enrolled({ organizationId, secret }, key);
-    const options = await webauthnAssertionOptions(testEnv, {
-      interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, rpId: RP_ID, expectedOrigin: ORIGIN,
-    });
+    await enrolled(secret, key);
+    const options = await assertionOptions();
     if (!options.ok) throw new Error("options failed");
     const signed = await assertion({ challenge: options.challenge, key, signCount: 1 });
-    const first = await assertLogin({
-      organizationId, credentialId: b64url(key.credentialId), response: signed,
-    });
-    // the first assertion reaches issuance and fails there only because this
-    // organization has no such operation (`unavailable`); the challenge is
-    // consumed regardless
-    expect(first.ok).toBe(false);
-    if (!first.ok) expect(first.failure.kind, JSON.stringify(first.failure)).toBe("unavailable");
-    const second = await assertLogin({
-      organizationId, credentialId: b64url(key.credentialId), response: signed,
-    });
+
+    const first = await assertLogin({ credentialId: b64url(key.credentialId), response: signed });
+    expect(first.ok).toBe(true);
+
+    const second = await assertLogin({ credentialId: b64url(key.credentialId), response: signed });
     expect(second.ok).toBe(false);
     if (!second.ok) expect(second.failure.kind).toBe("unauthenticated");
   });
 
-  it("refuses a wrong origin, a wrong RP id, and a tampered signature", async () => {
-    const { organizationId, secret } = await claimOrg("wrong");
+  it("refuses a wrong origin, a wrong RP id, a tampered signature, and an unknown credential", async () => {
+    const { secret } = await prepare("wrong");
     const key = await passkey(0x02);
-    await enrolled({ organizationId, secret }, key);
-
+    await enrolled(secret, key);
     const mint = async () => {
-      const options = await webauthnAssertionOptions(testEnv, {
-        interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, rpId: RP_ID, expectedOrigin: ORIGIN,
-      });
+      const options = await assertionOptions();
       if (!options.ok) throw new Error("options failed");
       return options.challenge;
     };
 
     const wrongOrigin = await assertion({ challenge: await mint(), key, origin: "https://evil.example" });
-    const originResult = await assertLogin({
-      organizationId, credentialId: b64url(key.credentialId), response: wrongOrigin,
-    });
+    const originResult = await assertLogin({ credentialId: b64url(key.credentialId), response: wrongOrigin });
     expect(originResult.ok).toBe(false);
     if (!originResult.ok) expect(originResult.failure.kind).toBe("unauthenticated");
 
     const wrongRp = await assertion({ challenge: await mint(), key, rpId: "other.test" });
-    const rpResult = await assertLogin({
-      organizationId, credentialId: b64url(key.credentialId), response: wrongRp,
-    });
+    const rpResult = await assertLogin({ credentialId: b64url(key.credentialId), response: wrongRp });
     expect(rpResult.ok).toBe(false);
     if (!rpResult.ok) expect(rpResult.failure.kind).toBe("unauthenticated");
 
     const tampered = await assertion({ challenge: await mint(), key, tamper: true });
-    const tamperedResult = await assertLogin({
-      organizationId, credentialId: b64url(key.credentialId), response: tampered,
-    });
+    const tamperedResult = await assertLogin({ credentialId: b64url(key.credentialId), response: tampered });
     expect(tamperedResult.ok).toBe(false);
     if (!tamperedResult.ok) expect(tamperedResult.failure.kind).toBe("unauthenticated");
 
     const unknown = await assertion({ challenge: await mint(), key: await passkey(0x03) });
     const unknownResult = await assertLogin({
-      organizationId, credentialId: b64url((await passkey(0x04)).credentialId), response: unknown,
+      credentialId: b64url((await passkey(0x04)).credentialId),
+      response: unknown,
     });
     expect(unknownResult.ok).toBe(false);
     if (!unknownResult.ok) expect(unknownResult.failure.kind).toBe("unauthenticated");
   });
 
   it("refuses a counter that does not advance, and accepts zero counters", async () => {
-    const { organizationId, secret } = await claimOrg("counter");
+    const { secret } = await prepare("counter");
     const key = await passkey(0x05);
-    await enrolled({ organizationId, secret }, key);
+    await enrolled(secret, key);
 
     const attempt = async (signCount: number) => {
-      const options = await webauthnAssertionOptions(testEnv, {
-        interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, rpId: RP_ID, expectedOrigin: ORIGIN,
-      });
+      const options = await assertionOptions();
       if (!options.ok) throw new Error("options failed");
       const signed = await assertion({ challenge: options.challenge, key, signCount });
-      return assertLogin({ organizationId, credentialId: b64url(key.credentialId), response: signed });
+      return assertLogin({ credentialId: b64url(key.credentialId), response: signed });
     };
 
     // zero counters are the synced-passkey signal: no regression is claimed
-    const zero = await attempt(0);
-    expect(zero.ok).toBe(false); // fails at issuance, not verification
-    if (!zero.ok) expect(zero.failure.kind).toBe("unavailable");
-    const zeroAgain = await attempt(0);
-    expect(zeroAgain.ok).toBe(false);
-    if (!zeroAgain.ok) expect(zeroAgain.failure.kind).toBe("unavailable");
+    expect((await attempt(0)).ok).toBe(true);
+    expect((await attempt(0)).ok).toBe(true);
 
     // a stored nonzero counter must advance
-    await call(org(organizationId), "POST", "/credential-counter", {
+    await call(org(DANA_ORG), "POST", "/credential-counter", {
       credentialId: b64url(key.credentialId), signCount: 7,
     });
     const regressed = await attempt(7);
     expect(regressed.ok).toBe(false);
     if (!regressed.ok) expect(regressed.failure.kind).toBe("unauthenticated");
-    const advanced = await attempt(8);
-    expect(advanced.ok).toBe(false); // issuance, not verification
-    if (!advanced.ok) expect(advanced.failure.kind, JSON.stringify(advanced.failure)).toBe("unavailable");
+    expect((await attempt(8)).ok).toBe(true);
   });
 
   it("refuses a credential with no principal link", async () => {
-    const { organizationId } = await claimOrg("unlinked");
+    await prepare("unlinked");
     const key = await passkey(0x06);
     const raw = new Uint8Array((await crypto.subtle.exportKey("raw", key.pair.publicKey)) as ArrayBuffer);
-    await call(org(organizationId), "POST", "/credential", {
+    await call(org(DANA_ORG), "POST", "/credential", {
       credentialId: b64url(key.credentialId),
-      actorId: CREW,
+      actorId: DANA,
       key: { alg: "ES256", x: b64url(raw.slice(1, 33)), y: b64url(raw.slice(33, 65)) },
       signCount: 0,
       backupEligible: false,
       backedUp: false,
     });
 
-    const options = await webauthnAssertionOptions(testEnv, {
-      interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, rpId: RP_ID, expectedOrigin: ORIGIN,
+    const options = await assertionOptions();
+    if (!options.ok) throw new Error("options failed");
+    const signed = await assertion({ challenge: options.challenge, key, signCount: 1 });
+    const result = await assertLogin({ credentialId: b64url(key.credentialId), response: signed });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure.kind).toBe("unauthenticated");
+  });
+
+  it("refuses a credential id found in two organizations", async () => {
+    const { secret } = await prepare("ambiguous");
+    const key = await passkey(0x07);
+    await enrolled(secret, key);
+
+    const raw = new Uint8Array((await crypto.subtle.exportKey("raw", key.pair.publicKey)) as ArrayBuffer);
+    await call(org(NORTH_ORG), "POST", "/credential", {
+      credentialId: b64url(key.credentialId),
+      actorId: "actor-11c2f8ab",
+      key: { alg: "ES256", x: b64url(raw.slice(1, 33)), y: b64url(raw.slice(33, 65)) },
+      signCount: 0,
+      backupEligible: false,
+      backedUp: false,
     });
+
+    const options = await assertionOptions(directoryFor(DANA_ORG, NORTH_ORG));
     if (!options.ok) throw new Error("options failed");
     const signed = await assertion({ challenge: options.challenge, key, signCount: 1 });
     const result = await assertLogin({
-      organizationId, credentialId: b64url(key.credentialId), response: signed,
+      credentialId: b64url(key.credentialId),
+      response: signed,
+      directory: directoryFor(DANA_ORG, NORTH_ORG),
     });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.failure.kind).toBe("unauthenticated");
+    if (!result.ok) expect(result.failure.kind).toBe("unavailable");
   });
 });

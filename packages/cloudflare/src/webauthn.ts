@@ -24,7 +24,7 @@ import {
 } from "org-hats/authority";
 import { base64UrlDecode, utf8 } from "org-hats/access";
 import type { Env } from "./env";
-import { activationSecretHash, runtimeFor } from "./runtime";
+import { activationSecretHash, organizationDirectory, runtimeFor } from "./runtime";
 import {
   parseAttestationObject,
   parseAuthenticatorData,
@@ -35,9 +35,8 @@ import { verifySignature } from "./webauthn/verify";
 
 export interface WebauthnRegistrationOptionsInput {
   readonly interfaceVersion: typeof AUTHORITY_INTERFACE_VERSION;
-  readonly organizationId: string;
   /** The activation secret as delivered; hashed at this boundary, never a
-   * caller-computed digest. */
+   * caller-computed digest. The organization is resolved from it. */
   readonly secret: string;
   /** The relying-party id the host serves — the zone apex by contract.
    * Minted into the options so the browser's default (the origin host)
@@ -67,8 +66,8 @@ export type WebauthnRegistrationOptionsResult =
 
 export interface CredentialFromRegistrationInput {
   readonly interfaceVersion: typeof AUTHORITY_INTERFACE_VERSION;
-  readonly organizationId: string;
-  /** The same activation secret the options call took. */
+  /** The same activation secret the options call took. The organization is
+   * resolved from it, never supplied by the caller. */
   readonly secret: string;
   /** The relying-party id the host serves — the zone apex by contract. */
   readonly rpId: string;
@@ -134,6 +133,71 @@ const decoded = (text: string, field: string): Uint8Array | Failure => {
   }
 };
 
+/** The organization that holds exactly one usable activation request for
+ * the digest. The runtime scans its directory, as the activation methods
+ * already do; ambiguity is a configuration fault, never a guess. */
+const resolveActivationOrganization = async (
+  env: Env,
+  secretHash: string,
+): Promise<{ readonly organizationId: string } | Failure> => {
+  const matches: string[] = [];
+  for (const organizationId of organizationDirectory(env)) {
+    const response = await env.ORGANIZATION.get(env.ORGANIZATION.idFromName(organizationId))
+      .fetch(`https://authority.internal/activation-organization?secretHash=${encodeURIComponent(secretHash)}`);
+    const body = (await response.json()) as { ok: boolean; failure?: Failure };
+    if (body.ok) {
+      matches.push(organizationId);
+      continue;
+    }
+    if (body.failure?.kind !== "unauthenticated") {
+      return body.failure ?? { kind: "unavailable", detail: "organization is unreachable" };
+    }
+  }
+  if (matches.length > 1) {
+    return { kind: "unavailable", detail: "the activation directory is ambiguous" };
+  }
+  const organizationId = matches[0];
+  return organizationId === undefined
+    ? { kind: "unauthenticated", detail: "activation is not usable" }
+    : { organizationId };
+};
+
+/** The organization that owns a credential id, found across the directory.
+ * The credential is only known after a discoverable assertion, so the host
+ * cannot name it; two matches are a configuration fault. */
+const resolveCredential = async (
+  env: Env,
+  credentialId: string,
+): Promise<{ readonly organizationId: string; readonly key: unknown } | Failure> => {
+  const matches: { organizationId: string; key: unknown }[] = [];
+  for (const organizationId of organizationDirectory(env)) {
+    const response = await env.ORGANIZATION.get(env.ORGANIZATION.idFromName(organizationId))
+      .fetch(`https://authority.internal/credential?credentialId=${encodeURIComponent(credentialId)}`);
+    const body = (await response.json()) as {
+      ok: boolean;
+      value?: { key: unknown };
+      failure?: Failure;
+    };
+    if (body.ok && body.value !== undefined) {
+      matches.push({ organizationId, key: body.value.key });
+      continue;
+    }
+    if (body.ok) {
+      return { kind: "unavailable", detail: "organization returned no credential" };
+    }
+    if (body.failure?.kind !== "unauthenticated") {
+      return body.failure ?? { kind: "unavailable", detail: "organization is unreachable" };
+    }
+  }
+  if (matches.length > 1) {
+    return { kind: "unavailable", detail: "the credential is ambiguous across organizations" };
+  }
+  const match = matches[0];
+  return match === undefined
+    ? { kind: "unauthenticated", detail: "the credential is not usable" }
+    : match;
+};
+
 /** Mint the ceremony options. The challenge rotates on every call, so a
  * stale options page cannot satisfy a later registration. */
 export const webauthnRegistrationOptions = async (
@@ -147,7 +211,9 @@ export const webauthnRegistrationOptions = async (
     return failed({ kind: "invalid-command", detail: "rpId and secret must be non-empty strings" });
   }
   const secretHash = await activationSecretHash(input.secret);
-  const response = await env.ORGANIZATION.get(env.ORGANIZATION.idFromName(input.organizationId))
+  const organization = await resolveActivationOrganization(env, secretHash);
+  if ("kind" in organization) return failed(organization);
+  const response = await env.ORGANIZATION.get(env.ORGANIZATION.idFromName(organization.organizationId))
     .fetch("https://authority.internal/webauthn-challenge", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -192,8 +258,10 @@ export const credentialFromRegistration = async (
   if (input.secret.length === 0) {
     return failed({ kind: "invalid-command", detail: "secret must be a non-empty string" });
   }
-  const stub = env.ORGANIZATION.get(env.ORGANIZATION.idFromName(input.organizationId));
   const secretHash = await activationSecretHash(input.secret);
+  const organization = await resolveActivationOrganization(env, secretHash);
+  if ("kind" in organization) return failed(organization);
+  const stub = env.ORGANIZATION.get(env.ORGANIZATION.idFromName(organization.organizationId));
 
   const challengeResponse = await stub.fetch(
     `https://authority.internal/webauthn-challenge?secretHash=${encodeURIComponent(secretHash)}`,
@@ -281,7 +349,10 @@ export const credentialFromRegistration = async (
 
 export interface WebauthnAssertionOptionsInput {
   readonly interfaceVersion: typeof AUTHORITY_INTERFACE_VERSION;
-  readonly organizationId: string;
+  /** The operation the host serves; the challenge is minted in its
+   * coordinator, because the organization is unknown until the credential
+   * is returned. */
+  readonly operationId: string;
   /** The relying-party id the host serves — the zone apex by contract. */
   readonly rpId: string;
   /** The origin the assertion will be signed for; bound to the challenge. */
@@ -299,8 +370,8 @@ export type WebauthnAssertionOptionsResult =
 
 export interface CredentialFromAssertionInput {
   readonly interfaceVersion: typeof AUTHORITY_INTERFACE_VERSION;
-  readonly organizationId: string;
-  /** The operation whose session is being issued. */
+  /** The operation the host serves: the challenge is consumed there, and the
+   * issued session belongs to it. */
   readonly operationId: string;
   /** The assertion's raw credential id, base64url — the stored key's name. */
   readonly credentialId: string;
@@ -329,7 +400,7 @@ export const webauthnAssertionOptions = async (
   if (input.rpId.length === 0 || input.expectedOrigin.length === 0) {
     return failed({ kind: "invalid-command", detail: "rpId and expectedOrigin must be non-empty strings" });
   }
-  const response = await env.ORGANIZATION.get(env.ORGANIZATION.idFromName(input.organizationId))
+  const response = await env.OPERATION.get(env.OPERATION.idFromName(input.operationId))
     .fetch("https://authority.internal/webauthn-assertion-challenge", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -400,14 +471,14 @@ export const credentialFromAssertion = async (
   if (input.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) {
     return failed({ kind: "wrong-interface-version" });
   }
-  const stub = env.ORGANIZATION.get(env.ORGANIZATION.idFromName(input.organizationId));
+  const operation = env.OPERATION.get(env.OPERATION.idFromName(input.operationId));
 
   const clientDataBytes = decoded(input.response.clientDataJSON, "clientDataJSON");
   if (clientDataBytes instanceof Object && "kind" in clientDataBytes) return failed(clientDataBytes);
   const clientData = parseClientData(clientDataBytes as Uint8Array, "webauthn.get");
   if ("kind" in clientData) return failed(clientData);
 
-  const challengeResponse = await stub.fetch(
+  const challengeResponse = await operation.fetch(
     `https://authority.internal/webauthn-assertion-challenge?challenge=${encodeURIComponent(clientData.challenge)}`,
   );
   const challengeBody = (await challengeResponse.json()) as {
@@ -441,18 +512,9 @@ export const credentialFromAssertion = async (
     return failed({ kind: "unauthenticated", detail: "the ceremony names another relying party" });
   }
 
-  const credentialResponse = await stub.fetch(
-    `https://authority.internal/credential?credentialId=${encodeURIComponent(input.credentialId)}`,
-  );
-  const credentialBody = (await credentialResponse.json()) as {
-    ok: boolean;
-    value?: { key: unknown };
-    failure?: Failure;
-  };
-  if (!credentialBody.ok || credentialBody.value === undefined) {
-    return failed({ kind: "unauthenticated", detail: "the credential is not usable" });
-  }
-  const key = storedKeyOf(credentialBody.value.key);
+  const resolved = await resolveCredential(env, input.credentialId);
+  if ("kind" in resolved) return failed(resolved);
+  const key = storedKeyOf(resolved.key);
   if ("kind" in key) return failed(key);
 
   const signature = decoded(input.response.signature, "signature");
@@ -463,23 +525,30 @@ export const credentialFromAssertion = async (
     return failed({ kind: "unauthenticated", detail: "the assertion's signature does not verify" });
   }
 
-  const completeResponse = await stub.fetch("https://authority.internal/webauthn-assertion-complete", {
+  const consumeResponse = await operation.fetch("https://authority.internal/webauthn-assertion-consume", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      challenge: clientData.challenge,
-      credentialId: input.credentialId,
-      signCount: authenticator.signCount,
-      backupEligible: authenticator.backupEligible,
-      backedUp: authenticator.backedUp,
-    }),
+    body: JSON.stringify({ challenge: clientData.challenge }),
   });
-  const completeBody = (await completeResponse.json()) as {
-    ok: boolean;
-    failure?: Failure;
-  };
-  if (!completeBody.ok) {
-    return failed(completeBody.failure ?? { kind: "unavailable", detail: "organization is unreachable" });
+  const consumeBody = (await consumeResponse.json()) as { ok: boolean; failure?: Failure };
+  if (!consumeBody.ok) {
+    return failed(consumeBody.failure ?? { kind: "unavailable", detail: "operation is unreachable" });
+  }
+
+  const advanceResponse = await env.ORGANIZATION.get(env.ORGANIZATION.idFromName(resolved.organizationId))
+    .fetch("https://authority.internal/webauthn-credential-advance", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        credentialId: input.credentialId,
+        signCount: authenticator.signCount,
+        backupEligible: authenticator.backupEligible,
+        backedUp: authenticator.backedUp,
+      }),
+    });
+  const advanceBody = (await advanceResponse.json()) as { ok: boolean; failure?: Failure };
+  if (!advanceBody.ok) {
+    return failed(advanceBody.failure ?? { kind: "unavailable", detail: "organization is unreachable" });
   }
 
   const issued = await (await runtimeFor(env)).accessFromEvidence({

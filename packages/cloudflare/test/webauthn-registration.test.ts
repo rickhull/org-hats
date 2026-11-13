@@ -23,7 +23,8 @@ const ORIGIN = "https://app.example.test";
 const RP_ID = "example.test";
 
 const org = (id: string) => env.ORGANIZATION.get(env.ORGANIZATION.idFromName(id));
-const testEnv = env as unknown as Env;
+const directory = (...ids: string[]): Env =>
+  ({ ...env, AUTHORITY_ORGANIZATION_IDS: ids.join(",") }) as Env;
 
 const secretHashOf = (secret: string): string =>
   createHash("sha256").update(secret, "utf8").digest("hex");
@@ -153,7 +154,7 @@ const ceremony = async (options: {
 describe("registration through the claim", () => {
   it("mints single-use ceremony options and rotates them", async () => {
     const { organizationId, secret } = await ready("options");
-    const first = await webauthnRegistrationOptions(testEnv, { interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, secret, rpId: RP_ID });
+    const first = await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
     expect(first.ok).toBe(true);
     if (!first.ok) return;
     expect(first.user.id).toBe(CREW);
@@ -166,7 +167,7 @@ describe("registration through the claim", () => {
       userVerification: "preferred",
     });
 
-    const second = await webauthnRegistrationOptions(testEnv, { interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, secret, rpId: RP_ID });
+    const second = await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
     expect(second.ok && second.ok && second.challenge).not.toBe(first.challenge);
   });
 
@@ -185,15 +186,15 @@ describe("registration through the claim", () => {
 
     // the claim was minted with the digest; the options hashing the secret to
     // that same digest is the shared-rule witness
-    const options = await webauthnRegistrationOptions(testEnv, {
-      interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, secret, rpId: RP_ID,
+    const options = await webauthnRegistrationOptions(directory(organizationId), {
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID,
     });
     expect(options.ok).toBe(true);
     if (!options.ok) return;
     const submission = await ceremony({ challenge: options.challenge });
-    const registered = await credentialFromRegistration(testEnv, {
+    const registered = await credentialFromRegistration(directory(organizationId), {
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-      organizationId, secret, rpId: RP_ID, expectedOrigin: ORIGIN,
+      secret, rpId: RP_ID, expectedOrigin: ORIGIN,
       credential: { response: { attestationObject: submission.attestationObject, clientDataJSON: submission.clientDataJSON } },
     });
     expect(registered.ok).toBe(true);
@@ -208,18 +209,38 @@ describe("registration through the claim", () => {
     await call(org(misuseOrg), "POST", "/activation-request", {
       actorId: CREW, byActorId: LEAD, secretHash,
     });
-    const digestAsSecret = await webauthnRegistrationOptions(testEnv, {
-      interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId: misuseOrg, secret: secretHash, rpId: RP_ID,
+    const digestAsSecret = await webauthnRegistrationOptions(directory(organizationId), {
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret: secretHash, rpId: RP_ID,
     });
     expect(digestAsSecret.ok).toBe(false);
     if (!digestAsSecret.ok) expect(digestAsSecret.failure.kind).toBe("unauthenticated");
   });
 
+  it("refuses an activation secret present in two organizations", async () => {
+    const secret = "secret-ambiguous";
+    const secretHash = secretHashOf(secret);
+    const ids = ["org-webauthn-ambiguous-a", "org-webauthn-ambiguous-b"];
+    for (const organizationId of ids) {
+      await call(org(organizationId), "POST", "/bootstrap", {
+        ...organizationBootstrap(organizationId),
+        principalLinks: [{ provider: "idp", subject: "lead", actorId: LEAD }],
+      });
+      const minted = await call(org(organizationId), "POST", "/activation-request", {
+        actorId: CREW, byActorId: LEAD, secretHash,
+      });
+      expect(minted.body.ok).toBe(true);
+    }
+    const result = await webauthnRegistrationOptions(directory(...ids), {
+      interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure.kind).toBe("unavailable");
+  });
+
   it("refuses options for an unusable secret, uniformly", async () => {
     await ready("options-bad");
-    const result = await webauthnRegistrationOptions(testEnv, {
+    const result = await webauthnRegistrationOptions(directory("org-webauthn-options-bad"), {
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-      organizationId: "org-webauthn-options-bad",
       secret: "never-minted",
       rpId: RP_ID,
     });
@@ -229,14 +250,13 @@ describe("registration through the claim", () => {
 
   it("enrolls through a genuine none-format ceremony and binds the link", async () => {
     const { organizationId, secret } = await ready("enroll");
-    const options = await webauthnRegistrationOptions(testEnv, { interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, secret, rpId: RP_ID });
+    const options = await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
     expect(options.ok).toBe(true);
     if (!options.ok) return;
     const submission = await ceremony({ challenge: options.challenge });
 
-    const registered = await credentialFromRegistration(testEnv, {
+    const registered = await credentialFromRegistration(directory(organizationId), {
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-      organizationId,
       secret,
       rpId: RP_ID,
       expectedOrigin: ORIGIN,
@@ -268,12 +288,12 @@ describe("registration through the claim", () => {
 
   it("verifies a packed self-attestation ceremony too", async () => {
     const { organizationId, secret } = await ready("packed");
-    const options = await webauthnRegistrationOptions(testEnv, { interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, secret, rpId: RP_ID });
+    const options = await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
     if (!options.ok) throw new Error("options failed");
     const submission = await ceremony({ challenge: options.challenge, signed: true });
-    const registered = await credentialFromRegistration(testEnv, {
+    const registered = await credentialFromRegistration(directory(organizationId), {
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-      organizationId, secret, rpId: RP_ID, expectedOrigin: ORIGIN,
+      secret, rpId: RP_ID, expectedOrigin: ORIGIN,
       credential: { response: { attestationObject: submission.attestationObject, clientDataJSON: submission.clientDataJSON } },
     });
     expect(registered.ok).toBe(true);
@@ -286,27 +306,27 @@ describe("registration through the claim", () => {
     ] as const;
     for (const item of cases) {
       const { organizationId, secret } = await ready(`bad-${item.label}`);
-      const options = await webauthnRegistrationOptions(testEnv, { interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, secret, rpId: RP_ID });
+      const options = await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
       if (!options.ok) throw new Error("options failed");
       const submission = item.label === "rp"
         ? await ceremony({ challenge: options.challenge, rpId: item.rpId })
         : await ceremony({ challenge: options.challenge, origin: item.origin });
-      const result = await credentialFromRegistration(testEnv, {
+      const result = await credentialFromRegistration(directory(organizationId), {
         interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-        organizationId, secret, rpId: RP_ID, expectedOrigin: ORIGIN,
+        secret, rpId: RP_ID, expectedOrigin: ORIGIN,
         credential: { response: { attestationObject: submission.attestationObject, clientDataJSON: submission.clientDataJSON } },
       });
       expect(result.ok, item.label).toBe(false);
     }
     // wrong challenge: stale options from a rotation
     const { organizationId, secret } = await ready("bad-challenge");
-    const stale = await webauthnRegistrationOptions(testEnv, { interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, secret, rpId: RP_ID });
+    const stale = await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
     if (!stale.ok) throw new Error("options failed");
-    await webauthnRegistrationOptions(testEnv, { interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, secret, rpId: RP_ID }); // rotates
+    await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID }); // rotates
     const submission = await ceremony({ challenge: stale.challenge });
-    const result = await credentialFromRegistration(testEnv, {
+    const result = await credentialFromRegistration(directory(organizationId), {
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-      organizationId, secret, rpId: RP_ID, expectedOrigin: ORIGIN,
+      secret, rpId: RP_ID, expectedOrigin: ORIGIN,
       credential: { response: { attestationObject: submission.attestationObject, clientDataJSON: submission.clientDataJSON } },
     });
     expect(result.ok).toBe(false);
@@ -314,17 +334,17 @@ describe("registration through the claim", () => {
 
   it("consumes the claim: a second registration on the same secret is refused", async () => {
     const { organizationId, secret } = await ready("consume");
-    const options = await webauthnRegistrationOptions(testEnv, { interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, secret, rpId: RP_ID });
+    const options = await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
     if (!options.ok) throw new Error("options failed");
     const submission = await ceremony({ challenge: options.challenge });
-    const first = await credentialFromRegistration(testEnv, {
+    const first = await credentialFromRegistration(directory(organizationId), {
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-      organizationId, secret, rpId: RP_ID, expectedOrigin: ORIGIN,
+      secret, rpId: RP_ID, expectedOrigin: ORIGIN,
       credential: { response: { attestationObject: submission.attestationObject, clientDataJSON: submission.clientDataJSON } },
     });
     expect(first.ok).toBe(true);
 
-    const again = await webauthnRegistrationOptions(testEnv, { interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, secret, rpId: RP_ID });
+    const again = await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
     expect(again.ok).toBe(false);
   });
 
@@ -345,13 +365,13 @@ describe("registration through the claim", () => {
       provider: "idp", subject: "crew-late", actorId: CREW,
     });
     expect(linked.body.ok).toBe(true);
-    const options = await webauthnRegistrationOptions(testEnv, { interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, secret, rpId: RP_ID });
+    const options = await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
     expect(options.ok).toBe(true);
     if (!options.ok) return;
     const submission = await ceremony({ challenge: options.challenge });
-    const result = await credentialFromRegistration(testEnv, {
+    const result = await credentialFromRegistration(directory(organizationId), {
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
-      organizationId, secret, rpId: RP_ID, expectedOrigin: ORIGIN,
+      secret, rpId: RP_ID, expectedOrigin: ORIGIN,
       credential: { response: { attestationObject: submission.attestationObject, clientDataJSON: submission.clientDataJSON } },
     });
     expect(result.ok).toBe(false);

@@ -47,7 +47,9 @@ import {
   OUTBOX_DELIVERED_RETENTION_SECONDS,
   OUTBOX_DRAIN_LIMIT,
 } from "./state";
-import { initializeOperationSchema } from "./schema/operation";
+import { initializeOperationSchema, OPERATION_SCHEMA_VERSION } from "./schema/operation";
+import { WEBAUTHN_CEREMONY_LIFETIME_SECONDS } from "./webauthn/constants";
+import { base64UrlEncode } from "org-hats/access";
 import { displayLabelFailure, identifierFailure } from "./validation";
 import { handleOperationRequest } from "./http/operation";
 import {
@@ -1685,6 +1687,70 @@ export class OperationAuthority extends DurableObject<Env> {
     });
   }
 
+  /** Mint a single-use assertion challenge for this operation's host. The
+   * operation is the scope the host knows before a session exists; the
+   * credential the assertion exercises lives in an organization the runtime
+   * resolves only after the browser returns. Binding the ceremony to the
+   * operation here is what lets login stay usernameless. */
+  private webauthnAssertionChallenge(input: {
+    readonly rpId: string;
+    readonly expectedOrigin: string;
+  }): Result<{ readonly challenge: string; readonly rpId: string }> {
+    const at = now();
+    const challenge = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+    return this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec("DELETE FROM webauthn_assertion_challenges WHERE expires_at < ?", at);
+      this.ctx.storage.sql.exec(
+        "INSERT INTO webauthn_assertion_challenges (challenge, rp_id, origin, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+        challenge,
+        input.rpId,
+        input.expectedOrigin,
+        at,
+        at + WEBAUTHN_CEREMONY_LIFETIME_SECONDS,
+      );
+      return value({ challenge, rpId: input.rpId });
+    });
+  }
+
+  /** Read the ceremony's bound context without consuming it. Verification
+   * happens outside the coordinator; consumption is the atomic act below. */
+  private webauthnAssertionChallengeOf(challenge: string): Result<{
+    readonly rpId: string;
+    readonly origin: string;
+  }> {
+    const row = this.one(
+      "SELECT rp_id, origin, consumed_at, expires_at FROM webauthn_assertion_challenges WHERE challenge = ?",
+      challenge,
+    );
+    if (row === undefined || row["consumed_at"] !== null || now() >= Number(row["expires_at"])) {
+      return failure("unauthenticated", "the ceremony is not usable");
+    }
+    return value({ rpId: String(row["rp_id"]), origin: String(row["origin"]) });
+  }
+
+  /** The operation's half of the replay control: consume the challenge. The
+   * organization's counter compare-and-set is the other half; the two are
+   * deliberately separate coordinators, so a failure between them fails the
+   * login rather than opening a replay window. */
+  private webauthnAssertionConsume(challenge: string): Result<{ readonly applied: true }> {
+    const at = now();
+    return this.ctx.storage.transactionSync(() => {
+      const row = this.one(
+        "SELECT consumed_at, expires_at FROM webauthn_assertion_challenges WHERE challenge = ?",
+        challenge,
+      );
+      if (row === undefined || row["consumed_at"] !== null || at >= Number(row["expires_at"])) {
+        return failure("unauthenticated", "the ceremony is not usable");
+      }
+      this.ctx.storage.sql.exec(
+        "UPDATE webauthn_assertion_challenges SET consumed_at = ? WHERE challenge = ?",
+        at,
+        challenge,
+      );
+      return value({ applied: true });
+    });
+  }
+
   private exportSnapshot(): ExportSnapshot | AbsentExport {
     if (this.one("SELECT 1 AS present FROM operation LIMIT 1") === undefined) {
       // Absence is a state result, not an empty export: a wiped tree must
@@ -1743,8 +1809,9 @@ export class OperationAuthority extends DurableObject<Env> {
     // current columns and fills columns the older snapshot did not carry with
     // null, so the schema-2 → accepted-schema drill is a restore, not a
     // second bootstrap. An unknown or future version is still refused.
-    const supported = new Set(["2", "3", "4", "5", "6", "7"]);
-    if (!supported.has(String(snapshot.schemaVersion))) {
+    const schemaVersion = String(snapshot.schemaVersion);
+    const shipped = /^[0-9]+$/.test(schemaVersion) ? Number(schemaVersion) : Number.NaN;
+    if (!Number.isInteger(shipped) || shipped < 2 || shipped > Number(OPERATION_SCHEMA_VERSION)) {
       return failure("invalid-command", "snapshot schema version is not supported");
     }
     if (typeof snapshot.tables !== "object" || snapshot.tables === null) return failure("invalid-command", "snapshot has no tables");
@@ -1877,6 +1944,9 @@ export class OperationAuthority extends DurableObject<Env> {
       snapshot: () => this.snapshot(),
       auditRows: () => this.auditRows(),
       outboxRows: () => this.outboxRows(),
+      webauthnAssertionChallenge: (input) => this.webauthnAssertionChallenge(input),
+      webauthnAssertionChallengeOf: (challenge) => this.webauthnAssertionChallengeOf(challenge),
+      webauthnAssertionConsume: (challenge) => this.webauthnAssertionConsume(challenge),
     });
   }
 }

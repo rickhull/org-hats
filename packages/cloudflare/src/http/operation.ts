@@ -82,6 +82,12 @@ export interface OperationRouteHost {
   snapshot(): Record<string, unknown>;
   auditRows(): readonly Record<string, unknown>[];
   outboxRows(): readonly Record<string, unknown>[];
+  webauthnAssertionChallenge(input: {
+    readonly rpId: string;
+    readonly expectedOrigin: string;
+  }): Result<unknown>;
+  webauthnAssertionChallengeOf(challenge: string): Result<unknown>;
+  webauthnAssertionConsume(challenge: string): Result<unknown>;
 }
 
 /** The coordinator validates policy meaning after this boundary proves its shape. */
@@ -419,6 +425,21 @@ export const handleOperationRequest = async (
 
     if (request.method === "POST" && url.pathname === "/drain") {
       return json(value(await host.drain()));
+    }
+
+    if (request.method === "POST" && url.pathname === "/webauthn-assertion-challenge") {
+      const body = await readBody(request);
+      return json(host.webauthnAssertionChallenge({
+        rpId: asString(body["rpId"], "rpId"),
+        expectedOrigin: asString(body["expectedOrigin"], "expectedOrigin"),
+      }));
+    }
+    if (request.method === "GET" && url.pathname === "/webauthn-assertion-challenge") {
+      return json(host.webauthnAssertionChallengeOf(asString(url.searchParams.get("challenge"), "challenge")));
+    }
+    if (request.method === "POST" && url.pathname === "/webauthn-assertion-consume") {
+      const body = await readBody(request);
+      return json(host.webauthnAssertionConsume(asString(body["challenge"], "challenge")));
     }
 
     if (request.method === "GET" && url.pathname === "/status") return json(value(host.status()));

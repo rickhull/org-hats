@@ -129,7 +129,7 @@ describe("the restore matrix", () => {
     if (isFailed(issued)) throw new Error(`sam issuance failed: ${issued.failure.kind}`);
 
     const source = await exportCoordinator("operation", OP);
-    expect(source.schemaVersion).toBe("7");
+    expect(source.schemaVersion).toBe("8");
     expect(source.tables["refresh_records"]?.length ?? 0).toBeGreaterThan(0);
     expect(source.tables["teams"]?.some((team) => team.status === "retired")).toBe(true);
     // The refresh table carries records without authentication facts too
@@ -138,14 +138,14 @@ describe("the restore matrix", () => {
     expect(withAuth).toBeDefined();
     expect(withAuth?.auth_time).not.toBeNull();
 
-    for (const version of ["2", "3", "4", "5", "6", "7"]) {
+    for (const version of ["2", "3", "4", "5", "6", "7", "8"]) {
       const target = `op-restore-matrix-${version}`;
       const restored = await restore("operation", target, atSchema(source, version));
       expect(restored.status).toBe(200);
       expect(restored.body.ok).toBe(true);
 
       const after = await exportCoordinator("operation", target);
-      expect(after.schemaVersion).toBe("7");
+      expect(after.schemaVersion).toBe("8");
       expect(withoutRestoreAudit(after).tables).toEqual(asRestored(source, version));
 
       // The named claims, stated once for the record. Schema 5 added the
@@ -274,7 +274,7 @@ describe("the restore matrix", () => {
     // column; schema 6 adds the assertion-challenge table. A snapshot taken
     // between those steps must still restore: the supported set is every
     // version this coordinator has shipped, not only the current one.
-    for (const version of ["4", "5"]) {
+    for (const version of ["4", "5", "6"]) {
       const tables = { ...source.tables };
       delete tables["webauthn_assertion_challenges"];
       if (version === "4") delete tables["credentials"];
@@ -283,7 +283,7 @@ describe("the restore matrix", () => {
       expect(restored.status, version).toBe(200);
       expect(restored.body.ok, version).toBe(true);
       const after = await exportCoordinator("organization", target);
-      expect(after.schemaVersion, version).toBe("6");
+      expect(after.schemaVersion, version).toBe("7");
       expect(after.tables["actors"]).toHaveLength(source.tables["actors"]?.length ?? 0);
     }
   }, 60_000);
@@ -296,7 +296,7 @@ describe("the restore matrix", () => {
     const futureOperation = await restore(
       "operation",
       "op-restore-matrix-future",
-      { ...operationSnapshot, schemaVersion: "8" },
+      { ...operationSnapshot, schemaVersion: "9" },
     );
     expect(futureOperation.body.failure?.kind).toBe("invalid-command");
 
@@ -310,7 +310,7 @@ describe("the restore matrix", () => {
     const futureOrganization = await restore(
       "organization",
       "org-restore-matrix-future",
-      { ...organizationSnapshot, schemaVersion: "7" },
+      { ...organizationSnapshot, schemaVersion: "8" },
     );
     expect(futureOrganization.body.failure?.kind).toBe("invalid-command");
   }, 60_000);

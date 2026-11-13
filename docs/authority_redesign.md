@@ -360,6 +360,16 @@ A local credential is a principal link like any other —
   unlink, enroll through a fresh claim, re-link — and a direct per-actor
   passkey enrollment is deferred with the per-link retire, under the same
   trigger: a consumer's runbook that needs a mixed actor without a reset.
+- **The operation is the login scope; the organization is resolved.**
+  Registration resolves the claim's organization from the secret across the
+  deployment directory, and assertion resolves the credential id the same
+  way; the host supplies neither. The assertion challenge is minted and
+  consumed in the operation coordinator, because a usernameless login has no
+  organization to name before the browser returns. Consumption is the
+  replay control; the owning organization's counter compare-and-set is the
+  ordering control, and a failure between the two is a failed login, not a
+  replay window. Two matches for one secret or one credential id are
+  `unavailable`, never a guess.
 - **The relying-party id is the zone apex.** One credential then works at
   every operation hostname, including hostnames that did not exist at
   enrollment. This is preconditioned on zone purity — the deployment

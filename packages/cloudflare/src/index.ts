@@ -155,14 +155,15 @@ export class AuthorityRuntimeEntrypoint extends WorkerEntrypoint<Env> implements
   credentialFromRegistration(input: CredentialFromRegistrationInput): Promise<CredentialFromRegistrationResult> {
     return credentialFromRegistration(this.env, input);
   }
-  /** Mint a single-use assertion challenge bound to the host's origin and
-   * relying-party id; the same unauthenticated surface with no user handle. */
+  /** Mint a single-use assertion challenge in the operation coordinator,
+   * bound to that operation, the host's origin, and its relying-party id. */
   webauthnAssertionOptions(input: WebauthnAssertionOptionsInput): Promise<WebauthnAssertionOptionsResult> {
     return webauthnAssertionOptions(this.env, input);
   }
-  /** Verify a passkey assertion against the stored key, consume the
-   * challenge, advance the counter, and issue through the session path a
-   * federated login reaches. */
+  /** Verify a passkey assertion against the stored key, resolve the owning
+   * organization from the credential id, consume the operation's challenge,
+   * advance the counter, and issue through the session path a federated
+   * login reaches. */
   credentialFromAssertion(input: CredentialFromAssertionInput): Promise<CredentialFromAssertionResult> {
     return credentialFromAssertion(this.env, input);
   }

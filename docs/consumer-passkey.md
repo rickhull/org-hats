@@ -2,7 +2,9 @@
 
 *The host half of a local-credential ceremony against the authority runtime.
 The runtime mints the options and verifies the proof; the host owns the
-browser call, the encodings, and the session that follows. The design
+browser call, the encodings, and the session that follows. The host names
+the operation for login and the claim secret for enrollment — never an
+organization. The design
 decisions are normative in
 [authority_redesign.md](authority_redesign.md#local-credentials-passkeys--design-decisions).*
 
@@ -23,11 +25,13 @@ enrollment
     ◄── { ok, actorId }        claim consumed; link + credential stored
 
 login
-  host ── webauthnAssertionOptions(rpId, expectedOrigin) ──► runtime
-    ◄── challenge bound to that origin and RP id
+  host ── webauthnAssertionOptions(operationId, rpId, expectedOrigin)
+    ◄── challenge bound to that operation, origin, and RP id
   browser ── navigator.credentials.get({ publicKey }) ──► authenticator
   host ── credentialFromAssertion(operationId, credentialId, response)
-    ◄── { ok, envelope, refresh }   challenge consumed; counter advanced
+    ◄── { ok, envelope, refresh }
+        challenge consumed in the operation; counter advanced at the
+        organization that owns the credential
 ```
 
 The host turns the returned `envelope` and `refresh` into its own session
@@ -41,8 +45,9 @@ writes no browser state.
 | --- | --- |
 | Host | the activation secret until it is delivered, the browser calls, `rpId` and `expectedOrigin`, cookies, product responses |
 | Browser/authenticator | the private key and (for a discoverable credential) the user handle; it signs only the challenge the runtime minted |
-| Organization authority | the principal link `(webauthn, credential id)`, the public key, the sign counter, the backup flags, and the one-shot assertion challenges |
-| Runtime surface | the ceremony options, the proof verification, and issuance through the ordinary session path |
+| Organization authority | the principal link `(webauthn, credential id)`, the public key, the sign counter, and the backup flags |
+| Operation authority | the one-shot assertion challenges, bound to the operation, origin, and RP id |
+| Runtime surface | the ceremony options, organization resolution, the proof verification, and issuance through the ordinary session path |
 | Operator | activation-mint, a federated link for a passkey actor, and recovery; a direct passkey-add ceremony is not built |
 
 The WebAuthn methods take the activation secret itself and hash it at the
@@ -51,7 +56,9 @@ stores only the digest. Pass the same secret to both WebAuthn calls.
 
 ## Registration
 
-`webauthnRegistrationOptions` returns options that are already
+`webauthnRegistrationOptions` takes the claim secret and resolves the
+organization it names across the runtime's directory; the host never sees
+or supplies that id. It returns options that are already
 `PublicKeyCredentialCreationOptions` except for two browser conversions:
 
 - `challenge` is base64url text — decode it to bytes;
@@ -63,7 +70,7 @@ contract), `residentKey` is `"required"` so the credential is discoverable,
 
 ```js
 const options = await runtime.webauthnRegistrationOptions({
-  interfaceVersion, organizationId, secret, rpId,
+  interfaceVersion, secret, rpId,
 });
 const credential = await navigator.credentials.create({ publicKey: {
   challenge: base64urlToBytes(options.challenge),
@@ -99,14 +106,16 @@ The two mixed-actor directions are not symmetric today:
 
 ## Login
 
-`webauthnAssertionOptions` mints a single-use challenge bound to the
-`rpId` and `expectedOrigin` in the call. Pass no `allowCredentials` list:
-the credential is discoverable, so the authenticator finds the user handle
-itself and the flow needs no username.
+`webauthnAssertionOptions` mints a single-use challenge **in the operation
+coordinator**, bound to the `operationId`, `rpId`, and `expectedOrigin` in
+the call. The operation is what the host knows before a session exists; the
+organization is resolved only after the browser returns. Pass no
+`allowCredentials` list: the credential is discoverable, so the
+authenticator finds the user handle itself and the flow needs no username.
 
 ```js
 const options = await runtime.webauthnAssertionOptions({
-  interfaceVersion, organizationId, rpId, expectedOrigin,
+  interfaceVersion, operationId, rpId, expectedOrigin,
 });
 const credential = await navigator.credentials.get({ publicKey: {
   challenge: base64urlToBytes(options.challenge),
@@ -122,8 +131,11 @@ credentialId, response.authenticatorData, response.clientDataJSON,
 response.signature        // all unpadded base64url
 ```
 
-On success the runtime consumes the challenge, advances the stored sign
-counter, and returns `{ envelope, refresh }`. Issuance is the ordinary path:
+After verifying the signature the runtime resolves the credential id across
+its organization directory, consumes the challenge in the operation, advances
+the stored sign counter at the organization that owns the credential, and
+returns `{ envelope, refresh }`. Two matches for one credential id are
+`unavailable`, never a guess. Issuance is the ordinary path:
 evidence is `provider: "webauthn"`, `subject: <credential id>`,
 `amr: ["webauthn"]`, and `auth_time` is the verification instant. A disabled
 actor is `not-admitted`; a revoked participation behaves as it does for a
@@ -160,8 +172,11 @@ passkey can be added.
 An authenticator that reports a zero sign counter is accepted forever; that
 is the synced-passkey signal, and most platform passkeys use it. A stored
 nonzero counter must strictly advance, and a regression is refused, not
-logged. The counter is advanced in the same transaction that consumes the
-challenge, so two concurrent assertions cannot both pass.
+logged. The challenge consume and the counter advance are separate
+coordinator acts — the operation's consume is the replay control, the
+organization's counter update is a compare-and-set — so two concurrent
+assertions still cannot both advance, and a failure between the two is a
+failed login, not a replay window.
 
 ## Recovery
 
