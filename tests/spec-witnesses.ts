@@ -109,7 +109,7 @@ export const SUPPLEMENTARY_WITNESSES: readonly SupplementaryWitness[] = [
 // genuinely exists only across a coordinator boundary. The passkey ids live
 // in the workerd ring because WebAuthn has no portable runtime.
 export const INTEGRATION_ONLY: readonly IntegrationOnly[] = [
-  ...["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"].map((id) => ({
+  ...["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9"].map((id) => ({
     id: id as SpecId,
     why: "the passkey ceremonies run in workerd; no portable runtime implements WebAuthn",
   })),

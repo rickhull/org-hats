@@ -14,6 +14,7 @@ import type { Env } from "../src/env";
 import {
   credentialFromRegistration,
   webauthnRegistrationOptions,
+  webauthnRegistrationOptionsJson,
 } from "../src/webauthn";
 import { decodeCbor, type CborValue } from "../src/webauthn/cbor";
 
@@ -34,6 +35,9 @@ const b64 = (bytes: Uint8Array): string =>
 
 const fromB64 = (text: string): Uint8Array =>
   new Uint8Array([...atob(text)].map((c) => c.charCodeAt(0)));
+
+const fromB64url = (text: string): Uint8Array =>
+  fromB64(text.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (text.length % 4)) % 4));
 
 const b64url = (bytes: Uint8Array): string => {
   const raw = btoa(String.fromCharCode(...bytes));
@@ -171,6 +175,20 @@ describe("registration through the claim", () => {
 
     const second = await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
     expect(second.ok && second.ok && second.challenge).not.toBe(first.challenge);
+  });
+
+  it("mints JSON registration options whose ids need no host conversion [W9]", async () => {
+    const { organizationId, secret } = await ready("options-json");
+    const options = await webauthnRegistrationOptionsJson(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
+    expect(options.ok).toBe(true);
+    if (!options.ok) return;
+    // the JSON serialization parseCreationOptionsFromJSON reads: both ids are
+    // base64url, not the actor-id text the host wire states
+    expect(new TextDecoder().decode(fromB64url(options.user.id))).toBe(CREW);
+    expect(fromB64url(options.challenge).length).toBeGreaterThan(20);
+    expect(options.user.name).toBe(CREW);
+    expect(options.pubKeyCredParams).toEqual([{ type: "public-key", alg: -7 }]);
+    expect(options.rp.id).toBe(RP_ID);
   });
 
   it("takes the plaintext secret and refuses its digest where the secret belongs", async () => {

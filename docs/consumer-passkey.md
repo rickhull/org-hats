@@ -93,6 +93,10 @@ exact `expectedOrigin` the browser spoke to. On success the activation claim
 is spent and the actor can log in; a failure is uniform, and a host cannot
 tell "already linked" from "bad secret" (see below).
 
+If the browser supports `parseCreationOptionsFromJSON`, skip both
+conversions by calling `webauthnRegistrationOptionsJson` instead; see
+[Modern JSON serialization](#modern-json-serialization).
+
 A claim enrolls at most one credential, and only for an actor with no links.
 The two mixed-actor directions are not symmetric today:
 
@@ -146,20 +150,33 @@ federated login.
 
 ## Modern JSON serialization
 
-Browsers now expose `PublicKeyCredential.parseCreationOptionsFromJSON()`,
-`parseRequestOptionsFromJSON()`, and `credential.toJSON()`. The response half
-already fits this runtime: pass `credential.toJSON()`'s `response` for
+Browsers expose `PublicKeyCredential.parseCreationOptionsFromJSON()`,
+`parseRequestOptionsFromJSON()`, and `credential.toJSON()`. Use the JSON
+registration method when it is available:
+
+```js
+const options = await runtime.webauthnRegistrationOptionsJson({
+  interfaceVersion, secret, rpId,
+});
+const publicKey = PublicKeyCredential.parseCreationOptionsFromJSON(options);
+const credential = await navigator.credentials.create({ publicKey });
+```
+
+`webauthnRegistrationOptionsJson` is additive: it returns the same ceremony
+as `webauthnRegistrationOptions`, with `challenge` and `user.id` already
+base64url, so no host conversion is needed. The host-wire method and its two
+conversions remain unchanged for hosts that encode the ids themselves.
+
+Assertion options already fit `parseRequestOptionsFromJSON` as returned:
+`challenge` is base64url and `rpId` is the relying-party id, so call it
+directly. On the response side, pass `credential.toJSON()`'s `response` for
 registration, and for assertion map `credential.id` to `credentialId` and
 pass the `response` fields.
-The options half does not yet: `parseCreationOptionsFromJSON` reads `user.id`
-as base64url bytes, while the runtime states it as the actor-id string, so
-the two manual conversions above remain required. Closing that gap is
-recorded in [`../plans/passkey_json_options.md`](../plans/passkey_json_options.md);
-it is a consumer-visible wire change and is not landed.
 
 Where the parse and serialization methods are unavailable (they are Baseline
 2025), the manual encodings in the samples above remain the fallback. Load a
 pinned `webauthn-polyfills` from your own origin rather than an unpinned CDN.
+The invariants are in [`../specs/passkeys.md`](../specs/passkeys.md) (W9).
 
 ## Failure is uniform
 

@@ -140,3 +140,18 @@ user-verification flag into `amr`.
 `accessFromEvidence` path both login methods reach.
 *If it breaks:* passkeys become a second session model with its own policy,
 and the envelope stops being the one place a host reads authentication facts.
+
+### W9 — The JSON registration wire needs no host conversion
+
+`webauthnRegistrationOptionsJson` returns the same ceremony with `challenge`
+and `user.id` as base64url text, so
+`PublicKeyCredential.parseCreationOptionsFromJSON` accepts the result
+unchanged. The host-wire method and its two conversions remain available and
+unchanged; the JSON method is additive, not a replacement. Assertion options
+already carry base64url `challenge` and `rpId`, so
+`parseRequestOptionsFromJSON` needs no separate method.
+
+*Held by:* the registration suite's `[W9]` JSON-options test, which decodes
+`user.id` back to the actor id and checks the browser-shaped members.
+*If it breaks:* every host reimplements the two conversions, and a wire
+mistake surfaces only in a person's browser.

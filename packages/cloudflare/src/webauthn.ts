@@ -70,6 +70,10 @@ export type WebauthnRegistrationOptionsResult =
   }
   | { readonly ok: false; readonly failure: Failure };
 
+/** The same shape as the host-wire result; `challenge` and `user.id` carry
+ * the browser's base64url JSON serialization instead of the host-wire text. */
+export type WebauthnRegistrationOptionsJsonResult = WebauthnRegistrationOptionsResult;
+
 export interface CredentialFromRegistrationInput {
   readonly interfaceVersion: typeof AUTHORITY_INTERFACE_VERSION;
   /** The same activation secret the options call took. The organization is
@@ -250,6 +254,22 @@ export const webauthnRegistrationOptions = async (
     },
     attestation: "none",
     timeout: WEBAUTHN_CEREMONY_LIFETIME_SECONDS * 1000,
+  };
+};
+
+/** Mint the same ceremony options for the browser's JSON serialization. The
+ * host-wire `challenge` and `user.id` conversions are performed here, so
+ * `PublicKeyCredential.parseCreationOptionsFromJSON` accepts the result
+ * unchanged; the host-wire method above keeps its existing shape. */
+export const webauthnRegistrationOptionsJson = async (
+  env: Env,
+  input: WebauthnRegistrationOptionsInput,
+): Promise<WebauthnRegistrationOptionsJsonResult> => {
+  const options = await webauthnRegistrationOptions(env, input);
+  if (!options.ok) return options;
+  return {
+    ...options,
+    user: { ...options.user, id: base64UrlOf(utf8(options.user.id)) },
   };
 };
 

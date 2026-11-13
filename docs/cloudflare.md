@@ -235,7 +235,7 @@ The host owns the browser ceremony — prompts, conditional mediation,
 cookies — and holds no signing key. The design decisions are normative in
 [authority_redesign.md](authority_redesign.md#local-credentials-passkeys--design-decisions).
 
-Four RPC methods on the `AuthorityRuntimeEntrypoint` service binding carry
+Five RPC methods on the `AuthorityRuntimeEntrypoint` service binding carry
 the ceremonies. The host names the operation for login and the claim secret
 for enrollment; it never supplies an organization id. The WebAuthn methods
 take the activation secret itself and hash it at the boundary with the same
@@ -253,6 +253,12 @@ stores only the digest.
   attestation is requested, and the only offered algorithm is ES256, in the
   browser's COSE form `{ type: "public-key", alg: -7 }` rather than as a
   JOSE name.
+- `webauthnRegistrationOptionsJson({ interfaceVersion, secret, rpId })`
+  returns the same ceremony in the browser's JSON serialization: `challenge`
+  and `user.id` are base64url text, so
+  `PublicKeyCredential.parseCreationOptionsFromJSON` accepts the result
+  unchanged. It is additive; the host-wire method and its two conversions
+  are unchanged.
 - `credentialFromRegistration({ interfaceVersion, secret, rpId,
   expectedOrigin, credential: { response: { attestationObject,
   clientDataJSON } } })` resolves the same organization from the secret,

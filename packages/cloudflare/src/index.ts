@@ -35,6 +35,7 @@ import {
   credentialFromRegistration,
   webauthnAssertionOptions,
   webauthnRegistrationOptions,
+  webauthnRegistrationOptionsJson,
   type CredentialFromAssertionInput,
   type CredentialFromAssertionResult,
   type CredentialFromRegistrationInput,
@@ -42,6 +43,7 @@ import {
   type WebauthnAssertionOptionsInput,
   type WebauthnAssertionOptionsResult,
   type WebauthnRegistrationOptionsInput,
+  type WebauthnRegistrationOptionsJsonResult,
   type WebauthnRegistrationOptionsResult,
 } from "./webauthn";
 import { base64UrlEncode, utf8, verify, type Failed } from "org-hats/access";
@@ -148,6 +150,11 @@ export class AuthorityRuntimeEntrypoint extends WorkerEntrypoint<Env> implements
    * challenge rotates on every call; unusable secrets answer uniformly. */
   webauthnRegistrationOptions(input: WebauthnRegistrationOptionsInput): Promise<WebauthnRegistrationOptionsResult> {
     return webauthnRegistrationOptions(this.env, input);
+  }
+  /** Mint the same options for `parseCreationOptionsFromJSON`: `challenge`
+   * and `user.id` are already base64url, so the host converts nothing. */
+  webauthnRegistrationOptionsJson(input: WebauthnRegistrationOptionsInput): Promise<WebauthnRegistrationOptionsJsonResult> {
+    return webauthnRegistrationOptionsJson(this.env, input);
   }
   /** Verify a passkey registration ceremony and enroll through the claim:
    * link, credential, and consume commit atomically in the organization
