@@ -31,6 +31,11 @@ scaled bench's state; the measured verdict, the consumer-agreed design
 (model-scoped epoch, trigger-backed), and the done-when are in
 [`snapshot_cache.md`](snapshot_cache.md).
 
+The passkey consumer JSON options path is deferred: the modern
+`parseCreationOptionsFromJSON` / `toJSON` flow needs a consumer-visible
+`user.id` wire change and a coordinated Quartermaster pin. The decision and
+the done-when are in [`passkey_json_options.md`](passkey_json_options.md).
+
 Durable decisions and completed work live in [`docs/`](../docs/README.md),
 [`specs/`](../specs/README.md), and commit history. Retired plans are removed;
 the index contains current forward work only.

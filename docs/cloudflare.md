@@ -299,6 +299,12 @@ Two counter rules are deliberate: a zero counter is accepted forever (the
 synced-passkey signal), and a stored nonzero counter must strictly
 advance — a regression is refused, not logged.
 
+The named invariants of this surface are in
+[`specs/passkeys.md`](../specs/passkeys.md). The parser is a closed, bounded
+subset over the fixed ceremony formats, and every cryptographic operation is
+left to `crypto.subtle`; the vetted-library question and the recorded trigger
+for revisiting it are settled there.
+
 Two preconditions travel with the surface. **The relying-party id is the
 zone apex**, so one credential works at every operation hostname, including
 hostnames that did not exist at enrollment; that requires **zone purity** —

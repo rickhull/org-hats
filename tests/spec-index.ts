@@ -50,8 +50,8 @@ export type SuiteName = "unit" | "smoke" | "integration" | "static";
 export const TRAITS = new Set(["portable", "unit", "smoke", "integration", "concurrency", "static", "review"]);
 
 const TEST_TITLE = /\b(?:test|it)\(\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|`([^`]*)`)/g;
-const TAG = /\[([AEP]\d+)\]/g;
-const SPEC_BLOCK = /^```[^\n]*\bspec=([AEP]\d+)\b([^\n]*)\n([\s\S]*?)^```[ \t]*$/gm;
+const TAG = /\[([AEPW]\d+)\]/g;
+const SPEC_BLOCK = /^```[^\n]*\bspec=([AEPW]\d+)\b([^\n]*)\n([\s\S]*?)^```[ \t]*$/gm;
 
 const rel = (path: string): string => relative(ROOT, path).split(sep).join("/");
 
@@ -80,7 +80,7 @@ export const readSpecs = (): {
     const lines = source.split(/\r?\n/);
     lines.forEach((line, index) => {
       if (!line.startsWith("### ")) return;
-      const match = /^### ([AEP]\d+)\s+—\s+(.+)$/.exec(line);
+      const match = /^### ([AEPW]\d+)\s+—\s+(.+)$/.exec(line);
       if (match === null) {
         problems.push(`${file}:${index + 1}: unparseable spec heading`);
         return;

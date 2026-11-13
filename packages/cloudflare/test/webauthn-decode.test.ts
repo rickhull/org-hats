@@ -95,7 +95,7 @@ describe("the CBOR decoder", () => {
     }
   });
 
-  it("refuses the constructs it does not implement, never skips them", () => {
+  it("refuses the constructs it does not implement, never skips them [W7]", () => {
     // major 6: tag
     expect(decodeCbor(new Uint8Array([0xc0, 0x01])).ok).toBe(false);
     // major 7: simple/float — starting with false (0xf4)
@@ -108,7 +108,7 @@ describe("the CBOR decoder", () => {
     expect(decodeCbor(new Uint8Array([0x1e])).ok).toBe(false);
   });
 
-  it("refuses nesting beyond the bound", () => {
+  it("refuses nesting beyond the bound [W7]", () => {
     let deep: CborValue = 1;
     for (let i = 0; i < 12; i += 1) deep = [deep];
     expect(decodeCbor(enc(deep)).ok).toBe(false);
@@ -172,7 +172,7 @@ describe("authenticator data", () => {
     expect(parsed.ok && parsed.value.credentialId).toBeUndefined();
   });
 
-  it("refuses trailing bytes, extension blocks, and truncation", () => {
+  it("refuses trailing bytes, extension blocks, and truncation [W7]", () => {
     const withCredential = authenticatorData(0x45, 1, true);
     expect(parseAuthenticatorData(new Uint8Array([...withCredential, 0x00])).ok).toBe(false);
     // extensions flag set (0x80): refused, not skipped
@@ -180,7 +180,7 @@ describe("authenticator data", () => {
     expect(parseAuthenticatorData(withCredential.slice(0, -3)).ok).toBe(false);
   });
 
-  it("refuses a credential block that is not a COSE EC2 ES256 key", () => {
+  it("refuses a credential block that is not a COSE EC2 ES256 key [W7]", () => {
     const rsaOnly = new Map<CborValue, CborValue>([[1, 2], [3, -7], [-1, 1], [-2, new Uint8Array(31)]]);
     const head = [...RPID_HASH, 0x45, 0, 0, 0, 1, ...aaguid, 0, 4, 1, 2, 3, 4];
     const bad = new Uint8Array([...head, ...enc(rsaOnly)]);

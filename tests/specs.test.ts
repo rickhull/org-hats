@@ -1,5 +1,5 @@
 // The spec witness gate. It is the test-side index over `specs/`: every
-// `A#`, `E#`, and `P#` heading needs at least one witness, and every witness
+// `A#`, `E#`, `P#`, and `W#` heading needs at least one witness, and every witness
 // must name a spec that still exists. The suites themselves remain the proof;
 // this gate makes an orphaned invariant or a stale tag fail loudly.
 //

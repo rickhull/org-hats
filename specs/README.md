@@ -17,9 +17,9 @@ The split, one line each:
 ## The protocol
 
 - Every entry carries a stable id (`A#` authority, `E#` envelope, `P#`
-  portability), a present-tense statement, *Held by* — the enforcement a
-  regression has to get past — and *If it breaks* — the consequence to
-  predict before choosing to break it.
+  portability, `W#` passkeys), a present-tense statement, *Held by* — the
+  enforcement a regression has to get past — and *If it breaks* — the
+  consequence to predict before choosing to break it.
 - A change that breaks an invariant names the id in its rationale and
   rewrites the entry in the same commit. Breaking one is allowed; breaking
   one silently is not.
@@ -40,6 +40,9 @@ The split, one line each:
 - [`portability.md`](portability.md) — the fence, the one reference
   runtime, the world-fixture boundary, and the public-repository and
   release posture.
+- [`passkeys.md`](passkeys.md) — the local-credential surface: the browser
+  wire, ceremony scope, uniform refusal, the counter rule, the claim guard,
+  and the closed parser.
 
 Quartermaster's `specs/` is a different genre — design-stage consumer
 contracts for unbuilt product surface. Neither directory mirrors the other;

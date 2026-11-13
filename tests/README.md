@@ -74,7 +74,7 @@ Every invariant in `specs/` has at least one named witness. A witness is:
   `tests/spec-witnesses.ts`; or
 - the same tag in a `packages/cloudflare/test/*.test.ts` title.
 
-`tests/specs.test.ts` is the gate. It parses `### A#`/`E#`/`P#` headings,
+`tests/specs.test.ts` is the gate. It parses `### A#`/`E#`/`P#`/`W#` headings,
 tagged titles, and `spec=` blocks; checks the supplementary table; and fails
 on an unwitnessed spec, an unknown id or trait, a stale static/review path, a
 failing portable block, or an integration-only id without a reason.

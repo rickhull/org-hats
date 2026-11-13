@@ -229,7 +229,7 @@ const assertLogin = async (input: {
 });
 
 describe("assertion login", () => {
-  it("mints an operation-scoped challenge bound to the origin and RP id, and rotates it", async () => {
+  it("mints an operation-scoped challenge bound to the origin and RP id, and rotates it [W4]", async () => {
     await prepare("options");
     const first = await assertionOptions();
     expect(first.ok).toBe(true);
@@ -241,7 +241,7 @@ describe("assertion login", () => {
     expect(second.ok && second.ok && second.challenge).not.toBe(first.challenge);
   });
 
-  it("enrolls through the claim, then asserts and issues a verified envelope", async () => {
+  it("enrolls through the claim, then asserts and issues a verified envelope [W8]", async () => {
     const { secret } = await prepare("e2e");
     const signer = await signerFor(env);
     const keys = await verificationKeys(env, signer);
@@ -266,7 +266,7 @@ describe("assertion login", () => {
     expect(verified.claims.auth_time).toBeGreaterThan(0);
   }, 60_000);
 
-  it("refuses a replayed challenge after the first login succeeds", async () => {
+  it("refuses a replayed challenge after the first login succeeds [W3]", async () => {
     const { secret } = await prepare("replay");
     const key = await passkey(0x01);
     await enrolled(secret, key);
@@ -282,7 +282,7 @@ describe("assertion login", () => {
     if (!second.ok) expect(second.failure.kind).toBe("unauthenticated");
   });
 
-  it("refuses a wrong origin, a wrong RP id, a tampered signature, and an unknown credential", async () => {
+  it("refuses a wrong origin, a wrong RP id, a tampered signature, and an unknown credential [W2]", async () => {
     const { secret } = await prepare("wrong");
     const key = await passkey(0x02);
     await enrolled(secret, key);
@@ -316,7 +316,7 @@ describe("assertion login", () => {
     if (!unknownResult.ok) expect(unknownResult.failure.kind).toBe("unauthenticated");
   });
 
-  it("refuses a counter that does not advance, and accepts zero counters", async () => {
+  it("refuses a counter that does not advance, and accepts zero counters [W5]", async () => {
     const { secret } = await prepare("counter");
     const key = await passkey(0x05);
     await enrolled(secret, key);

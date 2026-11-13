@@ -152,7 +152,7 @@ const ceremony = async (options: {
 };
 
 describe("registration through the claim", () => {
-  it("mints single-use ceremony options and rotates them", async () => {
+  it("mints single-use ceremony options and rotates them [W1]", async () => {
     const { organizationId, secret } = await ready("options");
     const first = await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
     expect(first.ok).toBe(true);
@@ -250,7 +250,7 @@ describe("registration through the claim", () => {
     if (!result.ok) expect(result.failure.kind).toBe("unauthenticated");
   });
 
-  it("enrolls through a genuine none-format ceremony and binds the link", async () => {
+  it("enrolls through a genuine none-format ceremony and binds the link [W6]", async () => {
     const { organizationId, secret } = await ready("enroll");
     const options = await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
     expect(options.ok).toBe(true);
@@ -301,7 +301,7 @@ describe("registration through the claim", () => {
     expect(registered.ok).toBe(true);
   });
 
-  it("refuses a wrong origin, a wrong challenge, and the wrong RP id", async () => {
+  it("refuses a wrong origin, a wrong challenge, and the wrong RP id [W2] [W4]", async () => {
     const cases = [
       { label: "origin", origin: "https://evil.example" },
       { label: "rp", rpId: "other.test" },
@@ -334,7 +334,7 @@ describe("registration through the claim", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("consumes the claim: a second registration on the same secret is refused", async () => {
+  it("consumes the claim: a second registration on the same secret is refused [W3]", async () => {
     const { organizationId, secret } = await ready("consume");
     const options = await webauthnRegistrationOptions(directory(organizationId), { interfaceVersion: AUTHORITY_INTERFACE_VERSION, secret, rpId: RP_ID });
     if (!options.ok) throw new Error("options failed");
@@ -350,7 +350,7 @@ describe("registration through the claim", () => {
     expect(again.ok).toBe(false);
   });
 
-  it("holds the strict guard: an actor linked after minting enrolls nothing", async () => {
+  it("holds the strict guard: an actor linked after minting enrolls nothing [W6]", async () => {
     const organizationId = "org-webauthn-guard";
     await call(org(organizationId), "POST", "/bootstrap", {
       ...organizationBootstrap(organizationId),

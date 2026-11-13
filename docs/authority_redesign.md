@@ -401,6 +401,11 @@ A local credential is a principal link like any other —
   name, never skipped. Taking `@simplewebauthn/server` remains an additive
   option — same routes, same storage — with one trigger: a pilot interop
   failure that cannot be reproduced and fixed in a single work session.
+  Modern Web Guidance recommends a vetted server library for WebAuthn; that
+  rule addresses general implementations with a broad parser and policy
+  surface, and the closed-verifier invariants it would replace are named in
+  [`specs/passkeys.md`](../specs/passkeys.md) (W7). The trigger above still
+  governs.
 
 Authentication facts travel without interpretation. Evidence may state how
 and when the principal authenticated — `amr` method references (RFC 8176)

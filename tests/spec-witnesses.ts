@@ -7,7 +7,7 @@
 // how it runs. A review witness names the document the claim is reviewed
 // against. Add an id here only when no tagged test is the cheaper witness.
 
-export type SpecId = `A${number}` | `E${number}` | `P${number}`;
+export type SpecId = `A${number}` | `E${number}` | `P${number}` | `W${number}`;
 export type Tier = "P" | "S" | "I1" | "I2" | "I3" | "X" | "R";
 
 export interface ConformanceWitness {
@@ -105,7 +105,12 @@ export const SUPPLEMENTARY_WITNESSES: readonly SupplementaryWitness[] = [
   },
 ];
 
-// Specs whose only witness is an I tier. The list is empty today: every id
-// has a portable, static, or review witness. Add an entry only when a fact
-// genuinely exists only across a coordinator boundary.
-export const INTEGRATION_ONLY: readonly IntegrationOnly[] = [];
+// Specs whose only witness is an I tier. Add an entry only when a fact
+// genuinely exists only across a coordinator boundary. The passkey ids live
+// in the workerd ring because WebAuthn has no portable runtime.
+export const INTEGRATION_ONLY: readonly IntegrationOnly[] = [
+  ...["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"].map((id) => ({
+    id: id as SpecId,
+    why: "the passkey ceremonies run in workerd; no portable runtime implements WebAuthn",
+  })),
+];

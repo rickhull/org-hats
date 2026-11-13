@@ -144,6 +144,23 @@ evidence is `provider: "webauthn"`, `subject: <credential id>`,
 actor is `not-admitted`; a revoked participation behaves as it does for a
 federated login.
 
+## Modern JSON serialization
+
+Browsers now expose `PublicKeyCredential.parseCreationOptionsFromJSON()`,
+`parseRequestOptionsFromJSON()`, and `credential.toJSON()`. The response half
+already fits this runtime: pass `credential.toJSON()`'s `response` for
+registration, and for assertion map `credential.id` to `credentialId` and
+pass the `response` fields.
+The options half does not yet: `parseCreationOptionsFromJSON` reads `user.id`
+as base64url bytes, while the runtime states it as the actor-id string, so
+the two manual conversions above remain required. Closing that gap is
+recorded in [`../plans/passkey_json_options.md`](../plans/passkey_json_options.md);
+it is a consumer-visible wire change and is not landed.
+
+Where the parse and serialization methods are unavailable (they are Baseline
+2025), the manual encodings in the samples above remain the fallback. Load a
+pinned `webauthn-polyfills` from your own origin rather than an unpinned CDN.
+
 ## Failure is uniform
 
 After a well-formed ceremony, the runtime refuses with `unauthenticated` for
@@ -233,3 +250,5 @@ with that requirement.
   — the normative decisions.
 - [`threat_model.md`](threat_model.md) — the passkey threats, mitigations,
   and residual risks.
+- [`../specs/passkeys.md`](../specs/passkeys.md) — the named invariants of
+  this surface.
