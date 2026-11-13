@@ -288,7 +288,7 @@ describe("the restore matrix", () => {
     const futureOrganization = await restore(
       "organization",
       "org-restore-matrix-future",
-      { ...organizationSnapshot, schemaVersion: "5" },
+      { ...organizationSnapshot, schemaVersion: "6" },
     );
     expect(futureOrganization.body.failure?.kind).toBe("invalid-command");
   }, 60_000);

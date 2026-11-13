@@ -16,6 +16,7 @@ import {
   type StateRow,
 } from "./state";
 import { initializeOrganizationSchema, ORGANIZATION_SCHEMA_VERSION } from "./schema/organization";
+import { base64UrlEncode } from "org-hats/access";
 import { displayLabelFailure, identifierFailure } from "./validation";
 import { handleOrganizationRequest } from "./http/organization";
 
@@ -1153,6 +1154,123 @@ export class OrganizationAuthority extends DurableObject<Env> {
     return value({ applied: true });
   }
 
+  /** Mint the WebAuthn ceremony challenge for an activation request.
+   * Single-use by rotation: every mint replaces the stored challenge, so a
+   * stale options page cannot satisfy a later registration. The refusal is
+   * the activation surface's uniform one — nothing about the request's
+   * state is enumerable from the outside. */
+  private webauthnChallenge(secretHash: string): Result<{
+    readonly challenge: string;
+    readonly actorId: string;
+    readonly displayName?: string;
+  }> {
+    const at = now();
+    return this.ctx.storage.transactionSync(() => {
+      const request = this.one(
+        "SELECT actor_id, consumed_at, revoked_at, expires_at FROM activation_requests WHERE secret_hash = ?",
+        secretHash,
+      );
+      if (
+        request === undefined || request["consumed_at"] !== null ||
+        request["revoked_at"] !== null || at >= Number(request["expires_at"])
+      ) return failure("unauthenticated", "activation is not usable");
+      const actorId = String(request["actor_id"]);
+      const actor = this.actor(actorId);
+      if (actor === undefined || actor.disabled) {
+        return failure("unauthenticated", "activation is not usable");
+      }
+      const challenge = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+      this.ctx.storage.sql.exec(
+        "UPDATE activation_requests SET webauthn_challenge = ? WHERE secret_hash = ?",
+        challenge,
+        secretHash,
+      );
+      return value({
+        challenge,
+        actorId,
+        ...(actor.displayName !== undefined ? { displayName: actor.displayName } : {}),
+      });
+    });
+  }
+
+  /** Read the stored challenge without consuming anything. The ceremony is
+   * verified outside the Durable Object (verification needs crypto.subtle
+   * over parsed bytes); this read is the same trust boundary as the
+   * service-bounding of every other internal route. */
+  private webauthnChallengeOf(secretHash: string): Result<{ readonly challenge: string; readonly actorId: string }> {
+    const request = this.one(
+      "SELECT actor_id, webauthn_challenge FROM activation_requests WHERE secret_hash = ?",
+      secretHash,
+    );
+    if (
+      request === undefined || request["webauthn_challenge"] === null ||
+      request["webauthn_challenge"] === undefined
+    ) return failure("unauthenticated", "activation is not usable");
+    return value({
+      challenge: String(request["webauthn_challenge"]),
+      actorId: String(request["actor_id"]),
+    });
+  }
+
+  /** The atomic act of passkey enrollment: one transaction binds the
+   * principal link, stores the credential, and consumes the activation
+   * request. The ceremony has already been verified by the caller; this is
+   * the state change, so the strict any-link guard and the consume happen
+   * together — no window where a link exists without its credential or the
+   * reverse. */
+  private webauthnRegister(input: {
+    readonly secretHash: string;
+    readonly credentialId: string;
+    readonly key: { readonly alg: string; readonly [field: string]: unknown };
+    readonly signCount: number;
+    readonly backupEligible: boolean;
+    readonly backedUp: boolean;
+  }): Result<{ applied: boolean; actorId: string }> {
+    const at = now();
+    return this.ctx.storage.transactionSync(() => {
+      const request = this.one(
+        "SELECT actor_id, consumed_at, revoked_at, expires_at, webauthn_challenge FROM activation_requests WHERE secret_hash = ?",
+        input.secretHash,
+      );
+      if (request === undefined || request["consumed_at"] !== null ||
+        request["revoked_at"] !== null || at >= Number(request["expires_at"])) {
+        return failure("unauthenticated", "activation is not usable");
+      }
+      const actorId = String(request["actor_id"]);
+      const actor = this.actor(actorId);
+      if (actor === undefined || actor.disabled) return failure("unauthenticated", "activation is not usable");
+      // the strict guard, verbatim from activationAccept: an actor holding
+      // any link cannot gain a second through a claim
+      const other = this.one("SELECT 1 AS present FROM principal_links WHERE actor_id = ? LIMIT 1", actorId);
+      if (other !== undefined) return failure("unauthenticated", "activation is not usable");
+      const claimed = this.one(
+        "SELECT actor_id FROM principal_links WHERE provider = ? AND subject = ?",
+        "webauthn", input.credentialId,
+      );
+      if (claimed !== undefined) return failure("denied", "the credential is already linked to another actor");
+      const stored = this.one("SELECT actor_id FROM credentials WHERE credential_id = ?", input.credentialId);
+      if (stored !== undefined) return failure("invalid-command", "credential id already stored");
+      this.ctx.storage.sql.exec(
+        "INSERT INTO principal_links (provider, subject, actor_id, created_at) VALUES (?, ?, ?, ?)",
+        "webauthn", input.credentialId, actorId, at,
+      );
+      this.ctx.storage.sql.exec(
+        `INSERT INTO credentials
+         (credential_id, actor_id, alg, key_json, sign_count, backup_eligible, backed_up, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        input.credentialId, actorId, input.key.alg,
+        canonicalJson(input.key as unknown as JsonValue),
+        input.signCount, input.backupEligible ? 1 : 0, input.backedUp ? 1 : 0, at, at,
+      );
+      this.ctx.storage.sql.exec(
+        "UPDATE activation_requests SET consumed_at = ?, webauthn_challenge = NULL WHERE secret_hash = ?",
+        at, input.secretHash,
+      );
+      this.audit("activation", `activation for actor ${actorId} accepted`, at);
+      return value({ applied: true, actorId });
+    });
+  }
+
   /** Scoped cleanup for one deleted operation: its invitation records,
    * the outbox rows addressed to it, the replay claims whose payloads name
    * it, and the audit facts that reference it. Everything else — actors,
@@ -1284,6 +1402,9 @@ export class OrganizationAuthority extends DurableObject<Env> {
       storeCredential: (input) => this.storeCredential(input),
       credentialFor: (credentialId) => this.credentialFor(credentialId),
       updateCredentialCounter: (credentialId, signCount) => this.updateCredentialCounter(credentialId, signCount),
+      webauthnChallenge: (secretHash) => this.webauthnChallenge(secretHash),
+      webauthnChallengeOf: (secretHash) => this.webauthnChallengeOf(secretHash),
+      webauthnRegister: (input) => this.webauthnRegister(input),
       restoreSnapshot: (input, operatorId) => this.restoreSnapshot(input, operatorId),
       auditRows: () => this.auditRows(),
       outboxRows: () => this.outboxRows(),

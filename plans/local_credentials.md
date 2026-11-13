@@ -82,7 +82,21 @@ the ordinary `principal_links` row `(webauthn, credential id)`:
 wipe/forget drill leaves it intact, and unlink removes it.
 **Evidence:** schema and restore-matrix coverage in the Cloudflare suite.
 
-## Phase 3 — registration through the claim
+## Phase 3 — registration through the claim — DONE
+
+Landed: `packages/cloudflare/src/webauthn.ts` — `webauthnRegistrationOptions`
+(challenge minted on the activation request, rotating on every call) and
+`credentialFromRegistration` (client-data boundary parse, challenge/origin
+match, RP-id hash, attestation decode, packed self-attestation verified
+via WebCrypto, then atomic link+credential+consume under the strict
+any-link guard). Internal DO routes `/webauthn-challenge` (mint/read) and
+`/webauthn-register`; schema v5 adds `activation_requests.webauthn_
+challenge`. Exposed as RPC methods on `AuthorityRuntimeEntrypoint` beside
+the provider exchange. One amendment to the approved shape: the inputs
+take `secretHash`, the digest every other activation route takes, not the
+plaintext secret — one hashing rule covers every door. Red-first tests in
+`packages/cloudflare/test/webauthn-registration.test.ts`, including the
+linked-after-minting window the guard must still close.
 
 `POST /webauthn/registration` (host-facing, beside the OIDC exchange):
 the host supplies the activation secret and the browser's registration

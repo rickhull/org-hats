@@ -31,6 +31,14 @@ import {
   type CloudflareSigner,
 } from "./runtime";
 import type { EvidenceFromProviderCodeInput, EvidenceFromProviderCodeResult } from "./exchange";
+import {
+  credentialFromRegistration,
+  webauthnRegistrationOptions,
+  type CredentialFromRegistrationInput,
+  type CredentialFromRegistrationResult,
+  type WebauthnRegistrationOptionsInput,
+  type WebauthnRegistrationOptionsResult,
+} from "./webauthn";
 import { base64UrlEncode, utf8, verify, type Failed, type VerifyKey } from "org-hats/access";
 import { CONFORMANCE_PRINCIPALS, type ConformanceWorld } from "org-hats/conformance";
 import { createCloudflareConformanceWorld } from "./conformance";
@@ -148,6 +156,17 @@ export class AuthorityRuntimeEntrypoint extends WorkerEntrypoint<Env> implements
    * `accessFromEvidence`. */
   evidenceFromProviderCode(input: EvidenceFromProviderCodeInput): Promise<EvidenceFromProviderCodeResult> {
     return evidenceFromProviderCode(this.env, input);
+  }
+  /** Mint the passkey ceremony options against an activation request. The
+   * challenge rotates on every call; unusable secrets answer uniformly. */
+  webauthnRegistrationOptions(input: WebauthnRegistrationOptionsInput): Promise<WebauthnRegistrationOptionsResult> {
+    return webauthnRegistrationOptions(this.env, input);
+  }
+  /** Verify a passkey registration ceremony and enroll through the claim:
+   * link, credential, and consume commit atomically in the organization
+   * coordinator, under the strict any-link guard. */
+  credentialFromRegistration(input: CredentialFromRegistrationInput): Promise<CredentialFromRegistrationResult> {
+    return credentialFromRegistration(this.env, input);
   }
   refresh(input: RefreshInput): Promise<AccessIssue | Failed> {
     return runtime(this.env).then((value) => value.refresh(input));

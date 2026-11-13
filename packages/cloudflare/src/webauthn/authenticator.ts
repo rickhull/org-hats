@@ -39,6 +39,10 @@ export interface Attestation {
 
 export interface Registration {
   readonly format: "none" | "packed";
+  /** The raw authenticator-data bytes, exactly as signed: a self-attestation
+   * signature covers `authenticatorData || clientDataHash`, so the verifier
+   * needs the member's bytes, not a re-encoding. */
+  readonly authenticatorDataBytes: Uint8Array;
   readonly authenticator: AuthenticatorData;
   readonly credentialId: Uint8Array;
   readonly credentialKey: CoseKey;
@@ -142,7 +146,7 @@ export const parseAttestationObject = (bytes: Uint8Array): ParseResult<Registrat
   if (!(attStmt instanceof Map)) return fail("the attestation statement is not a CBOR map");
   if (fmt === "none") {
     if (attStmt.size !== 0) return fail("a none-format statement carries fields");
-    return { ok: true, value: { format: "none", authenticator: authenticator.value, credentialId, credentialKey } };
+    return { ok: true, value: { format: "none", authenticatorDataBytes: authDataBytes, authenticator: authenticator.value, credentialId, credentialKey } };
   }
   const alg = attStmt.get("alg");
   const signature = attStmt.get("sig");
@@ -154,6 +158,7 @@ export const parseAttestationObject = (bytes: Uint8Array): ParseResult<Registrat
     ok: true,
     value: {
       format: "packed",
+      authenticatorDataBytes: authDataBytes,
       authenticator: authenticator.value,
       credentialId,
       credentialKey,

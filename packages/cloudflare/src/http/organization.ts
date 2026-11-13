@@ -55,6 +55,16 @@ export interface OrganizationRouteHost {
     readonly backupEligible: boolean;
     readonly backedUp: boolean;
   }): Result<unknown>;
+  webauthnChallenge(secretHash: string): Result<unknown>;
+  webauthnChallengeOf(secretHash: string): Result<unknown>;
+  webauthnRegister(input: {
+    readonly secretHash: string;
+    readonly credentialId: string;
+    readonly key: { readonly alg: string; readonly [field: string]: unknown };
+    readonly signCount: number;
+    readonly backupEligible: boolean;
+    readonly backedUp: boolean;
+  }): Result<unknown>;
   credentialFor(credentialId: string): Result<unknown>;
   updateCredentialCounter(credentialId: string, signCount: number): Result<unknown>;
   forgetOperation(operationId: string): Result<unknown>;
@@ -218,6 +228,28 @@ export const handleOrganizationRequest = async (
         asString(body["credentialId"], "credentialId"),
         asWholeNumber(body["signCount"], "signCount"),
       ));
+    }
+
+    if (request.method === "POST" && url.pathname === "/webauthn-challenge") {
+      const body = await readBody(request);
+      return json(host.webauthnChallenge(asString(body["secretHash"], "secretHash")));
+    }
+    if (request.method === "GET" && url.pathname === "/webauthn-challenge") {
+      return json(host.webauthnChallengeOf(asString(url.searchParams.get("secretHash"), "secretHash")));
+    }
+    if (request.method === "POST" && url.pathname === "/webauthn-register") {
+      // the ceremony is already verified by the caller; this is the atomic
+      // state change (link + credential + consume) inside one transaction
+      const body = await readBody(request);
+      const key = asRecord(body["key"]);
+      return json(host.webauthnRegister({
+        secretHash: asString(body["secretHash"], "secretHash"),
+        credentialId: asString(body["credentialId"], "credentialId"),
+        key: { ...key, alg: asString(key["alg"], "key.alg") },
+        signCount: asWholeNumber(body["signCount"] ?? 0, "signCount"),
+        backupEligible: body["backupEligible"] === true,
+        backedUp: body["backedUp"] === true,
+      }));
     }
 
     if (request.method === "POST" && url.pathname === "/forget-operation") {
