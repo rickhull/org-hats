@@ -273,6 +273,19 @@ documentation live in `docs/`, named invariants in `specs/`, and
 forward-looking plans in `plans/`.
 `AGENTS.md` carries directives only.
 
+**This repository owns no skills.** Every skill it offers comes from the
+shared agent-skills library at `~/.agents/packs`; `.agents/skills` holds
+generated per-skill symlinks that are gitignored, and `.envrc` runs
+`bin/wire-skills` on shell entry.  The packs are `cloudflare` and
+`typescript`, named in `bin/wire-skills` and `.pi/settings.json`, which are
+changed together.  `.claude/skills` is a tracked symlink to `.agents/skills`.
+Links are per skill and never per pack: Claude Code does not recurse a linked
+pack directory, so a pack-level link offers nothing, while Codex recurses and
+pi reads the pack paths from settings.  A skill worth writing goes to the
+shared library, not here; do not vendor a skill tree, add
+`.agents/skills/<name>/SKILL.md` as a real file, or create real files under
+`.claude/skills/`.
+
 Each agent enforces the Git policy with its own guard, because no shared
 mechanism exists: `.claude/settings.json` (allow + ask + deny),
 `.codex/config.toml` with `.codex/git-guard.sh`, and

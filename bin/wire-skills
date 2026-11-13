@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Link this repository's skill packs into `.agents/skills`.
+#
+# The packs are the shared agent-skills library at `~/.agents/packs`, which is
+# machine-local and outside Git on purpose: a symlink cannot hold `~`, so a
+# committed link would carry one machine's absolute home path. The links are
+# therefore generated and gitignored, and this script is the generator.
+#
+# **One link per skill, never one per pack.** Claude Code does not recurse a
+# linked pack directory — `.agents/skills/cloudflare` pointing at the pack
+# would load zero skills — while Codex recurses whatever it finds and pi reads
+# the pack paths from `.pi/settings.json`. Per-skill links are the one layout
+# all three harnesses discover, through the single tracked
+# `.claude/skills -> ../.agents/skills` symlink.
+#
+# It is idempotent, removes links whose target has gone, and **fails loudly
+# when a pack is absent** rather than leaving a clone silently skill-less.
+# `.envrc` runs it on shell entry; run it by hand after changing PACKS.
+
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+
+# This repository's packs, per the shared library's repo-to-pack mapping.
+readonly PACKS=(cloudflare typescript)
+readonly ROOT="${AGENT_PACKS_ROOT:-$HOME/.agents/packs}"
+readonly DEST=.agents/skills
+
+note() { printf 'skills: %s\n' "$1"; }
+
+missing=0
+for pack in "${PACKS[@]}"; do
+  [[ -d "$ROOT/$pack" ]] || { note "MISSING pack '$pack' is not at $ROOT/$pack"; missing=1; }
+done
+if (( missing )); then
+  note "the shared agent-skills library is not installed on this machine"
+  note "install it, or set AGENT_PACKS_ROOT, then re-run bin/wire-skills"
+  note "no skill is linked, so every harness here will offer none"
+  exit 1
+fi
+
+mkdir -p "$DEST" || exit 1
+
+# Drop stale links first: a renamed or retired pack skill must not linger as a
+# dangling entry that a harness still lists.
+shopt -s nullglob
+for link in "$DEST"/*; do
+  [[ -L $link ]] || continue
+  [[ -e $link ]] || { rm -f -- "$link"; note "pruned dangling $(basename "$link")"; }
+done
+
+linked=0
+for pack in "${PACKS[@]}"; do
+  for skill in "$ROOT/$pack"/*; do
+    [[ -d $skill ]] || continue
+    name=$(basename "$skill")
+    target=$DEST/$name
+    if [[ -e $target && ! -L $target ]]; then
+      note "REFUSED $name exists as a real path; a pack must not overwrite tracked content"
+      exit 1
+    fi
+    ln -sfn -- "$skill" "$target" || exit 1
+    linked=$((linked + 1))
+  done
+done
+
+note "linked $linked skills from: ${PACKS[*]}"
