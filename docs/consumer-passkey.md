@@ -15,10 +15,10 @@ is usernameless, because the credential is discoverable.
 
 ```text
 enrollment
-  host ── webauthnRegistrationOptions(secretHash, rpId) ──► runtime
+  host ── webauthnRegistrationOptions(secret, rpId) ──► runtime
     ◄── challenge, rp, user, pubKeyCredParams, authenticatorSelection
   browser ── navigator.credentials.create({ publicKey }) ──► authenticator
-  host ── credentialFromRegistration(secretHash, rpId, expectedOrigin,
+  host ── credentialFromRegistration(secret, rpId, expectedOrigin,
                                       response) ──► runtime
     ◄── { ok, actorId }        claim consumed; link + credential stored
 
@@ -39,17 +39,15 @@ writes no browser state.
 
 | Holder | Holds |
 | --- | --- |
-| Host | the activation secret until it is hashed and delivered, the browser calls, `rpId` and `expectedOrigin`, cookies, product responses |
+| Host | the activation secret until it is delivered, the browser calls, `rpId` and `expectedOrigin`, cookies, product responses |
 | Browser/authenticator | the private key and (for a discoverable credential) the user handle; it signs only the challenge the runtime minted |
 | Organization authority | the principal link `(webauthn, credential id)`, the public key, the sign counter, the backup flags, and the one-shot assertion challenges |
 | Runtime surface | the ceremony options, the proof verification, and issuance through the ordinary session path |
 | Operator | activation-mint, a federated link for a passkey actor, and recovery; a direct passkey-add ceremony is not built |
 
-The WebAuthn surface takes `secretHash`, the SHA-256 hex digest of the
-activation secret, not the plaintext; the runtime stores only the digest.
-This differs from the binding's `activationAccept` and `activationInspect`,
-which take the secret and hash it internally, so hash once and reuse the
-digest for both WebAuthn calls.
+The WebAuthn methods take the activation secret itself and hash it at the
+boundary with the same SHA-256 rule `activationAccept` uses; the runtime
+stores only the digest. Pass the same secret to both WebAuthn calls.
 
 ## Registration
 
@@ -65,7 +63,7 @@ contract), `residentKey` is `"required"` so the credential is discoverable,
 
 ```js
 const options = await runtime.webauthnRegistrationOptions({
-  interfaceVersion, organizationId, secretHash, rpId,
+  interfaceVersion, organizationId, secret, rpId,
 });
 const credential = await navigator.credentials.create({ publicKey: {
   challenge: base64urlToBytes(options.challenge),
@@ -80,7 +78,7 @@ const credential = await navigator.credentials.create({ publicKey: {
 
 Encode `credential.response.attestationObject` and
 `credential.response.clientDataJSON` as unpadded base64url and call
-`credentialFromRegistration` with the same `secretHash`, `rpId`, and the
+`credentialFromRegistration` with the same `secret`, `rpId`, and the
 exact `expectedOrigin` the browser spoke to. On success the activation claim
 is spent and the actor can log in; a failure is uniform, and a host cannot
 tell "already linked" from "bad secret" (see below).

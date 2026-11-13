@@ -12,10 +12,9 @@
 //
 // Everything cryptographic stays in crypto.subtle; parsing stays in
 // ./webauthn/cbor, ./webauthn/authenticator, and ./webauthn/verify with the
-// envelope gate's discipline. The activation secret arrives as its SHA-256
-// hex digest, unlike the binding's activation methods, which take the
-// plaintext secret and hash it at the boundary. Both ceremonies take the
-// digest so the host hashes once.
+// envelope gate's discipline. The activation secret is hashed at this
+// boundary with the same SHA-256 rule the binding's activation methods use.
+// The host passes the secret it delivered; no caller computes a digest.
 
 import {
   AUTHORITY_INTERFACE_VERSION,
@@ -25,7 +24,7 @@ import {
 } from "org-hats/authority";
 import { base64UrlDecode, utf8 } from "org-hats/access";
 import type { Env } from "./env";
-import { runtimeFor } from "./runtime";
+import { activationSecretHash, runtimeFor } from "./runtime";
 import {
   parseAttestationObject,
   parseAuthenticatorData,
@@ -37,8 +36,9 @@ import { verifySignature } from "./webauthn/verify";
 export interface WebauthnRegistrationOptionsInput {
   readonly interfaceVersion: typeof AUTHORITY_INTERFACE_VERSION;
   readonly organizationId: string;
-  /** The activation request's digest, exactly as `/activation-accept` takes it. */
-  readonly secretHash: string;
+  /** The activation secret as delivered; hashed at this boundary, never a
+   * caller-computed digest. */
+  readonly secret: string;
   /** The relying-party id the host serves — the zone apex by contract.
    * Minted into the options so the browser's default (the origin host)
    * cannot create a credential the runtime will not accept. */
@@ -68,7 +68,8 @@ export type WebauthnRegistrationOptionsResult =
 export interface CredentialFromRegistrationInput {
   readonly interfaceVersion: typeof AUTHORITY_INTERFACE_VERSION;
   readonly organizationId: string;
-  readonly secretHash: string;
+  /** The same activation secret the options call took. */
+  readonly secret: string;
   /** The relying-party id the host serves — the zone apex by contract. */
   readonly rpId: string;
   /** The origin the browser spoke to; the runtime verifies the ceremony
@@ -142,14 +143,15 @@ export const webauthnRegistrationOptions = async (
   if (input.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) {
     return failed({ kind: "wrong-interface-version" });
   }
-  if (input.rpId.length === 0) {
-    return failed({ kind: "invalid-command", detail: "rpId must be a non-empty string" });
+  if (input.rpId.length === 0 || input.secret.length === 0) {
+    return failed({ kind: "invalid-command", detail: "rpId and secret must be non-empty strings" });
   }
+  const secretHash = await activationSecretHash(input.secret);
   const response = await env.ORGANIZATION.get(env.ORGANIZATION.idFromName(input.organizationId))
     .fetch("https://authority.internal/webauthn-challenge", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ secretHash: input.secretHash }),
+      body: JSON.stringify({ secretHash }),
     });
   const body = (await response.json()) as {
     ok: boolean;
@@ -187,10 +189,14 @@ export const credentialFromRegistration = async (
   env: Env,
   input: CredentialFromRegistrationInput,
 ): Promise<CredentialFromRegistrationResult> => {
+  if (input.secret.length === 0) {
+    return failed({ kind: "invalid-command", detail: "secret must be a non-empty string" });
+  }
   const stub = env.ORGANIZATION.get(env.ORGANIZATION.idFromName(input.organizationId));
+  const secretHash = await activationSecretHash(input.secret);
 
   const challengeResponse = await stub.fetch(
-    `https://authority.internal/webauthn-challenge?secretHash=${encodeURIComponent(input.secretHash)}`,
+    `https://authority.internal/webauthn-challenge?secretHash=${encodeURIComponent(secretHash)}`,
   );
   const challengeBody = (await challengeResponse.json()) as {
     ok: boolean;
@@ -249,7 +255,7 @@ export const credentialFromRegistration = async (
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      secretHash: input.secretHash,
+      secretHash,
       credentialId: credentialIdText,
       key:
         credentialKey.alg === "ES256"

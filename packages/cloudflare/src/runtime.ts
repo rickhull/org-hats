@@ -259,6 +259,14 @@ export const organizationDirectory = (env: Env): readonly string[] =>
     .map((id) => id.trim())
     .filter((id) => id.length > 0);
 
+/** The one activation-secret digest rule: SHA-256 over UTF-8, lowercase hex.
+ * The public activation methods and the WebAuthn ceremonies share it, so a
+ * host hashes nothing and the coordinator matches every door by one rule. */
+export const activationSecretHash = async (secret: string): Promise<string> => {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", utf8(secret)));
+  return [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
 /** The worker's runtime, built from its configuration: the signer, the
  * verification key set, and the organization directory. */
 export const runtimeFor = async (env: Env): Promise<AuthorityRuntime> => {
@@ -277,11 +285,6 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     env.ORGANIZATION.get(env.ORGANIZATION.idFromName(organizationId));
   const operation = (operationId: string): DurableObjectStub =>
     env.OPERATION.get(env.OPERATION.idFromName(operationId));
-
-  const hashActivationSecret = async (secret: string): Promise<string> => {
-    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", utf8(secret)));
-    return [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  };
 
   const newActivationSecret = (): string =>
     base64UrlEncode(crypto.getRandomValues(new Uint8Array(16)));
@@ -593,7 +596,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
       organization(input.organizationId),
       "POST",
       "/activation-request",
-      { actorId: input.actorId, byActorId: resolved.actorId, secretHash: await hashActivationSecret(secret) },
+      { actorId: input.actorId, byActorId: resolved.actorId, secretHash: await activationSecretHash(secret) },
     );
     if (!result.ok || result.value === undefined) return failed(result.failure ?? { kind: "unavailable" });
     return { ...result.value, secret };
@@ -603,7 +606,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     input: ActivationInspectInput,
   ): Promise<ActivationInspection | Failed> => {
     if (input.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) return failed({ kind: "wrong-interface-version" });
-    const secretHash = await hashActivationSecret(input.secret);
+    const secretHash = await activationSecretHash(input.secret);
     let usable = false;
     for (const organizationId of organizationIds) {
       const result = await call<{ usable: true }>(organization(organizationId), "POST", "/activation-inspect", { secretHash });
@@ -621,7 +624,7 @@ export const createCloudflareRuntime = (options: CloudflareRuntimeOptions): Auth
     input: ActivationAcceptInput,
   ): Promise<ActivationAcceptance | Failed> => {
     if (input.interfaceVersion !== AUTHORITY_INTERFACE_VERSION) return failed({ kind: "wrong-interface-version" });
-    const secretHash = await hashActivationSecret(input.secret);
+    const secretHash = await activationSecretHash(input.secret);
     let targetOrganizationId: string | undefined;
     let replayActorId: string | undefined;
     for (const organizationId of organizationIds) {

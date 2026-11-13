@@ -20,11 +20,11 @@ regressions (claims shape gate, world/snapshot ownership, outbox union,
 route flag parsing); the durable findings live in
 [`docs/type_safety.md`](../docs/type_safety.md).
 
-The activation-secret shape is the next small interface cleanup: the
-public WebAuthn methods take `secretHash` while the activation methods take
-the plaintext secret, and the plan is to make every public method take the
-secret and hash at the boundary. The done-when and the consumer-facing
-consequence are in [`activation_secret_shape.md`](activation_secret_shape.md).
+The activation-secret shape is retired: every public activation and
+WebAuthn method now takes the secret and hashes it at the boundary, so a
+host hashes nothing and one digest rule covers every door. The rule is
+recorded in [`docs/cloudflare.md`](../docs/cloudflare.md) and
+[`docs/consumer-passkey.md`](../docs/consumer-passkey.md).
 
 The operation snapshot cache is deferred until a consumer approaches the
 scaled bench's state; the measured verdict, the consumer-agreed design

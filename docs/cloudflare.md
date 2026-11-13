@@ -236,20 +236,19 @@ cookies — and holds no signing key. The design decisions are normative in
 [authority_redesign.md](authority_redesign.md#local-credentials-passkeys--design-decisions).
 
 Four RPC methods on the `AuthorityRuntimeEntrypoint` service binding carry
-the ceremonies. The WebAuthn methods take the activation secret as its
-SHA-256 hex digest (`secretHash`), never the plaintext; the binding's
-`activationAccept` and `activationInspect` take the secret and hash it
-internally, so hash once and reuse the digest for both WebAuthn calls.
+the ceremonies. The WebAuthn methods take the activation secret itself and
+hash it at the boundary with the same SHA-256 rule `activationAccept` and
+`activationInspect` use; the coordinator stores only the digest.
 
 - `webauthnRegistrationOptions({ interfaceVersion, organizationId,
-  secretHash, rpId })` mints the ceremony options against a live activation
+  secret, rpId })` mints the ceremony options against a live activation
   request. The challenge rotates on every call, so a stale options page
   cannot satisfy a later registration. `rp.id` is the relying-party id the
   host serves and is minted into the options; `residentKey: "required"`
   makes the credential discoverable, `attestation: "none"` states that no
   attestation is requested, and the only offered algorithm is ES256.
 - `credentialFromRegistration({ interfaceVersion, organizationId,
-  secretHash, rpId, expectedOrigin, credential: { response:
+  secret, rpId, expectedOrigin, credential: { response:
   { attestationObject, clientDataJSON } } })` verifies the browser's
   registration response (ceremony type and challenge, origin, RP-id hash,
   user presence, attestation when present) and commits the link,

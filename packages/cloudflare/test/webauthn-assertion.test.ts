@@ -167,30 +167,31 @@ const assertion = async (
 };
 
 /** A fresh organization with an unlinked crew actor and a live claim. */
-const claimOrg = async (suffix: string): Promise<{ organizationId: string; secretHash: string }> => {
+const claimOrg = async (suffix: string): Promise<{ organizationId: string; secret: string }> => {
   const organizationId = `org-assert-${suffix}`;
   await call(org(organizationId), "POST", "/bootstrap", {
     ...organizationBootstrap(organizationId),
     principalLinks: [{ provider: "idp", subject: "lead", actorId: LEAD }],
   });
-  const secretHash = secretHashOf(`secret-${suffix}`);
+  const secret = `secret-${suffix}`;
+  const secretHash = secretHashOf(secret);
   const minted = await call(org(organizationId), "POST", "/activation-request", {
     actorId: CREW, byActorId: LEAD, secretHash,
   });
   expect(minted.body.ok).toBe(true);
-  return { organizationId, secretHash };
+  return { organizationId, secret };
 };
 
 /** Enroll `key` for `actorId` through the claim, returning the stored key. */
 const enrolled = async (
-  input: { readonly organizationId: string; readonly secretHash: string },
+  input: { readonly organizationId: string; readonly secret: string },
   key: Passkey,
   signCount = 0,
 ): Promise<void> => {
   const options = await webauthnRegistrationOptions(testEnv, {
     interfaceVersion: AUTHORITY_INTERFACE_VERSION,
     organizationId: input.organizationId,
-    secretHash: input.secretHash,
+    secret: input.secret,
     rpId: RP_ID,
   });
   if (!options.ok) throw new Error(`registration options failed: ${options.failure.kind}`);
@@ -198,7 +199,7 @@ const enrolled = async (
   const registered = await credentialFromRegistration(testEnv, {
     interfaceVersion: AUTHORITY_INTERFACE_VERSION,
     organizationId: input.organizationId,
-    secretHash: input.secretHash,
+    secret: input.secret,
     rpId: RP_ID,
     expectedOrigin: ORIGIN,
     credential: { response: ceremony },
@@ -226,8 +227,7 @@ const assertLogin = async (input: {
 
 describe("assertion login", () => {
   it("mints a challenge bound to the origin and RP id, and rotates it", async () => {
-    const { organizationId, secretHash } = await claimOrg("options");
-    void secretHash;
+    const { organizationId } = await claimOrg("options");
     const first = await webauthnAssertionOptions(testEnv, {
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
       organizationId,
@@ -260,14 +260,15 @@ describe("assertion login", () => {
       actorId: DANA, byActorId: DANA, idempotencyKey: "assert-unlink-dana",
     });
     expect(unlinked.body.ok).toBe(true);
-    const secretHash = secretHashOf("assert-dana-passkey");
+    const secret = "assert-dana-passkey";
+    const secretHash = secretHashOf(secret);
     const minted = await call(danaOrg, "POST", "/activation-request", {
       actorId: DANA, byActorId: DANA, secretHash,
     });
     expect(minted.body.ok).toBe(true);
 
     const key = await passkey(0xab);
-    await enrolled({ organizationId: DANA_ORG, secretHash }, key);
+    await enrolled({ organizationId: DANA_ORG, secret }, key);
 
     const options = await webauthnAssertionOptions(directory, {
       interfaceVersion: AUTHORITY_INTERFACE_VERSION,
@@ -299,9 +300,9 @@ describe("assertion login", () => {
   }, 60_000);
 
   it("refuses a replayed challenge", async () => {
-    const { organizationId, secretHash } = await claimOrg("replay");
+    const { organizationId, secret } = await claimOrg("replay");
     const key = await passkey(0x01);
-    await enrolled({ organizationId, secretHash }, key);
+    await enrolled({ organizationId, secret }, key);
     const options = await webauthnAssertionOptions(testEnv, {
       interfaceVersion: AUTHORITY_INTERFACE_VERSION, organizationId, rpId: RP_ID, expectedOrigin: ORIGIN,
     });
@@ -323,9 +324,9 @@ describe("assertion login", () => {
   });
 
   it("refuses a wrong origin, a wrong RP id, and a tampered signature", async () => {
-    const { organizationId, secretHash } = await claimOrg("wrong");
+    const { organizationId, secret } = await claimOrg("wrong");
     const key = await passkey(0x02);
-    await enrolled({ organizationId, secretHash }, key);
+    await enrolled({ organizationId, secret }, key);
 
     const mint = async () => {
       const options = await webauthnAssertionOptions(testEnv, {
@@ -365,9 +366,9 @@ describe("assertion login", () => {
   });
 
   it("refuses a counter that does not advance, and accepts zero counters", async () => {
-    const { organizationId, secretHash } = await claimOrg("counter");
+    const { organizationId, secret } = await claimOrg("counter");
     const key = await passkey(0x05);
-    await enrolled({ organizationId, secretHash }, key);
+    await enrolled({ organizationId, secret }, key);
 
     const attempt = async (signCount: number) => {
       const options = await webauthnAssertionOptions(testEnv, {
