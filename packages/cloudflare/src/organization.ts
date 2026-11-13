@@ -587,6 +587,10 @@ export class OrganizationAuthority extends DurableObject<Env> {
       }
       if (this.actor(input.actorId) === undefined) return failure("invalid-command", "unknown actor");
       this.ctx.storage.sql.exec("DELETE FROM principal_links WHERE actor_id = ?", input.actorId);
+      // the identity reset takes the local credentials with the links: a
+      // stored key whose principal link is gone could never log in again,
+      // and keeping it would leave recovery half-done
+      this.ctx.storage.sql.exec("DELETE FROM credentials WHERE actor_id = ?", input.actorId);
       this.ctx.storage.sql.exec(
         "UPDATE activation_requests SET revoked_at = ? WHERE actor_id = ? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at > ?",
         at, input.actorId, at,
@@ -1068,6 +1072,87 @@ export class OrganizationAuthority extends DurableObject<Env> {
     return Number(this.one("SELECT COUNT(*) AS pending FROM outbox WHERE delivered_at IS NULL")?.["pending"] ?? 0);
   }
 
+  /** Store a local credential's public facts. The COSE key is stored as
+   * canonical JSON of the decoded key — the same fields a verifier needs,
+   * readable in an export, and never a second CBOR encoding to own. The
+   * credential's link to the actor is the ordinary `principal_links` row
+   * `(webauthn, credential id)`; this table holds what verification needs,
+   * and `unlink-principal` removes it with the link — the documented
+   * identity reset. */
+  private storeCredential(input: {
+    readonly credentialId: string;
+    readonly actorId: string;
+    readonly key: { readonly alg: string; readonly [field: string]: unknown };
+    readonly signCount: number;
+    readonly backupEligible: boolean;
+    readonly backedUp: boolean;
+  }): Result<{ applied: boolean }> {
+    const at = now();
+    if (this.organizationId() === undefined) return failure("unavailable", "organization is not bootstrapped");
+    return this.ctx.storage.transactionSync(() => {
+      if (this.actor(input.actorId) === undefined) return failure("invalid-command", "unknown actor");
+      const existing = this.one("SELECT actor_id FROM credentials WHERE credential_id = ?", input.credentialId);
+      if (existing !== undefined) {
+        return failure("invalid-command", "credential id already stored");
+      }
+      this.ctx.storage.sql.exec(
+        `INSERT INTO credentials
+         (credential_id, actor_id, alg, key_json, sign_count, backup_eligible, backed_up, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        input.credentialId,
+        input.actorId,
+        input.key.alg,
+        canonicalJson(input.key as unknown as JsonValue),
+        input.signCount,
+        input.backupEligible ? 1 : 0,
+        input.backedUp ? 1 : 0,
+        at,
+        at,
+      );
+      return value({ applied: true });
+    });
+  }
+
+  private credentialFor(credentialId: string): Result<{
+    readonly actorId: string;
+    readonly key: { readonly alg: string; readonly [field: string]: unknown };
+    readonly signCount: number;
+    readonly backupEligible: boolean;
+    readonly backedUp: boolean;
+  }> {
+    const row = this.one(
+      "SELECT actor_id, alg, key_json, sign_count, backup_eligible, backed_up FROM credentials WHERE credential_id = ?",
+      credentialId,
+    );
+    if (row === undefined) return failure("unauthenticated", "credential is not registered");
+    let key: { alg: string } | undefined;
+    try {
+      key = JSON.parse(String(row["key_json"])) as { alg: string };
+    } catch {
+      return failure("unavailable", "credential key is unreadable");
+    }
+    return value({
+      actorId: String(row["actor_id"]),
+      key: key as { readonly alg: string; readonly [field: string]: unknown },
+      signCount: Number(row["sign_count"]),
+      backupEligible: row["backup_eligible"] === 1,
+      backedUp: row["backed_up"] === 1,
+    });
+  }
+
+  /** Record the observed sign counter after a verified assertion. */
+  private updateCredentialCounter(credentialId: string, signCount: number): Result<{ applied: boolean }> {
+    const existing = this.one("SELECT 1 AS present FROM credentials WHERE credential_id = ?", credentialId);
+    if (existing === undefined) return failure("invalid-command", "credential is not registered");
+    this.ctx.storage.sql.exec(
+      "UPDATE credentials SET sign_count = ?, updated_at = ? WHERE credential_id = ?",
+      signCount,
+      now(),
+      credentialId,
+    );
+    return value({ applied: true });
+  }
+
   /** Scoped cleanup for one deleted operation: its invitation records,
    * the outbox rows addressed to it, the replay claims whose payloads name
    * it, and the audit facts that reference it. Everything else — actors,
@@ -1139,7 +1224,7 @@ export class OrganizationAuthority extends DurableObject<Env> {
     // restore rather than a second bootstrap. An unknown or future version is
     // still refused — a schema bump must not strand an export taken before it.
     const version = String(this.one("SELECT value FROM meta WHERE key = 'schema_version'")?.["value"] ?? "0");
-    const supported = new Set(["1", "2", ORGANIZATION_SCHEMA_VERSION, version]);
+    const supported = new Set(["1", "2", "3", ORGANIZATION_SCHEMA_VERSION, version]);
     if (!supported.has(String(snapshot.schemaVersion))) {
       return failure("invalid-command", "snapshot schema version does not match");
     }
@@ -1196,6 +1281,9 @@ export class OrganizationAuthority extends DurableObject<Env> {
       status: () => this.status(),
       exportSnapshot: () => this.exportSnapshot(),
       forgetOperation: (operationId) => this.forgetOperation(operationId),
+      storeCredential: (input) => this.storeCredential(input),
+      credentialFor: (credentialId) => this.credentialFor(credentialId),
+      updateCredentialCounter: (credentialId, signCount) => this.updateCredentialCounter(credentialId, signCount),
       restoreSnapshot: (input, operatorId) => this.restoreSnapshot(input, operatorId),
       auditRows: () => this.auditRows(),
       outboxRows: () => this.outboxRows(),

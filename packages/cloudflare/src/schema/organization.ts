@@ -2,7 +2,7 @@
 
 import { ensureColumn, initializeSchema, type SchemaMigration } from "./sql";
 
-export const ORGANIZATION_SCHEMA_VERSION = "3";
+export const ORGANIZATION_SCHEMA_VERSION = "4";
 
 const ACTIVATION_REQUESTS = `CREATE TABLE IF NOT EXISTS activation_requests (
   request_id TEXT PRIMARY KEY,
@@ -65,6 +65,17 @@ const TABLES: readonly string[] = [
     created_at INTEGER NOT NULL,
     delivered_at INTEGER
   )`,
+  `CREATE TABLE IF NOT EXISTS credentials (
+    credential_id TEXT PRIMARY KEY,
+    actor_id TEXT NOT NULL,
+    alg TEXT NOT NULL,
+    key_json TEXT NOT NULL,
+    sign_count INTEGER NOT NULL,
+    backup_eligible INTEGER NOT NULL,
+    backed_up INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
 ];
 
 export const organizationMigrations: readonly SchemaMigration[] = [
@@ -77,6 +88,23 @@ export const organizationMigrations: readonly SchemaMigration[] = [
     version: "3",
     name: "display-short-name",
     apply: (sql) => ensureColumn(sql, "organization", "short_name", "TEXT"),
+  },
+  {
+    version: "4",
+    name: "credentials",
+    apply: (sql) => sql.exec(
+      `CREATE TABLE IF NOT EXISTS credentials (
+        credential_id TEXT PRIMARY KEY,
+        actor_id TEXT NOT NULL,
+        alg TEXT NOT NULL,
+        key_json TEXT NOT NULL,
+        sign_count INTEGER NOT NULL,
+        backup_eligible INTEGER NOT NULL,
+        backed_up INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+    ),
   },
 ];
 

@@ -7,6 +7,7 @@ import {
   asBoolean,
   asRecord,
   asString,
+  asWholeNumber,
   failure,
   json,
   readBody,
@@ -46,6 +47,16 @@ export interface OrganizationRouteHost {
   revokeActivation(input: RecoveryInput): Result<unknown>;
   unlinkPrincipal(input: RecoveryInput): Result<unknown>;
   invite(invitationId: string, operationId: string): Result<unknown>;
+  storeCredential(input: {
+    readonly credentialId: string;
+    readonly actorId: string;
+    readonly key: { readonly alg: string; readonly [field: string]: unknown };
+    readonly signCount: number;
+    readonly backupEligible: boolean;
+    readonly backedUp: boolean;
+  }): Result<unknown>;
+  credentialFor(credentialId: string): Result<unknown>;
+  updateCredentialCounter(credentialId: string, signCount: number): Result<unknown>;
   forgetOperation(operationId: string): Result<unknown>;
   intakeParticipationRevoked(operationId: string): Result<unknown>;
   drain(): Promise<{ readonly delivered: number; readonly pending: number }>;
@@ -180,6 +191,32 @@ export const handleOrganizationRequest = async (
       return json(host.invite(
         asString(body["invitationId"], "invitationId"),
         asString(body["operationId"], "operationId"),
+      ));
+    }
+
+    if (request.method === "POST" && url.pathname === "/credential") {
+      // internal runtime surface, reached through the service binding — the
+      // public registration ceremony arrives in a later phase and owns its
+      // own route; this is storage, not ceremony
+      const body = await readBody(request);
+      const key = asRecord(body["key"]);
+      return json(host.storeCredential({
+        credentialId: asString(body["credentialId"], "credentialId"),
+        actorId: asString(body["actorId"], "actorId"),
+        key: { ...key, alg: asString(key["alg"], "key.alg") },
+        signCount: asWholeNumber(body["signCount"] ?? 0, "signCount"),
+        backupEligible: body["backupEligible"] === true,
+        backedUp: body["backedUp"] === true,
+      }));
+    }
+    if (request.method === "GET" && url.pathname === "/credential") {
+      return json(host.credentialFor(asString(url.searchParams.get("credentialId"), "credentialId")));
+    }
+    if (request.method === "POST" && url.pathname === "/credential-counter") {
+      const body = await readBody(request);
+      return json(host.updateCredentialCounter(
+        asString(body["credentialId"], "credentialId"),
+        asWholeNumber(body["signCount"], "signCount"),
       ));
     }
 

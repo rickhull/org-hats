@@ -104,6 +104,7 @@ export const organizationTables: readonly TableSpec[] = [
   { name: "audit", columns: ["seq", "at", "actor", "fact"], orderBy: "seq" },
   { name: "claims", columns: ["idempotency_key", "payload", "created_at"], orderBy: "idempotency_key" },
   { name: "outbox", columns: ["id", "kind", "target", "payload", "created_at", "delivered_at"], orderBy: "id" },
+  { name: "credentials", columns: ["credential_id", "actor_id", "alg", "key_json", "sign_count", "backup_eligible", "backed_up", "created_at", "updated_at"], orderBy: "credential_id" },
 ];
 
 /** The operation's own facts. The `org_actors` projection is deliberately

@@ -32,6 +32,7 @@ describe("the schema migration chain", () => {
     expect(organizationMigrations.map(({ version, name }) => [version, name])).toEqual([
       ["2", "activation-requests"],
       ["3", "display-short-name"],
+      ["4", "credentials"],
     ]);
     expect(operationMigrations.map(({ version, name }) => [version, name])).toEqual([
       ["3", "refresh-authentication-facts"],

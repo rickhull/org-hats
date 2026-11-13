@@ -55,7 +55,15 @@ declines to implement.
 **Evidence:** `packages/cloudflare/test/webauthn-decode.test.ts`, red
 where behavior must exist, green with the vectors.
 
-## Phase 2 — org-side credential storage
+## Phase 2 — org-side credential storage — DONE
+
+Landed: schema v4 `credentials` table (organization chain), carried by
+export/restore (a pre-credentials snapshot restores with none, and every
+shipped schema stays restorable), internal DO routes for store/read/
+counter, `unlink-principal` removing credentials with the links (the
+identity reset), and the wipe drill proving operation delete +
+forget-operation leave credentials intact. The schema-parity guard's
+expected counts moved with the table.
 
 A `credentials` table in the organization coordinator (credential id,
 COSE public key, sign count, backup-eligibility flags read opaquely,
