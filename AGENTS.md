@@ -112,6 +112,25 @@ both notes are publishable: `notes/` is gitignored, but a gitignore is one
 `git add -f` from not applying.  No customer names, roster material, secrets,
 or key material.
 
+## Other notes relays
+
+Writer-owned outboxes are the shape for any peer, not a Quartermaster
+special case.  agent-skills keeps `notes/to-quartermaster.md` and
+`notes/to-thinkpad.md` in its own checkout; thinkpad keeps
+`notes/to-agent-skills.md` in its own; this repository now keeps
+`notes/to-agent-skills.md` for the pack-wiring and tooling conversation.
+A note addressed to this repository lives at
+`<peer checkout>/notes/to-org-hats.md`; none exists in agent-skills or
+thinkpad today.
+
+The relays open from here today are with Quartermaster and agent-skills.
+The entry format, atomic prepend, read-before-write, line cap, and
+publishability rules above apply unchanged to every `to-*` outbox.  Read
+the peer's note to us at the start of a turn that touches that peer, and
+never write in the peer's repository.  Opening a relay with a new peer
+means naming it here and in the note that opens it; do not reuse the
+Quartermaster paths for a different peer.
+
 ## The agent mesh
 
 The local Pi mesh is an interrupt channel, not a second relay.  Follow
@@ -169,6 +188,11 @@ run ends with a short self-evaluation of whether the skill earned its keep.
 - CI still uses the workflow's pinned pnpm and Node; the flake is the local
   development shell, not a second release path.  `flake.lock` is tracked and
   updated deliberately with the change that needs it.
+- Modern Web Guidance runs from the project root as
+  `env DISABLE_TELEMETRY=1 pnpm exec modern-web-guidance <search|retrieve>`;
+  its runtime is the exact-pinned `modern-web-guidance` dev dependency.  Never
+  use `npx`, `pnpx`, `@latest`, or a global executable, and keep search terms
+  generic — no customer data, secrets, or prompt excerpts.
 - Use `rg`, not `grep`.
 - Keep the flake minimal.  A routine tool belongs in the thinkpad devbox or
   the project flake when contributors need it; an occasional tool comes from
@@ -277,8 +301,9 @@ forward-looking plans in `plans/`.
 shared agent-skills library at `~/.agents/packs`; `.agents/skills` holds
 generated per-skill symlinks that are gitignored, and `.envrc` runs
 `bin/wire-skills` on shell entry.  The packs are `cloudflare` and
-`typescript`, named in `bin/wire-skills` and `.pi/settings.json`, which are
-changed together.  `.claude/skills` is a tracked symlink to `.agents/skills`.
+`typescript`, plus `design/modern-web-guidance` selected singly; they are
+named in `bin/wire-skills` and `.pi/settings.json`, which are changed
+together.  `.claude/skills` is a tracked symlink to `.agents/skills`.
 Links are per skill and never per pack: Claude Code does not recurse a linked
 pack directory, so a pack-level link offers nothing, while Codex recurses and
 pi reads the pack paths from settings.  A skill worth writing goes to the

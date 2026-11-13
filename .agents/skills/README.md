@@ -9,12 +9,14 @@ README.  Readers ignore root `.md` files, so the README is not a skill.
 bin/wire-skills        # generate the links; run by .envrc on shell entry
 ```
 
-## The packs
+## The selection
 
 `cloudflare` and `typescript`, per the shared library's repo-to-pack mapping —
 12 and 5 skills, with no name collision between them or with the library's
-core skills.  Change the set in `bin/wire-skills` and `.pi/settings.json`
-together; they are the two places this repository names its packs.
+core skills.  One skill is selected singly: `design/modern-web-guidance`, for
+the browser playground, without taking the rest of the `design` pack.  Change
+the selection in `bin/wire-skills` and `.pi/settings.json` together; they are
+the two places this repository names what it wires.
 
 ## Why links, and why one per skill
 
@@ -46,10 +48,10 @@ None.  A skill this repository would own belongs in the shared library, where
 every harness discovers it globally and every repository can use it.  A local
 skill tree is a second copy with no drift check.
 
-The `design` pack (including `modern-web-guidance`) is **not** wired: the
-shared library's mapping names only `cloudflare` and `typescript` for this
-repository, and the playground's browser code is illustrative rather than a
-supported frontend surface.  Adding it is a deliberate change to
-`bin/wire-skills`, `.pi/settings.json`, and the mapping — and
-`modern-web-guidance` additionally requires a project-local, exact-pinned
-`modern-web-guidance` dependency, which this repository does not declare.
+Modern Web Guidance is the one skill taken from outside the mapped packs.  It
+is wired from `design/modern-web-guidance` alone, not the whole `design` pack,
+because only that guidance applies here.  Its runtime is the project-local,
+exact-pinned `modern-web-guidance` dev dependency; invoke it from the project
+root as `env DISABLE_TELEMETRY=1 pnpm exec modern-web-guidance <command>`.
+Never use `npx`, `pnpx`, `@latest`, or a global executable, and never point an
+upstream installer at `~/.agents` or this link tree.

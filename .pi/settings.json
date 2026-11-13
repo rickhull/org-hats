@@ -1,6 +1,7 @@
 {
   "skills": [
     "~/.agents/packs/cloudflare",
-    "~/.agents/packs/typescript"
+    "~/.agents/packs/typescript",
+    "~/.agents/packs/design/modern-web-guidance"
   ]
 }

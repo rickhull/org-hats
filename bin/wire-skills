@@ -22,6 +22,10 @@ cd "$(dirname "$0")/.." || exit 2
 
 # This repository's packs, per the shared library's repo-to-pack mapping.
 readonly PACKS=(cloudflare typescript)
+# Individual skills selected from a pack this repository does not take whole.
+# `design` is not in the mapping; only Modern Web Guidance is used here, and
+# the skill's own setup note permits selecting its directory alone.
+readonly SKILLS=(design/modern-web-guidance)
 readonly ROOT="${AGENT_PACKS_ROOT:-$HOME/.agents/packs}"
 readonly DEST=.agents/skills
 
@@ -30,6 +34,9 @@ note() { printf 'skills: %s\n' "$1"; }
 missing=0
 for pack in "${PACKS[@]}"; do
   [[ -d "$ROOT/$pack" ]] || { note "MISSING pack '$pack' is not at $ROOT/$pack"; missing=1; }
+done
+for skill in "${SKILLS[@]}"; do
+  [[ -d "$ROOT/$skill" ]] || { note "MISSING skill '$skill' is not at $ROOT/$skill"; missing=1; }
 done
 if (( missing )); then
   note "the shared agent-skills library is not installed on this machine"
@@ -62,5 +69,15 @@ for pack in "${PACKS[@]}"; do
     linked=$((linked + 1))
   done
 done
+for skill in "${SKILLS[@]}"; do
+  name=$(basename "$skill")
+  target=$DEST/$name
+  if [[ -e $target && ! -L $target ]]; then
+    note "REFUSED $name exists as a real path; a skill must not overwrite tracked content"
+    exit 1
+  fi
+  ln -sfn -- "$ROOT/$skill" "$target" || exit 1
+  linked=$((linked + 1))
+done
 
-note "linked $linked skills from: ${PACKS[*]}"
+note "linked $linked skills from: ${PACKS[*]}, ${SKILLS[*]}"

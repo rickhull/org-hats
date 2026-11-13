@@ -11,6 +11,9 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.19.2
+      modern-web-guidance:
+        specifier: 1.0.0
+        version: 1.0.0
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
@@ -701,6 +704,11 @@ packages:
     resolution: {integrity: sha512-31uZmP8PGue7S3fYMIRXNXxFGh5/SEmd4OGna/80RXcE1nngVub21h9GbcWajQ7625mEYBnexpI2ogGo9NUa6Q==}
     engines: {node: '>=22.0.0'}
 
+  modern-web-guidance@1.0.0:
+    resolution: {integrity: sha512-vafIZwC8AS6QjM2yyoflZbnc7n3/TVOMLbEMRdPTwcFy0f9/Tq8s5rJQ8UIqRt2KPl9ixravyaMR4nTGuUrcmg==}
+    engines: {node: '>=22.0.0', vscode: ^1.90.0}
+    hasBin: true
+
   nanoid@3.3.20:
     resolution: {integrity: sha512-uKdg2G3GNCKQn9byYOpxbGqrT2fGO5KRt5J/8b3pok8rT6qxGWF6hxMyJiEYtAf+FVyYuD9hRaDqX5uPFYJ4ZQ==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
@@ -1389,6 +1397,8 @@ snapshots:
       - '@types/node'
       - bufferutil
       - utf-8-validate
+
+  modern-web-guidance@1.0.0: {}
 
   nanoid@3.3.20: {}
 
