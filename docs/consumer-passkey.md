@@ -66,7 +66,10 @@ or supplies that id. It returns options that are already
 
 `rp.id` is the relying-party id the host serves (the zone apex by
 contract), `residentKey` is `"required"` so the credential is discoverable,
-`attestation` is `"none"`, and the only offered algorithm is ES256.
+`attestation` is `"none"`, and the only offered algorithm is ES256, stated
+in the browser's COSE form as `{ type: "public-key", alg: -7 }`. The entry
+is browser-shaped, not a JOSE name: a JOSE `"ES256"` is refused by
+`navigator.credentials.create` before the ceremony starts.
 
 ```js
 const options = await runtime.webauthnRegistrationOptions({

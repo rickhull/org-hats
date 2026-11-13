@@ -250,7 +250,9 @@ stores only the digest.
   page cannot satisfy a later registration. `rp.id` is the relying-party id
   the host serves and is minted into the options; `residentKey: "required"`
   makes the credential discoverable, `attestation: "none"` states that no
-  attestation is requested, and the only offered algorithm is ES256.
+  attestation is requested, and the only offered algorithm is ES256, in the
+  browser's COSE form `{ type: "public-key", alg: -7 }` rather than as a
+  JOSE name.
 - `credentialFromRegistration({ interfaceVersion, secret, rpId,
   expectedOrigin, credential: { response: { attestationObject,
   clientDataJSON } } })` resolves the same organization from the secret,

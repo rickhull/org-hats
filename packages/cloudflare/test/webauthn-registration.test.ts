@@ -159,7 +159,9 @@ describe("registration through the claim", () => {
     if (!first.ok) return;
     expect(first.user.id).toBe(CREW);
     expect(first.challenge.length).toBeGreaterThan(20);
-    expect(first.pubKeyCredParams).toEqual([{ alg: "ES256" }]);
+    // browser-shaped: a JOSE name is not a PublicKeyCredentialParameters
+    // entry, and the browser refuses one before the ceremony starts
+    expect(first.pubKeyCredParams).toEqual([{ type: "public-key", alg: -7 }]);
     expect(first.rp.id).toBe(RP_ID);
     expect(first.authenticatorSelection).toEqual({
       residentKey: "required",

@@ -51,7 +51,13 @@ export type WebauthnRegistrationOptionsResult =
     /** The zone-apex relying party, stated to the browser. */
     readonly rp: { readonly id: string; readonly name: string };
     readonly user: { readonly id: string; readonly name: string; readonly displayName?: string };
-    readonly pubKeyCredParams: readonly { readonly alg: "ES256" }[];
+    /** Browser-shaped: the COSE algorithm identifier and its credential
+     * type, not a JOSE name. `navigator.credentials.create` refuses a
+     * JOSE-shaped entry before the ceremony starts. */
+    readonly pubKeyCredParams: readonly {
+      readonly type: "public-key";
+      readonly alg: -7;
+    }[];
     /** Discoverable credentials are required: login is usernameless, so the
      * authenticator must hold the user handle itself. */
     readonly authenticatorSelection: {
@@ -236,7 +242,7 @@ export const webauthnRegistrationOptions = async (
       name: body.value.actorId,
       ...(body.value.displayName !== undefined ? { displayName: body.value.displayName } : {}),
     },
-    pubKeyCredParams: [{ alg: "ES256" }],
+    pubKeyCredParams: [{ type: "public-key", alg: -7 }],
     authenticatorSelection: {
       residentKey: "required",
       requireResidentKey: true,
