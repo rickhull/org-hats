@@ -26,7 +26,7 @@ readonly PACKS=(cloudflare typescript)
 # `design` is not in the mapping; only Modern Web Guidance is used here, and
 # the skill's own setup note permits selecting its directory alone.
 readonly SKILLS=(design/modern-web-guidance)
-readonly ROOT="${AGENT_PACKS_ROOT:-$HOME/.agents/packs}"
+readonly ROOT="$HOME/.agents/packs"
 readonly DEST=.agents/skills
 
 note() { printf 'skills: %s\n' "$1"; }
@@ -40,7 +40,7 @@ for skill in "${SKILLS[@]}"; do
 done
 if (( missing )); then
   note "the shared agent-skills library is not installed on this machine"
-  note "install it, or set AGENT_PACKS_ROOT, then re-run bin/wire-skills"
+  note "install it, then re-run bin/wire-skills"
   note "no skill is linked, so every harness here will offer none"
   exit 1
 fi
