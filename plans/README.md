@@ -9,10 +9,11 @@ a miscellaneous file, or keep a plan alive to justify work.
 
 ## The plans
 
-The local-credentials (passkey) work is phased and ready to start: the
-decisions, guardrails, five phases, and the dependency-revisit gate are in
-[`local_credentials.md`](local_credentials.md). Phase 1 (the CBOR/WebAuthn
-decoding layer, vectors first) is the concrete next action.
+The local-credentials (passkey) work is retired: all five phases landed,
+with enrollment through the activation claim and usernameless assertion
+login published in `cloudflare-v0.19.0`. The durable design decisions are
+in [`docs/authority_redesign.md`](../docs/authority_redesign.md) and the
+surface in [`docs/cloudflare.md`](../docs/cloudflare.md).
 
 The type-safety plan is retired: all four slices landed with red-first
 regressions (claims shape gate, world/snapshot ownership, outbox union,

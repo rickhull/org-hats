@@ -2,7 +2,7 @@
 // and attestation parsing, and COSE-key mapping, built as an untrusted-
 // input boundary with the envelope gate's discipline — size- and
 // depth-bounded, unknown constructs refused rather than skipped, every
-// refusal a value (plans/local_credentials.md phase 1).
+// refusal a value (docs/authority_redesign.md § Local credentials).
 //
 // Nothing here is crypto: signature verification stays in crypto.subtle,
 // fed by the key material this layer extracts.

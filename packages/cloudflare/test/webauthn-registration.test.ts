@@ -1,4 +1,4 @@
-// Registration through the claim (plans/local_credentials.md phase 3): the
+// Registration through the claim (docs/cloudflare.md § Local credentials): the
 // host mints ceremony options against an activation request, then presents
 // the browser's registration response; the runtime verifies the ceremony,
 // stores the credential, and binds the principal link atomically with the

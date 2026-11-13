@@ -373,6 +373,13 @@ A local credential is a principal link like any other —
   path, format, or authenticator model is demanded. A device-fleet policy
   is a deployment concern that returns only with a concrete consumer
   need.
+- **No runtime dependency, and the library door stays ajar.** The CBOR
+  subset, authenticator-data parsing, DER signature conversion, and COSE
+  key mapping are written here, with every cryptographic operation left to
+  `crypto.subtle`; a malformed or unimplemented construct is refused by
+  name, never skipped. Taking `@simplewebauthn/server` remains an additive
+  option — same routes, same storage — with one trigger: a pilot interop
+  failure that cannot be reproduced and fixed in a single work session.
 
 Authentication facts travel without interpretation. Evidence may state how
 and when the principal authenticated — `amr` method references (RFC 8176)

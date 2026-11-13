@@ -1,4 +1,4 @@
-// Org-side credential storage (plans/local_credentials.md phase 2): a
+// Org-side credential storage (docs/cloudflare.md § Local credentials): a
 // `credentials` table beside the principal links, carried by export and
 // restore, removed by the identity-reset unlink, and untouched by the
 // operation-scoped wipe verbs. Internal DO routes only — no public surface

@@ -1,4 +1,4 @@
-// Assertion login (plans/local_credentials.md phase 4): the host mints a
+// Assertion login (docs/cloudflare.md § Local credentials (passkeys)): the host mints a
 // single-use ceremony challenge bound to its origin and relying-party id,
 // the browser signs it with the stored passkey, and the runtime verifies the
 // assertion, enforces the sign-counter rule, and issues through the same
